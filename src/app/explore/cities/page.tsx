@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { CitiesListView } from '@/components/cities/CitiesListView';
 import Link from 'next/link';
 import { StarIcon } from '@heroicons/react/24/solid';
+import CitiesListClient from './CitiesListClient';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -15,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
     .select('*', { count: 'exact', head: true });
   
   const cityCount = count || 0;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
     title: `Minnesota Cities Directory | Complete List of All Cities in MN | MNUDA`,
@@ -28,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: 'MNUDA',
       images: [
         {
-          url: '/MN.png',
+          url: '/logo.png',
           width: 1200,
           height: 630,
           type: 'image/png',
@@ -42,7 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
       description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location.`,
-      images: ['/MN.png'],
+      images: ['/logo.png'],
     },
     alternates: {
       canonical: `${baseUrl}/explore/cities`,
@@ -73,7 +74,7 @@ function generateStructuredData(cities: Array<{ id: string; name: string; slug: 
     '@type': 'CollectionPage',
     name: 'Minnesota Cities Directory',
     description: `Complete directory of all ${cities.length} cities in Minnesota with population data and city profiles.`,
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore/cities`,
+    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/cities`,
     mainEntity: {
       '@type': 'ItemList',
       numberOfItems: cities.length,
@@ -83,7 +84,7 @@ function generateStructuredData(cities: Array<{ id: string; name: string; slug: 
         item: {
           '@type': 'City',
           name: city.name,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore/city/${city.slug}`,
+          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/city/${city.slug}`,
           population: city.population,
           containedInPlace: city.county ? {
             '@type': 'County',
@@ -114,19 +115,19 @@ function generateBreadcrumbStructuredData() {
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/`,
       },
       {
         '@type': 'ListItem',
         position: 2,
         name: 'Explore',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore`,
       },
       {
         '@type': 'ListItem',
         position: 3,
         name: 'Cities',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore/cities`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/cities`,
       },
     ],
   };
@@ -153,6 +154,7 @@ export default async function CitiesListPage() {
 
   return (
     <>
+      <CitiesListClient />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

@@ -1,81 +1,93 @@
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
-import SimplePageLayout from '@/components/SimplePageLayout';
-import { getServerAuth } from '@/lib/authServer';
+import { createServerClient } from '@/lib/supabaseServer';
+import FeedMapClient from '@/components/feed/FeedMapClient';
+import { cache } from 'react';
+
+// Configure route segment for optimal caching
+export const dynamic = 'force-dynamic'; // Feed content changes frequently
+export const revalidate = 60; // Revalidate cities/counties every 60 seconds
+
+function formatNumber(num: number): string {
+  return num.toLocaleString('en-US');
+}
+
+function formatArea(area: number): string {
+  return `${formatNumber(area)} sq mi`;
+}
+
+// Cache cities and counties data - these change infrequently
+const getCitiesData = cache(async () => {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('cities')
+    .select('id, name, slug, population, county')
+    .order('population', { ascending: false });
+  
+  if (error) {
+    console.error('Error fetching cities:', error);
+  }
+  
+  return data || [];
+});
+
+const getCountiesData = cache(async () => {
+  const supabase = createServerClient();
+  const { data, error } = await supabase
+    .from('counties')
+    .select('id, name, slug, population, area_sq_mi')
+    .order('name', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching counties:', error);
+  }
+  
+  return data || [];
+});
 
 export default async function Home() {
-  // Server-side auth check - redirect if logged in
-  const auth = await getServerAuth();
-  if (auth) {
-    redirect('/feed');
-  }
+  // Fetch cities and counties in parallel with caching
+  const [citiesData, countiesData] = await Promise.all([
+    getCitiesData(),
+    getCountiesData(),
+  ]);
+
+  type CityData = {
+    id: number;
+    name: string;
+    slug: string | null;
+    population: number;
+    county: string | null;
+  };
+
+  type CountyData = {
+    id: number;
+    name: string;
+    slug: string | null;
+    population: number;
+    area_sq_mi: number | null;
+  };
+
+  const cities = (citiesData as CityData[])
+    .filter((city): city is CityData & { slug: string } => !!city.slug)
+    .map(city => ({
+      id: String(city.id),
+      name: city.name,
+      slug: city.slug,
+      population: formatNumber(city.population),
+      county: city.county ?? '',
+    }));
+
+  const counties = (countiesData as CountyData[])
+    .filter((county): county is CountyData & { slug: string } => !!county.slug)
+    .map(county => ({
+      id: String(county.id),
+      name: county.name,
+      slug: county.slug,
+      population: formatNumber(county.population),
+      area: formatArea(county.area_sq_mi ?? 0),
+    }));
 
   return (
-    <SimplePageLayout contentPadding="px-0" footerVariant="light">
-      <div>
-        {/* Hero Section */}
-        <section className="bg-[#f4f2ef] py-3 w-screen relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw]">
-          <div className="w-full px-[10px]">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-center max-w-7xl mx-auto">
-              {/* Left Side - Sign-in Content */}
-              <div className="space-y-3">
-                {/* Minnesota Badge */}
-                <div>
-                  <span className="inline-block px-[10px] py-[10px] bg-gray-700 text-white text-xs font-medium rounded-md tracking-wide uppercase">
-                    Minnesota Only
-                  </span>
-                </div>
-                
-                {/* Headline */}
-                <h1 className="text-sm font-semibold text-gray-900 leading-tight tracking-tight">
-                  Discover new opportunities
-                </h1>
-                
-                {/* CTA Buttons */}
-                <div className="space-y-3">
-                  <Link
-                    href="/login"
-                    className="block w-full px-[10px] py-[10px] bg-transparent border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-md transition-colors text-center"
-                  >
-                    Sign in with email
-                  </Link>
-                </div>
-
-                {/* Legal Text */}
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  By continuing, you agree to MNUDA&apos;s{' '}
-                  <Link href="/legal/user-agreement" className="text-gray-600 hover:text-gray-900 underline">User Agreement</Link>,{' '}
-                  <Link href="/legal/privacy-policy" className="text-gray-600 hover:text-gray-900 underline">Privacy Policy</Link>, and{' '}
-                  <Link href="/legal/community-guidelines" className="text-gray-600 hover:text-gray-900 underline">Community Guidelines</Link>.
-                </p>
-
-                {/* Join Prompt */}
-                <p className="text-xs text-gray-600">
-                  New to MNUDA?{' '}
-                  <Link href="/login" className="text-gray-900 font-medium hover:underline">
-                    Join now
-                  </Link>
-                </p>
-              </div>
-
-              {/* Right Side - Illustration */}
-              <div className="hidden lg:block">
-                <div className="w-full h-[480px] relative rounded-md overflow-hidden bg-white/50">
-                  <Image
-                    src="/guy-on-computer.png"
-                    alt="Person working at computer"
-                    fill
-                    className="object-contain"
-                    priority
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </SimplePageLayout>
+    <FeedMapClient cities={cities} counties={counties} />
   );
 }
 

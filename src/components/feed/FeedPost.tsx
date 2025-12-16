@@ -122,20 +122,10 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
   const hasMap = useMemo(() => !!(post.map_geometry || post.map_data || post.map_screenshot), [post.map_geometry, post.map_data, post.map_screenshot]);
   const showMediaLink = useMemo(() => validMedia.length > 0 && hasMap, [validMedia.length, hasMap]);
   const postUrl = useMemo(() => getPostUrl({ id: post.id, slug: undefined }), [post.id]);
-  // Profile URL - use profile username or account username if available
+  // Profile URL - profiles removed, use account settings instead
   const profileUrl = useMemo(() => {
-    const profiles = (post as { profiles?: { username?: string } | null }).profiles;
-    if (profiles?.username) {
-      return getProfileUrl(profiles.username);
-    }
-    // Check if account has username (accounts should have usernames after onboarding)
-    const accountWithUsername = account as { username?: string | null } | null;
-    if (accountWithUsername?.username) {
-      return getProfileUrl(accountWithUsername.username);
-    }
-    // No username available - return non-clickable fallback
     return '#';
-  }, [(post as { profiles?: { username?: string } | null }).profiles?.username, (account as { username?: string | null } | null)?.username]);
+  }, []);
   const locationText = useMemo(() => {
     // If hidePin is true, only show city
     if (post.map_hide_pin) {
@@ -169,12 +159,7 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2 flex-1 min-w-0">
             {/* Profile Photo - Show account image */}
-            <Link 
-              href={profileUrl} 
-              className="flex-shrink-0"
-              onClick={(e) => e.stopPropagation()}
-              aria-label={`View ${displayName}'s profile`}
-            >
+            <div className="flex-shrink-0">
               <ProfilePhoto
                 account={account ? {
                   id: account.id,
@@ -184,18 +169,14 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
                 } : null}
                 size="sm"
               />
-            </Link>
+            </div>
 
             {/* Profile Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-1.5 flex-wrap">
-                <Link 
-                  href={profileUrl} 
-                  className="block"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <div className="block">
                   <div className="flex items-center gap-1.5">
-                    <h3 className="font-medium text-gray-900 hover:text-gray-700 hover:underline inline text-xs">
+                    <h3 className="font-medium text-gray-900 inline text-xs">
                       {displayName}
                     </h3>
                     {account?.plan === 'pro' && (
@@ -204,7 +185,7 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
                       </span>
                     )}
                   </div>
-                </Link>
+                </div>
               </div>
 
               {/* Metadata */}

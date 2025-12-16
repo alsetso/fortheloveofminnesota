@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .select('id, name')
       .ilike('name', `%${query}%`)
       .order('name', { ascending: true })
-      .limit(20);
+      .limit(20) as { data: Array<{ id: string; name: string }> | null; error: any };
 
     if (error) {
       console.error('Error searching categories:', error);

@@ -105,3 +105,5 @@ COMMENT ON COLUMN public.posts.type IS
 -- These will fail silently if tables don't exist, which is fine
 
 
+
+

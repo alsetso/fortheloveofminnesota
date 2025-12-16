@@ -27,6 +27,10 @@ interface SimplePageLayoutProps {
    */
   hideFooter?: boolean;
   /**
+   * Hide the navigation bar (useful for full-screen pages like maps)
+   */
+  hideNav?: boolean;
+  /**
    * Optional toolbar component to render below SimpleNav
    */
   toolbar?: React.ReactNode;
@@ -49,6 +53,7 @@ export default function SimplePageLayout({
   contentPadding = 'px-[10px] py-3',
   footerVariant = 'light',
   hideFooter = false,
+  hideNav = false,
   toolbar,
 }: SimplePageLayoutProps) {
   const maxWidthClass = {
@@ -64,7 +69,7 @@ export default function SimplePageLayout({
   return (
     <div className={`flex flex-col min-h-screen ${backgroundColor}`}>
       {/* Navigation */}
-      <SimpleNav />
+      {!hideNav && <SimpleNav />}
 
       {/* Toolbar */}
       {toolbar}

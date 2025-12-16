@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GeocodingService, AddressSuggestion } from '@/features/map/services/geocodingService';
+import { GeocodingService, AddressSuggestion } from '@/features/_archive/map/services/geocodingService';
 
 interface AddressAutocompleteProps {
   value: string;

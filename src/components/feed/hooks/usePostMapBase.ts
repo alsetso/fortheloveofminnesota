@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/map/config';
+import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/_archive/map/config';
 import type { MapboxFeature, MapboxSuggestion } from '@/types/mapbox-events';
 
 export interface UsePostMapBaseReturn {

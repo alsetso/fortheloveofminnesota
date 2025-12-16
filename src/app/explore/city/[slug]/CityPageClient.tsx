@@ -8,12 +8,9 @@ interface CityPageClientProps {
 }
 
 export default function CityPageClient({ cityId, citySlug }: CityPageClientProps) {
-  usePageView({
-    entity_type: 'city',
-    entity_id: cityId,
-    enabled: true,
-  });
-
+  // Track page view
+  usePageView();
+  
   return null;
 }
 

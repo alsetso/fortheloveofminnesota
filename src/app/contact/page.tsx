@@ -1,34 +1,35 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/SimplePageLayout';
 import { EnvelopeIcon } from '@heroicons/react/24/outline';
+import ContactPageClient from './ContactPageClient';
 
 export const metadata: Metadata = {
-  title: 'Contact Us | MNUDA - Minnesota Real Estate Platform',
-  description: 'Get in touch with MNUDA for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities. Contact our team at support@mnuda.com.',
+  title: 'Contact Us | For the Love of Minnesota',
+  description: 'Get in touch with For the Love of Minnesota for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities. Contact our team at hi@fortheloveofminnesota.com.',
   keywords: [
-    'MNUDA contact',
+    'For the Love of Minnesota contact',
     'Minnesota real estate support',
-    'contact MNUDA',
-    'MNUDA customer service',
+    'contact For the Love of Minnesota',
+    'Minnesota real estate customer service',
     'Minnesota real estate questions',
     'property development support',
     'real estate platform contact',
     'Minnesota real estate help',
-    'MNUDA support email',
+    'Minnesota support email',
     'Minnesota property acquisition support'
   ],
   openGraph: {
-    title: 'Contact Us | MNUDA - Minnesota Real Estate Platform',
-    description: 'Get in touch with MNUDA for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities.',
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/contact`,
-    siteName: 'MNUDA',
+    title: 'Contact Us | For the Love of Minnesota',
+    description: 'Get in touch with For the Love of Minnesota for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities.',
+    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/contact`,
+    siteName: 'For the Love of Minnesota',
     images: [
       {
-        url: '/MN.png',
+        url: '/logo.png',
         width: 1200,
         height: 630,
         type: 'image/png',
-        alt: 'MNUDA - Minnesota Real Estate Platform',
+        alt: 'For the Love of Minnesota',
       },
     ],
     locale: 'en_US',
@@ -36,8 +37,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'Contact Us | MNUDA - Minnesota Real Estate Platform',
-    description: 'Get in touch with MNUDA for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities.',
+    title: 'Contact Us | For the Love of Minnesota',
+    description: 'Get in touch with For the Love of Minnesota for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities.',
   },
   robots: {
     index: true,
@@ -51,7 +52,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/contact`,
+    canonical: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/contact`,
   },
 };
 
@@ -63,7 +64,7 @@ export default function ContactPage() {
         <div className="space-y-1.5">
           <h1 className="text-sm font-semibold text-gray-900">Contact Us</h1>
           <p className="text-xs text-gray-600 leading-relaxed">
-            We&apos;re here to help with questions about MNUDA, Minnesota real estate development, property acquisition, platform features, or any other inquiries.
+            We&apos;re here to help with questions about For the Love of Minnesota, Minnesota real estate development, property acquisition, platform features, or any other inquiries.
           </p>
         </div>
 
@@ -82,10 +83,10 @@ export default function ContactPage() {
             <div className="flex-1 space-y-0.5">
               <p className="text-xs font-medium text-gray-900">Email Support</p>
               <a
-                href="mailto:support@mnuda.com"
+                href="mailto:hi@fortheloveofminnesota.com"
                 className="text-xs text-gray-600 hover:text-gray-900 transition-colors break-all"
               >
-                support@mnuda.com
+                hi@fortheloveofminnesota.com
               </a>
               <p className="text-xs text-gray-500 mt-1">
                 We typically respond within 24-48 hours during business days.
@@ -101,7 +102,7 @@ export default function ContactPage() {
             <div className="space-y-0.5">
               <p className="text-xs font-medium text-gray-900">Platform Support</p>
               <p className="text-xs text-gray-600">
-                Questions about using MNUDA, account management, features, or technical issues.
+                Questions about using For the Love of Minnesota, account management, features, or technical issues.
               </p>
             </div>
             <div className="space-y-0.5">
@@ -119,7 +120,7 @@ export default function ContactPage() {
             <div className="space-y-0.5">
               <p className="text-xs font-medium text-gray-900">General Questions</p>
               <p className="text-xs text-gray-600">
-                Any other questions about MNUDA, our services, or how we can assist with your Minnesota real estate needs.
+                Any other questions about For the Love of Minnesota, our services, or how we can assist with your Minnesota real estate needs.
               </p>
             </div>
           </div>

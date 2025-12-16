@@ -25,17 +25,16 @@ export default function AboutMnUDAModal({ isOpen, onClose }: AboutMnUDAModalProp
           className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-200 max-h-[90vh] overflow-y-auto flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
-          <ModalNav title="About MnUDA" onClose={onClose} />
+          <ModalNav title="About" onClose={onClose} />
           
           <div className="p-6 space-y-6">
             {/* Main Description */}
             <div>
               <p className="text-gray-700 leading-relaxed text-lg mb-4">
-                <strong className="text-gray-900">MnUDA</strong> is the premier platform for discovering and accessing{' '}
-                <strong className="text-gray-900">off-market real estate development and acquisition opportunities</strong> across Minnesota.
+                <strong className="text-gray-900">For the Love of Minnesota</strong> connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.
               </p>
               <p className="text-gray-600 leading-relaxed">
-                We connect developers, investors, and real estate professionals with exclusive opportunities that aren&apos;t available through traditional channels.
+                Share your Minnesota story and connect with others who love this state as much as you do.
               </p>
             </div>
 
@@ -43,12 +42,12 @@ export default function AboutMnUDAModal({ isOpen, onClose }: AboutMnUDAModalProp
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-gold-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <BuildingOfficeIcon className="w-6 h-6 text-gold-600" />
+                  <MapPinIcon className="w-6 h-6 text-gold-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Development Opportunities</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">Drop Pins</h3>
                   <p className="text-sm text-gray-600">
-                    Access exclusive off-market development projects and land acquisition opportunities.
+                    Archive special places and moments that matter to you across Minnesota.
                   </p>
                 </div>
               </div>
@@ -58,21 +57,23 @@ export default function AboutMnUDAModal({ isOpen, onClose }: AboutMnUDAModalProp
                   <MapPinIcon className="w-6 h-6 text-gold-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Minnesota Focus</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">Statewide Coverage</h3>
                   <p className="text-sm text-gray-600">
-                    Comprehensive coverage of opportunities across all Minnesota cities and counties.
+                    Connect with residents, neighbors, and professionals across all Minnesota cities and counties.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 bg-gold-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <ChartBarIcon className="w-6 h-6 text-gold-600" />
+                  <svg className="w-6 h-6 text-gold-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Market Intelligence</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">Connect</h3>
                   <p className="text-sm text-gray-600">
-                    Data-driven insights and analytics to help you make informed investment decisions.
+                    Share your Minnesota story and connect with others who love this state.
                   </p>
                 </div>
               </div>
@@ -84,9 +85,9 @@ export default function AboutMnUDAModal({ isOpen, onClose }: AboutMnUDAModalProp
                   </svg>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-1">Exclusive Access</h3>
+                  <h3 className="font-semibold text-gray-900 mb-1">Archive Memories</h3>
                   <p className="text-sm text-gray-600">
-                    Connect with property owners and developers before opportunities hit the public market.
+                    Preserve and share the special moments that make Minnesota home.
                   </p>
                 </div>
               </div>
@@ -95,7 +96,7 @@ export default function AboutMnUDAModal({ isOpen, onClose }: AboutMnUDAModalProp
             {/* Call to Action */}
             <div className="pt-4 border-t border-gray-200">
               <p className="text-sm text-gray-600">
-                Join MnUDA to start discovering exclusive real estate opportunities across Minnesota today.
+                Start archiving your special Minnesota moments today.
               </p>
             </div>
           </div>

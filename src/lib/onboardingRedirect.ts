@@ -12,11 +12,11 @@ import type { Account } from '@/features/auth/services/memberService';
 export function shouldRedirectToOnboarding(account: Account | null): string | null {
   if (!account) {
     // No account means user needs to complete onboarding
-    return '/account/onboarding';
+    return '/?modal=account&tab=onboarding';
   }
   
   if (account.onboarded === false) {
-    return '/account/onboarding';
+    return '/?modal=account&tab=onboarding';
   }
   
   return null;
@@ -37,10 +37,9 @@ export function redirectToOnboardingIfNeeded(account: Account | null): void {
  * Get redirect URL after onboarding completion
  */
 export function getPostOnboardingRedirect(account: Account | null): string {
-  if (account?.username) {
-    return `/profile/${account.username}`;
-  }
   return '/';
 }
+
+
 
 

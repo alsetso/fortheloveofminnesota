@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 export const revalidate = 86400; // Revalidate daily
 
 export async function GET() {
-  const baseUrl = 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const now = new Date().toISOString();
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -18,15 +18,7 @@ export async function GET() {
     <lastmod>${now}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>${baseUrl}/sitemap-for-sale-mn.xml</loc>
-    <lastmod>${now}</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>${baseUrl}/sitemap-for-rent-mn.xml</loc>
-    <lastmod>${now}</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>${baseUrl}/sitemap-feed.xml</loc>
+    <loc>${baseUrl}/sitemap-counties.xml</loc>
     <lastmod>${now}</lastmod>
   </sitemap>
   <sitemap>

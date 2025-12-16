@@ -21,15 +21,6 @@ export default function PagesCard({ account }: PagesCardProps) {
             </div>
             <span>Premium</span>
           </Link>
-          <Link 
-            href="/ads"
-            className="flex items-center gap-1.5 text-xs text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            <div className="w-4 h-4 bg-gray-100 rounded-md flex items-center justify-center">
-              <span className="text-[8px] font-bold text-gray-700">G</span>
-            </div>
-            <span>Advertise</span>
-          </Link>
         </div>
       </div>
     </div>

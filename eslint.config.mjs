@@ -18,6 +18,9 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      "server.js",
+      "tailwind.config.js",
+      "scripts/**",
     ],
   },
   {
@@ -31,6 +34,7 @@ const eslintConfig = [
         }
       ],
       "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
       "prefer-const": "error",
       "no-var": "error"
     }

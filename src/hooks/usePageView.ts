@@ -2,81 +2,78 @@
 
 import { useEffect, useRef } from 'react';
 
-type EntityType = 'post' | 'city' | 'county' | 'profile' | 'account' | 'business' | 'page' | 'feed' | 'map';
-
 interface UsePageViewOptions {
-  entity_type: EntityType;
-  entity_id?: string;
-  entity_slug?: string;
+  page_url?: string; // Optional - defaults to window.location.pathname
   enabled?: boolean;
 }
 
 /**
- * Hook to track page views
- * Tracks once per component mount to prevent duplicate tracking
+ * Hook to track page views using the simplified page_url system
+ * Automatically uses current page path if page_url not provided
  */
-export function usePageView({ entity_type, entity_id, entity_slug, enabled = true }: UsePageViewOptions) {
+export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {}) {
   const hasTracked = useRef(false);
 
   useEffect(() => {
     if (!enabled || hasTracked.current) return;
-    if (!entity_id && !entity_slug) {
-      // Only log in development to avoid exposing tracking data in production
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[usePageView] Skipping - no entity_id or entity_slug provided', { entity_type, entity_id, entity_slug });
-      }
+
+    // Get page URL - use provided or current pathname
+    const url = page_url || (typeof window !== 'undefined' ? window.location.pathname : '');
+    
+    if (!url || url.trim() === '') {
+      console.warn('[usePageView] Skipping - no page_url provided');
       return;
     }
 
     hasTracked.current = true;
 
-    // Track view asynchronously (don't block render)
+    // Get additional metadata
+    const referrer = typeof document !== 'undefined' ? document.referrer : null;
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+    
+    // Generate or get session ID from sessionStorage
+    let sessionId: string | null = null;
+    if (typeof window !== 'undefined') {
+      sessionId = sessionStorage.getItem('analytics_session_id');
+      if (!sessionId) {
+        sessionId = crypto.randomUUID();
+        sessionStorage.setItem('analytics_session_id', sessionId);
+      }
+    }
+
     const payload = {
-      entity_type,
-      entity_id: entity_id || null,
-      entity_slug: entity_slug || null,
+      page_url: url,
+      referrer_url: referrer || null,
+      user_agent: userAgent || null,
+      session_id: sessionId,
     };
     
-    // Only log in development to avoid exposing tracking data in production
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[usePageView] Tracking page view:', payload);
-    }
-    
-    fetch('/api/analytics/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          let errorMessage = `HTTP ${response.status}`;
-          try {
-            const error = await response.json();
-            errorMessage = error.error || error.message || errorMessage;
-          } catch {
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-        const data = await response.json();
-        // Only log in development
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[usePageView] Tracked successfully:', { 
-            entity_type, 
-            entity_id: entity_id || 'none',
-            entity_slug: entity_slug || 'none',
-            response: data 
-          });
-        }
-        return data;
+    // Use requestIdleCallback if available, otherwise setTimeout
+    const trackView = () => {
+      fetch('/api/analytics/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true, // Allows request to complete even if page unloads
       })
-      .catch((error) => {
-        // Silently fail - don't break the page
-        // Only log in development to avoid exposing tracking data
-        if (process.env.NODE_ENV === 'development') {
+        .then(async (response) => {
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error || error.message || `HTTP ${response.status}`);
+          }
+          return response.json();
+        })
+        .catch((error) => {
+          // Silently fail - don't break the page
           console.error('[usePageView] Failed to track:', error.message || error, payload);
-        }
-      });
-  }, [entity_type, entity_id, entity_slug, enabled]);
-}
+        });
+    };
 
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(trackView, { timeout: 2000 });
+    } else {
+      // Fallback: delay by 1 second
+      setTimeout(trackView, 1000);
+    }
+  }, [page_url, enabled]);
+}

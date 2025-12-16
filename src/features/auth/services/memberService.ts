@@ -23,7 +23,7 @@ export type BillingMode = 'standard' | 'trial';
 
 export interface Account {
   id: string;
-  user_id: string;
+  user_id: string | null; // Null for guest accounts
   username: string | null;
   first_name: string | null;
   last_name: string | null;
@@ -45,6 +45,7 @@ export interface Account {
   created_at: string;
   updated_at: string;
   last_visit: string | null;
+  guest_id?: string | null; // For guest accounts
 }
 
 export interface UpdateAccountData {
@@ -236,10 +237,18 @@ export class AccountService {
    */
   static getDisplayName(account: Account | null): string {
     if (!account) return 'Account';
+    
+    // For guest accounts, prefer first_name
+    if (account.user_id === null && account.guest_id) {
+      return account.first_name || 'Guest';
+    }
+    
+    // For authenticated users
     if (account.first_name || account.last_name) {
       return `${account.first_name || ''} ${account.last_name || ''}`.trim();
     }
-    return 'User';
+    
+    return account.username || 'User';
   }
 }
 

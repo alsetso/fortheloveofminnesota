@@ -60,7 +60,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     meta_description: string | null;
   };
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const url = `${baseUrl}/explore/county/${slug}`;
   const title = countyMeta.meta_title || `${countyMeta.name}, Minnesota | County Information`;
   const description = countyMeta.meta_description || `${countyMeta.name}, Minnesota. Population: ${countyMeta.population.toLocaleString()}, Area: ${countyMeta.area_sq_mi.toLocaleString()} sq mi. Information about ${countyMeta.name} County including cities, demographics, and resources.`;

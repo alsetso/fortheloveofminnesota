@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 export const revalidate = 86400; // Revalidate daily
 
 export async function GET() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const now = new Date().toISOString();
 
   // Static pages with their priorities and change frequencies
@@ -18,14 +18,8 @@ export async function GET() {
     { path: '/contact', priority: '0.8', changefreq: 'monthly' },
     { path: '/map', priority: '0.9', changefreq: 'weekly' },
     { path: '/explore', priority: '0.9', changefreq: 'weekly' },
-    { path: '/feed', priority: '0.9', changefreq: 'daily' },
-    { path: '/business', priority: '0.8', changefreq: 'monthly' },
-    { path: '/business/directory', priority: '0.9', changefreq: 'weekly' },
-    { path: '/legal', priority: '0.6', changefreq: 'yearly' },
-    { path: '/legal/terms-of-service', priority: '0.6', changefreq: 'yearly' },
-    { path: '/legal/privacy-policy', priority: '0.6', changefreq: 'yearly' },
-    { path: '/legal/user-agreement', priority: '0.6', changefreq: 'yearly' },
-    { path: '/legal/community-guidelines', priority: '0.6', changefreq: 'yearly' },
+    { path: '/explore/cities', priority: '0.8', changefreq: 'weekly' },
+    { path: '/explore/counties', priority: '0.8', changefreq: 'weekly' },
   ];
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -45,4 +39,6 @@ ${staticPages.map((page) => `  <url>
     },
   });
 }
+
+
 

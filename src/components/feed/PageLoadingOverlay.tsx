@@ -22,7 +22,7 @@ interface PageLoadingOverlayProps {
 
 // Default pages that benefit from loading overlay
 const DEFAULT_ENABLED_PAGES = [
-  '/feed',
+  '/',
   '/map',
   '/account/analytics',
   '/profile',
@@ -88,8 +88,8 @@ export default function PageLoadingOverlay({
       {/* MNUDA Emblem */}
       <div className="mb-6">
         <Image
-          src="/MNUDA-2.svg"
-          alt="MNUDA"
+          src="/word_logo.png"
+          alt="For the Love of Minnesota"
           width={120}
           height={24}
           className="w-[120px] h-auto"

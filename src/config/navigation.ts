@@ -24,7 +24,7 @@ export const appNavItems: NavItem[] = [
   { href: '/map', label: 'Map', icon: MapIcon },
   { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
   { href: '/account/analytics', label: 'Analytics', icon: ChartBarIcon },
-  { href: '/profile', label: 'Profile', icon: UserIcon },
+  { href: '/account/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];
 
 // Public navigation items for SimpleNav
@@ -32,7 +32,6 @@ export const publicNavItems: NavItem[] = [
   { href: '/', label: 'Home', icon: HomeIcon },
   { href: '/map', label: 'Map', icon: MapIcon },
   { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
-  { href: '/business/directory', label: 'Pages', icon: BuildingStorefrontIcon },
 ];
 
 // Legacy navItems for backward compatibility

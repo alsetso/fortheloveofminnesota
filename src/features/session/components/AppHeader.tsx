@@ -133,7 +133,7 @@ export default function AppHeader({
                 <div className="absolute inset-0 bg-gold-500/0 group-hover:bg-gold-500/10 rounded-lg transition-colors duration-300 blur-sm group-hover:blur-none" />
                 <div className="relative">
                   <Image
-                    src="/mnuda_emblem.png"
+                    src="/logo.png"
                     alt="MNUDA Emblem"
                     width={40}
                     height={40}
@@ -201,7 +201,7 @@ export default function AppHeader({
                 <ProfileDropdown />
               ) : (
                 <Link
-                  href="/login"
+                  href="/?modal=account&tab=settings"
                   className="px-4 py-2 text-sm font-semibold text-black bg-gold-500 hover:bg-gold-400 rounded-lg transition-all duration-200 shadow-md hover:shadow-gold-500/50 active:scale-95 focus:outline-none focus:ring-2 focus:ring-gold-400/50 focus:ring-offset-2 focus:ring-offset-black"
                 >
                   Sign In

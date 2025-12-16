@@ -68,3 +68,5 @@ COMMENT ON COLUMN public.cities.favorite IS 'Whether this city is marked as a fa
 
 
 
+
+

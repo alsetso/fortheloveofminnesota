@@ -66,7 +66,7 @@ export default function AccountViewsCard({ account }: AccountViewsCardProps) {
 
         {/* Profile Info - Left Aligned, Vertical Stack */}
         <div className="space-y-0.5">
-          <Link href="/profile" className="block hover:opacity-90 transition-opacity">
+          <Link href="/account/settings" className="block hover:opacity-90 transition-opacity">
             <div className="flex items-center gap-1.5">
               <h3 className="text-xs font-semibold text-gray-900">
                 {displayName}

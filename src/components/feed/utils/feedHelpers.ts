@@ -58,19 +58,21 @@ export function formatLocationBreadcrumb(
  * Get post URL - use post ID (simple schema doesn't have slugs)
  * @param post - Post data
  * @returns Post URL path
+ * @deprecated Feed post detail page has been archived
  */
 export function getPostUrl(post: Pick<FeedPostData, 'id' | 'slug'>): string {
-  // Simple posts schema uses UUID IDs, not slugs
-  return `/feed/post/${post.id}`;
+  // Feed post detail page archived - return hash to prevent navigation
+  return '#';
 }
 
 /**
  * Get profile URL from username
  * @param username - Profile username
- * @returns Profile URL path
+ * @returns Profile URL path (deprecated - profiles removed)
+ * @deprecated Profile pages have been removed
  */
 export function getProfileUrl(username?: string | null): string {
-  return username ? `/u/${username}` : '#';
+  return '#';
 }
 
 /**

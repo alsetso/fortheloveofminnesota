@@ -12,6 +12,7 @@ const ROUTE_PROTECTION: Record<string, {
   '/account/settings': { auth: true },
   '/account/billing': { auth: true },
   '/map-test': { auth: true },
+  '/admin': { auth: true, roles: ['admin'] },
 };
 
 /**
@@ -135,15 +136,42 @@ export async function middleware(req: NextRequest) {
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-inline' needed for Next.js
-    "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind
+    "worker-src 'self' blob:", // Mapbox uses blob URLs for Web Workers
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts + Tailwind
+    "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts stylesheets
     "img-src 'self' data: https:",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts fonts
     "connect-src 'self' https://*.supabase.co https://*.mapbox.com https://api.mapbox.com",
     "frame-ancestors 'none'",
   ].join('; ');
   response.headers.set('Content-Security-Policy', csp);
 
   const pathname = req.nextUrl.pathname;
+  
+  // Redirect account pages to / with modal params
+  if (pathname.startsWith('/account/')) {
+    const accountRouteMap: Record<string, string> = {
+      '/account/settings': 'settings',
+      '/account/billing': 'billing',
+      '/account/analytics': 'analytics',
+      '/account/notifications': 'notifications',
+      '/account/onboarding': 'onboarding',
+      '/account/change-plan': 'billing', // change-plan opens billing tab
+    };
+    
+    const tab = accountRouteMap[pathname] || 'settings';
+    const redirectUrl = new URL('/', req.url);
+    redirectUrl.searchParams.set('modal', 'account');
+    redirectUrl.searchParams.set('tab', tab);
+    
+    // Preserve query params (e.g., session_id from Stripe)
+    req.nextUrl.searchParams.forEach((value, key) => {
+      redirectUrl.searchParams.set(key, value);
+    });
+    
+    return NextResponse.redirect(redirectUrl);
+  }
+  
   const protection = matchesProtectedRoute(pathname);
 
   // Always refresh session for API routes to ensure cookies are set
@@ -217,7 +245,9 @@ export async function middleware(req: NextRequest) {
       }
     }
     
-    const redirectUrl = new URL('/login', req.url);
+    const redirectUrl = new URL('/', req.url);
+    redirectUrl.searchParams.set('modal', 'account');
+    redirectUrl.searchParams.set('tab', 'settings');
     redirectUrl.searchParams.set('redirect', pathname);
     redirectUrl.searchParams.set('message', 'Please sign in to access this page');
     return NextResponse.redirect(redirectUrl);
@@ -229,11 +259,12 @@ export async function middleware(req: NextRequest) {
   if (user && protection?.auth) {
     accountData = await getUserAccountData(supabase, user.id);
     
-    // Check onboarding status for protected routes (except onboarding page itself)
-    // Redirect to onboarding if not onboarded
-    if (pathname !== '/account/onboarding' && accountData && accountData.onboarded === false) {
-      const redirectUrl = new URL('/account/onboarding', req.url);
-      redirectUrl.searchParams.set('redirect', pathname);
+    // Check onboarding status for protected routes
+    // Redirect to home with onboarding modal if not onboarded
+    if (accountData && accountData.onboarded === false) {
+      const redirectUrl = new URL('/', req.url);
+      redirectUrl.searchParams.set('modal', 'account');
+      redirectUrl.searchParams.set('tab', 'onboarding');
       return NextResponse.redirect(redirectUrl);
     }
   }
@@ -250,17 +281,18 @@ export async function middleware(req: NextRequest) {
   // Update last_visit for authenticated users (except for static assets and API routes)
   if (user && protection?.auth && !pathname.startsWith('/api/') && !pathname.startsWith('/_next/')) {
     // Update last_visit asynchronously (don't block response)
-    supabase
-      .from('accounts')
-      .update({ last_visit: new Date().toISOString() })
-      .eq('user_id', user.id)
-      .then(() => {
-        // Silently handle - don't block request
-      })
-      .catch((error) => {
+    // Use void to explicitly ignore the promise result
+    void (async () => {
+      try {
+        await supabase
+          .from('accounts')
+          .update({ last_visit: new Date().toISOString() })
+          .eq('user_id', user.id);
+      } catch (error) {
         // Log but don't fail request
         console.error('Failed to update last_visit:', error);
-      });
+      }
+    })();
   }
 
   return response;

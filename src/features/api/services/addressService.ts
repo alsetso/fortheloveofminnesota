@@ -1,7 +1,7 @@
 'use client';
 
 import { apiService } from './apiService';
-import { GeocodingService } from '@/features/map/services/geocodingService';
+import { GeocodingService } from '@/features/_archive/map/services/geocodingService';
 import { NodeData } from '@/features/session/services/sessionStorage';
 import { MnudaIdService } from '@/features/shared/services/mnudaIdService';
 

@@ -16,3 +16,5 @@ COMMENT ON TABLE public.accounts IS
   'User account table. Age column has been removed.';
 
 
+
+

@@ -1,11 +1,12 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/map/config';
+import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/_archive/map/config';
 
 interface CityMapProps {
-  coordinates: { lat: number; lng: number };
+  coordinates?: { lat: number; lng: number } | null;
+  boundaryLines?: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
   cityName: string;
   height?: string;
   className?: string;
@@ -13,6 +14,7 @@ interface CityMapProps {
 
 export default function CityMap({
   coordinates,
+  boundaryLines,
   cityName,
   height = '300px',
   className = '',
@@ -22,7 +24,8 @@ export default function CityMap({
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
-    if (!mapContainer.current || !coordinates || map.current) return;
+    if (!mapContainer.current || map.current) return;
+    if (!boundaryLines && (!coordinates || !coordinates.lat || !coordinates.lng)) return;
 
     if (!MAP_CONFIG.MAPBOX_TOKEN) {
       console.error('Mapbox token missing');
@@ -38,12 +41,48 @@ export default function CityMap({
 
         if (!mapContainer.current) return;
 
-        // Start map at default center, then fly to city location
+        let initialCenter: [number, number] = MAP_CONFIG.DEFAULT_CENTER;
+        let initialZoom = MAP_CONFIG.DEFAULT_ZOOM;
+
+        // If we have boundary lines, calculate center and bounds from polygon
+        if (boundaryLines) {
+          let minLng = Infinity;
+          let maxLng = -Infinity;
+          let minLat = Infinity;
+          let maxLat = -Infinity;
+
+          const processCoordinates = (coords: number[][]) => {
+            coords.forEach(([lng, lat]) => {
+              minLng = Math.min(minLng, lng);
+              maxLng = Math.max(maxLng, lng);
+              minLat = Math.min(minLat, lat);
+              maxLat = Math.max(maxLat, lat);
+            });
+          };
+
+          if (boundaryLines.type === 'Polygon') {
+            boundaryLines.coordinates.forEach(ring => processCoordinates(ring));
+          } else if (boundaryLines.type === 'MultiPolygon') {
+            boundaryLines.coordinates.forEach(p => {
+              p.forEach(ring => processCoordinates(ring));
+            });
+          }
+
+          initialCenter = [
+            (minLng + maxLng) / 2,
+            (minLat + maxLat) / 2,
+          ];
+          initialZoom = 11;
+        } else if (coordinates) {
+          initialCenter = [coordinates.lng, coordinates.lat];
+          initialZoom = 13;
+        }
+
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
           style: MAP_CONFIG.MAPBOX_STYLE,
-          center: MAP_CONFIG.DEFAULT_CENTER,
-          zoom: MAP_CONFIG.DEFAULT_ZOOM,
+          center: initialCenter,
+          zoom: initialZoom,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
             [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
@@ -59,14 +98,69 @@ export default function CityMap({
         });
 
         mapInstance.on('load', () => {
-          // Fly to the city location with smooth animation
-          setTimeout(() => {
-            mapInstance.flyTo({
-              center: [coordinates.lng, coordinates.lat],
-              zoom: 13,
-              duration: 1500,
+          // If we have boundary lines, add them to the map
+          if (boundaryLines) {
+            const sourceId = 'city-boundary-source';
+            const layerId = 'city-boundary-layer';
+            const outlineLayerId = 'city-boundary-outline';
+
+            mapInstance.addSource(sourceId, {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: boundaryLines,
+                properties: { name: cityName },
+              },
             });
-          }, 100);
+
+            // Add fill layer
+            mapInstance.addLayer({
+              id: layerId,
+              type: 'fill',
+              source: sourceId,
+              paint: {
+                'fill-color': '#3b82f6',
+                'fill-opacity': 0.2,
+              },
+            });
+
+            // Add outline layer
+            mapInstance.addLayer({
+              id: outlineLayerId,
+              type: 'line',
+              source: sourceId,
+              paint: {
+                'line-color': '#3b82f6',
+                'line-width': 2,
+              },
+            });
+
+            // Fit bounds to polygon
+            const bounds = new mapbox.LngLatBounds();
+            if (boundaryLines.type === 'Polygon') {
+              boundaryLines.coordinates[0].forEach(([lng, lat]) => {
+                bounds.extend([lng, lat]);
+              });
+            } else if (boundaryLines.type === 'MultiPolygon') {
+              boundaryLines.coordinates[0][0].forEach(([lng, lat]) => {
+                bounds.extend([lng, lat]);
+              });
+            }
+
+            mapInstance.fitBounds(bounds, {
+              padding: 40,
+              duration: 1000,
+            });
+          } else if (coordinates) {
+            // Fly to the city location with smooth animation
+            setTimeout(() => {
+              mapInstance.flyTo({
+                center: [coordinates.lng, coordinates.lat],
+                zoom: 13,
+                duration: 1500,
+              });
+            }, 100);
+          }
 
           setMapLoaded(true);
         });
@@ -85,9 +179,9 @@ export default function CityMap({
     };
 
     initMap();
-  }, [coordinates, cityName]);
+  }, [coordinates, boundaryLines, cityName]);
 
-  if (!coordinates || !coordinates.lat || !coordinates.lng) {
+  if (!boundaryLines && (!coordinates || !coordinates.lat || !coordinates.lng)) {
     return null;
   }
 
@@ -97,5 +191,7 @@ export default function CityMap({
     </div>
   );
 }
+
+
 
 

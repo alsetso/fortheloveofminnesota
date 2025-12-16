@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/SimplePageLayout';
+import ExplorePageClient from './ExplorePageClient';
 import { BuildingOffice2Icon, RectangleGroupIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -17,10 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
     .from('counties')
     .select('*', { count: 'exact', head: true });
   
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
-    title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | MNUDA',
+    title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | For the Love of Minnesota',
     description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities. Discover population data, geographic information, demographics, official county websites, and detailed profiles for every location in Minnesota. Your complete guide to the Land of 10,000 Lakes.`,
     keywords: [
       'Minnesota cities',
@@ -40,13 +41,13 @@ export async function generateMetadata(): Promise<Metadata> {
       'MN county data',
     ],
     openGraph: {
-      title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | MNUDA',
+      title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | For the Love of Minnesota',
       description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities. Discover population data, geographic information, and detailed profiles for every location in Minnesota.`,
       url: `${baseUrl}/explore`,
-      siteName: 'MNUDA',
+      siteName: 'For the Love of Minnesota',
       images: [
         {
-          url: '/MN.png',
+          url: '/logo.png',
           width: 1200,
           height: 630,
           type: 'image/png',
@@ -60,7 +61,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN',
       description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities.`,
-      images: ['/MN.png'],
+      images: ['/logo.png'],
     },
     alternates: {
       canonical: `${baseUrl}/explore`,
@@ -80,7 +81,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 function generateStructuredData(cityCount: number, countyCount: number, favoriteCounties: Array<{ name: string; slug: string; website_url: string | null }>) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
     '@context': 'https://schema.org',
@@ -138,13 +139,13 @@ function generateBreadcrumbStructuredData() {
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/`,
       },
       {
         '@type': 'ListItem',
         position: 2,
         name: 'Explore',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore`,
       },
     ],
   };
@@ -206,6 +207,7 @@ export default async function ExplorePage() {
 
   return (
     <>
+      <ExplorePageClient />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

@@ -300,3 +300,5 @@ If you want to keep JSONB but make it better:
 5. Better for analytics and reporting
 
 
+
+

@@ -44,19 +44,31 @@ export interface SubscriptionState {
 export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionState> => {
   const cookieStore = await cookies();
   
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // Return default state if environment variables are missing
+    return {
+      plan: 'hobby',
+      billingMode: 'standard',
+      isActive: false,
+      isComped: false,
+      isTrial: false,
+      subscriptionStatus: null,
+    };
+  }
+  
   const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
           return cookieStore.getAll();
         },
-        set() {
-          // Server components can't set cookies
-        },
-        remove() {
-          // Server components can't remove cookies
+        setAll() {
+          // Server components can't set cookies - no-op
         },
       },
     }
@@ -131,10 +143,10 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
 /**
  * Check if user has access to a feature based on plan
  * 
- * @param requiredPlan - Minimum plan required ('hobby' or 'pro')
+ * @param _requiredPlan - Minimum plan required ('hobby' or 'pro') - reserved for future use
  * @returns 'limited_access' for hobby plan, 'full_access' for pro plan, or null if not authenticated
  */
-export async function getFeatureAccess(requiredPlan: Plan = 'hobby'): Promise<'limited_access' | 'full_access' | null> {
+export async function getFeatureAccess(_requiredPlan: Plan = 'hobby'): Promise<'limited_access' | 'full_access' | null> {
   const state = await getAccountSubscriptionState();
   
   if (!state.isActive && !state.isComped) {

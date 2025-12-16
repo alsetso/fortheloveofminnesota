@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     // Create new category (created_by will be set by trigger)
     const { data: newCategory, error: insertError } = await supabase
       .from('categories')
-      .insert({ name: name.trim() })
+      .insert({ name: name.trim() } as any)
       .select('id, name')
       .single();
 

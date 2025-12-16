@@ -21,7 +21,7 @@ export default function Logo({ size = 'md', className = '', variant = 'default' 
   return (
     <div className={`relative ${heightClass} ${className}`} style={{ width: 'auto' }}>
       <Image
-        src="/MNUDA-2.svg"
+        src="/word_logo.png"
         alt="MNUDA Logo"
         width={250}
         height={50}

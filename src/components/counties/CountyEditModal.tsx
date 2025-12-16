@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { County, UpdateCountyData } from '@/features/admin/services/countyAdminService';
-import DrawPolygonMap from '@/components/map/DrawPolygonMap';
+import DrawPolygonMap from '@/components/_archive/map/DrawPolygonMap';
 
 interface CountyEditModalProps {
   isOpen: boolean;

@@ -4,21 +4,18 @@ import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
 import type { Visitor } from '@/types/analytics';
 
-type EntityType = 'post' | 'city' | 'county' | 'account';
-
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
     const searchParams = request.nextUrl.searchParams;
-    const entity_type = searchParams.get('entity_type') as EntityType;
-    const entity_id = searchParams.get('entity_id');
-    const entity_slug = searchParams.get('entity_slug');
+    const page_url = searchParams.get('page_url');
+    const pin_id = searchParams.get('pin_id');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    if (!entity_type) {
+    if (!page_url && !pin_id) {
       return NextResponse.json(
-        { error: 'entity_type is required' },
+        { error: 'Either page_url or pin_id is required' },
         { status: 400 }
       );
     }
@@ -60,9 +57,9 @@ export async function GET(request: NextRequest) {
     // Get account
     const { data: account } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, username')
       .eq('user_id', user.id)
-      .single();
+      .single() as { data: { id: string; username: string | null } | null; error: any };
 
     if (!account) {
       return NextResponse.json(
@@ -71,29 +68,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Verify ownership of the entity
+    // Verify ownership
     let isOwner = false;
-    if (entity_type === 'account') {
-      // For account profiles, check if viewing own profile
-      if (entity_id === account.id) {
-        isOwner = true;
-      } else if (entity_slug) {
-        const { data: targetAccount } = await supabase
-          .from('accounts')
-          .select('id')
-          .eq('username', entity_slug)
-          .single();
-        isOwner = targetAccount?.id === account.id;
-      }
-    } else if (entity_type === 'post') {
-      if (entity_id) {
-        const { data: post } = await supabase
-          .from('posts')
-          .select('account_id')
-          .eq('id', entity_id)
-          .single();
-        isOwner = post?.account_id === account.id;
-      }
+    if (page_url) {
+      // For page URLs, check if it's the user's profile page
+      const profileUrl = account.username ? `/profile/${account.username}` : `/account/settings`;
+      isOwner = page_url === profileUrl;
+      
+      // Could also check other owned pages here (e.g., user-created pages)
+    } else if (pin_id) {
+      // For pins, check if user owns the pin
+      const { data: pin } = await supabase
+        .from('pins')
+        .select('account_id')
+        .eq('id', pin_id)
+        .single();
+      isOwner = pin?.account_id === account.id;
     }
 
     if (!isOwner) {
@@ -103,14 +93,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get visitors
-    const { data: visitors, error } = await supabase.rpc('get_entity_visitors', {
-      p_entity_type: entity_type,
-      p_entity_id: entity_id || null,
-      p_entity_slug: entity_slug || null,
-      p_limit: limit,
-      p_offset: offset,
-    });
+    // Get visitors using the new functions
+    let visitors: Visitor[] | null = null;
+    let error: any = null;
+
+    if (page_url) {
+      const result = await supabase.rpc('get_page_viewers', {
+        p_page_url: page_url,
+        p_limit: limit,
+        p_offset: offset,
+      });
+      visitors = result.data as Visitor[] | null;
+      error = result.error;
+    } else if (pin_id) {
+      const result = await supabase.rpc('get_pin_viewers', {
+        p_pin_id: pin_id,
+        p_limit: limit,
+        p_offset: offset,
+      });
+      visitors = result.data as Visitor[] | null;
+      error = result.error;
+    }
 
     if (error) {
       console.error('Error getting visitors:', error);
@@ -120,9 +123,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const visitorsArray = (visitors || []) as Visitor[];
     return NextResponse.json({
-      visitors: visitors || [],
-      total: visitors?.length || 0,
+      visitors: visitorsArray,
+      total: visitorsArray.length,
     });
   } catch (error) {
     console.error('Error in GET /api/analytics/visitors:', error);

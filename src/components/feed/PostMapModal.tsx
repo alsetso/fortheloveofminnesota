@@ -1,11 +1,11 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useReducer } from 'react';
-import { loadMapboxGL, loadMapboxDraw } from '@/features/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/map/config';
+import { loadMapboxGL, loadMapboxDraw } from '@/features/_archive/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/_archive/map/config';
 import { XMarkIcon, MapPinIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { AddressParser } from '@/features/map/services/addressParser';
-import { calculateCenter } from '@/features/map/utils/mapHelpers';
+import { AddressParser } from '@/features/_archive/map/services/addressParser';
+import { calculateCenter } from '@/features/_archive/map/utils/mapHelpers';
 import type { MapboxMapInstance, MapboxMouseEvent, MapboxDrawEvent, MapboxSuggestion, MapboxFeature } from '@/types/mapbox-events';
 
 export interface PostMapData {

@@ -35,15 +35,7 @@ export default function CompactFooter() {
           </li>
           <li>
             <Link 
-              href="/business/directory" 
-              className="text-xs text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              Businesses
-            </Link>
-          </li>
-          <li>
-            <Link 
-              href="/feed" 
+              href="/" 
               className="text-xs text-gray-600 hover:text-gray-900 transition-colors"
             >
               Feed
@@ -52,33 +44,9 @@ export default function CompactFooter() {
         </ul>
       </nav>
 
-      {/* Legal Links */}
+      {/* Contact Link */}
       <div className="pt-3 border-t border-gray-200">
         <ul className="space-y-1.5">
-          <li>
-            <Link 
-              href="/legal/terms-of-service" 
-              className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Terms of Service
-            </Link>
-          </li>
-          <li>
-            <Link 
-              href="/legal/privacy-policy" 
-              className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Privacy Policy
-            </Link>
-          </li>
-          <li>
-            <Link 
-              href="/legal/community-guidelines" 
-              className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Community Guidelines
-            </Link>
-          </li>
           <li>
             <Link 
               href="/contact" 
@@ -94,7 +62,7 @@ export default function CompactFooter() {
       <div className="pt-3 border-t border-gray-200">
         <Logo size="sm" variant="default" />
         <p className="text-[10px] text-gray-500 mt-1.5">
-          © {new Date().getFullYear()} MNUDA. All rights reserved.
+          © {new Date().getFullYear()} For the Love of Minnesota. All rights reserved.
         </p>
       </div>
     </div>

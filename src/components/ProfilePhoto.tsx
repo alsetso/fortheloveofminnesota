@@ -41,7 +41,11 @@ export default function ProfilePhoto({
     xl: 'w-12 h-12'
   };
 
-  const avatarUrl = account?.image_url || null;
+  // For guest accounts, use default guest image if no image_url
+  // Guest accounts have null user_id and non-null guest_id
+  const isGuestAccount = account && account.user_id === null && (account as any).guest_id;
+  const defaultGuestImage = 'https://hfklpjuiuhbulztsqapv.supabase.co/storage/v1/object/public/logos/Guest%20Image.png';
+  const avatarUrl = account?.image_url || (isGuestAccount ? defaultGuestImage : null);
   const displayName = AccountService.getDisplayName(account) || '';
   const email = account?.user_id || '';
 

@@ -60,7 +60,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     meta_description: string | null;
   };
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const url = `${baseUrl}/explore/city/${slug}`;
   const title = cityMeta.meta_title || `${cityMeta.name}, Minnesota | City Information`;
   const description = cityMeta.meta_description || `${cityMeta.name}, Minnesota. Population: ${cityMeta.population.toLocaleString()}${cityMeta.county ? `, County: ${cityMeta.county}` : ''}. Information about ${cityMeta.name} including demographics, location, and resources.`;
@@ -134,7 +134,7 @@ export default async function CityPage({ params }: Props) {
   }
 
   // Type assertion for city data - matches City interface from admin service
-  const cityData = city as City;
+  const cityData = city as City & { boundary_lines?: GeoJSON.Polygon | GeoJSON.MultiPolygon | null };
 
   // Find county by name to get county slug
   let countySlug: string | null = null;
@@ -317,11 +317,12 @@ export default async function CityPage({ params }: Props) {
 
         {/* Main content - text-heavy with inline links */}
         <div className="space-y-3 text-xs text-gray-600 leading-relaxed">
-          {/* Inline Map - Only if city has coordinates */}
-          {cityData.lat && cityData.lng && (
+          {/* Inline Map - Only if city has coordinates or boundary lines */}
+          {(cityData.boundary_lines || (cityData.lat && cityData.lng)) && (
             <div className="mb-3">
               <CityMap
-                coordinates={{ lat: parseFloat(cityData.lat.toString()), lng: parseFloat(cityData.lng.toString()) }}
+                coordinates={cityData.lat && cityData.lng ? { lat: parseFloat(cityData.lat.toString()), lng: parseFloat(cityData.lng.toString()) } : null}
+                boundaryLines={cityData.boundary_lines as GeoJSON.Polygon | GeoJSON.MultiPolygon | null | undefined}
                 cityName={cityData.name}
                 height="300px"
               />

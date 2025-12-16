@@ -152,3 +152,5 @@ COMMENT ON COLUMN public.map_pins.account_id IS 'Account that owns this pin (req
 COMMENT ON COLUMN public.map_pins.post_id IS 'Optional reference to a post';
 COMMENT ON COLUMN public.map_pins.city_id IS 'Optional reference to a city';
 COMMENT ON COLUMN public.map_pins.county_id IS 'Optional reference to a county';
+
+

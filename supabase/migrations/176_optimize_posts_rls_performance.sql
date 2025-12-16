@@ -106,3 +106,5 @@ COMMENT ON POLICY "posts_select_authenticated" ON public.posts IS
 COMMENT ON FUNCTION public.user_owns_account(UUID) IS 
   'Checks if current user owns the account. Uses SECURITY DEFINER to bypass accounts RLS. Optimized with index on accounts.user_id.';
 
+
+

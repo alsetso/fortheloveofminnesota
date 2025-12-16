@@ -128,8 +128,8 @@ This lead was submitted through the MNUDA website contact form.
           'Authorization': `Bearer ${resendApiKey}`,
         },
         body: JSON.stringify({
-          from: 'MNUDA <support@mnuda.com>',
-          to: 'cole@mnuda.com',
+          from: 'For the Love of Minnesota <hi@fortheloveofminnesota.com>',
+          to: 'hi@fortheloveofminnesota.com',
           subject: `New Lead: ${name} - ${accountTypeLabels[accountType] || accountType || 'Inquiry'}`,
           html: emailHtml,
           text: emailText,

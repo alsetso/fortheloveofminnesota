@@ -55,7 +55,7 @@ interface BaseNavProps {
 
 export default function BaseNav({
   navLinks,
-  logo = '/MNUDA-2.svg',
+  logo = '/word_logo.png',
   logoAlt = 'MNUDA',
   bgColor = 'bg-white',
   borderColor = 'border-gray-200',
@@ -173,19 +173,19 @@ export default function BaseNav({
           {/* Center Column: Logo/Emblem (Always Centered) */}
           <div className="flex items-center justify-center min-w-0">
             <Link href="/" className="hover:opacity-80 transition-opacity flex-shrink-0" aria-label="Home">
-              <Image
-                src={logo}
-                alt={logoAlt}
-                width={logo.includes('emblem') ? 32 : 100}
-                height={logo.includes('emblem') ? 32 : 20}
-                className={logo.includes('emblem') ? 'w-6 h-6 sm:w-7 sm:h-7 md:w-7 md:h-7 lg:w-8 lg:h-8' : 'w-16 sm:w-20 md:w-20 lg:w-[100px] h-auto'}
-                style={{ 
-                  maxWidth: logo.includes('emblem') ? '32px' : '100px', 
-                  height: 'auto', 
-                  display: 'block' 
-                }}
-                priority
-              />
+              <div className="w-[50px] h-[50px] flex items-center justify-center overflow-hidden">
+                <Image
+                  src={logo}
+                  alt={logoAlt}
+                  width={logo.includes('emblem') ? 32 : 100}
+                  height={logo.includes('emblem') ? 32 : 20}
+                  className="max-w-full max-h-full w-auto h-auto object-contain"
+                  style={{ 
+                    display: 'block' 
+                  }}
+                  priority
+                />
+              </div>
             </Link>
           </div>
 

@@ -16,30 +16,33 @@ interface Visitor {
 }
 
 interface VisitorsListProps {
-  entityType: 'post' | 'account' | 'business' | 'page';
-  entityId?: string;
-  entitySlug?: string;
+  page_url?: string;
+  pin_id?: string;
 }
 
-export default function VisitorsList({ entityType, entityId, entitySlug }: VisitorsListProps) {
+export default function VisitorsList({ page_url, pin_id }: VisitorsListProps) {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!page_url && !pin_id) {
+      setLoading(false);
+      return;
+    }
+
     const fetchVisitors = async () => {
       setLoading(true);
       setError(null);
       
       try {
         const params = new URLSearchParams({
-          entity_type: entityType,
           limit: '50',
           offset: '0',
         });
         
-        if (entityId) params.set('entity_id', entityId);
-        if (entitySlug) params.set('entity_slug', entitySlug);
+        if (page_url) params.set('page_url', page_url);
+        if (pin_id) params.set('pin_id', pin_id);
 
         const response = await fetch(`/api/analytics/visitors?${params.toString()}`);
         const data = await response.json();
@@ -60,7 +63,7 @@ export default function VisitorsList({ entityType, entityId, entitySlug }: Visit
     };
 
     fetchVisitors();
-  }, [entityType, entityId, entitySlug]);
+  }, [page_url, pin_id]);
 
   if (loading) {
     return (
@@ -96,10 +99,8 @@ export default function VisitorsList({ entityType, entityId, entitySlug }: Visit
             ? `${visitor.account_first_name} ${visitor.account_last_name}`
             : visitor.account_username || visitor.account_first_name || 'Anonymous';
 
-          const Wrapper = visitor.account_username ? Link : 'div';
-          const wrapperProps = visitor.account_username 
-            ? { href: `/profile/${visitor.account_username}` }
-            : {};
+          const Wrapper = 'div';
+          const wrapperProps = {};
 
           return (
             <Wrapper

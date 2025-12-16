@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient as createSSRClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 import { cookies } from 'next/headers';
 
@@ -50,11 +51,15 @@ export async function createServerClientWithAuth(cookieStore?: ReturnType<typeof
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
+  if (!supabaseUrl) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+  }
+
   // Use provided cookie store or get from next/headers
   const cookieStoreToUse = cookieStore || await cookies();
 
-  // Use the same pattern as getServerAuth() which we know works
-  return createClient<Database>(
+  // Use createServerClient from @supabase/ssr for cookie-based auth
+  return createSSRClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
     {
@@ -62,11 +67,8 @@ export async function createServerClientWithAuth(cookieStore?: ReturnType<typeof
         getAll() {
           return cookieStoreToUse.getAll();
         },
-        set() {
-          // Server components can't set cookies
-        },
-        remove() {
-          // Server components can't remove cookies
+        setAll() {
+          // Server components can't set cookies - no-op
         },
       },
     }

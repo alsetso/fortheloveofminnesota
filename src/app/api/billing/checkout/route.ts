@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
 
     // Get base URL for success/cancel redirects
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const successUrl = `${baseUrl}/account/billing?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${baseUrl}/account/billing?canceled=true`;
+    const successUrl = `${baseUrl}/?modal=account&tab=billing&session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${baseUrl}/?modal=account&tab=billing&canceled=true`;
 
     // Create checkout session
     // Payment methods are automatically saved to the customer when checkout completes

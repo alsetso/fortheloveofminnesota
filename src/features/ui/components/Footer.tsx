@@ -13,8 +13,8 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
 
   const isDark = variant === 'dark';
   const footerClasses = fixed
-    ? `fixed bottom-0 left-0 right-0 z-10 ${isDark ? 'bg-black/50 backdrop-blur-sm text-gray-300 border-t border-white/10' : 'bg-white text-gray-700 border-t border-gray-200'}`
-    : `${isDark ? 'bg-black/50 backdrop-blur-sm text-gray-300 mt-auto border-t border-white/10' : 'bg-white text-gray-700 mt-auto border-t border-gray-200'}`;
+    ? `fixed bottom-0 left-0 right-0 z-10 ${isDark ? 'bg-black/50 backdrop-blur-sm text-gray-300 border-t border-white/10' : 'bg-[#f4f2ef] text-gray-700 border-t border-gray-200'}`
+    : `${isDark ? 'bg-black/50 backdrop-blur-sm text-gray-300 mt-auto border-t border-white/10' : 'bg-[#f4f2ef] text-gray-700 mt-auto border-t border-gray-200'}`;
 
   return (
     <footer className={footerClasses} role="contentinfo">
@@ -63,15 +63,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 </li>
                 <li>
                   <Link 
-                    href="/business/directory" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    Businesses
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    href="/feed" 
+                    href="/" 
                     className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                   >
                     Feed
@@ -90,7 +82,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
               <ul className="space-y-1.5">
                 <li>
                   <Link 
-                    href="/login" 
+                    href="/?modal=account&tab=settings" 
                     className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                   >
                     Sign In
@@ -102,30 +94,6 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                     className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                   >
                     Settings
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    href="/legal/terms-of-service" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    href="/legal/privacy-policy" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    href="/legal/community-guidelines" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    Community Guidelines
                   </Link>
                 </li>
                 <li>

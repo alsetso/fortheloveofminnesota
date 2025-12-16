@@ -106,3 +106,5 @@ CREATE POLICY "Users can delete own map pins"
     account_id IS NOT NULL AND
     public.user_owns_account(account_id)
   );
+
+

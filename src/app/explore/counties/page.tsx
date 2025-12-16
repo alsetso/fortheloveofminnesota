@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { CountiesListView } from '@/components/counties/CountiesListView';
 import Link from 'next/link';
 import { StarIcon } from '@heroicons/react/24/solid';
+import CountiesListClient from './CountiesListClient';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -15,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
     .select('*', { count: 'exact', head: true });
   
   const countyCount = count || 87;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
     title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN | MNUDA`,
@@ -28,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: 'MNUDA',
       images: [
         {
-          url: '/MN.png',
+          url: '/logo.png',
           width: 1200,
           height: 630,
           type: 'image/png',
@@ -42,7 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
       description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area.`,
-      images: ['/MN.png'],
+      images: ['/logo.png'],
     },
     alternates: {
       canonical: `${baseUrl}/explore/counties`,
@@ -78,7 +79,7 @@ function generateStructuredData(counties: Array<{ id: string; name: string; slug
     '@type': 'CollectionPage',
     name: 'Minnesota Counties Directory',
     description: `Complete directory of all ${counties.length} counties in Minnesota with population data, area information, and county profiles.`,
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore/counties`,
+    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/counties`,
     mainEntity: {
       '@type': 'ItemList',
       numberOfItems: counties.length,
@@ -88,7 +89,7 @@ function generateStructuredData(counties: Array<{ id: string; name: string; slug
         item: {
           '@type': 'County',
           name: county.name,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore/county/${county.slug}`,
+          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/county/${county.slug}`,
           population: county.population,
           area: county.area_sq_mi ? {
             '@type': 'QuantitativeValue',
@@ -121,19 +122,19 @@ function generateBreadcrumbStructuredData() {
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/`,
       },
       {
         '@type': 'ListItem',
         position: 2,
         name: 'Explore',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore`,
       },
       {
         '@type': 'ListItem',
         position: 3,
         name: 'Counties',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com'}/explore/counties`,
+        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/counties`,
       },
     ],
   };
@@ -161,6 +162,7 @@ export default async function CountiesListPage() {
 
   return (
     <>
+      <CountiesListClient />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

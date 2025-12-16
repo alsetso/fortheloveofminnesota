@@ -27,12 +27,12 @@ export default function LoginOverlayModal({ isOpen, onClose, onLogin }: LoginOve
             Sign In Required
           </h2>
           <p className="text-gray-600 mb-6">
-            This post is only available to MNUDA members. Please sign in to view the full content.
+            This post is only available to members. Please sign in to view the full content.
           </p>
           
           <div className="flex flex-col gap-3">
             <Link
-              href="/login"
+              href="/?modal=account&tab=settings"
               onClick={onLogin}
               className="w-full px-6 py-3 bg-gold-500 text-black font-semibold rounded-lg hover:bg-gold-600 transition-colors text-center"
             >

@@ -10,7 +10,7 @@ export async function requireAdminAccess() {
   const auth = await getServerAuth();
   
   if (!auth) {
-    redirect('/login?redirect=/admin&message=Please sign in to access admin panel');
+    redirect('/?modal=account&tab=settings&redirect=/admin&message=Please sign in to access admin panel');
   }
   
   if (auth.role !== 'admin') {

@@ -2,46 +2,45 @@
  * TypeScript types for public map pins
  */
 
+export type MapPinVisibility = 'public' | 'only_me';
+
 export interface MapPin {
   id: string;
   lat: number;
   lng: number;
-  label: string | null;
   description: string | null;
   type: string | null;
-  color: string | null;
-  icon: string | null;
   media_url: string | null;
   account_id: string | null;
-  post_id: string | null;
   city_id: string | null;
   county_id: string | null;
+  visibility: MapPinVisibility;
+  view_count?: number;
   created_at: string;
   updated_at: string;
+  account?: {
+    id: string;
+    username: string | null;
+    image_url: string | null;
+  } | null;
 }
 
 export interface CreateMapPinData {
   lat: number;
   lng: number;
-  label: string;
-  color?: string | null;
   description?: string | null;
-  icon?: string | null;
   media_url?: string | null;
   post_id?: string | null;
   city_id?: string | null;
   county_id?: string | null;
+  visibility?: MapPinVisibility;
 }
 
 export interface UpdateMapPinData {
   lat?: number;
   lng?: number;
-  label?: string | null;
   description?: string | null;
-  color?: string | null;
-  icon?: string | null;
   media_url?: string | null;
-  post_id?: string | null;
   city_id?: string | null;
   county_id?: string | null;
 }
@@ -67,13 +66,9 @@ export interface MapPinGeoJSONFeature {
   };
   properties: {
     id: string;
-    label: string | null;
     description: string | null;
-    color: string | null;
-    icon: string | null;
     media_url: string | null;
     account_id: string | null;
-    post_id: string | null;
     city_id: string | null;
     county_id: string | null;
   };
@@ -86,3 +81,5 @@ export interface MapPinGeoJSONCollection {
   type: 'FeatureCollection';
   features: MapPinGeoJSONFeature[];
 }
+
+

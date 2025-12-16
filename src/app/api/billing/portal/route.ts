@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Get the return URL from request or use default
     const { return_url } = await request.json();
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const defaultReturnUrl = `${baseUrl}/account/billing`;
+    const defaultReturnUrl = `${baseUrl}/?modal=account&tab=billing`;
 
     // Create portal session
     const portalSession = await stripe.billingPortal.sessions.create({

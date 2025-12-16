@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       const resend = new Resend(RESEND_API_KEY);
       
       const { data, error } = await resend.emails.send({
-        from: 'MNUDA <support@mnuda.com>',
+        from: 'For the Love of Minnesota <hi@fortheloveofminnesota.com>',
         to: Array.isArray(to) ? to : [to],
         subject,
         html: html || undefined,

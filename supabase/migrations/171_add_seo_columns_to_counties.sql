@@ -75,3 +75,5 @@ COMMENT ON COLUMN public.counties.favorite IS 'Whether this county is marked as 
 
 
 
+
+

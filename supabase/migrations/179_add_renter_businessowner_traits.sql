@@ -101,3 +101,5 @@ COMMENT ON COLUMN public.accounts.traits IS
   'Array of account traits that help define the account''s activities on MNUDA. Users can select multiple traits from: homeowner, buyer, investor, realtor, wholesaler, lender, title, renter, businessowner.';
 
 
+
+

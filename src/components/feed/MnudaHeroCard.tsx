@@ -30,7 +30,7 @@ export default function MnudaHeroCard() {
             For the Love of Minnesota
           </p>
           <h3 className="text-xs font-semibold text-gray-900 mb-1">
-            The Platform for What&apos;s Under Development & Acquisition
+            Archive Special Moments in Minnesota
           </h3>
         </div>
 
@@ -38,15 +38,7 @@ export default function MnudaHeroCard() {
         <div>
           <h4 className="text-[10px] font-semibold text-gray-900 mb-1 uppercase tracking-wide">About</h4>
           <p className="text-xs text-gray-600 leading-relaxed">
-            MNUDA is Minnesota&apos;s Real Estate Feed, connecting residents, investors, wholesalers, contractors, and businesses in one statewide network.
-          </p>
-        </div>
-
-        {/* Mission */}
-        <div>
-          <h4 className="text-[10px] font-semibold text-gray-900 mb-1 uppercase tracking-wide">Mission</h4>
-          <p className="text-xs text-gray-600 leading-relaxed">
-            To move real estate forward by bringing together all stakeholders — Buy. Sell. Invest. Renovate. Connect.
+            For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.
           </p>
         </div>
 
@@ -55,10 +47,10 @@ export default function MnudaHeroCard() {
           <h4 className="text-[10px] font-semibold text-gray-900 mb-1.5 uppercase tracking-wide">Features</h4>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex items-start gap-1.5">
-              <BuildingOfficeIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+              <MapPinIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-[10px] font-medium text-gray-900">Development</p>
-                <p className="text-[10px] text-gray-500">Off-market opportunities</p>
+                <p className="text-[10px] font-medium text-gray-900">Drop Pins</p>
+                <p className="text-[10px] text-gray-500">Archive special places</p>
               </div>
             </div>
             <div className="flex items-start gap-1.5">
@@ -69,17 +61,17 @@ export default function MnudaHeroCard() {
               </div>
             </div>
             <div className="flex items-start gap-1.5">
-              <ChartBarIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+              <UserGroupIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-[10px] font-medium text-gray-900">Analytics</p>
-                <p className="text-[10px] text-gray-500">Market intelligence</p>
+                <p className="text-[10px] font-medium text-gray-900">Connect</p>
+                <p className="text-[10px] text-gray-500">Residents & neighbors</p>
               </div>
             </div>
             <div className="flex items-start gap-1.5">
               <UserGroupIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-[10px] font-medium text-gray-900">Network</p>
-                <p className="text-[10px] text-gray-500">Connect & collaborate</p>
+                <p className="text-[10px] font-medium text-gray-900">Share</p>
+                <p className="text-[10px] text-gray-500">Your Minnesota story</p>
               </div>
             </div>
           </div>

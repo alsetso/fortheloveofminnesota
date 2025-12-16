@@ -41,11 +41,8 @@ async function getServerSupabase() {
         getAll() {
           return cookieStore.getAll();
         },
-        set() {
-          // Server components can't set cookies
-        },
-        remove() {
-          // Server components can't remove cookies
+        setAll() {
+          // Server components can't set cookies - no-op
         },
       },
     }

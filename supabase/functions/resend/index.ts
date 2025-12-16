@@ -13,7 +13,7 @@ function getOtpTemplate(email: string, code: string): string {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Your MNUDA Access Code</title>
+      <title>Your Access Code - For the Love of Minnesota</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #000000;">
@@ -23,7 +23,7 @@ function getOtpTemplate(email: string, code: string): string {
               <!-- Logo -->
               <tr>
                 <td align="center" style="padding-bottom: 40px;">
-                  <img src="https://mnuda.com/mnuda_logo.png" alt="MNUDA" style="max-width: 200px; height: auto;" />
+                  <img src="https://fortheloveofminnesota.com/fav.png" alt="For the Love of Minnesota" style="max-width: 200px; height: auto;" />
                 </td>
               </tr>
               
@@ -96,9 +96,9 @@ Deno.serve(async (req) => {
     const html = getOtpTemplate(user.email, email_data.token);
       
     await resend.emails.send({
-        from: 'MNUDA <support@mnuda.com>',
+        from: 'For the Love of Minnesota <hi@fortheloveofminnesota.com>',
       to: user.email,
-        subject: 'Your MNUDA Access Code',
+        subject: 'Your Access Code - For the Love of Minnesota',
         html,
       });
 

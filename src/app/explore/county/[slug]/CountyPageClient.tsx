@@ -8,12 +8,9 @@ interface CountyPageClientProps {
 }
 
 export default function CountyPageClient({ countyId, countySlug }: CountyPageClientProps) {
-  usePageView({
-    entity_type: 'county',
-    entity_id: countyId,
-    enabled: true,
-  });
-
+  // Track page view
+  usePageView();
+  
   return null;
 }
 

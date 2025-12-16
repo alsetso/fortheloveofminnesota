@@ -9,7 +9,7 @@ import { createServerClient } from '@/lib/supabaseServer';
 export const revalidate = 86400; // Revalidate daily
 
 export async function GET() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mnuda.com';
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const supabase = createServerClient();
   
   // Fetch all cities with slugs
@@ -58,6 +58,8 @@ ${sortedCities.map((city) => {
     },
   });
 }
+
+
 
 
 

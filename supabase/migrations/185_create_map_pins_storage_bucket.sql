@@ -80,3 +80,5 @@ CREATE POLICY "Public can view map pin media"
   FOR SELECT
   TO authenticated, anon
   USING (bucket_id = 'map-pins-media');
+
+

@@ -42,7 +42,7 @@ export default function ProfileDropdown({ className = '' }: ProfileDropdownProps
       await signOut();
       localStorage.removeItem('freemap_sessions');
       localStorage.removeItem('freemap_current_session');
-      router.push('/login');
+      router.push('/');
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -67,7 +67,7 @@ export default function ProfileDropdown({ className = '' }: ProfileDropdownProps
   if (!user) {
     return (
       <Link
-        href="/login"
+        href="/?modal=account&tab=settings"
         className={`px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-header-focus/60 border border-header-focus rounded transition-colors ${className}`}
       >
         Sign In

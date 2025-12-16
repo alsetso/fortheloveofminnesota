@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { MagnifyingGlassIcon, ClockIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ClockIcon, XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { saveLocationSearch } from '@/features/location-searches/services/locationSearchService';
+import type { MapPin } from '@/types/map-pin';
 
 // Search type definitions - extensible for future search types
 type SearchType = 'locations' | 'pins' | 'areas' | 'general';
+type SearchTab = 'address' | 'pins';
 
 interface SearchTypeConfig {
   id: SearchType;
@@ -39,8 +41,10 @@ export default function AppSearch({
   
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<SearchTab>('address');
   const [activeSearchTypes, setActiveSearchTypes] = useState<SearchType[]>([]);
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
+  const [pinSuggestions, setPinSuggestions] = useState<MapPin[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   
@@ -88,6 +92,19 @@ export default function AppSearch({
       setActiveSearchTypes(['locations']);
     }
   }, [isMapPage, isOpen, activeSearchTypes]);
+
+  // Update active search types based on active tab
+  useEffect(() => {
+    if (activeTab === 'address') {
+      if (isMapPage) {
+        setActiveSearchTypes(['locations']);
+      } else {
+        setActiveSearchTypes([]);
+      }
+    } else if (activeTab === 'pins') {
+      setActiveSearchTypes(['pins']);
+    }
+  }, [activeTab, isMapPage]);
 
   // Measure tag container width for proper input padding
   useEffect(() => {
@@ -138,18 +155,45 @@ export default function AppSearch({
     }
   }, []);
 
+  // Search pins by description
+  const searchPins = useCallback(async (searchQuery: string) => {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
+      setPinSuggestions([]);
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    try {
+      const response = await fetch(`/api/map-pins/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!response.ok) throw new Error('Pin search failed');
+
+      const data = await response.json();
+      setPinSuggestions(data.pins || []);
+    } catch (error) {
+      console.error('Pin search error:', error);
+      setPinSuggestions([]);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  }, []);
+
   // Debounced search
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    if (activeSearchTypes.includes('locations') && query.length >= 2) {
+    if (activeTab === 'address' && activeSearchTypes.includes('locations') && query.length >= 2) {
       debounceRef.current = setTimeout(() => {
         searchLocations(query);
       }, 300);
+    } else if (activeTab === 'pins' && query.length >= 2) {
+      debounceRef.current = setTimeout(() => {
+        searchPins(query);
+      }, 300);
     } else {
       setLocationSuggestions([]);
+      setPinSuggestions([]);
     }
 
     return () => {
@@ -157,31 +201,37 @@ export default function AppSearch({
         clearTimeout(debounceRef.current);
       }
     };
-  }, [query, activeSearchTypes, searchLocations]);
+  }, [query, activeTab, activeSearchTypes, searchLocations, searchPins]);
 
   // Handle keyboard navigation
   useEffect(() => {
-    if (!isOpen || locationSuggestions.length === 0) return;
+    const suggestions = activeTab === 'address' ? locationSuggestions : pinSuggestions;
+    if (!isOpen || suggestions.length === 0) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedSuggestionIndex(prev => 
-          prev < locationSuggestions.length - 1 ? prev + 1 : prev
+          prev < suggestions.length - 1 ? prev + 1 : prev
         );
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
       } else if (e.key === 'Enter' && selectedSuggestionIndex >= 0) {
         e.preventDefault();
-        const suggestion = locationSuggestions[selectedSuggestionIndex];
-        handleLocationSelect(suggestion);
+        if (activeTab === 'address') {
+          const suggestion = locationSuggestions[selectedSuggestionIndex];
+          handleLocationSelect(suggestion);
+        } else {
+          const pin = pinSuggestions[selectedSuggestionIndex];
+          handlePinSelect(pin);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, locationSuggestions, selectedSuggestionIndex]);
+  }, [isOpen, activeTab, locationSuggestions, pinSuggestions, selectedSuggestionIndex]);
 
   const handleLocationSelect = async (suggestion: LocationSuggestion) => {
     const [lng, lat] = suggestion.center;
@@ -206,6 +256,18 @@ export default function AppSearch({
     }
   };
 
+  const handlePinSelect = (pin: MapPin) => {
+    setQuery(pin.description || '');
+    setIsOpen(false);
+    setPinSuggestions([]);
+    setSelectedSuggestionIndex(-1);
+    
+    // Fly to pin location on map
+    if (onLocationSelect) {
+      onLocationSelect({ lat: pin.lat, lng: pin.lng }, pin.description || 'Pin', undefined);
+    }
+  };
+
   const removeSearchType = (type: SearchType) => {
     setActiveSearchTypes(prev => prev.filter(t => t !== type));
     if (type === 'locations') {
@@ -216,8 +278,12 @@ export default function AppSearch({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedSuggestionIndex >= 0 && locationSuggestions.length > 0) {
-      handleLocationSelect(locationSuggestions[selectedSuggestionIndex]);
+    if (selectedSuggestionIndex >= 0) {
+      if (activeTab === 'address' && locationSuggestions.length > 0) {
+        handleLocationSelect(locationSuggestions[selectedSuggestionIndex]);
+      } else if (activeTab === 'pins' && pinSuggestions.length > 0) {
+        handlePinSelect(pinSuggestions[selectedSuggestionIndex]);
+      }
     } else {
       onSearch?.(query);
       setIsOpen(false);
@@ -319,8 +385,40 @@ export default function AppSearch({
               }}
             >
               <div className="p-2.5 max-h-[60vh] overflow-y-auto">
-              {/* Location Suggestions */}
-              {isMapPage && activeSearchTypes.includes('locations') && (
+              {/* Tabs */}
+              <div className="flex gap-1 mb-3 border-b border-gray-200 sticky top-0 bg-white pb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('address');
+                    setSelectedSuggestionIndex(-1);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    activeTab === 'address'
+                      ? 'text-gray-900 border-b-2 border-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Address
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('pins');
+                    setSelectedSuggestionIndex(-1);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                    activeTab === 'pins'
+                      ? 'text-gray-900 border-b-2 border-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Pins
+                </button>
+              </div>
+
+              {/* Address Suggestions */}
+              {activeTab === 'address' && isMapPage && activeSearchTypes.includes('locations') && (
                 <div className="mb-2">
                   {isLoadingSuggestions ? (
                     <div className="px-3 py-2 text-xs text-gray-500">Searching...</div>
@@ -355,11 +453,41 @@ export default function AppSearch({
                 </div>
               )}
 
-              {/* Other Search Types - Future extensibility */}
-              {activeSearchTypes.some(type => type !== 'locations') && (
-                <div className="mb-3">
-                  <p className="text-xs font-medium text-gray-600 mb-2">Search other types...</p>
-                  {/* Placeholder for future search types */}
+              {/* Pin Suggestions */}
+              {activeTab === 'pins' && (
+                <div className="mb-2">
+                  {isLoadingSuggestions ? (
+                    <div className="px-3 py-2 text-xs text-gray-500">Searching...</div>
+                  ) : pinSuggestions.length > 0 ? (
+                    <div className="space-y-0.5">
+                      {pinSuggestions.map((pin, index) => (
+                        <button
+                          key={pin.id}
+                          type="button"
+                          onClick={() => handlePinSelect(pin)}
+                          className={`w-full text-left px-3 py-2 text-xs rounded transition-all duration-150 ${
+                            index === selectedSuggestionIndex
+                              ? 'bg-gold-100 text-gold-700 border border-gold-300'
+                              : 'text-gray-700 hover:bg-gray-50 border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <MapPinIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{pin.description || 'Untitled Pin'}</div>
+                              {pin.account?.username && (
+                                <div className="text-[10px] text-gray-500 mt-0.5 truncate">
+                                  by {pin.account.username}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : query.length >= 2 && !isLoadingSuggestions ? (
+                    <div className="px-3 py-2 text-xs text-gray-500">No pins found</div>
+                  ) : null}
                 </div>
               )}
 

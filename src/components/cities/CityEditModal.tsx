@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { City, UpdateCityData } from '@/features/admin/services/cityAdminService';
-import AddCoordinatesMap from '@/components/map/AddCoordinatesMap';
+import AddCoordinatesMap from '@/components/_archive/map/AddCoordinatesMap';
 
 interface CityEditModalProps {
   isOpen: boolean;

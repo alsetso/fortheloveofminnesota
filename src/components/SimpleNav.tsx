@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
+import { GuestAccountService, type GuestAccount } from '@/features/auth/services/guestAccountService';
 import { useProfile } from '@/features/profiles/contexts/ProfileContext';
 import {
   HomeIcon,
@@ -14,6 +15,7 @@ import {
   BellIcon,
   UserIcon,
   ChartBarIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import { isAccountComplete } from '@/lib/accountCompleteness';
@@ -21,6 +23,7 @@ import { useNotifications } from '@/features/notifications';
 import ProfilePhoto from './ProfilePhoto';
 import AppSearch from './app/AppSearch';
 import BaseNav from './shared/BaseNav';
+import GuestDetailsModal from './auth/GuestDetailsModal';
 
 export default function SimpleNav() {
   const pathname = usePathname();
@@ -29,7 +32,10 @@ export default function SimpleNav() {
   const { user, signOut } = useAuth();
   const { selectedProfile } = useProfile();
   const [account, setAccount] = useState<Account | null>(null);
+  const [guestAccount, setGuestAccount] = useState<GuestAccount | null>(null);
+  const [hasCompletedGuestProfile, setHasCompletedGuestProfile] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isGuestModalOpen, setIsGuestModalOpen] = useState(false);
   const {
     notifications,
     loading: notificationsLoading,
@@ -45,17 +51,47 @@ export default function SimpleNav() {
   // Load account data
   useEffect(() => {
     const loadAccount = async () => {
-      if (!user) {
+      if (user) {
+        // Authenticated user
+        try {
+          const accountData = await AccountService.getCurrentAccount();
+          setAccount(accountData);
+          setGuestAccount(null);
+        } catch (error) {
+          console.error('Error loading account:', error);
+          setAccount(null);
+        }
+      } else {
+        // Guest user
         setAccount(null);
-        return;
-      }
-
-      try {
-        const accountData = await AccountService.getCurrentAccount();
-        setAccount(accountData);
-      } catch (error) {
-        console.error('Error loading account:', error);
-        setAccount(null);
+        
+        // Check if guest profile is complete
+        const guestName = GuestAccountService.getGuestName();
+        if (guestName && guestName.trim() && guestName !== 'Guest') {
+          setHasCompletedGuestProfile(true);
+          
+          // Fetch guest account from Supabase
+          try {
+            const guestId = GuestAccountService.getGuestId();
+            const account = await GuestAccountService.getGuestAccountByGuestId(guestId);
+            if (account) {
+              setGuestAccount(account);
+            } else {
+              // Try to create if it doesn't exist
+              try {
+                const newAccount = await GuestAccountService.getOrCreateGuestAccount();
+                setGuestAccount(newAccount);
+              } catch (error) {
+                console.error('[SimpleNav] Error creating guest account:', error);
+              }
+            }
+          } catch (error) {
+            console.error('[SimpleNav] Error fetching guest account:', error);
+          }
+        } else {
+          setHasCompletedGuestProfile(false);
+          setGuestAccount(null);
+        }
       }
     };
 
@@ -101,7 +137,7 @@ export default function SimpleNav() {
       localStorage.removeItem('freemap_sessions');
       localStorage.removeItem('freemap_current_session');
       setIsAccountMenuOpen(false);
-      router.push('/login');
+      router.push('/');
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -113,12 +149,12 @@ export default function SimpleNav() {
   // Build nav links - left side nav (excludes Pages which goes on right)
   const navLinks = user && account ? [
     { href: '/', label: 'Home', icon: HomeIcon },
-    { href: '/map', label: 'Map', icon: MapIcon },
     { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
+    { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
   ] : [
     { href: '/', label: 'Home', icon: HomeIcon },
-    { href: '/map', label: 'Map', icon: MapIcon },
     { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
+    { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
   ];
 
   // Account dropdown component (reusable) - defined before rightSection
@@ -138,7 +174,7 @@ export default function SimpleNav() {
 
             {/* Navigation Links */}
             <Link
-              href="/profile"
+              href="/account/settings"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsAccountMenuOpen(false);
@@ -146,7 +182,7 @@ export default function SimpleNav() {
               className="flex items-center gap-1.5 p-[10px] text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
             >
               <UserIcon className="w-3 h-3 text-gray-500" />
-              Profile
+              Account
             </Link>
             <Link
               href="/account/analytics"
@@ -222,20 +258,9 @@ export default function SimpleNav() {
     </>
   );
 
-  // Right section - Business link (web only) and Me dropdown
+  // Right section - Me dropdown or Guest account
   const rightSection = user && account ? (
     <div className="flex items-center gap-1">
-      {/* For Business - LinkedIn style (web only) */}
-      <Link
-        href="/business"
-        className="hidden md:flex flex-col items-center justify-center px-1.5 sm:px-2 py-1 min-w-[50px] sm:min-w-[60px] transition-all duration-200 text-gray-700 hover:text-gold-600"
-        aria-label="For Business"
-      >
-        <BuildingStorefrontIcon className="w-5 h-5 mb-0.5" />
-        <span className="text-[9px] sm:text-[10px] font-medium mt-0.5 hidden lg:inline">Business</span>
-        <span className="text-[9px] sm:text-[10px] font-medium mt-0.5 lg:hidden">Business</span>
-      </Link>
-
       {/* Me dropdown - far right */}
       <div ref={accountContainerRef} className="relative flex-shrink-0">
         <button
@@ -257,9 +282,28 @@ export default function SimpleNav() {
         <AccountDropdown />
       </div>
     </div>
+  ) : hasCompletedGuestProfile && guestAccount ? (
+    <div className="flex items-center gap-1">
+      {/* Guest account - far right */}
+      <div ref={accountContainerRef} className="relative flex-shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsGuestModalOpen(true);
+          }}
+          className="flex flex-col items-center justify-center px-1.5 sm:px-2 py-1 min-w-[50px] sm:min-w-[60px] transition-all duration-200 text-gray-700 hover:text-gold-600"
+          aria-label="Guest account"
+        >
+          <div className="mb-0.5">
+            <ProfilePhoto account={guestAccount as Account} size="sm" />
+          </div>
+          <span className="text-[9px] sm:text-[10px] font-medium mt-0.5">Guest</span>
+        </button>
+      </div>
+    </div>
   ) : (
     <Link
-      href="/login"
+      href="/?modal=account&tab=settings"
       className="px-4 py-1.5 text-sm font-medium border rounded transition-all duration-200 text-blue-600 border-blue-600 hover:bg-blue-50"
     >
       Sign In
@@ -284,15 +328,6 @@ export default function SimpleNav() {
             </Link>
           );
         })}
-        {user && account && (
-          <Link
-            href="/business"
-            className="block px-3 py-2 text-base font-medium transition-colors text-gray-600 hover:text-black hover:bg-gray-100 flex items-center gap-2"
-          >
-            <BuildingStorefrontIcon className="w-5 h-5" />
-            Business
-          </Link>
-        )}
         <div className="pt-4 border-t border-gray-200">
           {user && account ? (
             <>
@@ -324,9 +359,25 @@ export default function SimpleNav() {
                 </button>
               </div>
             </>
+          ) : hasCompletedGuestProfile && guestAccount ? (
+            <>
+              <button
+                onClick={() => setIsGuestModalOpen(true)}
+                className="block w-full px-3 py-2.5 text-base font-medium transition-colors text-gray-600 hover:text-black hover:bg-gray-100 flex items-center gap-3"
+              >
+                <ProfilePhoto account={guestAccount as Account} size="sm" />
+                <span>{guestAccount.first_name || 'Guest'}</span>
+              </button>
+              <Link
+                href="/?modal=account&tab=settings"
+                className="block px-3 py-2 text-base font-medium border-2 rounded-lg transition-colors text-center text-blue-600 border-blue-600 hover:bg-blue-50 mt-2"
+              >
+                Sign In
+              </Link>
+            </>
           ) : (
             <Link
-              href="/login"
+              href="/?modal=account&tab=settings"
               className="block px-3 py-2 text-base font-medium border-2 rounded-lg transition-colors text-center text-blue-600 border-blue-600 hover:bg-blue-50"
             >
               Sign In
@@ -338,7 +389,7 @@ export default function SimpleNav() {
   );
 
   // Determine logo based on auth state
-  const logo = user && account ? '/mnuda_emblem.png' : '/MNUDA-2.svg';
+  const logo = user && account ? '/logo.png' : '/word_logo.png';
   const logoAlt = user && account ? 'MNUDA Emblem' : 'MNUDA';
 
   // Compact search component for logged-in users (LinkedIn style - immediately after logo)
@@ -408,6 +459,44 @@ export default function SimpleNav() {
         showScrollEffect={true}
         mobileMenuContent={mobileMenuContent}
         searchSection={searchSection}
+      />
+      
+      {/* Guest Details Modal */}
+      <GuestDetailsModal
+        isOpen={isGuestModalOpen}
+        onClose={() => {
+          setIsGuestModalOpen(false);
+          // Refresh guest account after closing
+          if (!user) {
+            const guestName = GuestAccountService.getGuestName();
+            if (guestName && guestName.trim() && guestName !== 'Guest') {
+              setHasCompletedGuestProfile(true);
+            }
+          }
+        }}
+        onComplete={async () => {
+          // Verify account was created and mark profile as complete
+          try {
+            const guestId = GuestAccountService.getGuestId();
+            const account = await GuestAccountService.getGuestAccountByGuestId(guestId);
+            if (account) {
+              setGuestAccount(account);
+              setHasCompletedGuestProfile(true);
+            } else {
+              await GuestAccountService.getOrCreateGuestAccount();
+              setHasCompletedGuestProfile(true);
+            }
+          } catch (error) {
+            console.error('[SimpleNav] Error completing guest profile:', error);
+          }
+        }}
+        onSignIn={async () => {
+          setIsGuestModalOpen(false);
+          // Clean guest parameters before redirecting
+          const { cleanAuthParams } = await import('@/lib/urlParams');
+          cleanAuthParams(router);
+          router.push('/?modal=account&tab=settings');
+        }}
       />
     </>
   );

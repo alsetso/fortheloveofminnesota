@@ -5,8 +5,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import { 
   XMarkIcon,
   HomeIcon,
-  DocumentTextIcon,
-  ArrowRightOnRectangleIcon,
   MapIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
@@ -58,18 +56,6 @@ export default function GlobalSearchOverlay({ isOpen, onClose }: GlobalSearchOve
           label: 'Home', 
           description: 'Go to homepage',
           icon: <HomeIcon className="w-5 h-5" />
-        },
-        { 
-          href: '/login', 
-          label: 'Login', 
-          description: 'Sign in to your account',
-          icon: <ArrowRightOnRectangleIcon className="w-5 h-5" />
-        },
-        { 
-          href: '/legal/terms-of-service', 
-          label: 'Terms of Service', 
-          description: 'View terms and conditions',
-          icon: <DocumentTextIcon className="w-5 h-5" />
         },
       ];
 

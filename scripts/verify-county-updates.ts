@@ -39,7 +39,7 @@ async function verifyCounties() {
 
   for (const county of countiesToUpdate) {
     // Try exact match first
-    let { data, error } = await supabase
+    const { data, error } = await supabase
       .from('counties')
       .select('id, name, website_url, favorite')
       .eq('name', county.name)
@@ -73,6 +73,8 @@ async function verifyCounties() {
 }
 
 verifyCounties().catch(console.error);
+
+
 
 
 

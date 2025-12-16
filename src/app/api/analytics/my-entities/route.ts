@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
 
-type EntityType = 'post' | 'account';
+type EntityType = 'account' | 'pin';
 
 interface EntityWithViews {
   entity_type: EntityType;
   entity_id: string;
   entity_slug: string | null;
   title: string;
-  total_views: number; // Filtered views from page_views table
+  total_views: number;
   unique_visitors: number;
   first_viewed_at: string | null;
   last_viewed_at: string | null;
@@ -20,11 +20,8 @@ interface EntityWithViews {
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
     const searchParams = request.nextUrl.searchParams;
     const entityType = searchParams.get('entity_type') as EntityType | null;
-    const dateFrom = searchParams.get('date_from');
-    const dateTo = searchParams.get('date_to');
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -35,7 +32,8 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-    
+
+    const cookieStore = await cookies();
     const supabase = createServerClient<Database>(
       supabaseUrl,
       supabaseAnonKey,
@@ -52,7 +50,16 @@ export async function GET(request: NextRequest) {
     );
 
     // Get current user account
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('Auth error in my-entities:', authError);
+      return NextResponse.json(
+        { error: 'Authentication failed', details: authError.message },
+        { status: 401 }
+      );
+    }
+    
     if (!user) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -60,75 +67,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: account } = await supabase
+    const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('id')
+      .select('id, username')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (accountError) {
+      console.error('Error fetching account:', accountError);
+      return NextResponse.json(
+        { error: 'Failed to fetch account' },
+        { status: 500 }
+      );
+    }
 
     if (!account) {
       return NextResponse.json(
-        { error: 'Account not found' },
+        { error: 'Account not found. Please complete your profile setup.' },
         { status: 404 }
       );
     }
 
-    const accountId = (account as { id: string }).id;
+    const accountId = (account as { id: string; username: string | null }).id;
     const entities: EntityWithViews[] = [];
 
-    // Get user's posts
-    if (!entityType || entityType === 'post') {
-      const postsQuery = supabase
-        .from('posts')
-        .select('id, title, slug, created_at, visibility')
-        .eq('profile_id', accountId)
-        .in('visibility', ['public', 'members_only']);
-
-      const { data: posts } = await postsQuery.order('created_at', { ascending: false });
-
-      if (posts) {
-        for (const post of posts) {
-          const postData = post as { id: string; title: string | null; slug: string | null; created_at: string };
-          // Get page view stats
-          const { data: pageViews } = await supabase
-            .from('page_views')
-            .select('viewed_at, account_id')
-            .eq('entity_type', 'post')
-            .eq('entity_id', postData.id);
-
-          const filteredViews = (pageViews as Array<{ viewed_at: string; account_id: string | null }> | null)?.filter(pv => {
-            const viewDate = new Date(pv.viewed_at);
-            if (dateFrom && viewDate < new Date(dateFrom)) return false;
-            if (dateTo) {
-              const toDate = new Date(dateTo);
-              toDate.setHours(23, 59, 59, 999); // Include entire day
-              if (viewDate > toDate) return false;
-            }
-            return true;
-          }) || [];
-
-          const uniqueVisitors = new Set(filteredViews.map(pv => pv.account_id).filter(Boolean)).size;
-
-          entities.push({
-            entity_type: 'post',
-            entity_id: postData.id,
-            entity_slug: postData.slug,
-            title: postData.title || 'Untitled',
-            total_views: filteredViews.length,
-            unique_visitors: uniqueVisitors,
-            first_viewed_at: filteredViews.length > 0 ? filteredViews[filteredViews.length - 1]?.viewed_at : null,
-            last_viewed_at: filteredViews.length > 0 ? filteredViews[0]?.viewed_at : null,
-            created_at: postData.created_at,
-            url: `/feed/post/${postData.slug || postData.id}`,
-          });
-        }
-      }
-    }
-
-
-    // Get user's account/profile
+    // Get user's account/profile with stats
     if (!entityType || entityType === 'account') {
-        const { data: accountData } = await supabase
+      const { data: accountData } = await supabase
         .from('accounts')
         .select('id, username, first_name, last_name, created_at')
         .eq('id', accountId)
@@ -136,42 +101,108 @@ export async function GET(request: NextRequest) {
 
       if (accountData) {
         const accountDataTyped = accountData as { id: string; username: string | null; first_name: string | null; last_name: string | null; created_at: string };
-        const { data: pageViews } = await supabase
+        
+        // Get stats for account profile page
+        const profileUrl = accountDataTyped.username ? `/profile/${accountDataTyped.username}` : `/account/settings`;
+        const { data: stats } = await supabase.rpc('get_page_stats', {
+          p_page_url: profileUrl,
+          p_hours: null, // All time
+        });
+
+        const statsData = (stats as any)?.[0] || {};
+        
+        // Get first and last viewed dates
+        const { data: firstView } = await supabase
           .from('page_views')
-          .select('viewed_at, account_id')
-          .eq('entity_type', 'account')
-          .or(`entity_id.eq.${accountId},entity_slug.eq.${accountDataTyped.username || accountId}`);
+          .select('viewed_at')
+          .eq('page_url', profileUrl)
+          .order('viewed_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-        const filteredViews = (pageViews as Array<{ viewed_at: string; account_id: string | null }> | null)?.filter(pv => {
-          if (dateFrom && new Date(pv.viewed_at) < new Date(dateFrom)) return false;
-          if (dateTo && new Date(pv.viewed_at) > new Date(dateTo)) return false;
-          return true;
-        }) || [];
-
-        const uniqueVisitors = new Set(filteredViews.map(pv => pv.account_id).filter(Boolean)).size;
+        const { data: lastView } = await supabase
+          .from('page_views')
+          .select('viewed_at')
+          .eq('page_url', profileUrl)
+          .order('viewed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         entities.push({
           entity_type: 'account',
           entity_id: accountDataTyped.id,
           entity_slug: accountDataTyped.username,
-          title: `${accountDataTyped.first_name || ''} ${accountDataTyped.last_name || ''}`.trim() || 'My Profile',
-          total_views: filteredViews.length,
-          unique_visitors: uniqueVisitors,
-          first_viewed_at: filteredViews.length > 0 ? filteredViews[filteredViews.length - 1]?.viewed_at : null,
-          last_viewed_at: filteredViews.length > 0 ? filteredViews[0]?.viewed_at : null,
+          title: `${accountDataTyped.first_name || ''} ${accountDataTyped.last_name || ''}`.trim() || 'My Account',
+          total_views: statsData.total_views || 0,
+          unique_visitors: statsData.unique_viewers || 0,
+          first_viewed_at: firstView?.viewed_at || null,
+          last_viewed_at: lastView?.viewed_at || null,
           created_at: accountDataTyped.created_at,
-          url: accountDataTyped.username ? `/profile/${accountDataTyped.username}` : '',
+          url: profileUrl,
         });
       }
     }
 
-    // Business/pages functionality removed - not prioritizing
+    // Get user's pins with stats
+    if (!entityType || entityType === 'pin') {
+      const { data: pins } = await supabase
+        .from('pins')
+        .select('id, name, description, created_at')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false });
 
-    // Sort by last_viewed_at (most recent first) or created_at
+      if (pins) {
+        for (const pin of pins) {
+          const pinData = pin as { id: string; name: string | null; description: string | null; created_at: string };
+          
+          // Get stats for this pin
+          const { data: stats } = await supabase.rpc('get_pin_stats', {
+            p_pin_id: pinData.id,
+            p_hours: null, // All time
+          });
+
+          const statsData = (stats as any)?.[0] || {};
+          
+          // Get first and last viewed dates
+          const { data: firstView } = await supabase
+            .from('pin_views')
+            .select('viewed_at')
+            .eq('pin_id', pinData.id)
+            .order('viewed_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          const { data: lastView } = await supabase
+            .from('pin_views')
+            .select('viewed_at')
+            .eq('pin_id', pinData.id)
+            .order('viewed_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          entities.push({
+            entity_type: 'pin',
+            entity_id: pinData.id,
+            entity_slug: null,
+            title: pinData.name || pinData.description || 'Pin',
+            total_views: statsData.total_views || 0,
+            unique_visitors: statsData.unique_viewers || 0,
+            first_viewed_at: firstView?.viewed_at || null,
+            last_viewed_at: lastView?.viewed_at || null,
+            created_at: pinData.created_at,
+            url: '#', // Pins don't have direct URLs
+          });
+        }
+      }
+    }
+
+    // Sort by last_viewed_at (most recent first), then by created_at
     entities.sort((a, b) => {
-      const aDate = a.last_viewed_at ? new Date(a.last_viewed_at).getTime() : 0;
-      const bDate = b.last_viewed_at ? new Date(b.last_viewed_at).getTime() : 0;
-      if (aDate !== bDate) return bDate - aDate;
+      if (a.last_viewed_at && b.last_viewed_at) {
+        return new Date(b.last_viewed_at).getTime() - new Date(a.last_viewed_at).getTime();
+      }
+      if (a.last_viewed_at) return -1;
+      if (b.last_viewed_at) return 1;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
@@ -187,5 +218,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
-

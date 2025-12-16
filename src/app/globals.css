@@ -137,6 +137,15 @@ body {
   padding: 12px;
 }
 
+/* Map pin popup - compact design system styling */
+.map-pin-popup .mapboxgl-popup-content {
+  padding: 0 !important;
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+
 .pin-popup-container .mapboxgl-popup-tip {
   border-top-color: rgba(255, 255, 255, 0.3) !important;
 }

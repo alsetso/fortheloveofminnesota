@@ -4,8 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, MapPinIcon, PhoneIcon, EnvelopeIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/features/auth';
-import { usePageView } from '@/hooks/usePageView';
-import { BusinessWithCities } from '@/app/business/directory/page';
+import { BusinessWithCities } from '@/app/_archive/business/directory/page';
 
 interface BusinessesListClientProps {
   initialBusinesses: BusinessWithCities[];
@@ -18,13 +17,6 @@ export default function BusinessesListClient({ initialBusinesses }: BusinessesLi
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [mounted, setMounted] = useState(false);
-
-  // Track directory page view
-  usePageView({
-    entity_type: 'business',
-    entity_slug: 'directory',
-    enabled: true,
-  });
 
   // Prevent hydration mismatch by only showing auth-dependent content after mount
   useEffect(() => {
@@ -139,9 +131,9 @@ export default function BusinessesListClient({ initialBusinesses }: BusinessesLi
       {mounted && !user && (
         <div className="mb-3 p-2 bg-gray-50 border border-gray-200 rounded-md">
           <p className="text-xs text-gray-700">
-            <a href="/login" className="font-medium underline hover:text-gray-900">
+            <Link href="/?modal=account&tab=settings" className="font-medium underline hover:text-gray-900">
               Sign in
-            </a>
+            </Link>
             {' '}to register your business in the official directory.
           </p>
         </div>

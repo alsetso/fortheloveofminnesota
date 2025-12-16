@@ -41,17 +41,17 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Get feed statistics using the database function
-    // This function uses SECURITY DEFINER so it bypasses RLS
-    // @ts-expect-error - RPC function types not fully defined in Database type
-    const { data: stats, error } = await supabase.rpc('get_feed_stats', {
+    // Get feed statistics using the new get_page_stats function
+    // Feed page URL is '/feed'
+    const { data: stats, error } = await supabase.rpc('get_page_stats', {
+      p_page_url: '/feed',
       p_hours: hours,
     });
 
     if (error) {
       console.error('Error fetching feed stats:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch feed statistics' },
+        { error: 'Failed to fetch feed statistics', details: error.message },
         { status: 500 }
       );
     }
@@ -59,9 +59,9 @@ export async function GET(request: NextRequest) {
     // Return stats with default values if null
     const statsArray = stats as PageStats[] | null;
     return NextResponse.json({
-      total_loads: statsArray?.[0]?.total_loads || 0,
-      unique_visitors: statsArray?.[0]?.unique_visitors || 0,
-      accounts_active: statsArray?.[0]?.accounts_active || 0,
+      total_loads: statsArray?.[0]?.total_views || 0,
+      unique_visitors: statsArray?.[0]?.unique_viewers || 0,
+      accounts_active: statsArray?.[0]?.accounts_viewed || 0,
     });
   } catch (error) {
     console.error('Error in feed-stats route:', error);

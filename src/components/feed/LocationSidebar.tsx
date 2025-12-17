@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { XMarkIcon, MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon } from '@heroicons/react/24/outline';
 import IntelligenceModal from './IntelligenceModal';
 import { MAP_CONFIG } from '@/features/_archive/map/config';
 import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
@@ -11,6 +11,76 @@ import type { MapboxMapInstance, MapboxMouseEvent } from '@/types/mapbox-events'
 import PinStatsCard from '@/components/pins/PinStatsCard';
 import PinTrendingBadge from '@/components/pins/PinTrendingBadge';
 import PinAnalyticsModal from '@/components/pins/PinAnalyticsModal';
+import AtlasEntityModal, { type AtlasEntityData } from '@/components/atlas/AtlasEntityModal';
+import type { AtlasEntityType } from '@/features/atlas/services/atlasService';
+import { findCityByName, updateCityCoordinates, createLake, checkLakeExists, deleteNeighborhood, deleteSchool, deletePark, deleteLake } from '@/features/atlas/services/atlasService';
+import { useAuth } from '@/features/auth/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+
+// Helper to get friendly category label from mapbox feature properties
+function getFeatureCategory(properties: Record<string, any>, type: string): string | null {
+  const cls = properties.class || properties.road_class || properties.landuse_class;
+  const typ = properties.type || properties.road_type || properties.water_type || properties.landuse_type || type;
+  
+  // Check if this is a water layer (layer ID contains 'water')
+  if (type.includes('water') || properties.water_type) {
+    return 'Lake';
+  }
+  
+  // Map raw values to friendly labels
+  const categoryMap: Record<string, string> = {
+    // Roads
+    'tertiary': 'Road',
+    'secondary': 'Road',
+    'primary': 'Road',
+    'street_major': 'Street',
+    'street_minor': 'Street',
+    'street': 'Street',
+    'motorway': 'Highway',
+    'trunk': 'Highway',
+    'path': 'Path',
+    'track': 'Trail',
+    // Places
+    'park_like': 'Park',
+    'park': 'Park',
+    'settlement': 'City',
+    'settlement_subdivision': 'Neighborhood',
+    'neighborhood': 'Neighborhood',
+    // Water
+    'water': 'Lake',
+    'lake': 'Lake',
+    'pond': 'Lake',
+    'river': 'Lake',
+    'reservoir': 'Lake',
+    // POI classes
+    'education': 'School',
+    'arts_and_entertainment': 'Entertainment',
+    'lodging': 'Lodging',
+    'food_and_drink': 'Food & Drink',
+    'medical': 'Medical',
+    'fuel': 'Gas Station',
+    // POI types
+    'University': 'School',
+    'College': 'School',
+    'School': 'School',
+    'Stadium': 'Stadium',
+    'Hotel': 'Hotel',
+    'Restaurant': 'Restaurant',
+    'Hospital': 'Hospital',
+  };
+  
+  // Check type first, then class
+  if (typ && categoryMap[typ]) return categoryMap[typ];
+  if (cls && categoryMap[cls]) return categoryMap[cls];
+  
+  // Fallback: capitalize first meaningful value
+  const fallback = cls || typ;
+  if (fallback && typeof fallback === 'string') {
+    return fallback.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
+  
+  return null;
+}
 
 interface MapboxFeature {
   id: string;
@@ -39,6 +109,8 @@ interface LocationData {
   placeName?: string;
   address?: string;
   type?: 'map-click' | 'pin-click' | 'search';
+  city?: string;
+  county?: string;
 }
 
 interface PinData {
@@ -53,6 +125,7 @@ interface PinData {
     id: string;
     username: string | null;
     image_url: string | null;
+    guest_id?: string | null;
   } | null;
 }
 
@@ -60,6 +133,20 @@ interface FeatureMetadata {
   type: string;
   name?: string;
   properties: Record<string, any>;
+}
+
+interface AtlasEntity {
+  id: string;
+  name: string;
+  slug?: string;
+  layerType: 'cities' | 'counties' | 'neighborhoods' | 'schools' | 'parks' | 'lakes';
+  emoji: string;
+  lat: number;
+  lng: number;
+  school_type?: string;
+  park_type?: string;
+  description?: string;
+  [key: string]: any;
 }
 
 interface LocationSidebarProps {
@@ -72,6 +159,7 @@ interface LocationSidebarProps {
   onSkipTrace?: (coordinates: { lat: number; lng: number }) => void;
   onDrawArea?: (coordinates: { lat: number; lng: number }) => void;
   onRemoveTemporaryPin?: (removeFn: () => void) => void;
+  onUpdateTemporaryPinColor?: (updateFn: (visibility: 'public' | 'only_me') => void) => void;
   onCloseCreatePinModal?: () => void;
 }
 
@@ -85,8 +173,10 @@ export default function LocationSidebar({
   onSkipTrace,
   onDrawArea,
   onRemoveTemporaryPin,
+  onUpdateTemporaryPinColor,
   onCloseCreatePinModal
 }: LocationSidebarProps) {
+  const { user } = useAuth();
   const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [selectedPin, setSelectedPin] = useState<PinData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,12 +191,64 @@ export default function LocationSidebar({
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [analyticsPinId, setAnalyticsPinId] = useState<string | null>(null);
   const [analyticsPinName, setAnalyticsPinName] = useState<string | null>(null);
+  const [isComingSoonModalOpen, setIsComingSoonModalOpen] = useState(false);
+  const [comingSoonFeature, setComingSoonFeature] = useState<string>('');
+  const [currentUserAccountId, setCurrentUserAccountId] = useState<string | null>(null);
+  const [currentUserPlan, setCurrentUserPlan] = useState<'hobby' | 'pro'>('hobby');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAtlasEntityModalOpen, setIsAtlasEntityModalOpen] = useState(false);
+  const [atlasEntityType, setAtlasEntityType] = useState<AtlasEntityType>('neighborhood');
+  const [atlasEntityFeatureName, setAtlasEntityFeatureName] = useState<string | undefined>(undefined);
+  const [atlasEntityModalMode, setAtlasEntityModalMode] = useState<'create' | 'edit'>('create');
+  const [atlasEntityToEdit, setAtlasEntityToEdit] = useState<AtlasEntityData | undefined>(undefined);
+  const [isUpdatingCityCoords, setIsUpdatingCityCoords] = useState(false);
+  const [cityUpdateMessage, setCityUpdateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isCreatingLake, setIsCreatingLake] = useState(false);
+  const [lakeCreateMessage, setLakeCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<AtlasEntity | null>(null);
+  const [isDeletingAtlasEntity, setIsDeletingAtlasEntity] = useState(false);
+  const [atlasEntityMessage, setAtlasEntityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const temporaryMarkerRef = useRef<any>(null);
   const pathname = usePathname();
+
+  // Fetch current user's account info (ID, plan, and role)
+  useEffect(() => {
+    const fetchAccountInfo = async () => {
+      if (!user) {
+        setCurrentUserAccountId(null);
+        setCurrentUserPlan('hobby');
+        setIsAdmin(false);
+        return;
+      }
+
+      try {
+        const { data: account, error } = await supabase
+          .from('accounts')
+          .select('id, plan, role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching account info:', error);
+          return;
+        }
+
+        if (account) {
+          setCurrentUserAccountId(account.id);
+          setCurrentUserPlan((account.plan as 'hobby' | 'pro') || 'hobby');
+          setIsAdmin(account.role === 'admin');
+        }
+      } catch (err) {
+        console.error('Error fetching account info:', err);
+      }
+    };
+
+    fetchAccountInfo();
+  }, [user]);
 
   // Add/remove temporary pin marker
   const addTemporaryPin = useCallback(async (coordinates: { lat: number; lng: number }) => {
@@ -171,6 +313,40 @@ export default function LocationSidebar({
     if (temporaryMarkerRef.current) {
       temporaryMarkerRef.current.remove();
       temporaryMarkerRef.current = null;
+    }
+  }, []);
+
+  // Update temporary pin color based on visibility
+  const updateTemporaryPinColor = useCallback((visibility: 'public' | 'only_me') => {
+    if (!temporaryMarkerRef.current) return;
+    
+    const el = temporaryMarkerRef.current.getElement();
+    if (!el) return;
+
+    if (visibility === 'only_me') {
+      // Grey color for private pins
+      el.style.backgroundColor = '#6b7280';
+      el.style.boxShadow = '0 0 0 0 rgba(107, 114, 128, 0.7)';
+    } else {
+      // Red color for public pins
+      el.style.backgroundColor = '#ef4444';
+      el.style.boxShadow = '0 0 0 0 rgba(239, 68, 68, 0.7)';
+    }
+
+    // Update keyframe animation colors
+    const styleEl = document.getElementById('temporary-marker-styles');
+    if (styleEl) {
+      const color = visibility === 'only_me' ? '107, 114, 128' : '239, 68, 68';
+      styleEl.textContent = `
+        @keyframes pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(${color}, 0.7);
+          }
+          50% {
+            box-shadow: 0 0 0 10px rgba(${color}, 0);
+          }
+        }
+      `;
     }
   }, []);
 
@@ -249,10 +425,11 @@ export default function LocationSidebar({
     setSearchQuery(feature.place_name);
     setShowSuggestions(false);
     setSelectedIndex(-1);
-    
-    // Clear selected pin when selecting a new location
+
+    // Clear selected pin and atlas entity when selecting a new location
     setSelectedPin(null);
-    
+    setSelectedAtlasEntity(null);
+
     setLocationData({
       coordinates,
       placeName: feature.place_name,
@@ -262,6 +439,9 @@ export default function LocationSidebar({
 
     // Add temporary pin
     addTemporaryPin(coordinates);
+
+    // Dispatch event to close any open pin popup
+    window.dispatchEvent(new CustomEvent('location-selected-on-map'));
 
     // Get feature metadata at selected location (convert coordinates to point)
     if (map && !map.removed) {
@@ -393,10 +573,18 @@ export default function LocationSidebar({
 
 
   // Reverse geocode coordinates to get address
-  const reverseGeocode = useCallback(async (lng: number, lat: number): Promise<string | null> => {
+  interface ReverseGeocodeResult {
+    address: string | null;
+    city: string | null;
+    county: string | null;
+  }
+
+  const reverseGeocode = useCallback(async (lng: number, lat: number): Promise<ReverseGeocodeResult> => {
     const token = MAP_CONFIG.MAPBOX_TOKEN;
+    const emptyResult: ReverseGeocodeResult = { address: null, city: null, county: null };
+    
     if (!token) {
-      return null;
+      return emptyResult;
     }
 
     try {
@@ -409,20 +597,56 @@ export default function LocationSidebar({
 
       const response = await fetch(`${url}?${params}`);
       if (!response.ok) {
-        return null;
+        return emptyResult;
       }
 
       const data = await response.json();
       if (!data.features || data.features.length === 0) {
-        return null;
+        return emptyResult;
       }
 
-      return data.features[0].place_name || null;
+      const feature = data.features[0];
+      const address = feature.place_name || null;
+      
+      // Extract city and county from context array
+      let city: string | null = null;
+      let county: string | null = null;
+      
+      if (feature.context && Array.isArray(feature.context)) {
+        for (const ctx of feature.context) {
+          // city is typically "place.xxx" in the context id
+          if (ctx.id?.startsWith('place.')) {
+            city = ctx.text || null;
+          }
+          // county is typically "district.xxx" in the context id
+          if (ctx.id?.startsWith('district.')) {
+            county = ctx.text || null;
+          }
+        }
+      }
+
+      return { address, city, county };
     } catch (error) {
       console.error('Error reverse geocoding:', error);
-      return null;
+      return emptyResult;
     }
   }, []);
+
+  // Listen for "pin-popup-opening" event to close location details when a pin popup opens
+  useEffect(() => {
+    const handlePinPopupOpening = () => {
+      // Close location details when a pin popup opens
+      setLocationData(null);
+      setPinFeature(null);
+      removeTemporaryPin();
+    };
+
+    window.addEventListener('pin-popup-opening', handlePinPopupOpening as EventListener);
+
+    return () => {
+      window.removeEventListener('pin-popup-opening', handlePinPopupOpening as EventListener);
+    };
+  }, [removeTemporaryPin]);
 
   // Listen for "open-pin-sidebar" event from popup "See More" button
   useEffect(() => {
@@ -437,24 +661,26 @@ export default function LocationSidebar({
       }
       
       // Reverse geocode to get address for the pin
-      const address = await reverseGeocode(pin.coordinates.lng, pin.coordinates.lat);
+      const geocodeResult = await reverseGeocode(pin.coordinates.lng, pin.coordinates.lat);
       
       // Set selected pin data with address
       setSelectedPin({
         ...pin,
-        address: address || null,
+        address: geocodeResult.address || null,
       });
       
       // Set location data to open sidebar
       setLocationData({
         coordinates: pin.coordinates,
         placeName: pin.name,
-        address: address || undefined,
+        address: geocodeResult.address || undefined,
         type: 'pin-click',
+        city: geocodeResult.city || undefined,
+        county: geocodeResult.county || undefined,
       });
       
       // Update search input with pin name or address
-      setSearchQuery(address || pin.name);
+      setSearchQuery(geocodeResult.address || pin.name);
       
       // Clear pin feature metadata (we're showing pin data instead)
       setPinFeature(null);
@@ -465,7 +691,7 @@ export default function LocationSidebar({
           id: pin.id,
           name: pin.name,
           coordinates: pin.coordinates,
-          address: address || undefined,
+          address: geocodeResult.address || undefined,
           description: pin.description || undefined,
         });
       }
@@ -478,19 +704,59 @@ export default function LocationSidebar({
     };
   }, [onPinClick, reverseGeocode, map, mapLoaded, onLocationSelect]);
 
+  // Listen for atlas entity clicks
+  useEffect(() => {
+    const handleAtlasEntityClick = (event: CustomEvent<AtlasEntity>) => {
+      const entity = event.detail;
+      
+      // Clear other selections
+      setSelectedPin(null);
+      setLocationData(null);
+      setPinFeature(null);
+      removeTemporaryPin();
+      
+      // Set the selected atlas entity
+      setSelectedAtlasEntity(entity);
+      setAtlasEntityMessage(null);
+      
+      // Fly to the entity location
+      if (map && mapLoaded && entity.lat && entity.lng) {
+        (map as any).flyTo({
+          center: [entity.lng, entity.lat],
+          zoom: 14,
+          duration: 1000,
+        });
+      }
+    };
+
+    window.addEventListener('atlas-entity-click', handleAtlasEntityClick as EventListener);
+
+    return () => {
+      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick as EventListener);
+    };
+  }, [map, mapLoaded, removeTemporaryPin]);
+
   const handleMapClick = useCallback(async (e: MapboxMouseEvent) => {
     if (!map || !mapLoaded) return;
     
     const { lng, lat } = e.lngLat;
     
-    // Check if click hit a pin - if so, don't show map click data
+    // Check if click hit a pin or atlas entity - if so, don't show map click data
     try {
       const mapboxMap = map as any;
       const layersToCheck = [
+        // User pins
         'map-pins-unclustered-point',
         'map-pins-unclustered-point-label',
         'map-pins-clusters',
         'map-pins-cluster-count',
+        // Atlas layers
+        'atlas-cities-points',
+        'atlas-counties-points',
+        'atlas-neighborhoods-points',
+        'atlas-schools-points',
+        'atlas-parks-points',
+        'atlas-lakes-points',
       ];
       
       const existingLayers = layersToCheck.filter(layerId => {
@@ -506,7 +772,7 @@ export default function LocationSidebar({
           layers: existingLayers,
         });
 
-        // If a pin was clicked, don't show map click data (pin click handler will show it)
+        // If a pin or atlas entity was clicked, don't show map click data (their click handlers will handle it)
         if (features.length > 0) {
           return;
         }
@@ -518,26 +784,32 @@ export default function LocationSidebar({
     // Add temporary pin
     addTemporaryPin({ lat, lng });
 
-    // Clear selected pin when clicking on map (not a pin)
+    // Dispatch event to close any open pin popup
+    window.dispatchEvent(new CustomEvent('location-selected-on-map'));
+
+    // Clear selected pin and atlas entity when clicking on map (not a pin)
     setSelectedPin(null);
+    setSelectedAtlasEntity(null);
 
     // Get feature metadata at pin location
     const pinMetadata = getFeatureMetadata(e.point);
     setPinFeature(pinMetadata);
 
     // Reverse geocode to get address
-    const address = await reverseGeocode(lng, lat);
-    const placeName = address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const geocodeResult = await reverseGeocode(lng, lat);
+    const placeName = geocodeResult.address || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
     // Update search input with address
     setSearchQuery(placeName);
 
-    // Set location data with address
+    // Set location data with address and city/county
     setLocationData({
       coordinates: { lat, lng },
-      placeName: address || undefined,
-      address: address || undefined,
+      placeName: geocodeResult.address || undefined,
+      address: geocodeResult.address || undefined,
       type: 'map-click',
+      city: geocodeResult.city || undefined,
+      county: geocodeResult.county || undefined,
     });
 
     // Close create pin modal if open when user clicks a new location
@@ -576,6 +848,13 @@ export default function LocationSidebar({
       onRemoveTemporaryPin(removeTemporaryPin);
     }
   }, [onRemoveTemporaryPin, removeTemporaryPin]);
+
+  // Expose updateTemporaryPinColor function to parent
+  useEffect(() => {
+    if (onUpdateTemporaryPinColor) {
+      onUpdateTemporaryPinColor(updateTemporaryPinColor);
+    }
+  }, [onUpdateTemporaryPinColor, updateTemporaryPinColor]);
 
   // Cleanup search timeout and temporary marker
   useEffect(() => {
@@ -648,8 +927,8 @@ export default function LocationSidebar({
     return undefined;
   }, [showSuggestions, suggestions, selectedIndex, handleSuggestionSelect]);
 
-  // Sidebar expands if either location data or selected pin exists
-  const hasData = locationData !== null || selectedPin !== null;
+  // Sidebar expands if either location data, selected pin, or selected atlas entity exists
+  const hasData = locationData !== null || selectedPin !== null || selectedAtlasEntity !== null;
   const isExpanded = hasData;
 
   // Search input is always in the sidebar
@@ -666,6 +945,7 @@ export default function LocationSidebar({
           onClick={() => {
             setLocationData(null);
             setSelectedPin(null);
+            setSelectedAtlasEntity(null);
             removeTemporaryPin();
           }}
         />
@@ -687,13 +967,13 @@ export default function LocationSidebar({
       >
         <div className="flex flex-col p-4 lg:p-4">
         {/* Search Input - Always Visible */}
-        <div className={`relative bg-white rounded-lg border border-gray-200 shadow-sm ${hasData ? 'mb-0 border-b-0 rounded-b-none lg:rounded-b-none' : ''}`} style={{ pointerEvents: 'auto', zIndex: 50 }}>
+        <div className={`relative bg-white/10 backdrop-blur rounded-lg border border-white/20 ${hasData ? 'mb-0 border-b-0 rounded-b-none lg:rounded-b-none' : ''}`} style={{ pointerEvents: 'auto', zIndex: 50 }}>
           <div className="relative flex items-center">
             {/* Hamburger Menu Icon - Inside Input */}
             <div className="relative" ref={menuRef}>
               <button
-                className={`flex items-center justify-center w-11 h-11 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-all duration-150 rounded-l-lg pointer-events-auto ${
-                  isMenuOpen ? 'bg-gray-50 text-gray-900' : ''
+                className={`flex items-center justify-center w-11 h-11 text-white hover:bg-white/20 transition-all duration-150 rounded-l-lg pointer-events-auto ${
+                  isMenuOpen ? 'bg-white/20' : ''
                 }`}
                 title={isMenuOpen ? 'Close Menu' : 'Menu'}
                 aria-label={isMenuOpen ? 'Close Menu' : 'Menu'}
@@ -711,15 +991,15 @@ export default function LocationSidebar({
 
               {/* Menu Dropdown */}
               {isMenuOpen && (
-                <div className="absolute left-0 top-full mt-1 w-80 bg-white rounded-lg border border-gray-200 shadow-xl z-50">
+                <div className="absolute left-0 top-full mt-1 w-80 bg-white/10 backdrop-blur rounded-lg border border-white/20 z-50">
                   {/* Tabs */}
-                  <div className="flex border-b border-gray-200">
+                  <div className="flex border-b border-white/20">
                     <button
                       onClick={() => setActiveTab('about')}
                       className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
                         activeTab === 'about'
-                          ? 'text-gray-900 border-gray-900'
-                          : 'text-gray-500 hover:text-gray-700 border-transparent'
+                          ? 'text-white border-white'
+                          : 'text-white/60 hover:text-white border-transparent'
                       }`}
                     >
                       About
@@ -728,8 +1008,8 @@ export default function LocationSidebar({
                       onClick={() => setActiveTab('moderation')}
                       className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
                         activeTab === 'moderation'
-                          ? 'text-gray-900 border-gray-900 bg-gray-50'
-                          : 'text-gray-500 hover:text-gray-700 border-transparent'
+                          ? 'text-white border-white bg-white/10'
+                          : 'text-white/60 hover:text-white border-transparent'
                       }`}
                     >
                       Moderation
@@ -738,8 +1018,8 @@ export default function LocationSidebar({
                       onClick={() => setActiveTab('press')}
                       className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
                         activeTab === 'press'
-                          ? 'text-gray-900 border-gray-900'
-                          : 'text-gray-500 hover:text-gray-700 border-transparent'
+                          ? 'text-white border-white'
+                          : 'text-white/60 hover:text-white border-transparent'
                       }`}
                     >
                       Press
@@ -750,8 +1030,8 @@ export default function LocationSidebar({
                   <div className="max-h-96 overflow-y-auto">
                     {activeTab === 'about' && (
                       <div className="p-4 space-y-4">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-2">About Us</h3>
-                        <p className="text-xs text-gray-600 leading-relaxed">
+                        <h3 className="text-sm font-semibold text-white mb-2">About Us</h3>
+                        <p className="text-xs text-white/80 leading-relaxed">
                           For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.
                         </p>
                       </div>
@@ -759,29 +1039,29 @@ export default function LocationSidebar({
 
                     {activeTab === 'moderation' && (
                       <div className="p-4 space-y-4">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-2">Moderation Guidelines</h3>
-                        <p className="text-xs text-gray-600 leading-relaxed mb-3">
+                        <h3 className="text-sm font-semibold text-white mb-2">Moderation Guidelines</h3>
+                        <p className="text-xs text-white/80 leading-relaxed mb-3">
                           Posts are moderated to maintain a safe and respectful environment for the For the Love of Minnesota community.
                         </p>
                         <div className="space-y-2">
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-white/80">
                             <span className="font-medium">1. Breaches of Privacy:</span> Posts containing personal identifying information (names, phone numbers, email addresses, social media handles, exact addresses) without consent.
                           </div>
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-white/80">
                             <span className="font-medium">2. Hate Speech:</span> Posts that degrade or threaten based on race, ethnicity, citizenship, ability, sexuality, sex, gender, or class.
                           </div>
-                          <div className="text-xs text-gray-600">
+                          <div className="text-xs text-white/80">
                             <span className="font-medium">3. Spam/Unauthorized Advertising:</span> Spam posts or unauthorized advertisements that don&apos;t align with our community guidelines.
                           </div>
                         </div>
-                        <p className="text-xs text-gray-600 leading-relaxed mt-3">
+                        <p className="text-xs text-white/80 leading-relaxed mt-3">
                           Moderation is in place to ensure a safe and respectful environment for all Minnesota residents, neighbors, and professionals.
                         </p>
                         <div className="mt-4">
-                          <h4 className="text-xs font-semibold text-gray-900 mb-1">Request Removal</h4>
-                          <p className="text-xs text-gray-600 leading-relaxed">
+                          <h4 className="text-xs font-semibold text-white mb-1">Request Removal</h4>
+                          <p className="text-xs text-white/80 leading-relaxed">
                             To request removal of a post or report content concerns, please contact{' '}
-                            <a href="mailto:hi@fortheloveofminnesota.com" className="text-blue-600 hover:underline">
+                            <a href="mailto:hi@fortheloveofminnesota.com" className="text-white hover:underline">
                               hi@fortheloveofminnesota.com
                             </a>
                           </p>
@@ -791,14 +1071,14 @@ export default function LocationSidebar({
 
                     {activeTab === 'press' && (
                       <div className="p-4 space-y-4">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-2">Press</h3>
-                        <p className="text-xs text-gray-600 leading-relaxed">
+                        <h3 className="text-sm font-semibold text-white mb-2">Press</h3>
+                        <p className="text-xs text-white/80 leading-relaxed">
                           For media inquiries, press releases, or interview requests about For the Love of Minnesota, please contact our team.
                         </p>
                         <div className="mt-3">
-                          <p className="text-xs text-gray-600 leading-relaxed">
+                          <p className="text-xs text-white/80 leading-relaxed">
                             Press Contact:{' '}
-                            <a href="mailto:hi@fortheloveofminnesota.com" className="text-blue-600 hover:underline">
+                            <a href="mailto:hi@fortheloveofminnesota.com" className="text-white hover:underline">
                               hi@fortheloveofminnesota.com
                             </a>
                           </p>
@@ -807,18 +1087,18 @@ export default function LocationSidebar({
                     )}
 
                     {/* Footer Links */}
-                    <div className="border-t border-gray-200 p-4">
-                      <div className="grid grid-cols-2 gap-px border border-gray-200">
-                        <Link href="/faqs" className="px-3 py-2 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 text-center border-r border-gray-200">
+                    <div className="border-t border-white/20 p-4">
+                      <div className="grid grid-cols-2 gap-px border border-white/20">
+                        <Link href="/faqs" className="px-3 py-2 text-xs text-white/80 hover:text-white hover:bg-white/10 text-center border-r border-white/20">
                           FAQs
                         </Link>
-                        <Link href="/terms" className="px-3 py-2 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 text-center">
+                        <Link href="/terms" className="px-3 py-2 text-xs text-white/80 hover:text-white hover:bg-white/10 text-center">
                           Terms of Use
                         </Link>
-                        <Link href="/privacy" className="px-3 py-2 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 text-center border-r border-gray-200 border-t border-gray-200">
+                        <Link href="/privacy" className="px-3 py-2 text-xs text-white/80 hover:text-white hover:bg-white/10 text-center border-r border-white/20 border-t border-white/20">
                           Privacy Policy
                         </Link>
-                        <Link href="/contact" className="px-3 py-2 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 text-center border-t border-gray-200">
+                        <Link href="/contact" className="px-3 py-2 text-xs text-white/80 hover:text-white hover:bg-white/10 text-center border-t border-white/20">
                           Contact
                         </Link>
                       </div>
@@ -828,9 +1108,9 @@ export default function LocationSidebar({
               )}
             </div>
             
-            <div className="relative flex-1 border-l border-gray-200">
+            <div className="relative flex-1 border-l border-white/20">
               {/* Search Icon */}
-              <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+              <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60 pointer-events-none" />
               
               <input
                 ref={searchInputRef}
@@ -849,12 +1129,12 @@ export default function LocationSidebar({
                   }
                 }}
                 placeholder="Search locations..."
-                className="w-full pl-11 pr-10 py-3 text-sm bg-transparent border-0 text-gray-900 placeholder-gray-400 focus:outline-none focus:placeholder-gray-300 transition-all"
+                className="w-full pl-11 pr-10 py-3 text-sm bg-transparent border-0 text-white placeholder-white/50 focus:outline-none focus:placeholder-white/30 transition-all"
                 style={{ pointerEvents: 'auto', position: 'relative', zIndex: 50 }}
               />
               {isSearching && (
                 <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2">
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 </div>
               )}
             </div>
@@ -864,7 +1144,7 @@ export default function LocationSidebar({
           {showSuggestions && suggestions.length > 0 && (
             <div
               ref={suggestionsRef}
-              className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-lg border border-gray-200 shadow-xl max-h-64 overflow-y-auto"
+              className="absolute top-full left-0 right-0 mt-1.5 bg-white/10 backdrop-blur rounded-lg border border-white/20 max-h-64 overflow-y-auto"
               style={{ pointerEvents: 'auto', zIndex: 60 }}
             >
               {suggestions.map((feature, index) => (
@@ -872,29 +1152,25 @@ export default function LocationSidebar({
                   key={feature.id}
                   onClick={() => handleSuggestionSelect(feature)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full text-left px-4 py-2.5 transition-colors border-b border-gray-100 last:border-b-0 first:rounded-t-lg last:rounded-b-lg ${
+                  className={`w-full text-left px-4 py-2.5 transition-colors border-b border-white/10 last:border-b-0 first:rounded-t-lg last:rounded-b-lg ${
                     selectedIndex === index
-                      ? 'bg-gray-50'
-                      : 'hover:bg-gray-50'
+                      ? 'bg-white/20'
+                      : 'hover:bg-white/20'
                   }`}
                 >
-                  <div className="text-sm font-medium text-gray-900">{feature.text}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{feature.place_name}</div>
+                  <div className="text-sm font-medium text-white">{feature.text}</div>
+                  <div className="text-xs text-white/60 mt-0.5">{feature.place_name}</div>
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Border between search and location details */}
-        {isExpanded && locationData && (
-          <div className="w-full border-t border-gray-200"></div>
-        )}
 
         {/* Content Sections - Only shown when expanded */}
         {isExpanded && (
           <div 
-            className="overflow-y-auto bg-white rounded-b-lg lg:rounded-b-lg"
+            className="overflow-y-auto bg-white/10 backdrop-blur rounded-b-lg lg:rounded-b-lg"
             style={{ 
               maxHeight: 'calc(100vh - 140px)',
               minHeight: 0,
@@ -904,12 +1180,12 @@ export default function LocationSidebar({
               
               {/* Pin Details - Shown when an existing pin is clicked */}
               {selectedPin && (
-                <div className="space-y-3 mb-4 pb-4 border-b border-gray-200 relative">
+                <div className="space-y-3 mb-4 pb-4 border-b border-white/20 relative">
                   <button
                     onClick={() => {
                       setSelectedPin(null);
                     }}
-                    className="absolute top-0 right-0 p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="absolute top-0 right-0 p-1 text-white/70 hover:text-white transition-colors"
                     title="Close Pin Details"
                   >
                     <XMarkIcon className="w-4 h-4" />
@@ -917,32 +1193,65 @@ export default function LocationSidebar({
                   <div>
                     {/* Account Info */}
                     {selectedPin.account && (
-                      <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-200">
-                        {selectedPin.account.image_url ? (
-                          <img 
-                            src={selectedPin.account.image_url} 
-                            alt={selectedPin.account.username || 'User'} 
-                            className="w-6 h-6 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs text-gray-600 font-medium">
-                            {(selectedPin.account.username || 'U')[0].toUpperCase()}
-                          </div>
-                        )}
-                        <span className="text-xs font-medium text-gray-900">
-                          {selectedPin.account.username || 'Unknown User'}
-                        </span>
+                      <div className="flex items-center gap-2 mb-3 pb-3 border-b border-white/20">
+                        {(() => {
+                          const profileSlug = selectedPin.account.username || selectedPin.account.guest_id;
+                          const displayName = selectedPin.account.username || 'Guest';
+                          
+                          if (profileSlug) {
+                            return (
+                              <Link 
+                                href={`/profile/${profileSlug}`}
+                                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                              >
+                                {selectedPin.account.image_url ? (
+                                  <img 
+                                    src={selectedPin.account.image_url} 
+                                    alt={displayName} 
+                                    className="w-6 h-6 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs text-white font-medium">
+                                    {displayName[0].toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="text-xs font-medium text-white hover:underline">
+                                  {displayName}
+                                </span>
+                              </Link>
+                            );
+                          }
+                          
+                          return (
+                            <>
+                              {selectedPin.account.image_url ? (
+                                <img 
+                                  src={selectedPin.account.image_url} 
+                                  alt={displayName} 
+                                  className="w-6 h-6 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs text-white font-medium">
+                                  {displayName[0].toUpperCase()}
+                                </div>
+                              )}
+                              <span className="text-xs font-medium text-white">
+                                {displayName}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                     
                     <div className="flex items-start justify-between gap-2 mb-2 pr-6">
-                      <h3 className="text-sm font-semibold text-gray-900">{selectedPin.name}</h3>
+                      <h3 className="text-sm font-semibold text-white">{selectedPin.name}</h3>
                       {selectedPin.id && (
                         <PinTrendingBadge pinId={selectedPin.id} className="flex-shrink-0" />
                       )}
                     </div>
                     {selectedPin.description && (
-                      <p className="text-xs text-gray-700 mb-2 leading-relaxed">
+                      <p className="text-xs text-white/80 mb-2 leading-relaxed">
                         {selectedPin.description}
                       </p>
                     )}
@@ -963,14 +1272,14 @@ export default function LocationSidebar({
                         ) : null}
                       </div>
                     )}
-                    <div className="text-xs text-gray-500 mt-2">
+                    <div className="text-xs text-white/60 mt-2">
                       {new Date(selectedPin.created_at).toLocaleDateString()}
                     </div>
                   </div>
 
                   {/* Pin Analytics */}
                   {selectedPin.id && (
-                    <div className="space-y-2 pt-2 border-t border-gray-100">
+                    <div className="space-y-2 pt-2 border-t border-white/10">
                       <PinStatsCard pinId={selectedPin.id} compact={true} />
                       <button
                         onClick={() => {
@@ -978,25 +1287,186 @@ export default function LocationSidebar({
                           setAnalyticsPinName(selectedPin.name || null);
                           setIsAnalyticsModalOpen(true);
                         }}
-                        className="w-full text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-2 py-1.5 rounded transition-colors text-left"
+                        className="w-full text-xs text-white/70 hover:text-white hover:bg-white/10 px-2 py-1.5 rounded transition-colors text-left"
                       >
                         View Full Analytics →
                       </button>
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* Intelligence Button for Selected Pin */}
-                  <div className="pt-3 border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setIsIntelligenceModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors"
-                    >
-                      <SparklesIcon className="w-4 h-4 text-gray-500" />
-                      <span>Intelligence</span>
-                    </button>
+              {/* Atlas Entity Details - Shown when an atlas entity is clicked */}
+              {selectedAtlasEntity && (
+                <div className="space-y-3 mb-4 pb-4 border-b border-white/20 relative">
+                  <button
+                    onClick={() => {
+                      setSelectedAtlasEntity(null);
+                      setAtlasEntityMessage(null);
+                    }}
+                    className="absolute top-0 right-0 p-1 text-white/70 hover:text-white transition-colors"
+                    title="Close"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                  </button>
+                  <div>
+                    <div className="flex items-center gap-2 mb-2 pr-6">
+                      <span className="text-lg">{selectedAtlasEntity.emoji}</span>
+                      <h3 className="text-sm font-semibold text-white">{selectedAtlasEntity.name}</h3>
+                    </div>
+                    <div className="text-xs text-white/60 mb-2">
+                      {selectedAtlasEntity.layerType === 'schools' && selectedAtlasEntity.school_type && (
+                        <span className="capitalize">{selectedAtlasEntity.school_type.replace('_', ' ')} School</span>
+                      )}
+                      {selectedAtlasEntity.layerType === 'parks' && selectedAtlasEntity.park_type && (
+                        <span className="capitalize">{selectedAtlasEntity.park_type.replace('_', ' ')} Park</span>
+                      )}
+                      {selectedAtlasEntity.layerType === 'cities' && <span>City</span>}
+                      {selectedAtlasEntity.layerType === 'counties' && <span>County</span>}
+                      {selectedAtlasEntity.layerType === 'neighborhoods' && <span>Neighborhood</span>}
+                      {selectedAtlasEntity.layerType === 'lakes' && <span>Lake</span>}
+                    </div>
+                    {selectedAtlasEntity.description && (
+                      <p className="text-xs text-white/80 mb-2 leading-relaxed">
+                        {selectedAtlasEntity.description}
+                      </p>
+                    )}
+                    <div className="text-xs text-white/50">
+                      <div>Lat: {selectedAtlasEntity.lat.toFixed(6)}</div>
+                      <div>Lng: {selectedAtlasEntity.lng.toFixed(6)}</div>
+                    </div>
+                    
+                    {/* Explore Link for cities */}
+                    {selectedAtlasEntity.layerType === 'cities' && selectedAtlasEntity.slug && (
+                      <Link 
+                        href={`/explore/city/${selectedAtlasEntity.slug}`}
+                        className="block mt-2 text-xs text-white/70 hover:text-white underline transition-colors"
+                      >
+                        Explore {selectedAtlasEntity.name} →
+                      </Link>
+                    )}
+                    
+                    {/* Explore Link for counties */}
+                    {selectedAtlasEntity.layerType === 'counties' && selectedAtlasEntity.slug && (
+                      <Link 
+                        href={`/explore/county/${selectedAtlasEntity.slug}`}
+                        className="block mt-2 text-xs text-white/70 hover:text-white underline transition-colors"
+                      >
+                        Explore {selectedAtlasEntity.name} County →
+                      </Link>
+                    )}
                   </div>
+
+                  {/* Admin Actions */}
+                  {isAdmin && selectedAtlasEntity.layerType !== 'cities' && selectedAtlasEntity.layerType !== 'counties' && (
+                    <div className="space-y-2 pt-2 border-t border-white/10">
+                      <div className="text-[10px] text-white/50 font-medium">Admin Actions</div>
+                      
+                      {/* Edit Button - Opens modal in edit mode */}
+                      <button
+                        onClick={() => {
+                          // Map layerType to singular entityType
+                          const typeMap: Record<string, AtlasEntityType> = {
+                            neighborhoods: 'neighborhood',
+                            schools: 'school',
+                            parks: 'park',
+                            lakes: 'lake',
+                          };
+                          const entityType = typeMap[selectedAtlasEntity.layerType];
+                          if (entityType) {
+                            setAtlasEntityType(entityType);
+                            setAtlasEntityModalMode('edit');
+                            setAtlasEntityToEdit({
+                              id: selectedAtlasEntity.id,
+                              name: selectedAtlasEntity.name,
+                              slug: selectedAtlasEntity.slug,
+                              lat: selectedAtlasEntity.lat,
+                              lng: selectedAtlasEntity.lng,
+                              description: selectedAtlasEntity.description,
+                              website_url: selectedAtlasEntity.website_url,
+                              city_id: selectedAtlasEntity.city_id,
+                              county_id: selectedAtlasEntity.county_id,
+                              school_type: selectedAtlasEntity.school_type,
+                              is_public: selectedAtlasEntity.is_public,
+                              district: selectedAtlasEntity.district,
+                              park_type: selectedAtlasEntity.park_type,
+                            });
+                            setIsAtlasEntityModalOpen(true);
+                          }
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                      >
+                        <Cog6ToothIcon className="w-4 h-4 text-white/70" />
+                        <span>Edit {selectedAtlasEntity.layerType.slice(0, -1)}</span>
+                      </button>
+                      
+                      {/* Delete Button */}
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Are you sure you want to delete "${selectedAtlasEntity.name}"? This action cannot be undone.`)) {
+                            return;
+                          }
+                          
+                          setIsDeletingAtlasEntity(true);
+                          setAtlasEntityMessage(null);
+                          
+                          try {
+                            // Call appropriate delete function based on type
+                            switch (selectedAtlasEntity.layerType) {
+                              case 'neighborhoods':
+                                await deleteNeighborhood(selectedAtlasEntity.id);
+                                break;
+                              case 'schools':
+                                await deleteSchool(selectedAtlasEntity.id);
+                                break;
+                              case 'parks':
+                                await deletePark(selectedAtlasEntity.id);
+                                break;
+                              case 'lakes':
+                                await deleteLake(selectedAtlasEntity.id);
+                                break;
+                            }
+                            
+                            // Refresh the layer
+                            window.dispatchEvent(new CustomEvent('atlas-layer-refresh', {
+                              detail: { layerId: selectedAtlasEntity.layerType }
+                            }));
+                            
+                            setAtlasEntityMessage({ type: 'success', text: `Deleted "${selectedAtlasEntity.name}"` });
+                            
+                            // Clear selection after short delay
+                            setTimeout(() => {
+                              setSelectedAtlasEntity(null);
+                              setAtlasEntityMessage(null);
+                            }, 1500);
+                          } catch (error) {
+                            console.error('Error deleting entity:', error);
+                            setAtlasEntityMessage({ 
+                              type: 'error', 
+                              text: error instanceof Error ? error.message : 'Failed to delete'
+                            });
+                          } finally {
+                            setIsDeletingAtlasEntity(false);
+                          }
+                        }}
+                        disabled={isDeletingAtlasEntity}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-300 bg-transparent border border-red-500/30 hover:bg-red-500/20 rounded-md transition-colors disabled:opacity-50"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                        <span>{isDeletingAtlasEntity ? 'Deleting...' : 'Delete'}</span>
+                      </button>
+                      
+                      {atlasEntityMessage && (
+                        <div className={`px-2 py-1 text-[10px] rounded ${
+                          atlasEntityMessage.type === 'success' 
+                            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}>
+                          {atlasEntityMessage.text}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1009,19 +1479,19 @@ export default function LocationSidebar({
                       setPinFeature(null);
                       removeTemporaryPin();
                     }}
-                    className="absolute top-0 right-0 p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="absolute top-0 right-0 p-1 text-white/70 hover:text-white transition-colors"
                     title="Close Location Details"
                   >
                     <XMarkIcon className="w-4 h-4" />
                   </button>
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2 pr-6">Location Details</h3>
+                    <h3 className="text-sm font-semibold text-white mb-2 pr-6">Location Details</h3>
                     {(locationData.address || locationData.placeName) && (
-                      <p className="text-sm text-gray-700 mb-1">
+                      <p className="text-sm text-white/80 mb-1">
                         {locationData.address || locationData.placeName}
                       </p>
                     )}
-                    <div className="text-xs text-gray-600 mt-2">
+                    <div className="text-xs text-white/70 mt-2">
                       <div>Lat: {locationData.coordinates.lat.toFixed(6)}</div>
                       <div>Lng: {locationData.coordinates.lng.toFixed(6)}</div>
                     </div>
@@ -1031,8 +1501,8 @@ export default function LocationSidebar({
 
               {/* Tools Section - Only show for location data (temporary pin), not for existing pins */}
               {locationData && !selectedPin && (onCreatePin || onSkipTrace || onDrawArea) && (
-                <div className="pt-3 border-t border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-900 mb-2">Tools</h4>
+                <div className="pt-3 border-t border-white/20">
+                  <h4 className="text-xs font-semibold text-white mb-2">Tools</h4>
                   <div className="space-y-2">
                     {onCreatePin && (
                       <button
@@ -1042,87 +1512,367 @@ export default function LocationSidebar({
                           // Keep temporary pin visible until modal closes or pin is created
                           // Location details will be restored when modal closes via back button
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
                       >
-                        <MapPinIcon className="w-4 h-4 text-gray-500" />
-                        <span>Create Pin</span>
+                        <MapPinIcon className="w-4 h-4 text-white/70" />
+                        <span>Drop Heart</span>
                       </button>
                     )}
-                    <button
-                      onClick={() => {
-                        setIsIntelligenceModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors"
-                    >
-                      <SparklesIcon className="w-4 h-4 text-gray-500" />
-                      <span>Intelligence</span>
-                    </button>
-                    {onSkipTrace && (
-                      <button
-                        onClick={() => {
-                          // Coming soon - do nothing
-                        }}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <FingerPrintIcon className="w-4 h-4 text-gray-500" />
-                          <span>Skip Trace</span>
+                    {/* Intelligence - Hide for road-type locations */}
+                    {(() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const roadTypes = ['Road', 'Street', 'Highway', 'Path', 'Trail'];
+                      const isRoad = pinCategory && roadTypes.includes(pinCategory);
+                      if (isRoad) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            setIsIntelligenceModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                        >
+                          <SparklesIcon className="w-4 h-4 text-white/70" />
+                          <span>Intelligence</span>
+                        </button>
+                      );
+                    })()}
+                    {/* Report Incident - Only show for road-type locations */}
+                    {(() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const roadTypes = ['Road', 'Street', 'Highway', 'Path', 'Trail'];
+                      const isRoad = pinCategory && roadTypes.includes(pinCategory);
+                      if (!isRoad) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            setComingSoonFeature('Report Incident');
+                            setIsComingSoonModalOpen(true);
+                          }}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ExclamationTriangleIcon className="w-4 h-4 text-white/70" />
+                            <span>Report Incident</span>
+                          </div>
+                          <span className="text-[10px] text-white/50 font-normal">Coming Soon</span>
+                        </button>
+                      );
+                    })()}
+                    {/* Create Neighborhood - Only show for admin users on neighborhood-type locations */}
+                    {isAdmin && (() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const isNeighborhood = pinCategory === 'Neighborhood';
+                      if (!isNeighborhood) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            setAtlasEntityType('neighborhood');
+                            setAtlasEntityModalMode('create');
+                            setAtlasEntityToEdit(undefined);
+                            setAtlasEntityFeatureName(pinFeature?.name);
+                            setIsAtlasEntityModalOpen(true);
+                          }}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <BuildingOffice2Icon className="w-4 h-4 text-white/70" />
+                            <span>Create Neighborhood</span>
+                          </div>
+                          <span className="text-[10px] text-white/50 font-normal">Admin</span>
+                        </button>
+                      );
+                    })()}
+                    {/* Create School - Only show for admin users on school/education-type locations */}
+                    {isAdmin && (() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const isSchool = pinCategory === 'School';
+                      if (!isSchool) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            setAtlasEntityType('school');
+                            setAtlasEntityModalMode('create');
+                            setAtlasEntityToEdit(undefined);
+                            setAtlasEntityFeatureName(pinFeature?.name);
+                            setIsAtlasEntityModalOpen(true);
+                          }}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <AcademicCapIcon className="w-4 h-4 text-white/70" />
+                            <span>Create School</span>
+                          </div>
+                          <span className="text-[10px] text-white/50 font-normal">Admin</span>
+                        </button>
+                      );
+                    })()}
+                    {/* Create Park - Only show for admin users on park-type locations */}
+                    {isAdmin && (() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const isPark = pinCategory === 'Park';
+                      if (!isPark) return null;
+                      return (
+                        <button
+                          onClick={() => {
+                            setAtlasEntityType('park');
+                            setAtlasEntityModalMode('create');
+                            setAtlasEntityToEdit(undefined);
+                            setAtlasEntityFeatureName(pinFeature?.name);
+                            setIsAtlasEntityModalOpen(true);
+                          }}
+                          className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <SunIcon className="w-4 h-4 text-white/70" />
+                            <span>Create Park</span>
+                          </div>
+                          <span className="text-[10px] text-white/50 font-normal">Admin</span>
+                        </button>
+                      );
+                    })()}
+                    {/* Create Lake - Only show for admin users on water/lake-type locations */}
+                    {isAdmin && (() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const isLake = pinCategory === 'Lake';
+                      if (!isLake || !pinFeature?.name || !locationData?.coordinates) return null;
+                      return (
+                        <div className="space-y-1.5">
+                          <button
+                            onClick={async () => {
+                              if (!pinFeature?.name || !locationData?.coordinates) return;
+                              
+                              setIsCreatingLake(true);
+                              setLakeCreateMessage(null);
+                              
+                              try {
+                                // Check if lake with this name already exists
+                                const exists = await checkLakeExists(pinFeature.name);
+                                
+                                if (exists) {
+                                  // Name not unique - open modal for manual resolution
+                                  setAtlasEntityType('lake');
+                                  setAtlasEntityModalMode('create');
+                                  setAtlasEntityToEdit(undefined);
+                                  setAtlasEntityFeatureName(pinFeature.name);
+                                  setIsAtlasEntityModalOpen(true);
+                                  setLakeCreateMessage({ type: 'error', text: `Lake "${pinFeature.name}" already exists. Please modify the name.` });
+                                } else {
+                                  // Name is unique - create directly
+                                  await createLake({
+                                    name: pinFeature.name,
+                                    lat: locationData.coordinates.lat,
+                                    lng: locationData.coordinates.lng,
+                                  });
+                                  
+                                  // Refresh the lakes layer on the map (autoEnable to show immediately)
+                                  window.dispatchEvent(new CustomEvent('atlas-layer-refresh', {
+                                    detail: { layerId: 'lakes', autoEnable: true }
+                                  }));
+                                  
+                                  setLakeCreateMessage({ type: 'success', text: `Created "${pinFeature.name}"` });
+                                  
+                                  // Clear message after 3 seconds
+                                  setTimeout(() => setLakeCreateMessage(null), 3000);
+                                }
+                              } catch (error) {
+                                console.error('Error creating lake:', error);
+                                setLakeCreateMessage({ 
+                                  type: 'error', 
+                                  text: error instanceof Error ? error.message : 'Failed to create lake'
+                                });
+                              } finally {
+                                setIsCreatingLake(false);
+                              }
+                            }}
+                            disabled={isCreatingLake}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="flex items-center gap-2">
+                              <GlobeAmericasIcon className="w-4 h-4 text-white/70" />
+                              <span>{isCreatingLake ? 'Creating...' : 'Create Lake'}</span>
+                            </div>
+                            <span className="text-[10px] text-white/50 font-normal">Admin</span>
+                          </button>
+                          {lakeCreateMessage && (
+                            <div className={`px-2 py-1 text-[10px] rounded ${
+                              lakeCreateMessage.type === 'success' 
+                                ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                                : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                            }`}>
+                              {lakeCreateMessage.text}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[10px] text-gray-400 font-normal">Coming Soon</span>
-                      </button>
-                    )}
-                    {onDrawArea && (
-                      <button
-                        onClick={() => {
-                          // Coming soon - do nothing
-                        }}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 rounded-md transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Square3Stack3DIcon className="w-4 h-4 text-gray-500" />
-                          <span>Draw Area</span>
+                      );
+                    })()}
+                    {/* Update City Coordinates - Only show for admin users on city-type locations */}
+                    {isAdmin && (() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const isCity = pinCategory === 'City';
+                      if (!isCity || !pinFeature?.name || !locationData?.coordinates) return null;
+                      
+                      return (
+                        <div className="space-y-1.5">
+                          <button
+                            onClick={async () => {
+                              if (!pinFeature?.name || !locationData?.coordinates) return;
+                              
+                              setIsUpdatingCityCoords(true);
+                              setCityUpdateMessage(null);
+                              
+                              try {
+                                // Find the city by name
+                                const city = await findCityByName(pinFeature.name);
+                                
+                                if (!city) {
+                                  setCityUpdateMessage({ type: 'error', text: `City "${pinFeature.name}" not found in database` });
+                                  return;
+                                }
+                                
+                                // Update the coordinates
+                                await updateCityCoordinates(
+                                  city.id,
+                                  locationData.coordinates.lat,
+                                  locationData.coordinates.lng
+                                );
+                                
+                                // Refresh the cities layer on the map
+                                window.dispatchEvent(new CustomEvent('atlas-layer-refresh', {
+                                  detail: { layerId: 'cities' }
+                                }));
+                                
+                                setCityUpdateMessage({ type: 'success', text: `Updated ${pinFeature.name} coordinates` });
+                                
+                                // Clear message after 3 seconds
+                                setTimeout(() => setCityUpdateMessage(null), 3000);
+                              } catch (error) {
+                                console.error('Error updating city coordinates:', error);
+                                setCityUpdateMessage({ 
+                                  type: 'error', 
+                                  text: error instanceof Error ? error.message : 'Failed to update coordinates'
+                                });
+                              } finally {
+                                setIsUpdatingCityCoords(false);
+                              }
+                            }}
+                            disabled={isUpdatingCityCoords}
+                            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <div className="flex items-center gap-2">
+                              <MapPinIcon className="w-4 h-4 text-white/70" />
+                              <span>{isUpdatingCityCoords ? 'Updating...' : 'Update City Coordinates'}</span>
+                            </div>
+                            <span className="text-[10px] text-white/50 font-normal">Admin</span>
+                          </button>
+                          {cityUpdateMessage && (
+                            <div className={`px-2 py-1 text-[10px] rounded ${
+                              cityUpdateMessage.type === 'success' 
+                                ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                                : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                            }`}>
+                              {cityUpdateMessage.text}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-[10px] text-gray-400 font-normal">Coming Soon</span>
-                      </button>
-                    )}
+                      );
+                    })()}
+                    {/* Hide Skip Trace and Draw Area for City, Road, Lake, Park, and School locations */}
+                    {(() => {
+                      const pinCategory = pinFeature ? getFeatureCategory(pinFeature.properties, pinFeature.type) : null;
+                      const roadTypes = ['Road', 'Street', 'Highway', 'Path', 'Trail'];
+                      const isCity = pinCategory === 'City';
+                      const isRoad = pinCategory && roadTypes.includes(pinCategory);
+                      const isLake = pinCategory === 'Lake';
+                      const isPark = pinCategory === 'Park';
+                      const isSchool = pinCategory === 'School';
+                      if (isCity || isRoad || isLake || isPark || isSchool) return null;
+                      return (
+                        <>
+                          {onSkipTrace && (
+                            <button
+                              onClick={() => {
+                                setComingSoonFeature('Skip Trace');
+                                setIsComingSoonModalOpen(true);
+                              }}
+                              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <FingerPrintIcon className="w-4 h-4 text-white/70" />
+                                <span>Skip Trace</span>
+                              </div>
+                              <span className="text-[10px] text-white/50 font-normal">Coming Soon</span>
+                            </button>
+                          )}
+                          {onDrawArea && (
+                            <button
+                              onClick={() => {
+                                setComingSoonFeature('Draw Area');
+                                setIsComingSoonModalOpen(true);
+                              }}
+                              className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-medium text-white bg-transparent border border-white/20 hover:bg-white/10 rounded-md transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Square3Stack3DIcon className="w-4 h-4 text-white/70" />
+                                <span>Draw Area</span>
+                              </div>
+                              <span className="text-[10px] text-white/50 font-normal">Coming Soon</span>
+                            </button>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
 
               {/* Pin Location Metadata - Static */}
               {pinFeature && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-900 mb-2">
-                    Pin Location: {pinFeature.name || pinFeature.type}
-                  </h4>
-                  {Object.keys(pinFeature.properties).length > 0 && (
-                    <div className="space-y-1">
-                      {Object.entries(pinFeature.properties).slice(0, 5).map(([key, value]) => (
-                        <div key={key} className="text-xs text-gray-600">
-                          <span className="font-medium">{key}:</span> {String(value)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="mt-3 bg-white/5 rounded-md px-2 py-1.5">
+                  <div className="text-[10px] text-white/60">
+                    <span className="font-medium text-white/80">{pinFeature.name || pinFeature.type}</span>
+                    {(() => {
+                      const category = getFeatureCategory(pinFeature.properties, pinFeature.type);
+                      return category ? <span> · {category}</span> : null;
+                    })()}
+                  </div>
+                  {(() => {
+                    const category = getFeatureCategory(pinFeature.properties, pinFeature.type);
+                    if (category === 'City' && pinFeature.name) {
+                      const citySlug = pinFeature.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      return (
+                        <Link href={`/explore/city/${citySlug}`} className="block text-[10px] text-white/70 hover:text-white underline transition-colors mt-1">
+                          Explore City
+                        </Link>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
 
 
               {/* Cursor Position Metadata - Dynamic */}
               {hoverFeature && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="text-xs font-semibold text-gray-900 mb-2">
-                    Cursor: {hoverFeature.name || hoverFeature.type}
-                  </h4>
-                  {Object.keys(hoverFeature.properties).length > 0 && (
-                    <div className="space-y-1">
-                      {Object.entries(hoverFeature.properties).slice(0, 5).map(([key, value]) => (
-                        <div key={key} className="text-xs text-gray-600">
-                          <span className="font-medium">{key}:</span> {String(value)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="mt-3 bg-white/5 rounded-md px-2 py-1.5">
+                  <div className="text-[10px] text-white/60">
+                    <span className="font-medium text-white/80">{hoverFeature.name || hoverFeature.type}</span>
+                    {(() => {
+                      const category = getFeatureCategory(hoverFeature.properties, hoverFeature.type);
+                      return category ? <span> · {category}</span> : null;
+                    })()}
+                  </div>
+                  {(() => {
+                    const category = getFeatureCategory(hoverFeature.properties, hoverFeature.type);
+                    if (category === 'City' && hoverFeature.name) {
+                      const citySlug = hoverFeature.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                      return (
+                        <Link href={`/explore/city/${citySlug}`} className="block text-[10px] text-white/70 hover:text-white underline transition-colors mt-1">
+                          Explore City
+                        </Link>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>
@@ -1164,8 +1914,70 @@ export default function LocationSidebar({
           }}
           pinId={analyticsPinId}
           pinName={analyticsPinName || undefined}
+          isOwner={!!(currentUserAccountId && selectedPin?.account?.id === currentUserAccountId)}
+          isPro={currentUserPlan === 'pro'}
+          onUpgrade={() => {
+            // Close analytics modal and open account modal with billing tab
+            setIsAnalyticsModalOpen(false);
+            setAnalyticsPinId(null);
+            setAnalyticsPinName(null);
+            // Navigate to billing via URL params
+            const url = new URL(window.location.href);
+            url.searchParams.set('modal', 'account');
+            url.searchParams.set('tab', 'billing');
+            window.history.pushState({}, '', url.toString());
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }}
         />
       )}
+
+      {/* Coming Soon Modal */}
+      {isComingSoonModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setIsComingSoonModalOpen(false)}
+          />
+          <div className="relative bg-white/10 backdrop-blur rounded-md border border-white/20 p-[10px] max-w-sm w-full">
+            <div className="flex items-center gap-2 mb-2">
+              <SparklesIcon className="w-4 h-4 text-white/70" />
+              <span className="text-sm font-semibold text-white">{comingSoonFeature}</span>
+            </div>
+            <p className="text-xs text-white/80 mb-3">
+              This feature is coming soon. We&apos;re working hard to bring you powerful new tools.
+            </p>
+            <button
+              onClick={() => setIsComingSoonModalOpen(false)}
+              className="w-full px-3 py-2 text-xs font-medium text-white bg-white/10 hover:bg-white/20 rounded-md transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Atlas Entity Modal (Admin Only) - Supports Create and Edit modes */}
+      <AtlasEntityModal
+        isOpen={isAtlasEntityModalOpen}
+        onClose={() => {
+          setIsAtlasEntityModalOpen(false);
+          setAtlasEntityToEdit(undefined);
+        }}
+        entityType={atlasEntityType}
+        mode={atlasEntityModalMode}
+        coordinates={atlasEntityModalMode === 'create' ? locationData?.coordinates : undefined}
+        featureName={atlasEntityModalMode === 'create' ? atlasEntityFeatureName : undefined}
+        cityName={atlasEntityModalMode === 'create' ? locationData?.city : undefined}
+        countyName={atlasEntityModalMode === 'create' ? locationData?.county : undefined}
+        existingEntity={atlasEntityModalMode === 'edit' ? atlasEntityToEdit : undefined}
+        onSuccess={() => {
+          // Clear the selected atlas entity after successful edit
+          if (atlasEntityModalMode === 'edit') {
+            setSelectedAtlasEntity(null);
+          }
+          console.log(`Successfully ${atlasEntityModalMode === 'edit' ? 'updated' : 'created'} ${atlasEntityType}`);
+        }}
+      />
     </>
   );
 }

@@ -20,6 +20,7 @@ import { usePageView } from '@/hooks/usePageView';
 import { useHomepageState } from './useHomepageState';
 import { useGuestAccountMerge } from '@/features/auth/hooks/useGuestAccountMerge';
 import { GuestAccountService } from '@/features/auth/services/guestAccountService';
+import { MapLayersPanel, useAtlasLayers, AtlasLayersRenderer } from '@/components/atlas';
 
 interface FeedMapClientProps {
   cities: Array<{
@@ -47,12 +48,16 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [is3DMode, setIs3DMode] = useState(false);
+  const [roadsVisible, setRoadsVisible] = useState(true);
   const [pinsRefreshKey, setPinsRefreshKey] = useState(0);
   const removeTemporaryPinRef = useRef<(() => void) | null>(null);
+  const updateTemporaryPinColorRef = useRef<((visibility: 'public' | 'only_me') => void) | null>(null);
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const [isGuestDetailsModalOpen, setIsGuestDetailsModalOpen] = useState(false);
   const [hasCompletedGuestProfile, setHasCompletedGuestProfile] = useState(false);
+  const [isLayersPanelCollapsed, setIsLayersPanelCollapsed] = useState(true);
+  const { layers, toggleLayer, setLayerCount } = useAtlasLayers();
 
   // Centralized state management for all homepage modals and UI states
   const {
@@ -355,6 +360,54 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
     });
   }, [mapLoaded]);
 
+  // Toggle road layers visibility
+  const handleRoadsToggle = useCallback((visible: boolean) => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+    setRoadsVisible(visible);
+    
+    const map = mapInstanceRef.current;
+    
+    // Road layer patterns in Mapbox styles
+    const roadLayerPatterns = [
+      'road',
+      'bridge',
+      'tunnel',
+      'highway',
+      'motorway',
+      'trunk',
+      'primary',
+      'secondary',
+      'tertiary',
+      'street',
+      'path',
+      'pedestrian',
+      'cycleway',
+      'track',
+    ];
+    
+    try {
+      const style = map.getStyle();
+      if (!style?.layers) return;
+      
+      style.layers.forEach((layer) => {
+        const layerId = layer.id.toLowerCase();
+        const isRoadLayer = roadLayerPatterns.some(pattern =>
+          layerId.includes(pattern)
+        );
+        
+        if (isRoadLayer) {
+          try {
+            map.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
+          } catch {
+            // Layer might not support visibility, ignore
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('[FeedMap] Error toggling road layers:', e);
+    }
+  }, [mapLoaded]);
+
   const handlePinCreated = () => {
     // Refresh pins layer
     setPinsRefreshKey(prev => prev + 1);
@@ -387,6 +440,17 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
         <PinsLayer key={pinsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
       )}
 
+      {/* Atlas Layers (Cities, Counties, Neighborhoods, Schools, Parks, Lakes) */}
+      {mapLoaded && mapInstanceRef.current && (
+        <AtlasLayersRenderer
+          map={mapInstanceRef.current}
+          mapLoaded={mapLoaded}
+          layers={layers}
+          onLayerCountUpdate={setLayerCount}
+          onToggleLayer={toggleLayer}
+        />
+      )}
+
       {/* Left Sidebar with Search and Location Details - Always visible, expands on mobile when data exists */}
       <LocationSidebar 
         map={mapInstanceRef.current} 
@@ -406,6 +470,9 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
         }}
         onRemoveTemporaryPin={(removeFn) => {
           removeTemporaryPinRef.current = removeFn;
+        }}
+        onUpdateTemporaryPinColor={(updateFn) => {
+          updateTemporaryPinColorRef.current = updateFn;
         }}
         onCloseCreatePinModal={() => {
           closeCreatePinModal();
@@ -438,7 +505,19 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
         mapLoaded={mapLoaded}
         is3DMode={is3DMode}
         on3DToggle={handle3DToggle}
+        roadsVisible={roadsVisible}
+        onRoadsToggle={handleRoadsToggle}
       />
+
+      {/* Atlas Layers Panel - Bottom Left */}
+      <div className="fixed bottom-4 left-4 z-30">
+        <MapLayersPanel
+          layers={layers}
+          onToggleLayer={toggleLayer}
+          isCollapsed={isLayersPanelCollapsed}
+          onToggleCollapse={() => setIsLayersPanelCollapsed(!isLayersPanelCollapsed)}
+        />
+      </div>
 
       {/* Welcome Modal */}
       <WelcomeModal 
@@ -487,6 +566,11 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
         onBack={() => {
           // Go back to location sidebar (temporary pin remains visible)
           backFromCreatePin();
+        }}
+        onVisibilityChange={(visibility) => {
+          if (updateTemporaryPinColorRef.current) {
+            updateTemporaryPinColorRef.current(visibility);
+          }
         }}
       />
 

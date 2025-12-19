@@ -193,7 +193,7 @@ export default function BaseNav({
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className={`md:hidden border-t ${borderColor} py-4`}>
+          <div className={`md:hidden border-t ${borderColor} py-4 bg-white`}>
             {mobileMenuContent ? (
               <div onClick={(e) => {
                 // Close menu when clicking on links

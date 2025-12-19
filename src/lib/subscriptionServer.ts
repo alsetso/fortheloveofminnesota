@@ -93,7 +93,7 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
     .from('accounts')
     .select('plan, billing_mode, subscription_status, stripe_subscription_id')
     .eq('user_id', user.id)
-    .maybeSingle();
+    .maybeSingle() as { data: { plan: string; billing_mode: string; subscription_status: string | null; stripe_subscription_id: string | null } | null; error: any };
 
   if (accountError || !account) {
     // Return default state if account doesn't exist

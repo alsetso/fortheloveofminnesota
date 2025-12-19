@@ -28,6 +28,10 @@ export function createServerClient() {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
+  if (!supabaseUrl) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
+  }
+
   return createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
@@ -65,7 +69,8 @@ export async function createServerClientWithAuth(cookieStore?: ReturnType<typeof
     {
       cookies: {
         getAll() {
-          return cookieStoreToUse.getAll();
+          const store = cookieStoreToUse as Awaited<ReturnType<typeof cookies>>;
+          return store.getAll();
         },
         setAll() {
           // Server components can't set cookies - no-op

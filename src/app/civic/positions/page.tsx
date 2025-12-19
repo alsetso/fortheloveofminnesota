@@ -27,12 +27,13 @@ export default async function PositionsPage() {
     .select('id, title, slug, branch, level, authority_rank')
     .order('authority_rank', { ascending: true, nullsFirst: false })
     .order('level')
-    .order('title');
+    .order('title') as { data: { id: string; title: string; slug: string; branch: string | null; level: string | null; authority_rank: number | null }[] | null; error: any };
 
   // Group by level
-  const federalPositions = positions?.filter(p => p.level === 'Federal') || [];
-  const statePositions = positions?.filter(p => p.level === 'State') || [];
-  const otherPositions = positions?.filter(p => p.level !== 'Federal' && p.level !== 'State') || [];
+  const positionsArray = (positions || []) as { id: string; title: string; slug: string; branch: string | null; level: string | null; authority_rank: number | null }[];
+  const federalPositions = positionsArray.filter(p => p.level === 'Federal');
+  const statePositions = positionsArray.filter(p => p.level === 'State');
+  const otherPositions = positionsArray.filter(p => p.level !== 'Federal' && p.level !== 'State');
 
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
@@ -56,7 +57,7 @@ export default async function PositionsPage() {
         <div className="mb-3">
           <h1 className="text-sm font-semibold text-gray-900 mb-1.5">Government Positions in Minnesota</h1>
           <p className="text-xs text-gray-600 mb-1.5">
-            {positions?.length || 0} elected and appointed offices that govern the North Star State. 
+            {positionsArray.length} elected and appointed offices that govern the North Star State. 
             From federal representatives in Washington to local officials in your city, these positions shape policy and serve Minnesotans.
           </p>
           <p className="text-xs text-gray-500">
@@ -161,7 +162,7 @@ export default async function PositionsPage() {
           </div>
         )}
 
-        {(!positions || positions.length === 0) && (
+        {positionsArray.length === 0 && (
           <div className="bg-white rounded-md border border-gray-200 p-[10px]">
             <p className="text-xs text-gray-500">No positions found.</p>
           </div>

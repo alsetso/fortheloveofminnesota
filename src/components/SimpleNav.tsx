@@ -10,7 +10,6 @@ import {
   BuildingLibraryIcon,
   UserIcon,
   QuestionMarkCircleIcon,
-  EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from './ProfilePhoto';
 import AppSearch from './app/AppSearch';
@@ -50,7 +49,6 @@ export default function SimpleNav() {
     { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
     { href: '/civic', label: 'Civic', icon: BuildingLibraryIcon },
     { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
-    { href: '/invite', label: 'Invite', icon: EnvelopeIcon },
   ];
 
   // Profile link

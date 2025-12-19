@@ -289,10 +289,10 @@ export async function middleware(req: NextRequest) {
     // Use void to explicitly ignore the promise result
     void (async () => {
       try {
-        await supabase
+        await (supabase
           .from('accounts')
-          .update({ last_visit: new Date().toISOString() })
-          .eq('user_id', user.id);
+          .update({ last_visit: new Date().toISOString() } as any)
+          .eq('user_id', user.id) as any);
       } catch (error) {
         // Log but don't fail request
         console.error('Failed to update last_visit:', error);

@@ -235,13 +235,12 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             };
 
             const createPopupContent = (viewCount: number | null, isLoading: boolean = false) => {
-              // Determine profile URL - use username if available, otherwise guest_id
-              const profileSlug = pin.account?.username || pin.account?.guest_id;
+              // Determine profile URL - use username if available
+              const profileSlug = pin.account?.username;
               const profileUrl = profileSlug ? `/profile/${encodeURIComponent(profileSlug)}` : null;
-              const isGuestAccount = !!pin.account?.guest_id;
               
-              // Display name: use first_name if available, otherwise username, otherwise 'Guest'
-              const displayName = pin.account?.first_name || pin.account?.username || 'Guest';
+              // Display name: use username, fallback to 'User'
+              const displayName = pin.account?.username || 'User';
               
               const accountInfo = pin.account ? `
                 <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
@@ -256,9 +255,6 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     <span style="font-size: 12px; color: #111827; font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#111827'">
                       ${escapeHtml(displayName)}
                     </span>
-                    ${isGuestAccount ? `
-                      <span style="font-size: 9px; color: #6b7280; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; white-space: nowrap;">Guest</span>
-                    ` : ''}
                   </div>
                 </a>
               ` : '';
@@ -395,7 +391,6 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                             id: pin.account.id,
                             username: pin.account.username,
                             image_url: pin.account.image_url,
-                            guest_id: pin.account.guest_id || null,
                           } : null,
                         },
                         flyToLocation: true,

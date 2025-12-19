@@ -972,7 +972,7 @@ export default function LocationSidebar({
   }, []);
 
   const handlePinFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    // Require signed-in user (not guest) to upload media
+    // Require signed-in user to upload media
     // Check ref to get current auth state (avoids stale closure issues)
     if (authLoadingRef.current || !userRef.current) {
       e.preventDefault();
@@ -1053,7 +1053,7 @@ export default function LocationSidebar({
       let mediaUrl: string | null = null;
 
       if (pinSelectedFile) {
-        // Require signed-in user (not guest) to upload media server-side
+        // Require signed-in user to upload media server-side
         // Check ref to get current auth state (avoids stale closure issues)
         if (!userRef.current) {
           throw new Error('Please sign in to upload photos and videos');
@@ -2457,48 +2457,6 @@ export default function LocationSidebar({
                         </div>
                       )}
 
-                      {/* Guest Pin Limit Warning */}
-                      {!user && guestPinLimit && (
-                        <div className={`text-[10px] p-2 rounded -mt-1 ${
-                          !guestPinLimit.canCreate 
-                            ? 'bg-amber-50 border border-amber-200' 
-                            : guestPinLimit.remaining <= 3 
-                              ? 'bg-gray-50 border border-gray-200' 
-                              : ''
-                        }`}>
-                          {!guestPinLimit.canCreate ? (
-                            <div className="space-y-2">
-                              <p className="text-amber-700 font-medium">
-                                Guest limit reached ({guestPinLimit.limit} pins)
-                              </p>
-                              <p className="text-amber-600">
-                                Sign in to create unlimited pins and sync across devices.
-                              </p>
-                              <button
-                                onClick={() => {
-                                  resetPinForm();
-                                  openWelcome();
-                                }}
-                                className="w-full px-3 py-1.5 text-xs font-medium text-white bg-amber-500 hover:bg-amber-600 rounded transition-colors"
-                              >
-                                Sign In
-                              </button>
-                            </div>
-                          ) : guestPinLimit.remaining <= 3 ? (
-                            <p className="text-gray-600">
-                              <span className="font-medium">{guestPinLimit.remaining}</span> of {guestPinLimit.limit} guest pins remaining.{' '}
-                              <button 
-                                onClick={openWelcome}
-                                className="text-blue-600 hover:underline"
-                              >
-                                Sign in
-                              </button>
-                              {' '}for unlimited.
-                            </p>
-                          ) : null}
-                        </div>
-                      )}
-
                       {/* Actions */}
                       <div className="flex items-center gap-2 -mt-3">
                         <button
@@ -3343,7 +3301,7 @@ export default function LocationSidebar({
                             <span>{recommendedEntity.icon}</span>
                             <span>+ Create {recommendedEntity.label}</span>
                             {pinFeature?.name && (
-                              <span className="opacity-70 truncate max-w-[80px]">"{pinFeature.name}"</span>
+                              <span className="opacity-70 truncate max-w-[80px]">&quot;{pinFeature.name}&quot;</span>
                             )}
                           </button>
                         )}

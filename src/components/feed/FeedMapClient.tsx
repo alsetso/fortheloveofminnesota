@@ -80,12 +80,11 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
     openWelcomeRef.current = openWelcome;
   }, [user, authLoading, openWelcome]);
 
-  // Initialize guest mode (no auto-modal)
+  // Initialize component (one-time setup)
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    
-  }, [user]);
+  }, []);
 
   // Listen for pin-created event from inline form to refresh pins layer
   useEffect(() => {
@@ -114,6 +113,7 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
       if (!mounted || !mapContainer.current) return;
 
       try {
+        // @ts-expect-error - CSS import doesn't have type declarations
         await import('mapbox-gl/dist/mapbox-gl.css');
         const mapbox = await loadMapboxGL();
         mapbox.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
@@ -133,7 +133,7 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
           ],
         });
 
-        mapInstanceRef.current = mapInstance;
+        mapInstanceRef.current = mapInstance as MapboxMapInstance;
 
         mapInstance.on('load', () => {
           if (mounted) {

@@ -46,7 +46,7 @@ export default function CountyEditModal({
         name: county.name,
         population: county.population,
         area_sq_mi: county.area_sq_mi,
-        polygon: polygonData,
+        polygon: polygonData as GeoJSON.Polygon | GeoJSON.MultiPolygon | null | undefined,
         meta_title: county.meta_title || null,
         meta_description: county.meta_description || null,
         website_url: county.website_url || null,

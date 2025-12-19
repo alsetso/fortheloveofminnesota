@@ -146,13 +146,14 @@ export default function CountyMap({
         map.current = mapInstance;
 
         return () => {
-          if (map.current && !map.current.removed) {
+          if (map.current && !(map.current as any)._removed) {
             map.current.remove();
             map.current = null;
           }
         };
       } catch (error) {
         console.error('Error initializing county map:', error);
+        return undefined;
       }
     };
 

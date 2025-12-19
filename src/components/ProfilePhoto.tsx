@@ -42,7 +42,7 @@ export default function ProfilePhoto({
   };
 
   const avatarUrl = account?.image_url || null;
-  const displayName = AccountService.getDisplayName(account) || '';
+  const displayName = AccountService.getDisplayName(account ?? null) || '';
   const email = account?.user_id || '';
 
   // Reset error state when avatar URL changes

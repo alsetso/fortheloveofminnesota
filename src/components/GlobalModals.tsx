@@ -43,6 +43,10 @@ export default function GlobalModals() {
       <UpgradeToProModal
         isOpen={modal.type === 'upgrade'}
         onClose={closeModal}
+        onUpgrade={() => {
+          closeModal();
+          window.location.href = '/account/settings?tab=billing';
+        }}
         feature={modal.feature}
       />
     </>

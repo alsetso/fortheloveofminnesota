@@ -43,7 +43,7 @@ export default function CityMap({
         if (!mapContainer.current) return;
 
         let initialCenter: [number, number] = MAP_CONFIG.DEFAULT_CENTER;
-        let initialZoom = MAP_CONFIG.DEFAULT_ZOOM;
+        let initialZoom: number = MAP_CONFIG.DEFAULT_ZOOM;
 
         // If we have boundary lines, calculate center and bounds from polygon
         if (boundaryLines) {

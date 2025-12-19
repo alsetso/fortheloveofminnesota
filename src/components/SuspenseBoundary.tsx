@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, ReactNode } from 'react';
-import { PageLoadingSkeleton, AuthLoadingSkeleton, LoadingSkeleton } from '@/components/LoadingSkeleton';
+import LoadingSkeleton, { PageLoadingSkeleton, AuthLoadingSkeleton } from '@/components/LoadingSkeleton';
 
 interface SuspenseBoundaryProps {
   children: ReactNode;

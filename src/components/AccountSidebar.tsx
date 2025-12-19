@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserIcon, CreditCardIcon, XMarkIcon, ChartBarIcon, BellIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { UserIcon, CreditCardIcon, XMarkIcon, ChartBarIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { AccountService } from '@/features/auth';
 
 interface AccountSidebarProps {
@@ -42,7 +42,6 @@ export default function AccountSidebar({ className = '', isOpen = true, onClose 
 
   const navItems: NavItem[] = [
     { href: '/account/analytics', label: 'Analytics', icon: ChartBarIcon },
-    { href: '/account/notifications', label: 'Notifications', icon: BellIcon },
     { 
       href: '/account/onboarding', 
       label: 'Onboarding', 

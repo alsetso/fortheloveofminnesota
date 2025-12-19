@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       p_user_agent: user_agent || null,
       p_referrer_url: referrer_url || null,
       p_session_id: session_id || null,
-    });
+    } as any);
 
     if (error) {
       console.error('Error recording pin view:', error);

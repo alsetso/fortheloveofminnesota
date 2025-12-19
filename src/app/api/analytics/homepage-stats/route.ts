@@ -43,15 +43,15 @@ export async function GET(request: NextRequest) {
       supabase.rpc('get_page_stats', {
         p_page_url: '/',
         p_hours: 24,
-      }),
+      } as any),
       supabase.rpc('get_page_stats', {
         p_page_url: '/',
         p_hours: 168, // 7 days
-      }),
+      } as any),
       supabase.rpc('get_page_stats', {
         p_page_url: '/',
         p_hours: 720, // 30 days
-      }),
+      } as any),
     ]);
 
     // Extract stats with default values

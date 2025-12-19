@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth, AccountService, Account } from '@/features/auth';
+import { useAuth, Account } from '@/features/auth';
 import { isAccountComplete as checkAccountComplete } from '@/lib/accountCompleteness';
 import { cleanAuthParams } from '@/lib/urlParams';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { checkOnboardingStatus } from '@/lib/onboardingCheck';
 
 export type HomepageModalState = 
   | 'none'
@@ -33,6 +35,7 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { openOnboarding } = useAppModalContextSafe();
   const [state, setState] = useState<HomepageState>({
     modalState: 'none',
     accountModalTab: null,
@@ -134,7 +137,7 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     }
   }, [state.modalState, updateState]);
 
-  // Check account completeness
+  // Check account completeness - simplified and centralized
   const checkAccountCompleteness = useCallback(async () => {
     if (!user) {
       updateState({
@@ -142,22 +145,22 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
         isAccountComplete: true,
         isCheckingAccount: false,
       });
-      return;
+      return { account: null, isComplete: true };
     }
 
     updateState({ isCheckingAccount: true });
 
     try {
-      const accountData = await AccountService.getCurrentAccount();
-      const complete = checkAccountComplete(accountData);
+      const { needsOnboarding, account } = await checkOnboardingStatus();
+      const isComplete = !needsOnboarding;
       
       updateState({
-        account: accountData,
-        isAccountComplete: complete,
+        account,
+        isAccountComplete: isComplete,
         isCheckingAccount: false,
       });
 
-      return { account: accountData, isComplete: complete };
+      return { account, isComplete };
     } catch (error) {
       console.error('Error checking account completeness:', error);
       updateState({
@@ -173,13 +176,9 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
   const refreshAccount = useCallback(async () => {
     const result = await checkAccountCompleteness();
     
-    // If account is now complete and we're on onboarding tab, allow closing
-    if (result.isComplete && state.modalState === 'account' && state.accountModalTab === 'onboarding') {
-      // Account is complete, user can now close modal
-    }
-    
+    // Account completeness is now handled by OnboardingModal itself
     return result;
-  }, [checkAccountCompleteness, state.modalState, state.accountModalTab]);
+  }, [checkAccountCompleteness]);
 
   // Handle user authentication state changes
   useEffect(() => {
@@ -207,26 +206,33 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
       // Clean guest/account parameters from URL when user logs in
       cleanAuthParams(router);
       
+      // Check onboarding status and open modal if needed
       checkAccountCompleteness().then((result) => {
         if (result && !result.isComplete) {
-          // Account incomplete: open account modal with onboarding tab
-          openAccountModal('onboarding');
-        } else {
-          // Account complete: close any modals
+          // Account incomplete: open onboarding modal immediately
+          openOnboarding();
+        } else if (result && result.isComplete) {
+          // Account complete: close welcome modal if open
           if (state.modalState === 'welcome') {
             closeWelcomeModal();
           }
         }
       });
     }
-  }, [user, openWelcomeModal, closeAllModals, openAccountModal, closeWelcomeModal, checkAccountCompleteness, state.modalState]);
+  }, [user, openWelcomeModal, closeAllModals, openAccountModal, closeWelcomeModal, checkAccountCompleteness, openOnboarding, state.modalState, router]);
 
-  // Check account completeness when user is authenticated
+  // Check account completeness when user is authenticated and account not loaded
+  // This handles cases where user was already authenticated on page load
   useEffect(() => {
-    if (user && !state.account) {
-      checkAccountCompleteness();
+    if (user && !state.account && !state.isCheckingAccount) {
+      checkAccountCompleteness().then((result) => {
+        // If incomplete, open onboarding
+        if (result && !result.isComplete) {
+          openOnboarding();
+        }
+      });
     }
-  }, [user, state.account, checkAccountCompleteness]);
+  }, [user, state.account, state.isCheckingAccount, checkAccountCompleteness, openOnboarding]);
 
   return {
     // State

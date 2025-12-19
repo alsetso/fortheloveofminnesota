@@ -5,14 +5,12 @@ import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
-import { Bars3Icon, BellIcon, SparklesIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, SparklesIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Account, AccountService } from '@/features/auth';
 import { useAuth } from '@/features/auth';
 import { useProfile } from '@/features/profiles/contexts/ProfileContext';
 import ProfilePhoto from '@/components/ProfilePhoto';
 import AppSearch from './AppSearch';
-import { formatDistanceToNow } from 'date-fns';
-import { useNotifications } from '@/features/notifications';
 
 interface AppTopProps {
   onMenuToggle: () => void;
@@ -39,20 +37,7 @@ export default function AppTop({
   const router = useRouter();
   const { profiles, selectedProfile, setSelectedProfile } = useProfile();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const accountContainerRef = useRef<HTMLDivElement>(null);
-  const notificationContainerRef = useRef<HTMLDivElement>(null);
-  
-  const {
-    notifications,
-    loading: notificationsLoading,
-    unreadCount,
-    markAsRead: markAsReadNotification,
-  } = useNotifications({
-    limit: 10,
-    unreadOnly: false,
-    autoLoad: !!user && !!account,
-  });
 
   const handleSignOut = async () => {
     try {
@@ -72,33 +57,14 @@ export default function AppTop({
       if (accountContainerRef.current && !accountContainerRef.current.contains(event.target as Node)) {
         setIsAccountMenuOpen(false);
       }
-      if (notificationContainerRef.current && !notificationContainerRef.current.contains(event.target as Node)) {
-        setIsNotificationMenuOpen(false);
-      }
     };
 
-    if (isAccountMenuOpen || isNotificationMenuOpen) {
+    if (isAccountMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
     return undefined;
-  }, [isAccountMenuOpen, isNotificationMenuOpen]);
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      await markAsReadNotification(notificationId);
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const formatTime = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-    } catch {
-      return 'Recently';
-    }
-  };
+  }, [isAccountMenuOpen]);
 
   // Use account for display name
   const displayName = account 
@@ -164,7 +130,7 @@ export default function AppTop({
             />
           </div>
 
-          {/* Right Section - AI Agent, Notifications, Profile/Login */}
+          {/* Right Section - AI Agent, Profile/Login */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* AI Agent Icon - Always visible */}
             <button
@@ -179,101 +145,6 @@ export default function AppTop({
             >
               <SparklesIcon className="w-5 h-5" />
             </button>
-
-            {/* Notifications */}
-            {user && account && (
-              <div ref={notificationContainerRef} className="relative">
-                <button
-                  onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)}
-                  className={`relative p-2 text-sm font-medium rounded-lg transition-all duration-200 border ${
-                    isNotificationMenuOpen
-                      ? 'text-gold-400 bg-header-focus/60 border-header-focus'
-                      : 'text-gray-300 hover:text-gold-400 hover:bg-header-focus/60 border-transparent hover:border-header-focus'
-                  }`}
-                  aria-label="Notifications"
-                >
-                  <BellIcon className="w-5 h-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 w-2 h-2 bg-gold-400 rounded-full border-2 border-black/95" />
-                  )}
-                </button>
-
-                {/* Notification Dropdown */}
-                {isNotificationMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-black/95 backdrop-blur-md z-50 overflow-hidden rounded-lg border border-header-focus">
-                    <div className="py-1">
-                      {/* Header */}
-                      <div className="px-3 py-2 border-b border-header-focus/50 flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-100">Notifications</p>
-                        {unreadCount > 0 && (
-                          <span className="text-xs text-gold-400 bg-gold-400/20 px-2 py-0.5 rounded-full">
-                            {unreadCount} new
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Notification List */}
-                      <div className="max-h-96 overflow-y-auto">
-                        {notificationsLoading ? (
-                          <div className="px-3 py-4 text-center">
-                            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                          </div>
-                        ) : notifications.length === 0 ? (
-                          <div className="px-3 py-4 text-center text-xs text-gray-400">
-                            No notifications
-                          </div>
-                        ) : (
-                          notifications.map((notification) => (
-                            <button
-                              key={notification.id}
-                              onClick={() => {
-                                if (!notification.read) {
-                                  markAsRead(notification.id);
-                                }
-                                setIsNotificationMenuOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 hover:bg-gray-800/60 transition-all duration-200 border-b border-header-focus/30 last:border-b-0 ${
-                                notification.read ? '' : 'bg-header-focus/20'
-                              }`}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className={`flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${
-                                  notification.read ? 'bg-transparent' : 'bg-gold-400'
-                                }`} />
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-xs font-medium mb-0.5 line-clamp-1 ${
-                                    notification.read ? 'text-gray-400' : 'text-gray-100'
-                                  }`}>
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-xs text-gray-500 line-clamp-1 mb-0.5">
-                                    {notification.message}
-                                  </p>
-                                  <p className="text-[10px] text-gray-600">
-                                    {formatTime(notification.created_at)}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                        )}
-                      </div>
-
-                      {/* Footer */}
-                      <div className="border-t border-header-focus/50 px-3 py-2">
-                        <Link
-                          href="/account/notifications"
-                          onClick={() => setIsNotificationMenuOpen(false)}
-                          className="block w-full text-center text-xs text-gray-400 hover:text-gold-400 transition-colors"
-                        >
-                          View all notifications
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Profile/Login */}
             {isLoading ? (

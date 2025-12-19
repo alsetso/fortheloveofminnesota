@@ -174,17 +174,19 @@ export default function LocationSidebar({
   onToggleLayer,
 }: LocationSidebarProps) {
   // Auth state - use isLoading to ensure auth is initialized before making decisions
-  const { user, isLoading: authLoading } = useAuthStateSafe();
-  const { openWelcome } = useAppModalContextSafe();
+  const { user, account, isLoading: authLoading } = useAuthStateSafe();
+  const { openWelcome, openOnboarding } = useAppModalContextSafe();
   
   // Ref to access current auth state in event handlers (avoids stale closures)
   const userRef = useRef(user);
+  const accountRef = useRef(account);
   const authLoadingRef = useRef(authLoading);
   
   useEffect(() => {
     userRef.current = user;
+    accountRef.current = account;
     authLoadingRef.current = authLoading;
-  }, [user, authLoading]);
+  }, [user, account, authLoading]);
   const { openWindow } = useWindowManager();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -1039,10 +1041,17 @@ export default function LocationSidebar({
       setPinError('Checking authentication...');
       return;
     }
-    
+
     if (!userRef.current) {
       setPinError('Please sign in to create pins');
       openWelcome();
+      return;
+    }
+
+    // Require username to post
+    if (!accountRef.current?.username) {
+      setPinError('Please complete your profile to post');
+      openOnboarding();
       return;
     }
 
@@ -1151,7 +1160,7 @@ export default function LocationSidebar({
       setIsPinSubmitting(false);
       setIsPinUploading(false);
     }
-  }, [locationData, pinDescription, pinSelectedFile, pinVisibility, user, resetPinForm, removeTemporaryPin, pinFeature, selectedAtlasEntity]);
+  }, [locationData, pinDescription, pinSelectedFile, pinVisibility, user, resetPinForm, removeTemporaryPin, pinFeature, selectedAtlasEntity, openOnboarding, openWelcome]);
 
   // Map control handlers
   const handleZoomIn = useCallback(() => {
@@ -1474,53 +1483,6 @@ export default function LocationSidebar({
     };
   }, [removeTemporaryPin, clearSelection]);
 
-  // Listen for "open-pin-sidebar" event from popup "See More" button
-  useEffect(() => {
-    const handleOpenPinSidebar = async (event: CustomEvent) => {
-      const { pin, flyToLocation } = event.detail;
-      
-      if (!pin) return;
-      
-      // Fly to location first if requested
-      if (flyToLocation && map && mapLoaded && onLocationSelect) {
-        onLocationSelect(pin.coordinates);
-      }
-      
-      // Reverse geocode to get address for the pin
-      const geocodeResult = await reverseGeocode(pin.coordinates.lng, pin.coordinates.lat);
-      
-      // Set selected pin data with address
-      const pinWithAddress: PinData = {
-        ...pin,
-        address: geocodeResult.address || null,
-      };
-      selectionCacheRef.current = { location: null, pin: pinWithAddress, entity: null, feature: null };
-      setSelectedPin(pinWithAddress);
-      
-      // Update search input with pin name or address
-      setSearchQuery(geocodeResult.address || pin.name);
-      
-      // Clear pin feature metadata (we're showing pin data instead)
-      setPinFeature(null);
-      
-      // Call onPinClick callback if provided
-      if (onPinClick) {
-        onPinClick({
-          id: pin.id,
-          name: pin.name,
-          coordinates: pin.coordinates,
-          address: geocodeResult.address || undefined,
-          description: pin.description || undefined,
-        });
-      }
-    };
-
-    window.addEventListener('open-pin-sidebar', handleOpenPinSidebar as unknown as EventListener);
-
-    return () => {
-      window.removeEventListener('open-pin-sidebar', handleOpenPinSidebar as unknown as EventListener);
-    };
-  }, [onPinClick, reverseGeocode, map, mapLoaded, onLocationSelect]);
 
   // Listen for atlas entity clicks
   useEffect(() => {
@@ -1566,11 +1528,13 @@ export default function LocationSidebar({
         type: 'map-click',
       });
       
-      // Expand the inline pin form
-      setIsDropHeartExpanded(true);
-      
-      // Add temporary pin marker
-      addTemporaryPin({ lat, lng });
+      // Expand the inline pin form if user is authenticated
+      // Username check happens on submit, not here
+      if (userRef.current) {
+        setIsDropHeartExpanded(true);
+        // Add temporary pin marker
+        addTemporaryPin({ lat, lng });
+      }
       
       // Fly to location
       if (map && mapLoaded) {
@@ -2303,7 +2267,7 @@ export default function LocationSidebar({
                 <div className="space-y-3">
                   {/* Expanded Form */}
                   {isDropHeartExpanded && (
-                    <div className="border border-gray-200 rounded-md p-3 space-y-2 bg-gray-50">
+                    <div className="space-y-2">
                       {/* Address Header with Back Button */}
                       <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
                         <button
@@ -2321,6 +2285,26 @@ export default function LocationSidebar({
                         </div>
                       </div>
                       
+                      {/* Account Info Header */}
+                      {account && account.username && (
+                        <div className="flex items-center gap-2 pb-2">
+                          {account.image_url ? (
+                            <img 
+                              src={account.image_url} 
+                              alt={account.username} 
+                              className="w-6 h-6 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs text-gray-700 font-medium flex-shrink-0">
+                              {account.username[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className="text-xs font-medium text-gray-900 truncate">
+                            @{account.username}
+                          </span>
+                        </div>
+                      )}
+                      
                       {/* Caption */}
                       <div>
                         <textarea
@@ -2331,7 +2315,7 @@ export default function LocationSidebar({
                             }
                           }}
                           maxLength={240}
-                          className="w-full px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-300 resize-none bg-white"
+                          className="w-full px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none bg-transparent"
                           placeholder="What's going on here?"
                           rows={5}
                           disabled={isPinSubmitting || isPinUploading}
@@ -2483,6 +2467,7 @@ export default function LocationSidebar({
                           openWelcome();
                           return;
                         }
+                        // Allow form to expand - username check happens on submit
                         setIsDropHeartExpanded(true);
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors shadow-sm"
@@ -3178,13 +3163,24 @@ export default function LocationSidebar({
 
                   {/* Type info - subtle inline display */}
                   <div className="flex items-center gap-1.5 mt-1">
-                    {/* Home indicator badge when building is residential */}
-                    {pinFeature.showIntelligence && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-medium rounded">
-                        <HomeIcon className="w-2.5 h-2.5" />
-                        Home
-                      </span>
-                    )}
+                    {/* Home indicator badge - only for residential buildings */}
+                    {(() => {
+                      // Check if this is actually a residential building/home
+                      const buildingType = (pinFeature.properties.type || '').toLowerCase();
+                      const buildingClass = (pinFeature.properties.class || '').toLowerCase();
+                      const residentialTypes = ['home', 'house', 'residential', 'detached', 'semidetached_house', 
+                                                'terrace', 'bungalow', 'cabin', 'farm', 'houseboat', 'static_caravan'];
+                      const isResidential = residentialTypes.includes(buildingType) ||
+                                           buildingClass === 'residential' ||
+                                           pinFeature.category === 'house';
+                      
+                      return isResidential ? (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-medium rounded">
+                          <HomeIcon className="w-2.5 h-2.5" />
+                          Home
+                        </span>
+                      ) : null;
+                    })()}
                     {pinFeature.properties.class && (
                       <span className="text-[10px] text-gray-500 capitalize">
                         {pinFeature.properties.class.replace(/_/g, ' ')}
@@ -3205,25 +3201,46 @@ export default function LocationSidebar({
                     )}
                   </div>
 
-                  {/* Admin: Raw data toggle - Hidden when create pin form is open */}
-                  {isAdmin && !isDropHeartExpanded && (
-                    <div className="mt-2">
+                  {/* Metadata Accordion - Hidden when create pin form is open */}
+                  {!isDropHeartExpanded && (
+                    <div className="mt-2 border-t border-gray-200 pt-2">
                       <button
                         onClick={() => setIsMetadataOpen(!isMetadataOpen)}
-                        className="text-[9px] text-gray-400 hover:text-gray-600 transition-colors"
+                        className="w-full flex items-center justify-between text-[10px] text-gray-600 hover:text-gray-900 transition-colors"
                       >
-                        {isMetadataOpen ? '− Hide raw' : '+ Show raw'}
+                        <span className="font-medium">Metadata</span>
+                        {isMetadataOpen ? (
+                          <ChevronUpIcon className="w-3 h-3" />
+                        ) : (
+                          <ChevronDownIcon className="w-3 h-3" />
+                        )}
                       </button>
 
                       {isMetadataOpen && (
-                        <div className="mt-1.5 text-[9px] text-gray-500 font-mono space-y-0.5 bg-gray-50 rounded p-2 border border-gray-100">
-                          <div><span className="text-gray-400">layer:</span> {pinFeature.layerId}</div>
-                          {pinFeature.sourceLayer && (
-                            <div><span className="text-gray-400">source:</span> {pinFeature.sourceLayer}</div>
+                        <div className="mt-1.5 space-y-1.5">
+                          {/* Layer Info */}
+                          <div className="text-[9px] text-gray-500 font-mono space-y-0.5">
+                            <div><span className="text-gray-400">layer:</span> {pinFeature.layerId}</div>
+                            {pinFeature.sourceLayer && (
+                              <div><span className="text-gray-400">source:</span> {pinFeature.sourceLayer}</div>
+                            )}
+                            <div><span className="text-gray-400">category:</span> {pinFeature.category}</div>
+                            {pinFeature.atlasType && (
+                              <div><span className="text-gray-400">atlasType:</span> {pinFeature.atlasType}</div>
+                            )}
+                          </div>
+
+                          {/* Properties */}
+                          {Object.keys(pinFeature.properties).length > 0 && (
+                            <div className="text-[9px] text-gray-500 font-mono space-y-0.5">
+                              <div className="text-[10px] font-medium text-gray-600 mb-0.5">Properties:</div>
+                              {Object.entries(pinFeature.properties).map(([key, value]) => (
+                                <div key={key} className="pl-2">
+                                  <span className="text-gray-400">{key}:</span> <span className="text-gray-600">{String(value)}</span>
+                                </div>
+                              ))}
+                            </div>
                           )}
-                          {Object.entries(pinFeature.properties).map(([key, value]) => (
-                            <div key={key}><span className="text-gray-400">{key}:</span> {String(value)}</div>
-                          ))}
                         </div>
                       )}
                     </div>

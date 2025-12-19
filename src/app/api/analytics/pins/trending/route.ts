@@ -72,12 +72,13 @@ export async function GET(request: NextRequest) {
       .slice(0, limit)
       .map(([pinId, viewCount]) => ({ pin_id: pinId, view_count: viewCount }));
 
-    // Fetch pin details
+    // Fetch pin details (excluding archived)
     const pinIds = trendingPins.map((p) => p.pin_id);
     const { data: pins, error: pinsError } = await supabase
       .from('pins')
       .select('id, name, description, created_at, account_id')
-      .in('id', pinIds);
+      .in('id', pinIds)
+      .eq('archived', false); // Exclude archived pins
 
     if (pinsError) {
       console.error('Error fetching pin details:', pinsError);

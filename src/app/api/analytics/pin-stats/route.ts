@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         const { data: rangeStats } = await supabase.rpc('get_pin_stats', {
           p_pin_id: pinId,
           p_hours: range.hours,
-        });
+        } as any);
         return {
           label: range.label,
           ...((rangeStats as any)?.[0] || { total_views: 0, unique_viewers: 0, accounts_viewed: 0 }),
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         p_pin_id: pinId,
         p_limit: viewerLimit,
         p_offset: 0,
-      });
+      } as any);
 
       if (!viewersError && viewersData) {
         viewers = viewersData;

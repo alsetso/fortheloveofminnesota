@@ -5,6 +5,8 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { AccountService, Account } from '../services/memberService';
 import { isAccountComplete } from '@/lib/accountCompleteness';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { checkOnboardingStatus } from '@/lib/onboardingCheck';
 
 // Display account type (authenticated only)
 export type DisplayAccount = Account | null;
@@ -69,6 +71,9 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
   // Modal state
   const [activeModal, setActiveModal] = useState<AuthModalType>('none');
   const [accountModalTab, setAccountModalTab] = useState<string | null>(null);
+  
+  // Use AppModalContext for onboarding (separate from account modal)
+  const { openOnboarding } = useAppModalContextSafe();
   
   // Computed states
   const isAuthenticated = !!user;
@@ -148,17 +153,19 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     const loadAccount = async () => {
       setIsAccountLoading(true);
       try {
-        const accountData = await AccountService.getCurrentAccount();
-        setAccount(accountData);
+        // Use centralized onboarding check (ensures account exists)
+        const { needsOnboarding, account } = await checkOnboardingStatus();
+        setAccount(account);
         
-        // Check account completeness and open onboarding if needed
-        if (accountData && !isAccountComplete(accountData)) {
-          setActiveModal('account');
-          setAccountModalTab('onboarding');
+        // Open onboarding if needed
+        if (needsOnboarding) {
+          openOnboarding();
         }
       } catch (error) {
         console.error('[AuthStateContext] Error loading account:', error);
         setAccount(null);
+        // On error, assume onboarding is needed
+        openOnboarding();
       } finally {
         setIsAccountLoading(false);
       }

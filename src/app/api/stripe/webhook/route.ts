@@ -162,10 +162,12 @@ export async function POST(request: NextRequest) {
         customerId = invoice.customer as string | null;
         
         // If invoice has a subscription, fetch it
-        if (invoice.subscription) {
-          const subId = typeof invoice.subscription === 'string' 
-            ? invoice.subscription 
-            : invoice.subscription.id;
+        // invoice.subscription can be a string (subscription ID) or Subscription object
+        const subscriptionId = invoice.subscription;
+        if (subscriptionId) {
+          const subId = typeof subscriptionId === 'string' 
+            ? subscriptionId 
+            : (subscriptionId as Stripe.Subscription).id;
           subscription = await stripe.subscriptions.retrieve(subId);
         }
         break;

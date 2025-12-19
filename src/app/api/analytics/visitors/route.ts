@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
         p_page_url: page_url,
         p_limit: limit,
         p_offset: offset,
-      });
+      } as any);
       visitors = result.data as Visitor[] | null;
       error = result.error;
     } else if (pin_id) {
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         p_pin_id: pin_id,
         p_limit: limit,
         p_offset: offset,
-      });
+      } as any);
       visitors = result.data as Visitor[] | null;
       error = result.error;
     }

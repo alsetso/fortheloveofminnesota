@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         const { data: stats } = await supabase.rpc('get_page_stats', {
           p_page_url: profileUrl,
           p_hours: null, // All time
-        });
+        } as any);
 
         const statsData = (stats as any)?.[0] || {};
         
@@ -135,20 +135,21 @@ export async function GET(request: NextRequest) {
           title: `${accountDataTyped.first_name || ''} ${accountDataTyped.last_name || ''}`.trim() || 'My Account',
           total_views: statsData.total_views || 0,
           unique_visitors: statsData.unique_viewers || 0,
-          first_viewed_at: firstView?.viewed_at || null,
-          last_viewed_at: lastView?.viewed_at || null,
+          first_viewed_at: (firstView as any)?.viewed_at || null,
+          last_viewed_at: (lastView as any)?.viewed_at || null,
           created_at: accountDataTyped.created_at,
           url: profileUrl,
         });
       }
     }
 
-    // Get user's pins with stats
+    // Get user's pins with stats (excluding archived)
     if (!entityType || entityType === 'pin') {
       const { data: pins } = await supabase
         .from('pins')
         .select('id, name, description, created_at')
         .eq('account_id', accountId)
+        .eq('archived', false) // Exclude archived pins
         .order('created_at', { ascending: false });
 
       if (pins) {
@@ -159,7 +160,7 @@ export async function GET(request: NextRequest) {
           const { data: stats } = await supabase.rpc('get_pin_stats', {
             p_pin_id: pinData.id,
             p_hours: null, // All time
-          });
+          } as any);
 
           const statsData = (stats as any)?.[0] || {};
           
@@ -187,8 +188,8 @@ export async function GET(request: NextRequest) {
             title: pinData.name || pinData.description || 'Pin',
             total_views: statsData.total_views || 0,
             unique_visitors: statsData.unique_viewers || 0,
-            first_viewed_at: firstView?.viewed_at || null,
-            last_viewed_at: lastView?.viewed_at || null,
+            first_viewed_at: (firstView as any)?.viewed_at || null,
+            last_viewed_at: (lastView as any)?.viewed_at || null,
             created_at: pinData.created_at,
             url: '#', // Pins don't have direct URLs
           });

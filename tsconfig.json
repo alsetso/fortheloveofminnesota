@@ -27,6 +27,25 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "supabase/functions/**", "apps/**", "packages/**", "scripts/**", "**/_archive/**", "**/*_archive/**"]
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next",
+    "out",
+    "dist",
+    "build",
+    "supabase/functions/**",
+    "apps/**",
+    "packages/**",
+    "scripts/**",
+    "src/app/_archive",
+    "src/components/_archive",
+    "src/features/_archive",
+    "src/app/api/_archive"
+  ]
 }

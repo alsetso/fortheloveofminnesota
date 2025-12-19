@@ -637,7 +637,7 @@ export class PinService {
   }
 
   /**
-   * Delete a pin
+   * Delete a pin (soft delete - marks as archived)
    */
   static async deletePin(pinId: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -645,7 +645,7 @@ export class PinService {
       throw new Error('User not authenticated');
     }
 
-    // Get user's profile IDs
+    // Get user's account
     const { data: account } = await supabase
       .from('accounts')
       .select('id')
@@ -656,26 +656,17 @@ export class PinService {
       throw new Error('Account not found');
     }
 
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('account_id', account.id);
-
-    const profileIds = profiles?.map(p => p.id) || [];
-    
-    if (profileIds.length === 0) {
-      throw new Error('No profiles found');
-    }
-
+    // Soft delete: set archived = true instead of deleting
     const { error } = await supabase
       .from('pins')
-      .delete()
+      .update({ archived: true })
       .eq('id', pinId)
-      .in('profile_id', profileIds);
+      .eq('account_id', account.id) // Ensure user owns the pin
+      .eq('archived', false); // Only archive pins that aren't already archived
 
     if (error) {
-      console.error('Error deleting pin:', error);
-      throw new Error(`Failed to delete pin: ${error.message}`);
+      console.error('Error archiving pin:', error);
+      throw new Error(`Failed to archive pin: ${error.message}`);
     }
   }
 

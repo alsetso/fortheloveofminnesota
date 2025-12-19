@@ -291,7 +291,7 @@ export default function GuestDetailsModal({
               {/* Info Message */}
               <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
                 <p className="text-xs text-gray-600">
-                  You're browsing as a guest. Your pins and activity are saved locally. 
+                  You&apos;re browsing as a guest. Your pins and activity are saved locally. 
                   Sign in to access additional features.
                 </p>
               </div>

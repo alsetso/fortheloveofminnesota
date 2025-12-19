@@ -1,18 +1,23 @@
 import { Account } from '@/features/auth';
 
 /**
- * Check if account has all required personal information fields
- * Required: username, first_name, last_name, image_url
+ * SOURCE OF TRUTH for account onboarding completion
+ * 
+ * Simplified: Only checks if username is set.
+ * Username is required for profile URLs and is the minimum requirement.
+ * 
+ * This is the PRIMARY source of truth - we check actual data, not flags.
+ * 
+ * Usage:
+ * - After OTP verification: Check completeness to determine if onboarding is needed
+ * - On protected routes: Check completeness before allowing access
+ * - After onboarding form submission: Verify completeness before closing modal
  */
 export function isAccountComplete(account: Account | null): boolean {
   if (!account) return false;
   
-  return !!(
-    account.username &&
-    account.first_name &&
-    account.last_name &&
-    account.image_url
-  );
+  // Only check username - simplest requirement
+  return !!account.username;
 }
 
 /**
@@ -25,15 +30,12 @@ export function getAccountCompletionStatus(account: Account | null): {
   if (!account) {
     return {
       isComplete: false,
-      missingFields: ['account', 'username', 'first_name', 'last_name', 'image_url'],
+      missingFields: ['account', 'username'],
     };
   }
 
   const missingFields: string[] = [];
   if (!account.username) missingFields.push('username');
-  if (!account.first_name) missingFields.push('first_name');
-  if (!account.last_name) missingFields.push('last_name');
-  if (!account.image_url) missingFields.push('image_url');
 
   return {
     isComplete: missingFields.length === 0,

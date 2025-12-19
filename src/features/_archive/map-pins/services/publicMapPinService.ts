@@ -32,7 +32,10 @@ export class PublicMapPinService {
    * Now works for both authenticated and anonymous users (RLS allows viewing accounts with public pins)
    */
   static async getPins(filters?: MapPinFilters): Promise<MapPin[]> {
-    // Join accounts for all users (RLS now allows anonymous users to view accounts with public pins)
+    // Pure RLS approach: Let Supabase handle the join and RLS filtering
+    // RLS policies ensure:
+    // - Authenticated users: Can see all accounts (migration 144)
+    // - Anonymous users: Can see accounts with public pins (migrations 217, 258)
     const selectQuery = `*,
       accounts(
         id,
@@ -44,6 +47,7 @@ export class PublicMapPinService {
     let query = supabase
       .from('pins')
       .select(selectQuery)
+      .eq('archived', false) // Exclude archived pins
       .order('created_at', { ascending: false });
 
     if (filters?.account_id) {
@@ -73,9 +77,9 @@ export class PublicMapPinService {
     }
 
     // Transform the nested account data to match our interface
-    // Handle both array and object formats from Supabase
+    // RLS ensures accounts are only returned if user has permission to view them
     return (data || []).map((pin: any) => {
-      // Handle accounts join - could be object, array, or null
+      // Handle accounts join - Supabase returns as nested object or array
       let account = null;
       if (pin.accounts) {
         if (Array.isArray(pin.accounts)) {
@@ -93,7 +97,7 @@ export class PublicMapPinService {
           username: account.username || account.first_name || 'User',
           image_url: account.image_url,
         } : null,
-        // Remove the raw accounts field if it exists
+        // Remove the raw accounts field (Supabase returns it as nested)
         accounts: undefined,
       };
     }) as MapPin[];
@@ -189,6 +193,7 @@ export class PublicMapPinService {
         ...data,
         account_id: account.id,
         visibility: data.visibility || 'public',
+        archived: false, // New pins are never archived
       })
       .select()
       .single();
@@ -228,6 +233,7 @@ export class PublicMapPinService {
       .update(data)
       .eq('id', pinId)
       .eq('account_id', account.id) // Ensure user owns the pin
+      .eq('archived', false) // Can't update archived pins
       .select()
       .single();
 
@@ -244,7 +250,7 @@ export class PublicMapPinService {
   }
 
   /**
-   * Delete a map pin
+   * Delete a map pin (soft delete - marks as archived)
    * User must own the pin
    */
   static async deletePin(pinId: string): Promise<void> {
@@ -265,15 +271,17 @@ export class PublicMapPinService {
       throw new Error('Account not found');
     }
 
+    // Soft delete: set archived = true instead of deleting
     const { error } = await supabase
       .from('pins')
-      .delete()
+      .update({ archived: true })
       .eq('id', pinId)
-      .eq('account_id', account.id); // Ensure user owns the pin
+      .eq('account_id', account.id) // Ensure user owns the pin
+      .eq('archived', false); // Only archive pins that aren't already archived
 
     if (error) {
-      console.error('Error deleting map pin:', error);
-      throw new Error(`Failed to delete pin: ${error.message}`);
+      console.error('Error archiving map pin:', error);
+      throw new Error(`Failed to archive pin: ${error.message}`);
     }
   }
 

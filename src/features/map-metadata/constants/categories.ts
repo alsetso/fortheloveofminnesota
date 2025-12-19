@@ -445,8 +445,8 @@ export const CATEGORY_CONFIG: Record<FeatureCategory, {
   lake: { icon: '💧', label: 'Lake', color: '#0EA5E9', atlasType: 'lake' },
   
   // Buildings
-  building: { icon: '🏢', label: 'Building', color: '#64748B' }, // Generic - no atlasType
-  house: { icon: '🏠', label: 'House', color: '#8B5CF6', showIntelligence: true }, // Special: shows intelligence
+  building: { icon: '🏢', label: 'Building', color: '#64748B' }, // Generic - no intelligence by default
+  house: { icon: '🏠', label: 'House', color: '#8B5CF6', showIntelligence: true }, // Residential - shows intelligence
   
   // Atlas Entity Types (direct mappings)
   school: { icon: '🏫', label: 'School', color: '#F59E0B', atlasType: 'school' },

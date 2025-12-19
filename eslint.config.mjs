@@ -21,6 +21,12 @@ const eslintConfig = [
       "server.js",
       "tailwind.config.js",
       "scripts/**",
+      "**/_archive/**",
+      "**/*_archive/**",
+      "src/app/_archive/**",
+      "src/components/_archive/**",
+      "src/features/_archive/**",
+      "src/app/api/_archive/**",
     ],
   },
   {

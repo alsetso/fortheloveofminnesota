@@ -53,7 +53,8 @@ export async function GET(request: NextRequest) {
       const { data: pins, error: pinsError } = await supabase
         .from('pins')
         .select('id, name')
-        .in('id', pinIds);
+        .in('id', pinIds)
+        .eq('archived', false); // Exclude archived pins
       
       if (pinsError) {
         console.error('Error fetching pins:', pinsError);

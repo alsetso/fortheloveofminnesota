@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     
     // Build query with ILIKE for fuzzy matching
     // Try to join accounts - may fail for anonymous users due to RLS, handle gracefully
-    let dbQuery = supabase
+    const dbQuery = supabase
       .from('pins')
       .select(`
         id,
@@ -60,6 +60,7 @@ export async function GET(request: NextRequest) {
           image_url
         )
       `)
+      .eq('archived', false) // Exclude archived pins
       .not('description', 'is', null)
       .ilike('description', `%${searchTerm}%`)
       .limit(20);

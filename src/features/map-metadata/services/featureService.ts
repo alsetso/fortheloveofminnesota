@@ -281,9 +281,22 @@ export function extractFeature(mapboxFeature: any): ExtractedFeature | null {
   // Determine if this feature has useful data
   const hasUsefulData = !!(name || Object.keys(properties).length > 0 || category !== 'unknown');
 
-  // Get atlas type and intelligence flag
+  // Get atlas type
   const atlasType = getAtlasTypeFromCategory(category);
-  const showIntelligence = shouldShowIntelligence(category);
+  
+  // Determine intelligence flag - show for all buildings
+  let showIntelligence = false;
+  
+  if (layerId.includes('building')) {
+    // Show intelligence for all building types
+    showIntelligence = true;
+  } else if (category === 'house') {
+    // If already categorized as 'house' (from POI or other detection), show intelligence
+    showIntelligence = true;
+  } else {
+    // For other features, use category-based check
+    showIntelligence = shouldShowIntelligence(category);
+  }
 
   return {
     layerId,

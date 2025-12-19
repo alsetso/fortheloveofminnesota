@@ -1,11 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AccountService, Account } from '@/features/auth';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/features/auth';
-import { ArrowRightIcon, CheckCircleIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 interface OnboardingClientProps {
   initialAccount: Account | null;
@@ -15,21 +13,15 @@ interface OnboardingClientProps {
 
 export default function OnboardingClient({ initialAccount, redirectTo, onComplete }: OnboardingClientProps) {
   const router = useRouter();
-  const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [account, setAccount] = useState<Account | null>(initialAccount);
   const [loading, setLoading] = useState(!initialAccount);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
   
   const [formData, setFormData] = useState({
     username: '',
-    first_name: '',
-    last_name: '',
-    image_url: null as string | null,
   });
 
   // Load account data if not provided
@@ -40,9 +32,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       setAccount(initialAccount);
       setFormData({
         username: initialAccount.username || '',
-        first_name: initialAccount.first_name || '',
-        last_name: initialAccount.last_name || '',
-        image_url: initialAccount.image_url,
       });
       setLoading(false);
       return;
@@ -56,9 +45,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
           setAccount(accountData);
           setFormData({
             username: accountData.username || '',
-            first_name: accountData.first_name || '',
-            last_name: accountData.last_name || '',
-            image_url: accountData.image_url,
           });
         }
       } catch (error) {
@@ -114,9 +100,9 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     setSaving(true);
     setError('');
 
-    // Validate required fields
-    if (!formData.username.trim() || !formData.first_name.trim() || !formData.last_name.trim() || !formData.image_url) {
-      setError('Please fill in all required fields');
+    // Validate required field
+    if (!formData.username.trim()) {
+      setError('Please enter a username');
       setSaving(false);
       return;
     }
@@ -144,9 +130,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       // Update account using AccountService (handles auth, validation, error handling)
       await AccountService.updateCurrentAccount({
         username: formData.username.trim(),
-        first_name: formData.first_name.trim(),
-        last_name: formData.last_name.trim(),
-        image_url: formData.image_url,
       });
 
       // Set onboarded flag (use existing account.id if available, otherwise fetch)
@@ -214,10 +197,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   };
 
   const handleFormChange = (field: keyof typeof formData, value: string | string[] | null) => {
-    // For image_url, ensure we only use string | null (not string[])
-    const normalizedValue = field === 'image_url' 
-      ? (Array.isArray(value) ? value[0] || null : value)
-      : (Array.isArray(value) ? value[0] || '' : value);
+    const normalizedValue = Array.isArray(value) ? value[0] || '' : value || '';
     
     setFormData(prev => ({
       ...prev,
@@ -229,57 +209,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image must be smaller than 5MB');
-      return;
-    }
-
-    setIsUploadingImage(true);
-    setError('');
-
-    try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const timestamp = Date.now();
-      const random = Math.random().toString(36).substring(7);
-      const fileName = `${user.id}/accounts/profile/${timestamp}-${random}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('logos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('logos')
-        .getPublicUrl(fileName);
-
-      if (!urlData?.publicUrl) {
-        throw new Error('Failed to get image URL');
-      }
-
-      handleFormChange('image_url', urlData.publicUrl);
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      setError(err instanceof Error ? err.message : 'Failed to upload image');
-    } finally {
-      setIsUploadingImage(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
 
   if (loading) {
     return (
@@ -292,115 +221,21 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     );
   }
 
-  const displayName = formData.first_name && formData.last_name 
-    ? `${formData.first_name} ${formData.last_name}`.trim()
-    : formData.first_name || formData.last_name || 'Your Name';
-
   return (
     <div className="space-y-3">
-      {/* Profile Card Style Form */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden relative">
-        {/* Cover/Banner Area */}
-        <div className="h-24 bg-gradient-to-r from-gray-50 to-gray-100 relative">
-        </div>
-
-        {/* Profile Content */}
-        <div className="px-[10px] pb-[10px] pt-3">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {error && (
-              <div className="px-[10px] py-[10px] rounded-md text-xs bg-red-50 border border-red-200 text-red-700 flex items-start gap-2 mb-3">
-                <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span>{error}</span>
-              </div>
-            )}
-
-            {/* Profile Photo Upload - Circular Button */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                Profile Photo <span className="text-red-500">*</span>
-              </label>
-              <div className="flex items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={isUploadingImage || saving}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingImage || saving}
-                  className="relative w-20 h-20 rounded-full bg-gray-100 border-2 border-white overflow-hidden shadow-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group"
-                >
-                  {formData.image_url ? (
-                    <>
-                      <img
-                        src={formData.image_url}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <CameraIcon className="w-5 h-5 text-white" />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {isUploadingImage ? (
-                        <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <CameraIcon className="w-6 h-6 text-gray-400" />
-                      )}
-                    </>
-                  )}
-                </button>
-                <div className="flex-1">
-                  <p className="text-xs text-gray-600">
-                    {formData.image_url ? 'Click to replace photo' : 'Click to upload photo'}
-                  </p>
-                  {isUploadingImage && (
-                    <p className="text-xs text-gray-500 mt-0.5">Uploading...</p>
-                  )}
-                </div>
-              </div>
+      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {error && (
+            <div className="px-[10px] py-[10px] rounded-md text-xs bg-red-50 border border-red-200 text-red-700 flex items-start gap-2">
+              <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{error}</span>
             </div>
+          )}
 
-            {/* Name Display - Profile Style */}
-            <div className="space-y-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-0.5">Name</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    id="first_name"
-                    type="text"
-                    required
-                    value={formData.first_name}
-                    onChange={(e) => handleFormChange('first_name', e.target.value)}
-                    className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:border-gray-900 focus:ring-gray-900 transition-colors bg-transparent"
-                    placeholder="First name"
-                    disabled={saving}
-                  />
-                  <input
-                    id="last_name"
-                    type="text"
-                    required
-                    value={formData.last_name}
-                    onChange={(e) => handleFormChange('last_name', e.target.value)}
-                    className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:border-gray-900 focus:ring-gray-900 transition-colors bg-transparent"
-                    placeholder="Last name"
-                    disabled={saving}
-                  />
-                </div>
-                {formData.first_name && formData.last_name && (
-                  <p className="mt-1.5 text-sm font-semibold text-gray-900">{displayName}</p>
-                )}
-              </div>
-
-              {/* Username - Profile Style */}
-              <div>
+          {/* Username */}
+          <div>
                 <label htmlFor="username" className="block text-xs font-medium text-gray-500 mb-0.5">
                   Username <span className="text-red-500">*</span>
                 </label>
@@ -446,13 +281,9 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
                 {formData.username && (
                   <p className="mt-0.5 text-xs text-gray-400">@{formData.username}</p>
                 )}
-              </div>
-            </div>
+          </div>
 
-            {/* Divider */}
-            <div className="border-t border-gray-200 my-3"></div>
-
-            {/* Submit Button */}
+          {/* Submit Button */}
             <div>
               <button
                 type="submit"
@@ -466,14 +297,13 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
                   </>
                 ) : (
                   <>
-                    Save Profile
+                    Set Username
                     <ArrowRightIcon className="w-3 h-3" />
                   </>
                 )}
               </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );

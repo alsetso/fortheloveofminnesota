@@ -13,6 +13,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
  * 
  * URL patterns:
  * - /?modal=welcome
+ * - /?modal=onboarding
  * - /?modal=account&tab=settings
  * - /?modal=account&tab=billing
  * - /?modal=upgrade&feature=intelligence
@@ -26,6 +27,7 @@ export type AppModalType =
   | 'none'
   // Auth/User modals
   | 'welcome'
+  | 'onboarding'
   | 'account'
   | 'upgrade'
   // Map/Feature modals
@@ -69,6 +71,7 @@ export interface UseAppModalsReturn {
   
   // Auth modals
   openWelcome: () => void;
+  openOnboarding: () => void;
   openAccount: (tab?: string) => void;
   openUpgrade: (feature?: string) => void;
   
@@ -102,6 +105,9 @@ export function useAppModals(): UseAppModalsReturn {
     switch (modalType) {
       case 'welcome':
         return { type: 'welcome' };
+        
+      case 'onboarding':
+        return { type: 'onboarding' };
         
       case 'account':
         return {
@@ -183,6 +189,10 @@ export function useAppModals(): UseAppModalsReturn {
     updateUrl({ modal: 'welcome' });
   }, [updateUrl]);
 
+  const openOnboarding = useCallback(() => {
+    updateUrl({ modal: 'onboarding' });
+  }, [updateUrl]);
+
   const openAccount = useCallback((tab?: string) => {
     updateUrl({
       modal: 'account',
@@ -249,6 +259,7 @@ export function useAppModals(): UseAppModalsReturn {
     modal,
     isModalOpen,
     openWelcome,
+    openOnboarding,
     openAccount,
     openUpgrade,
     openIntelligence,

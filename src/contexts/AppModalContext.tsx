@@ -37,6 +37,7 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       modal: { type: 'none' },
       isModalOpen: false,
       openWelcome: () => {},
+      openOnboarding: () => {},
       openAccount: () => {},
       openUpgrade: () => {},
       openIntelligence: () => {},

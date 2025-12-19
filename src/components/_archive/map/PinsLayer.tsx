@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PublicMapPinService } from '@/features/_archive/map-pins/services/publicMapPinService';
 import type { MapPin } from '@/types/map-pin';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { useAuthStateSafe } from '@/features/auth';
 
 interface PinsLayerProps {
   map: MapboxMapInstance;
@@ -19,6 +20,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
   const pointLayerId = 'map-pins-point';
   const pointLabelLayerId = 'map-pins-point-label';
   
+  const { account } = useAuthStateSafe();
   const pinsRef = useRef<MapPin[]>([]);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const isAddingLayersRef = useRef<boolean>(false);
@@ -28,6 +30,16 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
   const selectPinByIdHandlerRef = useRef<((event: CustomEvent<{ pinId: string }>) => void) | null>(null);
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHandlingStyleChangeRef = useRef<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDescription, setEditDescription] = useState('');
+  const currentPinRef = useRef<MapPin | null>(null);
+  const accountRef = useRef(account);
+  
+  // Keep account ref updated
+  useEffect(() => {
+    accountRef.current = account;
+  }, [account]);
 
   // Fetch pins and add to map
   useEffect(() => {
@@ -179,6 +191,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         if (!clickHandlersAddedRef.current) {
           const handlePinClick = async (e: any) => {
             if (!mounted) return;
+            if (!mapboxMap || !e || !e.point || typeof e.point.x !== 'number' || typeof e.point.y !== 'number' || typeof mapboxMap.queryRenderedFeatures !== 'function') return;
             
             const features = mapboxMap.queryRenderedFeatures(e.point, {
               layers: [pointLayerId, pointLabelLayerId],
@@ -207,7 +220,6 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             });
 
             // Don't automatically open sidebar - only show popup
-            // Sidebar will open when user clicks "See More" button
 
             // Helper functions
             const escapeHtml = (text: string | null): string => {
@@ -234,29 +246,64 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               }
             };
 
-            const createPopupContent = (viewCount: number | null, isLoading: boolean = false) => {
+            const createPopupContent = (viewCount: number | null, isLoading: boolean = false, pinToUse: MapPin = pin) => {
+              // Use provided pin or fallback to current pin
+              const currentPin = pinToUse || pin;
               // Determine profile URL - use username if available
-              const profileSlug = pin.account?.username;
+              const profileSlug = currentPin.account?.username;
               const profileUrl = profileSlug ? `/profile/${encodeURIComponent(profileSlug)}` : null;
               
               // Display name: use username, fallback to 'User'
-              const displayName = pin.account?.username || 'User';
+              const displayName = currentPin.account?.username || 'User';
               
-              const accountInfo = pin.account ? `
-                <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
-                  ${pin.account.image_url ? `
-                    <img src="${escapeHtml(pin.account.image_url)}" alt="${escapeHtml(displayName)}" style="width: 12px; height: 12px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />
+              // Check if current user owns this pin
+              const isOwnPin = accountRef.current && currentPin.account_id === accountRef.current.id;
+              
+              // Always show account info - even if account is null, show placeholder
+              const accountInfo = `
+                <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
+                  ${currentPin.account?.image_url ? `
+                    <img src="${escapeHtml(currentPin.account.image_url)}" alt="${escapeHtml(displayName)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e7eb;" />
                   ` : `
-                    <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 7px; color: #6b7280; flex-shrink: 0; font-weight: 500;">
-                      ${escapeHtml((displayName)[0].toUpperCase())}
+                    <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #f3f4f6; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; flex-shrink: 0; font-weight: 500;">
+                      ${escapeHtml(displayName[0].toUpperCase())}
                     </div>
                   `}
-                  <div style="display: flex; align-items: center; gap: 4px; overflow: hidden;">
-                    <span style="font-size: 12px; color: #111827; font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#111827'">
+                  <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; min-width: 0;">
+                    <span style="font-size: 13px; color: #111827; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#111827'">
                       ${escapeHtml(displayName)}
                     </span>
                   </div>
                 </a>
+              `;
+              
+              // Manage button (only for own pins)
+              const manageButton = isOwnPin ? `
+                <div style="position: relative;">
+                  <button class="pin-manage-button" data-pin-id="${currentPin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';" aria-label="Manage pin">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <circle cx="12" cy="5" r="2"></circle>
+                      <circle cx="12" cy="12" r="2"></circle>
+                      <circle cx="12" cy="19" r="2"></circle>
+                    </svg>
+                  </button>
+                  <div class="pin-manage-menu" id="pin-manage-menu-${currentPin.id}" style="display: none; position: absolute; top: 28px; right: 0; min-width: 120px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden;">
+                    <button class="pin-edit-button" data-pin-id="${currentPin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      Edit
+                    </button>
+                    <button class="pin-delete-button" data-pin-id="${currentPin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      Delete
+                    </button>
+                  </div>
+                </div>
               ` : '';
 
               const viewCountDisplay = isLoading ? `
@@ -280,39 +327,41 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
 
               return `
                 <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
-                  <!-- Header with account info and close button -->
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                    ${accountInfo || '<div></div>'}
-                    <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px; line-height: 1; flex-shrink: 0; transition: color 0.15s;" onmouseover="this.style.color='#111827'" onmouseout="this.style.color='#6b7280'" aria-label="Close popup">×</button>
+                  <!-- Header with account info, manage button, and close button -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                    ${accountInfo}
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                      ${manageButton}
+                      <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px; line-height: 1; flex-shrink: 0; transition: color 0.15s;" onmouseover="this.style.color='#111827'" onmouseout="this.style.color='#6b7280'" aria-label="Close popup">×</button>
+                    </div>
                   </div>
                   
                   <!-- Content -->
                   <div style="margin-bottom: 8px;">
-                    ${pin.description ? `
-                      <div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: ${pin.media_url ? '8px' : '0'}; word-wrap: break-word;">
-                        ${escapeHtml(pin.description)}
+                    ${currentPin.description ? `
+                      <div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: ${currentPin.media_url ? '8px' : '0'}; word-wrap: break-word;">
+                        ${escapeHtml(currentPin.description)}
                       </div>
                     ` : ''}
-                    ${pin.media_url ? `
-                      <div style="margin-top: ${pin.description ? '8px' : '0'};">
-                        ${pin.media_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `
-                          <img src="${escapeHtml(pin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 120px; object-fit: cover; display: block;" />
-                        ` : pin.media_url.match(/\.(mp4|webm|ogg)$/i) ? `
-                          <video src="${escapeHtml(pin.media_url)}" controls style="width: 100%; border-radius: 4px; max-height: 120px; display: block;" />
+                    ${currentPin.media_url ? `
+                      <div style="margin-top: ${currentPin.description ? '8px' : '0'};">
+                        ${currentPin.media_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `
+                          <img src="${escapeHtml(currentPin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 120px; object-fit: cover; display: block;" />
+                        ` : currentPin.media_url.match(/\.(mp4|webm|ogg)$/i) ? `
+                          <video src="${escapeHtml(currentPin.media_url)}" controls style="width: 100%; border-radius: 4px; max-height: 120px; display: block;" />
                         ` : ''}
                       </div>
                     ` : ''}
                   </div>
                   
-                  <!-- Footer with date, view count, and See More button -->
+                  <!-- Footer with date and view count -->
                   <div style="padding-top: 8px; border-top: 1px solid #e5e7eb;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
                       <div style="font-size: 12px; color: #6b7280;">
-                        ${formatDate(pin.created_at)}
+                        ${formatDate(currentPin.created_at)}
                       </div>
                       ${viewCountDisplay}
                     </div>
-                    <button class="pin-see-more-button" data-pin-id="${pin.id}" data-pin-lat="${pin.lat}" data-pin-lng="${pin.lng}" style="width: 100%; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #111827; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb'; this.style.borderColor='#d1d5db';" onmouseout="this.style.background='#f3f4f6'; this.style.borderColor='#e5e7eb';">See More</button>
                   </div>
                 </div>
               `;
@@ -347,7 +396,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               .setHTML(createPopupContent(null, true))
               .addTo(mapboxMap);
 
-            // Add click handlers for close button and "See More" button after popup is added to DOM
+            // Add click handlers after popup is added to DOM
             const setupPopupHandlers = () => {
               const popupElement = popupRef.current?.getElement();
               if (!popupElement) return;
@@ -365,43 +414,288 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                 });
               }
 
-              // "See More" button handler
-              const seeMoreButton = popupElement.querySelector('.pin-see-more-button') as HTMLButtonElement;
-              if (seeMoreButton) {
-                seeMoreButton.addEventListener('click', (e: MouseEvent) => {
+              // Manage button handler
+              const manageButton = popupElement.querySelector('.pin-manage-button') as HTMLButtonElement;
+              const manageMenu = popupElement.querySelector('.pin-manage-menu') as HTMLDivElement;
+              
+              if (manageButton && manageMenu) {
+                // Toggle menu on button click
+                manageButton.addEventListener('click', (e: MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const isVisible = manageMenu.style.display === 'block';
+                  manageMenu.style.display = isVisible ? 'none' : 'block';
+                });
+
+                // Close menu when clicking outside
+                const handleClickOutside = (e: MouseEvent) => {
+                  if (!manageMenu.contains(e.target as Node) && !manageButton.contains(e.target as Node)) {
+                    manageMenu.style.display = 'none';
+                  }
+                };
+                document.addEventListener('click', handleClickOutside);
+
+                // Edit button handler
+                const editButton = popupElement.querySelector('.pin-edit-button') as HTMLButtonElement;
+                if (editButton) {
+                  editButton.addEventListener('click', async (e: MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    manageMenu.style.display = 'none';
+                    
+                    // Store current pin for editing
+                    currentPinRef.current = pin;
+                    setEditDescription(pin.description || '');
+                    setIsEditing(true);
+                    
+                    // Update popup to show edit form
+                    if (popupRef.current) {
+                      const editForm = `
+                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
+                          <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                            <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Edit Pin</h3>
+                          </div>
+                          <div style="margin-bottom: 10px;">
+                            <label style="display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 4px;">Description</label>
+                            <textarea id="pin-edit-description" style="width: 100%; min-height: 60px; padding: 6px 8px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; font-family: inherit;" placeholder="Add a description...">${escapeHtml(pin.description || '')}</textarea>
+                          </div>
+                          <div style="display: flex; gap: 6px;">
+                            <button class="pin-edit-cancel" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">Cancel</button>
+                            <button class="pin-edit-save" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #111827; border: 1px solid #111827; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#374151';" onmouseout="this.style.background='#111827';">Save</button>
+                          </div>
+                        </div>
+                      `;
+                      popupRef.current.setHTML(editForm);
+                      setTimeout(() => setupPopupHandlers(), 0);
+                    }
+                  });
+                }
+
+                // Delete button handler
+                const deleteButton = popupElement.querySelector('.pin-delete-button') as HTMLButtonElement;
+                if (deleteButton) {
+                  deleteButton.addEventListener('click', (e: MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    manageMenu.style.display = 'none';
+                    
+                    // Show inline confirmation
+                    if (popupRef.current) {
+                      const confirmDeleteForm = `
+                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
+                          <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                            <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Delete Pin</h3>
+                          </div>
+                          <div style="margin-bottom: 10px;">
+                            <p style="font-size: 12px; color: #374151; line-height: 1.5; margin: 0 0 8px 0;">
+                              Are you sure you want to delete this pin? This action cannot be undone.
+                            </p>
+                            ${pin.description ? `
+                              <div style="padding: 8px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 8px;">
+                                <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Pin description:</div>
+                                <div style="font-size: 12px; color: #111827;">${escapeHtml(pin.description)}</div>
+                              </div>
+                            ` : ''}
+                          </div>
+                          <div style="display: flex; gap: 6px;">
+                            <button class="pin-delete-cancel" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">Cancel</button>
+                            <button class="pin-delete-confirm" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #dc2626; border: 1px solid #dc2626; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#b91c1c';" onmouseout="this.style.background='#dc2626';">Delete</button>
+                          </div>
+                        </div>
+                      `;
+                      popupRef.current.setHTML(confirmDeleteForm);
+                      setTimeout(() => setupPopupHandlers(), 0);
+                    }
+                  });
+                }
+              }
+
+              // Delete confirmation handlers
+              const deleteCancelButton = popupElement.querySelector('.pin-delete-cancel') as HTMLButtonElement;
+              if (deleteCancelButton) {
+                deleteCancelButton.addEventListener('click', (e: MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
                   
-                  const pinId = seeMoreButton.getAttribute('data-pin-id');
+                  const pinId = deleteCancelButton.getAttribute('data-pin-id');
+                  if (!pinId) return;
                   
-                  if (pinId && pin) {
-                    // Dispatch event to open sidebar with pin details
-                    window.dispatchEvent(new CustomEvent('open-pin-sidebar', {
-                      detail: {
-                        pin: {
-                          id: pin.id,
-                          name: pin.description || 'Unnamed Pin',
-                          description: pin.description,
-                          media_url: pin.media_url,
-                          address: null, // Will be reverse geocoded in LocationSidebar
-                          coordinates: { lat: pin.lat, lng: pin.lng },
-                          created_at: pin.created_at,
-                          view_count: pin.view_count || null,
-                          account: pin.account ? {
-                            id: pin.account.id,
-                            username: pin.account.username,
-                            image_url: pin.account.image_url,
-                          } : null,
-                        },
-                        flyToLocation: true,
-                      },
-                    }));
+                  const currentPinForCancel = pinsRef.current.find(p => p.id === pinId) || pin;
+                  if (!currentPinForCancel) return;
+                  
+                  // Reload popup with original content
+                  if (popupRef.current) {
+                    popupRef.current.setHTML(createPopupContent(null, false, currentPinForCancel));
+                    setTimeout(() => setupPopupHandlers(), 0);
+                  }
+                });
+              }
+
+              const deleteConfirmButton = popupElement.querySelector('.pin-delete-confirm') as HTMLButtonElement;
+              if (deleteConfirmButton) {
+                deleteConfirmButton.addEventListener('click', async (e: MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  const pinId = deleteConfirmButton.getAttribute('data-pin-id');
+                  if (!pinId) return;
+                  
+                  const pinToDelete = pinsRef.current.find(p => p.id === pinId) || pin;
+                  if (!pinToDelete) return;
+                  
+                  setIsDeleting(true);
+                  
+                  // Update button to show loading state
+                  if (deleteConfirmButton) {
+                    deleteConfirmButton.disabled = true;
+                    deleteConfirmButton.style.opacity = '0.6';
+                    deleteConfirmButton.style.cursor = 'not-allowed';
+                    deleteConfirmButton.textContent = 'Deleting...';
                   }
                   
-                  // Close popup
+                  try {
+                    await PublicMapPinService.deletePin(pinId);
+                    // Remove pin from local refs
+                    pinsRef.current = pinsRef.current.filter(p => p.id !== pinId);
+                    // Reload pins
+                    const updatedPins = await PublicMapPinService.getPins();
+                    pinsRef.current = updatedPins;
+                    const geoJSON = PublicMapPinService.pinsToGeoJSON(updatedPins);
+                    const source = mapboxMap.getSource(sourceId) as any;
+                    if (source) {
+                      source.setData(geoJSON);
+                    }
+                    // Close popup
+                    if (popupRef.current) {
+                      popupRef.current.remove();
+                      popupRef.current = null;
+                    }
+                    // Dispatch event to refresh pins
+                    window.dispatchEvent(new CustomEvent('pin-deleted', { detail: { pinId } }));
+                  } catch (error) {
+                    console.error('[PinsLayer] Error deleting pin:', error);
+                    // Restore button state
+                    if (deleteConfirmButton) {
+                      deleteConfirmButton.disabled = false;
+                      deleteConfirmButton.style.opacity = '1';
+                      deleteConfirmButton.style.cursor = 'pointer';
+                      deleteConfirmButton.textContent = 'Delete';
+                    }
+                    // Show error in popup
+                    if (popupRef.current) {
+                      const errorForm = `
+                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
+                          <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                            <h3 style="font-size: 13px; font-weight: 600; color: #dc2626; margin: 0;">Delete Failed</h3>
+                          </div>
+                          <div style="margin-bottom: 10px;">
+                            <p style="font-size: 12px; color: #374151; line-height: 1.5; margin: 0;">
+                              Failed to delete pin. Please try again.
+                            </p>
+                          </div>
+                          <div style="display: flex; gap: 6px;">
+                            <button class="pin-delete-error-ok" data-pin-id="${pinId}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #111827; border: 1px solid #111827; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#374151';" onmouseout="this.style.background='#111827';">OK</button>
+                          </div>
+                        </div>
+                      `;
+                      popupRef.current.setHTML(errorForm);
+                      setTimeout(() => {
+                        const okButton = popupRef.current?.getElement()?.querySelector('.pin-delete-error-ok') as HTMLButtonElement;
+                        if (okButton) {
+                          okButton.addEventListener('click', () => {
+                            if (popupRef.current) {
+                              const currentPinForReload = pinsRef.current.find(p => p.id === pinId) || pinToDelete;
+                              popupRef.current.setHTML(createPopupContent(null, false, currentPinForReload));
+                              setTimeout(() => setupPopupHandlers(), 0);
+                            }
+                          });
+                        }
+                      }, 0);
+                    }
+                  } finally {
+                    setIsDeleting(false);
+                  }
+                });
+              }
+
+              // Edit form handlers (when in edit mode)
+              const editCancelButton = popupElement.querySelector('.pin-edit-cancel') as HTMLButtonElement;
+              if (editCancelButton) {
+                editCancelButton.addEventListener('click', (e: MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  const pinId = editCancelButton.getAttribute('data-pin-id');
+                  if (!pinId) return;
+                  
+                  const currentPinForCancel = pinsRef.current.find(p => p.id === pinId) || pin;
+                  if (!currentPinForCancel) return;
+                  
+                  setIsEditing(false);
+                  currentPinRef.current = null;
+                  // Reload popup with original content
                   if (popupRef.current) {
-                    popupRef.current.remove();
-                    popupRef.current = null;
+                    popupRef.current.setHTML(createPopupContent(null, false, currentPinForCancel));
+                    setTimeout(() => setupPopupHandlers(), 0);
+                  }
+                });
+              }
+
+              const editSaveButton = popupElement.querySelector('.pin-edit-save') as HTMLButtonElement;
+              const editDescriptionTextarea = popupElement.querySelector('#pin-edit-description') as HTMLTextAreaElement;
+              if (editSaveButton) {
+                editSaveButton.addEventListener('click', async (e: MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  const pinId = editSaveButton.getAttribute('data-pin-id');
+                  if (!pinId) return;
+                  
+                  const currentPinForEdit = pinsRef.current.find(p => p.id === pinId) || pin;
+                  if (!currentPinForEdit) return;
+                  
+                  const newDescription = editDescriptionTextarea?.value.trim() || null;
+                  
+                  try {
+                    await PublicMapPinService.updatePin(pinId, {
+                      description: newDescription,
+                    });
+                    
+                    // Update pin in local refs
+                    const pinIndex = pinsRef.current.findIndex(p => p.id === pinId);
+                    if (pinIndex !== -1) {
+                      pinsRef.current[pinIndex] = {
+                        ...pinsRef.current[pinIndex],
+                        description: newDescription,
+                      };
+                    }
+                    
+                    // Reload pins to get fresh data
+                    const updatedPins = await PublicMapPinService.getPins();
+                    pinsRef.current = updatedPins;
+                    const geoJSON = PublicMapPinService.pinsToGeoJSON(updatedPins);
+                    const source = mapboxMap.getSource(sourceId) as any;
+                    if (source) {
+                      source.setData(geoJSON);
+                    }
+                    
+                    // Update popup with new content
+                    if (popupRef.current) {
+                      const updatedPin = updatedPins.find(p => p.id === pinId);
+                      if (updatedPin) {
+                        popupRef.current.setHTML(createPopupContent(null, false, updatedPin));
+                        setTimeout(() => setupPopupHandlers(), 0);
+                      }
+                    }
+                    
+                    setIsEditing(false);
+                    currentPinRef.current = null;
+                    
+                    // Dispatch event to refresh pins
+                    window.dispatchEvent(new CustomEvent('pin-updated', { detail: { pinId } }));
+                  } catch (error) {
+                    console.error('[PinsLayer] Error updating pin:', error);
+                    alert('Failed to update pin. Please try again.');
                   }
                 });
               }

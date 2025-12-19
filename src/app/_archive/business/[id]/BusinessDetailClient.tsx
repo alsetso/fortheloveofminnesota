@@ -39,10 +39,7 @@ export interface Business {
   view_count?: number;
 }
 
-export interface BusinessWithCities extends Business {
-  category: { id: string; name: string } | null;
-  cities: Array<{ id: string; name: string }> | null;
-}
+import { BusinessWithCities } from '@/types/business';
 
 type ViewMode = 'admin' | 'visitor';
 

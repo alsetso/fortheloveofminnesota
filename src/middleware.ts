@@ -16,22 +16,15 @@ const ROUTE_PROTECTION: Record<string, {
 };
 
 /**
- * Check if account has all required fields
+ * Check if account has required field (username only)
  */
 function isAccountComplete(account: {
-  first_name: string | null;
-  last_name: string | null;
-  image_url: string | null;
   username: string | null;
 } | null): boolean {
   if (!account) return false;
   
-  return !!(
-    account.username &&
-    account.first_name &&
-    account.last_name &&
-    account.image_url
-  );
+  // Only check username - simplified requirement
+  return !!account.username;
 }
 
 /**
@@ -45,10 +38,10 @@ async function getUserAccountData(
   onboarded: boolean | null;
   isComplete: boolean;
 }> {
-  // Try to get account role, onboarded status, and completeness fields
+  // Try to get account role, onboarded status, and username (only field needed for completion)
   const { data: account, error: accountError } = await supabase
     .from('accounts')
-    .select('role, onboarded, username, first_name, last_name, image_url')
+    .select('role, onboarded, username')
     .eq('user_id', userId)
     .limit(1)
     .maybeSingle();
@@ -150,12 +143,24 @@ export async function middleware(req: NextRequest) {
   
   // Redirect account pages to / with modal params
   if (pathname.startsWith('/account/')) {
+    // Special handling for onboarding - separate modal
+    if (pathname === '/account/onboarding') {
+      const redirectUrl = new URL('/', req.url);
+      redirectUrl.searchParams.set('modal', 'onboarding');
+      
+      // Preserve query params (e.g., session_id from Stripe)
+      req.nextUrl.searchParams.forEach((value, key) => {
+        redirectUrl.searchParams.set(key, value);
+      });
+      
+      return NextResponse.redirect(redirectUrl);
+    }
+    
+    // Other account pages go to account modal with tab
     const accountRouteMap: Record<string, string> = {
       '/account/settings': 'settings',
       '/account/billing': 'billing',
       '/account/analytics': 'analytics',
-      '/account/notifications': 'notifications',
-      '/account/onboarding': 'onboarding',
       '/account/change-plan': 'billing', // change-plan opens billing tab
     };
     
@@ -259,12 +264,12 @@ export async function middleware(req: NextRequest) {
   if (user && protection?.auth) {
     accountData = await getUserAccountData(supabase, user.id);
     
-    // Check onboarding status for protected routes
-    // Redirect to home with onboarding modal if not onboarded
-    if (accountData && accountData.onboarded === false) {
+    // Check account completeness for protected routes
+    // Source of truth: isComplete checks actual data (username, first_name, last_name, image_url)
+    // Redirect to home with onboarding modal if account is incomplete
+    if (accountData && !accountData.isComplete) {
       const redirectUrl = new URL('/', req.url);
-      redirectUrl.searchParams.set('modal', 'account');
-      redirectUrl.searchParams.set('tab', 'onboarding');
+      redirectUrl.searchParams.set('modal', 'onboarding');
       return NextResponse.redirect(redirectUrl);
     }
   }

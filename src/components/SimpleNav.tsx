@@ -8,12 +8,10 @@ import {
   HomeIcon,
   GlobeAltIcon,
   BuildingLibraryIcon,
-  BellIcon,
   UserIcon,
   QuestionMarkCircleIcon,
   EnvelopeIcon,
 } from '@heroicons/react/24/outline';
-import { useNotifications } from '@/features/notifications';
 import ProfilePhoto from './ProfilePhoto';
 import AppSearch from './app/AppSearch';
 import BaseNav from './shared/BaseNav';
@@ -36,13 +34,6 @@ export default function SimpleNav() {
   
   // Local modal state
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  
-  // Notifications
-  const { unreadCount } = useNotifications({
-    limit: 10,
-    unreadOnly: false,
-    autoLoad: !!user && !!account,
-  });
 
   const handleSignOut = async () => {
     try {
@@ -118,18 +109,6 @@ export default function SimpleNav() {
               <ProfilePhoto account={account} size="sm" />
               <span>{displayName}</span>
             </button>
-            <Link
-              href="/account/notifications"
-              className="block px-3 py-2.5 text-base font-medium transition-colors text-gray-600 hover:text-black hover:bg-gray-100 flex items-center gap-3 relative"
-            >
-              <BellIcon className="w-5 h-5" />
-              <span>Notifications</span>
-              {unreadCount > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
             <div className="pt-2 border-t border-gray-200">
               <button
                 onClick={handleSignOut}

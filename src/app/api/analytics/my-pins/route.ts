@@ -64,11 +64,12 @@ export async function GET() {
 
     const accountId = (account as { id: string }).id;
 
-    // Get all user's pins
+    // Get all user's pins (excluding archived)
     const { data: pins, error: pinsError } = await supabase
       .from('pins')
       .select('id, description, type, created_at')
       .eq('account_id', accountId)
+      .eq('archived', false) // Exclude archived pins
       .order('created_at', { ascending: false });
 
     if (pinsError) {
@@ -100,9 +101,10 @@ export async function GET() {
       const { data: stats } = await supabase.rpc('get_pin_stats', {
         p_pin_id: pinData.id,
         p_hours: null,
-      });
+      } as any);
 
-      const statsData = (stats as { total_views: number; unique_viewers: number }[])?.[0] || {
+      const statsArray = (stats as { total_views: number; unique_viewers: number }[] | null) || [];
+      const statsData = statsArray[0] || {
         total_views: 0,
         unique_viewers: 0,
       };

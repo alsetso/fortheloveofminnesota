@@ -2,15 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChartBarIcon, BellIcon, SparklesIcon, UserIcon, CreditCardIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChartBarIcon, UserIcon, CreditCardIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import type { BillingData } from '@/lib/billingServer';
-import { isAccountComplete } from '@/lib/accountCompleteness';
 import AnalyticsClient from '@/components/feed/AnalyticsClient';
-import NotificationsClient from '@/app/_archive/account/notifications/NotificationsClient';
 import SettingsClient from '@/app/_archive/account/settings/SettingsClient';
 import BillingClient from '@/app/_archive/account/billing/BillingClient';
-import OnboardingClient from '@/app/_archive/account/onboarding/OnboardingClient';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -19,7 +16,7 @@ interface AccountModalProps {
   onAccountUpdate?: () => void | Promise<void>;
 }
 
-type TabId = 'analytics' | 'notifications' | 'onboarding' | 'settings' | 'billing';
+type TabId = 'analytics' | 'settings' | 'billing';
 
 interface Tab {
   id: TabId;
@@ -29,15 +26,12 @@ interface Tab {
 
 const tabs: Tab[] = [
   { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
-  { id: 'notifications', label: 'Notifications', icon: BellIcon },
-  { id: 'onboarding', label: 'Onboarding', icon: SparklesIcon },
   { id: 'settings', label: 'Settings', icon: UserIcon },
   { id: 'billing', label: 'Billing', icon: CreditCardIcon },
 ];
 
 export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpdate }: AccountModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>(initialTab || 'settings');
-  const [accountComplete, setAccountComplete] = useState(true);
   const [showChangePlan, setShowChangePlan] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
@@ -52,23 +46,6 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
     }
   }, [initialTab, isOpen]);
 
-  // Check account completeness and force onboarding tab if incomplete
-  // Wait until account is loaded (not loading) before checking
-  useEffect(() => {
-    if (isOpen && !loading && account) {
-      const complete = isAccountComplete(account);
-      setAccountComplete(complete);
-      
-      // Force onboarding tab if account is incomplete
-      if (!complete) {
-        setActiveTab('onboarding');
-      }
-    } else if (isOpen && !loading && !account) {
-      // If account is null after loading, assume incomplete
-      setAccountComplete(false);
-      setActiveTab('onboarding');
-    }
-  }, [isOpen, loading, account]);
 
   // Fetch account data when modal opens
   useEffect(() => {
@@ -159,27 +136,12 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
             </div>
             <div className="flex flex-col">
               <h2 className="text-sm font-semibold text-gray-900">Account</h2>
-              {!accountComplete && (
-                <p className="text-[10px] text-gray-500">Please complete your profile to continue</p>
-              )}
             </div>
           </div>
           <button
-            onClick={() => {
-              // Prevent closing if account is incomplete
-              if (!accountComplete) {
-                return;
-              }
-              onClose();
-            }}
-            disabled={!accountComplete}
-            className={`p-1 transition-colors ${
-              accountComplete 
-                ? 'text-gray-500 hover:text-gray-700' 
-                : 'text-gray-300 cursor-not-allowed'
-            }`}
+            onClick={onClose}
+            className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
             aria-label="Close"
-            title={!accountComplete ? 'Please complete your profile to continue' : 'Close'}
           >
             <XMarkIcon className="w-4 h-4" />
           </button>
@@ -189,29 +151,17 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
         <div className="flex border-b border-gray-200 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            // Disable tabs other than onboarding if account is incomplete
-            const isDisabled = !accountComplete && tab.id !== 'onboarding';
             return (
               <button
                 key={tab.id}
-                onClick={() => {
-                  // Prevent switching away from onboarding if account is incomplete
-                  if (!accountComplete && tab.id !== 'onboarding') {
-                    return;
-                  }
-                  setActiveTab(tab.id);
-                }}
-                disabled={isDisabled}
+                onClick={() => setActiveTab(tab.id)}
                 className={`
                   flex items-center gap-1.5 px-[10px] py-2 text-xs font-medium transition-colors whitespace-nowrap border-b-2
                   ${activeTab === tab.id
                     ? 'text-gray-900 border-gray-900'
-                    : isDisabled
-                    ? 'text-gray-300 cursor-not-allowed border-transparent'
                     : 'text-gray-500 hover:text-gray-700 border-transparent'
                   }
                 `}
-                title={isDisabled ? 'Please complete your profile first' : undefined}
               >
                 <Icon className="w-3 h-3" />
                 {tab.label}
@@ -229,29 +179,6 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
           ) : (
             <>
               {activeTab === 'analytics' && <AnalyticsClient />}
-              {activeTab === 'notifications' && <NotificationsClient />}
-              {activeTab === 'onboarding' && account && (
-                <OnboardingClient 
-                  initialAccount={account} 
-                  redirectTo={undefined}
-                  onComplete={async () => {
-                    // Refresh account data
-                    try {
-                      const accountData = await AccountService.getCurrentAccount();
-                      setAccount(accountData);
-                      const complete = isAccountComplete(accountData);
-                      setAccountComplete(complete);
-                      
-                      // Call parent callback if provided
-                      if (onAccountUpdate) {
-                        await onAccountUpdate();
-                      }
-                    } catch (error) {
-                      console.error('Error refreshing account after completion:', error);
-                    }
-                  }}
-                />
-              )}
               {activeTab === 'settings' && account && <SettingsClient initialAccount={account} userEmail={userEmail} />}
               {activeTab === 'billing' && (
                 <>

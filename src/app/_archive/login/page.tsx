@@ -101,7 +101,8 @@ export default function LoginPage() {
       const urlParams = new URLSearchParams(window.location.search);
       const redirectTo = urlParams.get('redirect') || '/';
       
-      // Check onboarding status with timeout
+      // Check account completeness and redirect accordingly
+      // Source of truth: isAccountComplete() checks actual data (username, first_name, last_name, image_url)
       const checkOnboardingAndRedirect = async () => {
         try {
           // Set timeout to prevent infinite loading
@@ -110,14 +111,15 @@ export default function LoginPage() {
           );
           
           const { AccountService } = await import('@/features/auth');
+          const { isAccountComplete } = await import('@/lib/accountCompleteness');
           const accountPromise = AccountService.getCurrentAccount();
           
           const account = await Promise.race([accountPromise, timeoutPromise]) as Awaited<ReturnType<typeof AccountService.getCurrentAccount>> | null;
           
-          // Only redirect to onboarding if explicitly not onboarded
-          // If account doesn't exist or is null, just go to redirect URL
-          if (account && account.onboarded === false) {
-            router.replace('/?modal=account&tab=onboarding');
+          // Check account completeness (source of truth: actual data fields)
+          // If account is incomplete, redirect to onboarding modal
+          if (account && !isAccountComplete(account)) {
+            router.replace('/?modal=onboarding');
           } else {
             // If redirect is an account page, convert to feed with modal
             if (redirectTo.startsWith('/account/')) {
@@ -125,7 +127,6 @@ export default function LoginPage() {
                 '/account/settings': 'settings',
                 '/account/billing': 'billing',
                 '/account/analytics': 'analytics',
-                '/account/notifications': 'notifications',
                 '/account/onboarding': 'onboarding',
                 '/account/change-plan': 'billing',
               };
@@ -136,9 +137,9 @@ export default function LoginPage() {
             }
           }
         } catch (error) {
-          console.warn('Error checking onboarding status, redirecting anyway:', error);
+          console.warn('Error checking account completeness, redirecting anyway:', error);
           // On error or timeout, just redirect to the intended destination
-          // Don't force onboarding - let the destination page handle it
+          // The destination page (homepage) will check completeness and show onboarding if needed
           router.replace(redirectTo);
         }
       };

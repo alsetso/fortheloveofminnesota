@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PlusIcon, MagnifyingGlassIcon, FunnelIcon, MapPinIcon, PhoneIcon, EnvelopeIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/features/auth';
-import { BusinessWithCities } from '@/app/_archive/business/directory/page';
+import { BusinessWithCities } from '@/types/business';
 
 interface BusinessesListClientProps {
   initialBusinesses: BusinessWithCities[];

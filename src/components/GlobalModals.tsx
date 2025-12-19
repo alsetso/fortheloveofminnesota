@@ -2,6 +2,7 @@
 
 import { useAppModalContext } from '@/contexts/AppModalContext';
 import WelcomeModal from '@/components/feed/WelcomeModal';
+import OnboardingModal from '@/components/feed/OnboardingModal';
 import AccountModal from '@/components/feed/AccountModal';
 import UpgradeToProModal from '@/components/UpgradeToProModal';
 
@@ -22,11 +23,17 @@ export default function GlobalModals() {
         onClose={closeModal}
       />
 
+      {/* Onboarding Modal - separate from account settings */}
+      <OnboardingModal
+        isOpen={modal.type === 'onboarding'}
+        onClose={closeModal}
+      />
+
       {/* Account Settings Modal - only for authenticated users */}
       <AccountModal
         isOpen={modal.type === 'account'}
         onClose={closeModal}
-        initialTab={modal.tab as 'settings' | 'billing' | 'onboarding' | undefined}
+        initialTab={modal.tab as 'settings' | 'billing' | 'analytics' | undefined}
         onAccountUpdate={() => {
           // Account updated - could trigger refresh if needed
         }}

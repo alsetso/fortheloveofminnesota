@@ -34,6 +34,7 @@ export interface MapPin {
   city_id: string | null;
   county_id: string | null;
   visibility: MapPinVisibility;
+  archived?: boolean; // Soft delete flag - true means pin is archived
   view_count?: number;
   location_metadata?: LocationMetadata | null;
   atlas_metadata?: AtlasMetadata | null;

@@ -203,7 +203,13 @@ export default function ProfilePinsLayer({
         if (!confirm('Delete this pin? This cannot be undone.')) return;
         
         try {
-          const { error } = await supabase.from('pins').delete().eq('id', pin.id);
+          // Soft delete: set archived = true
+          const { error } = await supabase
+            .from('pins')
+            .update({ archived: true })
+            .eq('id', pin.id)
+            .eq('archived', false); // Only archive pins that aren't already archived
+          
           if (error) throw error;
           
           popupRef.current?.remove();

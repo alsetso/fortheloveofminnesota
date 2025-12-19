@@ -93,6 +93,7 @@ export default async function ProfilePage({ params }: Props) {
       updated_at
     `)
     .eq('account_id', account.id)
+    .eq('archived', false) // Exclude archived pins
     .order('created_at', { ascending: false });
 
   // If viewing own profile, include private pins; otherwise only public

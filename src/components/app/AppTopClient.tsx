@@ -4,14 +4,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Bars3Icon, BellIcon, SparklesIcon, Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Bars3Icon, SparklesIcon, Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Account, AccountService } from '@/features/auth';
 import { useAuth } from '@/features/auth';
 import { useProfile } from '@/features/profiles/contexts/ProfileContext';
 import ProfilePhoto from '@/components/ProfilePhoto';
 import AppSearch from './AppSearch';
-import { formatDistanceToNow } from 'date-fns';
-import { useNotifications } from '@/features/notifications';
 import { isAccountComplete } from '@/lib/accountCompleteness';
 import { appNavItems } from '@/config/navigation';
 
@@ -41,26 +39,13 @@ export default function AppTopClient({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const accountContainerRef = useRef<HTMLDivElement>(null);
-  const notificationContainerRef = useRef<HTMLDivElement>(null);
   const menuContainerRef = useRef<HTMLDivElement>(null);
   
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
-  
-  const {
-    notifications,
-    loading: notificationsLoading,
-    unreadCount,
-    markAsRead: markAsReadNotification,
-  } = useNotifications({
-    limit: 10,
-    unreadOnly: false,
-    autoLoad: !!user && !!account,
-  });
 
   const handleSignOut = async () => {
     try {
@@ -80,36 +65,17 @@ export default function AppTopClient({
       if (accountContainerRef.current && !accountContainerRef.current.contains(event.target as Node)) {
         setIsAccountMenuOpen(false);
       }
-      if (notificationContainerRef.current && !notificationContainerRef.current.contains(event.target as Node)) {
-        setIsNotificationMenuOpen(false);
-      }
       if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
         setIsSidebarOpen(false);
       }
     };
 
-    if (isAccountMenuOpen || isNotificationMenuOpen || isSidebarOpen) {
+    if (isAccountMenuOpen || isSidebarOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
     return undefined;
-  }, [isAccountMenuOpen, isNotificationMenuOpen, isSidebarOpen]);
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      await markAsReadNotification(notificationId);
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const formatTime = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-    } catch {
-      return 'Recently';
-    }
-  };
+  }, [isAccountMenuOpen, isSidebarOpen]);
 
   // Use account for display name
   const displayName = account 
@@ -256,7 +222,7 @@ export default function AppTopClient({
             />
           </div>
 
-          {/* Right Section - AI Agent, Notifications, Profile/Login */}
+          {/* Right Section - AI Agent, Profile/Login */}
           <div className="flex items-center gap-2 flex-shrink-0">
             {/* AI Agent Icon - Always visible */}
             <button
@@ -274,119 +240,6 @@ export default function AppTopClient({
             >
               <SparklesIcon className="w-5 h-5" />
             </button>
-
-            {/* Notifications */}
-            {user && account && (
-              <div ref={notificationContainerRef} className="relative">
-                <button
-                  onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)}
-                  className={`relative p-2 text-sm font-medium rounded-lg transition-all duration-200 border ${
-                    isNotificationMenuOpen
-                      ? 'text-gold-400 bg-header-focus/60 border-header-focus'
-                      : 'text-gray-300 hover:text-gold-400 hover:bg-header-focus/60 border-transparent hover:border-header-focus'
-                  }`}
-                  aria-label="Notifications"
-                >
-                  <BellIcon className="w-5 h-5" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 w-2 h-2 bg-gold-400 rounded-full border-2 border-black/95" />
-                  )}
-                </button>
-
-                {/* Notification Dropdown */}
-                {isNotificationMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-black/95 backdrop-blur-md z-50 overflow-hidden rounded-lg border border-header-focus">
-                    <div className="py-1">
-                      {/* Header */}
-                      <div className="px-3 py-2 border-b border-header-focus/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-medium text-gray-100">Notifications</p>
-                          {unreadCount > 0 && (
-                            <span className="text-xs text-gold-400 bg-gold-400/20 px-2 py-0.5 rounded-full">
-                              {unreadCount} new
-                            </span>
-                          )}
-                        </div>
-                        {/* Onboarding Status */}
-                        {account && (!account.onboarded || !isAccountComplete(account)) && (
-                          <Link
-                            href="/account/onboarding"
-                            onClick={() => setIsNotificationMenuOpen(false)}
-                            className="flex items-center gap-2 px-2 py-1.5 bg-yellow-500/20 border border-yellow-500/30 rounded text-xs text-yellow-400 hover:bg-yellow-500/30 transition-colors group"
-                          >
-                            <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-                            <span className="flex-1">
-                              {!account.onboarded ? 'Complete onboarding' : 'Complete profile'}
-                            </span>
-                            <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </Link>
-                        )}
-                      </div>
-
-                      {/* Notification List */}
-                      <div className="max-h-96 overflow-y-auto">
-                        {notificationsLoading ? (
-                          <div className="px-3 py-4 text-center">
-                            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                          </div>
-                        ) : notifications.length === 0 ? (
-                          <div className="px-3 py-4 text-center text-xs text-gray-400">
-                            No notifications
-                          </div>
-                        ) : (
-                          notifications.map((notification) => (
-                            <button
-                              key={notification.id}
-                              onClick={() => {
-                                if (!notification.read) {
-                                  markAsRead(notification.id);
-                                }
-                                setIsNotificationMenuOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 hover:bg-gray-800/60 transition-all duration-200 border-b border-header-focus/30 last:border-b-0 ${
-                                notification.read ? '' : 'bg-header-focus/20'
-                              }`}
-                            >
-                              <div className="flex items-start gap-2">
-                                <div className={`flex-shrink-0 w-1.5 h-1.5 rounded-full mt-1.5 ${
-                                  notification.read ? 'bg-transparent' : 'bg-gold-400'
-                                }`} />
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-xs font-medium mb-0.5 line-clamp-1 ${
-                                    notification.read ? 'text-gray-400' : 'text-gray-100'
-                                  }`}>
-                                    {notification.title}
-                                  </p>
-                                  <p className="text-xs text-gray-500 line-clamp-1 mb-0.5">
-                                    {notification.message}
-                                  </p>
-                                  <p className="text-[10px] text-gray-600">
-                                    {formatTime(notification.created_at)}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                        )}
-                      </div>
-
-                      {/* Footer */}
-                      <div className="border-t border-header-focus/50 px-3 py-2">
-                        <Link
-                          href="/account/notifications"
-                          onClick={() => setIsNotificationMenuOpen(false)}
-                          className="block w-full text-center text-xs text-gray-400 hover:text-gold-400 transition-colors"
-                        >
-                          View all notifications
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Profile/Login */}
             {user && account ? (

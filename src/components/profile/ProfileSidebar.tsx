@@ -322,7 +322,7 @@ export default function ProfileSidebar({
           <div ref={resultsRef} className="border-b border-gray-100 max-h-[200px] overflow-y-auto">
             {filteredPins.length === 0 ? (
               <div className="px-4 py-3 text-xs text-gray-500 text-center">
-                No pins found matching "{searchQuery}"
+                No pins found matching &quot;{searchQuery}&quot;
               </div>
             ) : (
               <div className="py-1">

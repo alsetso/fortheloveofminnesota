@@ -3,9 +3,12 @@
  */
 
 export interface PageStats {
-  total_loads: number;
-  unique_visitors: number;
-  accounts_active: number;
+  total_loads?: number;
+  total_views?: number;
+  unique_visitors?: number;
+  unique_viewers?: number;
+  accounts_active?: number;
+  accounts_viewed?: number;
 }
 
 export interface PageView {

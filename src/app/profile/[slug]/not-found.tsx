@@ -8,7 +8,7 @@ export default function ProfileNotFound() {
           Profile Not Found
         </h1>
         <p className="text-sm text-gray-600 mb-6">
-          The profile you're looking for doesn't exist or may have been removed.
+          The profile you&apos;re looking for doesn&apos;t exist or may have been removed.
         </p>
         <Link
           href="/"

@@ -20,6 +20,18 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: false,
+    tsconfigPath: './tsconfig.json',
+  },
+  // Exclude _archive folders from build output tracing
+  experimental: {
+    outputFileTracingExcludes: {
+      '*': [
+        '**/_archive/**',
+        '**/*_archive/**',
+        '**/features/_archive/**',
+        '**/components/_archive/**',
+      ],
+    },
   },
   images: {
     remotePatterns: [

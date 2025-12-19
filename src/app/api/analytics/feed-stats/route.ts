@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const { data: stats, error } = await supabase.rpc('get_page_stats', {
       p_page_url: '/feed',
       p_hours: hours,
-    });
+    } as any);
 
     if (error) {
       console.error('Error fetching feed stats:', error);

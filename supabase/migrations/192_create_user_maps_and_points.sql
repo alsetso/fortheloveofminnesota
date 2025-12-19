@@ -345,3 +345,4 @@ COMMENT ON FUNCTION public.user_owns_map(UUID) IS 'Checks if the current authent
 COMMENT ON FUNCTION public.user_has_map_access(UUID, public.map_permission) IS 'Checks if the current authenticated user has access to a map (either as owner or via share). Returns true if user has the required permission level or higher.';
 
 
+

@@ -202,3 +202,4 @@ The state management ensures only one modal can be open at a time:
 2. Continue as guest → Map with sidebar
 3. Click map → Location sidebar (limited functionality)
 
+

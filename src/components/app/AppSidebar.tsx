@@ -78,10 +78,10 @@ export default function AppSidebar({
 
   return (
     <>
-      {/* Mobile Overlay - Below lg (800px) */}
+      {/* Mobile Overlay - Below lg (800px) - Transparent to allow backdrop-blur to work */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-[150] lg:hidden"
+          className="fixed inset-0 z-[150] lg:hidden"
           onClick={handleClose}
           style={{ top: '3.5rem' }}
         />
@@ -171,21 +171,27 @@ export default function AppSidebar({
         <aside
           className={`
             fixed inset-y-0 left-0 z-[200]
-            bg-white border-r border-gray-200
+            bg-white/60 backdrop-blur-2xl backdrop-saturate-[1.8]
+            border-r border-white/40
             transition-transform duration-300 ease-in-out
             ${isOpen ? 'translate-x-0' : '-translate-x-full'}
             w-64 flex-shrink-0 flex-col
             lg:hidden
+            isolate
           `}
-          style={{ top: '3.5rem', borderTopLeftRadius: '1.5rem' }}
+          style={{ 
+            top: '3.5rem', 
+            borderTopLeftRadius: '1.5rem',
+            WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+          }}
         >
           <div className="flex flex-col h-full">
             {/* Header with close button */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b border-white/20">
               <h2 className="text-sm font-semibold text-gray-900">Menu</h2>
               <button
                 onClick={handleClose}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors"
+                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-white/40 rounded-lg transition-colors"
                 aria-label="Close menu"
               >
                 <XMarkIcon className="w-5 h-5" />
@@ -209,8 +215,8 @@ export default function AppSidebar({
                           text-sm font-medium transition-colors
                           ${
                             active
-                              ? 'bg-gray-200 text-gray-900'
-                              : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                              ? 'bg-white/50 text-gray-900'
+                              : 'text-gray-700 hover:bg-white/40 hover:text-gray-900'
                           }
                         `}
                       >
@@ -223,7 +229,7 @@ export default function AppSidebar({
               </ul>
 
               {/* Settings Section - Pinned to bottom */}
-              <div className="mt-auto pt-6 border-t border-gray-200">
+              <div className="mt-auto pt-6 border-t border-white/20">
                 <Link
                   href="/account/settings"
                   onClick={handleClose}
@@ -232,8 +238,8 @@ export default function AppSidebar({
                     text-sm font-medium transition-colors
                     ${
                       isActive('/account/settings')
-                        ? 'bg-gray-200 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+                        ? 'bg-white/50 text-gray-900'
+                        : 'text-gray-700 hover:bg-white/40 hover:text-gray-900'
                     }
                   `}
                 >

@@ -32,7 +32,7 @@ export default function LoginOverlayModal({ isOpen, onClose, onLogin }: LoginOve
           
           <div className="flex flex-col gap-3">
             <Link
-              href="/?modal=account&tab=settings"
+              href="/?modal=welcome"
               onClick={onLogin}
               className="w-full px-6 py-3 bg-gold-500 text-black font-semibold rounded-lg hover:bg-gold-600 transition-colors text-center"
             >

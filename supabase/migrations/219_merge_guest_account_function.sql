@@ -70,3 +70,4 @@ COMMENT ON FUNCTION public.merge_guest_account_into_user IS
   'Merges a guest account into an authenticated user account. Transfers all pins from guest account to user account. Optionally deletes the guest account. Only the authenticated user can merge their own accounts.';
 
 
+

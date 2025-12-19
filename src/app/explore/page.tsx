@@ -217,7 +217,7 @@ export default async function ExplorePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }}
       />
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Breadcrumb Navigation */}
           <nav className="mb-3" aria-label="Breadcrumb">
             <ol className="flex items-center gap-2 text-xs text-gray-600">
@@ -538,6 +538,28 @@ export default async function ExplorePage() {
                 Start by exploring the <Link href="/explore/cities" className="text-gray-700 underline hover:text-gray-900 transition-colors">Minnesota Cities Directory</Link> or 
                 the <Link href="/explore/counties" className="text-gray-700 underline hover:text-gray-900 transition-colors">Minnesota Counties Directory</Link> to discover detailed information about any location in the Land of 10,000 Lakes.
               </p>
+            </div>
+          </div>
+
+          {/* Related Sections */}
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <h2 className="text-xs font-semibold text-gray-900 mb-2">Related</h2>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/civic" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
+                Civic Leaders
+              </Link>
+              <span className="text-gray-300">•</span>
+              <Link href="/civic/leaders" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
+                Government Officials
+              </Link>
+              <span className="text-gray-300">•</span>
+              <Link href="/civic/jurisdictions" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
+                Jurisdictions
+              </Link>
+              <span className="text-gray-300">•</span>
+              <Link href="/faqs" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
+                FAQs
+              </Link>
             </div>
           </div>
         </div>

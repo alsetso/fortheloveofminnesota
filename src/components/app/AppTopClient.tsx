@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Bars3Icon, BellIcon, SparklesIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { useRouter, usePathname } from 'next/navigation';
+import { Bars3Icon, BellIcon, SparklesIcon, Cog6ToothIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Account, AccountService } from '@/features/auth';
 import { useAuth } from '@/features/auth';
 import { useProfile } from '@/features/profiles/contexts/ProfileContext';
@@ -13,6 +13,7 @@ import AppSearch from './AppSearch';
 import { formatDistanceToNow } from 'date-fns';
 import { useNotifications } from '@/features/notifications';
 import { isAccountComplete } from '@/lib/accountCompleteness';
+import { appNavItems } from '@/config/navigation';
 
 interface AppTopClientProps {
   user: { id: string; email: string } | null;
@@ -29,6 +30,7 @@ export default function AppTopClient({
 }: AppTopClientProps) {
   const { user: clientUser, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const { profiles: contextProfiles, selectedProfile, setSelectedProfile } = useProfile();
   
   // Use server data as initial state, but allow client updates
@@ -42,6 +44,12 @@ export default function AppTopClient({
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const accountContainerRef = useRef<HTMLDivElement>(null);
   const notificationContainerRef = useRef<HTMLDivElement>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+  
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname.startsWith(href);
+  };
   
   const {
     notifications,
@@ -75,14 +83,17 @@ export default function AppTopClient({
       if (notificationContainerRef.current && !notificationContainerRef.current.contains(event.target as Node)) {
         setIsNotificationMenuOpen(false);
       }
+      if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
+        setIsSidebarOpen(false);
+      }
     };
 
-    if (isAccountMenuOpen || isNotificationMenuOpen) {
+    if (isAccountMenuOpen || isNotificationMenuOpen || isSidebarOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
     return undefined;
-  }, [isAccountMenuOpen, isNotificationMenuOpen]);
+  }, [isAccountMenuOpen, isNotificationMenuOpen, isSidebarOpen]);
 
   const markAsRead = async (notificationId: string) => {
     try {
@@ -148,17 +159,69 @@ export default function AppTopClient({
           <div className="flex items-center gap-3 flex-shrink-0">
             {/* Hamburger Menu - Below lg (800px), Only show when authenticated */}
             {isAuthenticated && (
-              <button
-                onClick={() => {
-                  setIsSidebarOpen(!isSidebarOpen);
-                  window.dispatchEvent(new CustomEvent('appMenuToggle'));
-                }}
-                className="lg:hidden p-2 text-white/90 hover:text-white hover:bg-white/10 rounded transition-colors"
-                aria-label="Toggle menu"
-                aria-expanded={isSidebarOpen}
-              >
-                <Bars3Icon className="w-6 h-6" />
-              </button>
+              <div ref={menuContainerRef} className="relative lg:hidden">
+                <button
+                  onClick={() => {
+                    setIsSidebarOpen(!isSidebarOpen);
+                  }}
+                  className={`p-2 text-white/90 hover:text-white hover:bg-white/10 rounded transition-colors ${
+                    isSidebarOpen ? 'bg-white/10' : ''
+                  }`}
+                  aria-label="Toggle menu"
+                  aria-expanded={isSidebarOpen}
+                >
+                  {isSidebarOpen ? (
+                    <XMarkIcon className="w-6 h-6" />
+                  ) : (
+                    <Bars3Icon className="w-6 h-6" />
+                  )}
+                </button>
+
+                {/* Menu Dropdown - iOS Blur Style */}
+                {isSidebarOpen && (
+                  <div className="absolute left-0 top-full mt-2 w-56 bg-black/80 backdrop-blur-xl backdrop-saturate-150 rounded-lg border border-white/20 z-50 overflow-hidden">
+                    <nav className="py-1">
+                      {appNavItems.map((item) => {
+                        const Icon = item.icon;
+                        const active = isActive(item.href);
+
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setIsSidebarOpen(false)}
+                            className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                              active
+                                ? 'bg-white/20 text-white'
+                                : 'text-white/80 hover:bg-white/10 hover:text-white'
+                            }`}
+                          >
+                            <Icon className="w-5 h-5" />
+                            <span>{item.label}</span>
+                          </Link>
+                        );
+                      })}
+
+                      {/* Divider */}
+                      <div className="my-1 border-t border-white/10" />
+
+                      {/* Settings */}
+                      <Link
+                        href="/account/settings"
+                        onClick={() => setIsSidebarOpen(false)}
+                        className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+                          isActive('/account/settings')
+                            ? 'bg-white/20 text-white'
+                            : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <Cog6ToothIcon className="w-5 h-5" />
+                        <span>Settings</span>
+                      </Link>
+                    </nav>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Logo - lg and up, Left Aligned */}

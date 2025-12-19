@@ -16,16 +16,18 @@ interface PinsLayerProps {
  */
 export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
   const sourceId = 'map-pins';
-  const layerId = 'map-pins-clusters';
-  const clusterCountLayerId = 'map-pins-cluster-count';
-  const unclusteredPointLayerId = 'map-pins-unclustered-point';
-  const unclusteredPointLabelLayerId = 'map-pins-unclustered-point-label';
+  const pointLayerId = 'map-pins-point';
+  const pointLabelLayerId = 'map-pins-point-label';
   
   const pinsRef = useRef<MapPin[]>([]);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const isAddingLayersRef = useRef<boolean>(false);
   const popupRef = useRef<any>(null); // Mapbox Popup instance
   const clickHandlersAddedRef = useRef<boolean>(false);
+  const locationSelectedHandlerRef = useRef<(() => void) | null>(null);
+  const selectPinByIdHandlerRef = useRef<((event: CustomEvent<{ pinId: string }>) => void) | null>(null);
+  const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isHandlingStyleChangeRef = useRef<boolean>(false);
 
   // Fetch pins and add to map
   useEffect(() => {
@@ -73,17 +75,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         // Source doesn't exist - need to add source and layers
         // First, clean up any existing layers (shouldn't exist if source doesn't, but be safe)
         try {
-          if (mapboxMap.getLayer(unclusteredPointLabelLayerId)) {
-            mapboxMap.removeLayer(unclusteredPointLabelLayerId);
+          if (mapboxMap.getLayer(pointLabelLayerId)) {
+            mapboxMap.removeLayer(pointLabelLayerId);
           }
-          if (mapboxMap.getLayer(unclusteredPointLayerId)) {
-            mapboxMap.removeLayer(unclusteredPointLayerId);
-          }
-          if (mapboxMap.getLayer(clusterCountLayerId)) {
-            mapboxMap.removeLayer(clusterCountLayerId);
-          }
-          if (mapboxMap.getLayer(layerId)) {
-            mapboxMap.removeLayer(layerId);
+          if (mapboxMap.getLayer(pointLayerId)) {
+            mapboxMap.removeLayer(pointLayerId);
           }
           if (mapboxMap.getSource(sourceId)) {
             mapboxMap.removeSource(sourceId);
@@ -93,54 +89,10 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
           // This is expected and safe to ignore
         }
 
-        // Add source
+        // Add source (no clustering)
         mapboxMap.addSource(sourceId, {
           type: 'geojson',
           data: geoJSON,
-          cluster: true,
-          clusterMaxZoom: 14,
-          clusterRadius: 50,
-        });
-
-        // Add cluster circles
-        mapboxMap.addLayer({
-          id: layerId,
-          type: 'circle',
-          source: sourceId,
-          filter: ['has', 'point_count'],
-          paint: {
-            'circle-color': [
-              'step',
-              ['get', 'point_count'],
-              '#51bbd6',
-              10,
-              '#f1f075',
-              30,
-              '#f28cb1',
-            ],
-            'circle-radius': [
-              'step',
-              ['get', 'point_count'],
-              20,
-              10,
-              30,
-              30,
-              40,
-            ],
-          },
-        });
-
-        // Add cluster count labels
-        mapboxMap.addLayer({
-          id: clusterCountLayerId,
-          type: 'symbol',
-          source: sourceId,
-          filter: ['has', 'point_count'],
-          layout: {
-            'text-field': '{point_count_abbreviated}',
-            'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-            'text-size': 12,
-          },
         });
 
         // Load pin icon image
@@ -183,12 +135,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
           }
         }
 
-        // Add unclustered points as pin icons
+        // Add points as pin icons
         map.addLayer({
-          id: unclusteredPointLayerId,
+          id: pointLayerId,
           type: 'symbol',
           source: sourceId,
-          filter: ['!', ['has', 'point_count']],
           layout: {
             'icon-image': pinImageId,
             'icon-size': 1, // Image is already sized to 8px
@@ -197,12 +148,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
           },
         });
 
-        // Add labels for unclustered points (positioned above pin icon)
+        // Add labels for points (positioned above pin icon)
         mapboxMap.addLayer({
-          id: unclusteredPointLabelLayerId,
+          id: pointLabelLayerId,
           type: 'symbol',
           source: sourceId,
-          filter: ['!', ['has', 'point_count']],
           layout: {
             'text-field': [
               'case',
@@ -231,7 +181,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             if (!mounted) return;
             
             const features = mapboxMap.queryRenderedFeatures(e.point, {
-              layers: [unclusteredPointLayerId, unclusteredPointLabelLayerId],
+              layers: [pointLayerId, pointLabelLayerId],
             });
 
             if (features.length === 0) return;
@@ -285,19 +235,32 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             };
 
             const createPopupContent = (viewCount: number | null, isLoading: boolean = false) => {
+              // Determine profile URL - use username if available, otherwise guest_id
+              const profileSlug = pin.account?.username || pin.account?.guest_id;
+              const profileUrl = profileSlug ? `/profile/${encodeURIComponent(profileSlug)}` : null;
+              const isGuestAccount = !!pin.account?.guest_id;
+              
+              // Display name: use first_name if available, otherwise username, otherwise 'Guest'
+              const displayName = pin.account?.first_name || pin.account?.username || 'Guest';
+              
               const accountInfo = pin.account ? `
-                <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
+                <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
                   ${pin.account.image_url ? `
-                    <img src="${escapeHtml(pin.account.image_url)}" alt="${escapeHtml(pin.account.username || 'User')}" style="width: 12px; height: 12px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />
+                    <img src="${escapeHtml(pin.account.image_url)}" alt="${escapeHtml(displayName)}" style="width: 12px; height: 12px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />
                   ` : `
                     <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 7px; color: #6b7280; flex-shrink: 0; font-weight: 500;">
-                      ${escapeHtml((pin.account.username || 'U')[0].toUpperCase())}
+                      ${escapeHtml((displayName)[0].toUpperCase())}
                     </div>
                   `}
-                  <div style="font-size: 12px; color: #111827; font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    ${escapeHtml(pin.account.username || 'Unknown User')}
+                  <div style="display: flex; align-items: center; gap: 4px; overflow: hidden;">
+                    <span style="font-size: 12px; color: #111827; font-weight: 500; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color 0.15s;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#111827'">
+                      ${escapeHtml(displayName)}
+                    </span>
+                    ${isGuestAccount ? `
+                      <span style="font-size: 9px; color: #6b7280; background: #f3f4f6; padding: 1px 4px; border-radius: 3px; white-space: nowrap;">Guest</span>
+                    ` : ''}
                   </div>
-                </div>
+                </a>
               ` : '';
 
               const viewCountDisplay = isLoading ? `
@@ -364,6 +327,16 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               popupRef.current.remove();
             }
 
+            // Update URL with pin parameter for shareable links
+            const url = new URL(window.location.href);
+            url.searchParams.set('pin', pin.id);
+            window.history.replaceState({}, '', url.pathname + url.search);
+
+            // Dispatch event to notify LocationSidebar to close location details
+            window.dispatchEvent(new CustomEvent('pin-popup-opening', {
+              detail: { pinId: pin.id }
+            }));
+
             // Create popup immediately with loading state
             const mapbox = await import('mapbox-gl');
             popupRef.current = new mapbox.default.Popup({
@@ -422,6 +395,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                             id: pin.account.id,
                             username: pin.account.username,
                             image_url: pin.account.image_url,
+                            guest_id: pin.account.guest_id || null,
                           } : null,
                         },
                         flyToLocation: true,
@@ -443,6 +417,12 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             // Cleanup popup ref when it closes
             popupRef.current.on('close', () => {
               popupRef.current = null;
+              // Clear pin parameter from URL when popup closes
+              const url = new URL(window.location.href);
+              if (url.searchParams.has('pin')) {
+                url.searchParams.delete('pin');
+                window.history.replaceState({}, '', url.pathname + url.search || '/');
+              }
             });
 
             // Track pin view and fetch updated count asynchronously
@@ -502,18 +482,43 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             })();
           };
 
-          // Add click handler to unclustered point layer
+          // Add click handler to point layer
           // Cast to any for layer-specific event handlers (not in interface)
-          (mapboxMap as any).on('click', unclusteredPointLayerId, handlePinClick);
-          (mapboxMap as any).on('click', unclusteredPointLabelLayerId, handlePinClick);
+          (mapboxMap as any).on('click', pointLayerId, handlePinClick);
+          (mapboxMap as any).on('click', pointLabelLayerId, handlePinClick);
 
           // Make pins cursor pointer
-          (mapboxMap as any).on('mouseenter', unclusteredPointLayerId, () => {
+          (mapboxMap as any).on('mouseenter', pointLayerId, () => {
             (mapboxMap as any).getCanvas().style.cursor = 'pointer';
           });
-          (mapboxMap as any).on('mouseleave', unclusteredPointLayerId, () => {
+          (mapboxMap as any).on('mouseleave', pointLayerId, () => {
             (mapboxMap as any).getCanvas().style.cursor = '';
           });
+
+          // Listen for location-selected-on-map event to close popup
+          locationSelectedHandlerRef.current = () => {
+            if (popupRef.current) {
+              popupRef.current.remove();
+              popupRef.current = null;
+            }
+          };
+          window.addEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
+
+          // Listen for select-pin-by-id event (from URL param watcher)
+          selectPinByIdHandlerRef.current = (event: CustomEvent<{ pinId: string }>) => {
+            const { pinId } = event.detail;
+            const pin = pinsRef.current.find(p => p.id === pinId);
+            if (pin) {
+              // Simulate a click on the pin to open popup
+              const fakeEvent = {
+                point: { x: 0, y: 0 },
+                lngLat: { lng: pin.lng, lat: pin.lat },
+              };
+              // Directly trigger the pin click handler logic
+              handlePinClick(fakeEvent);
+            }
+          };
+          window.addEventListener('select-pin-by-id', selectPinByIdHandlerRef.current as EventListener);
 
           clickHandlersAddedRef.current = true;
         }
@@ -535,20 +540,41 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
     loadPins();
 
     // Re-add pins when map style changes (e.g., switching to satellite)
-    // 'styledata' fires when style loads, but we need to wait for it to be ready
+    // 'styledata' fires multiple times during style change - debounce to handle only the final one
     const handleStyleData = () => {
       if (!mounted) return;
-      // Wait for next frame to ensure style is fully loaded
-      requestAnimationFrame(() => {
+      
+      // Clear any pending timeout to debounce multiple styledata events
+      if (styleChangeTimeoutRef.current) {
+        clearTimeout(styleChangeTimeoutRef.current);
+      }
+      
+      // Debounce style change handling - wait 100ms after last styledata event
+      styleChangeTimeoutRef.current = setTimeout(() => {
+        if (!mounted) return;
+        
         const mapboxMap = map as any;
-        if (mounted && mapboxMap.isStyleLoaded()) {
-          // Reset the flag and reload pins
-          // Note: click handlers will be re-added when layers are recreated
-          isAddingLayersRef.current = false;
-          clickHandlersAddedRef.current = false;
-          loadPins();
+        if (!mapboxMap.isStyleLoaded()) return;
+        
+        // Check if our source was removed by the style change
+        const sourceExists = !!mapboxMap.getSource(sourceId);
+        if (sourceExists) {
+          // Source still exists, no need to re-add
+          return;
         }
-      });
+        
+        // Prevent concurrent re-initialization
+        if (isHandlingStyleChangeRef.current) return;
+        isHandlingStyleChangeRef.current = true;
+        
+        // Reset flags and reload pins since style change cleared our layers
+        isAddingLayersRef.current = false;
+        clickHandlersAddedRef.current = false;
+        
+        loadPins().finally(() => {
+          isHandlingStyleChangeRef.current = false;
+        });
+      }, 100);
     };
 
     // Subscribe to style changes
@@ -573,10 +599,26 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
     return () => {
       mounted = false;
       
+      // Clear style change timeout
+      if (styleChangeTimeoutRef.current) {
+        clearTimeout(styleChangeTimeoutRef.current);
+        styleChangeTimeoutRef.current = null;
+      }
+      
       // Unsubscribe from real-time updates
       if (subscriptionRef.current) {
         subscriptionRef.current.unsubscribe();
         subscriptionRef.current = null;
+      }
+
+      // Remove window event listeners
+      if (locationSelectedHandlerRef.current) {
+        window.removeEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
+        locationSelectedHandlerRef.current = null;
+      }
+      if (selectPinByIdHandlerRef.current) {
+        window.removeEventListener('select-pin-by-id', selectPinByIdHandlerRef.current as EventListener);
+        selectPinByIdHandlerRef.current = null;
       }
       
       // Remove event listeners safely
@@ -612,32 +654,16 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             // Remove layers in reverse order of creation
             if (typeof mapboxMap.getLayer === 'function') {
               try {
-                if (mapboxMap.getLayer(unclusteredPointLabelLayerId)) {
-                  mapboxMap.removeLayer(unclusteredPointLabelLayerId);
+                if (mapboxMap.getLayer(pointLabelLayerId)) {
+                  mapboxMap.removeLayer(pointLabelLayerId);
                 }
               } catch (e) {
                 // Layer may already be removed
               }
               
               try {
-                if (mapboxMap.getLayer(unclusteredPointLayerId)) {
-                  mapboxMap.removeLayer(unclusteredPointLayerId);
-                }
-              } catch (e) {
-                // Layer may already be removed
-              }
-              
-              try {
-                if (mapboxMap.getLayer(clusterCountLayerId)) {
-                  mapboxMap.removeLayer(clusterCountLayerId);
-                }
-              } catch (e) {
-                // Layer may already be removed
-              }
-              
-              try {
-                if (mapboxMap.getLayer(layerId)) {
-                  mapboxMap.removeLayer(layerId);
+                if (mapboxMap.getLayer(pointLayerId)) {
+                  mapboxMap.removeLayer(pointLayerId);
                 }
               } catch (e) {
                 // Layer may already be removed
@@ -665,10 +691,10 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
       if (map && typeof (map as any).off === 'function') {
         const mapboxMap = map as any;
         try {
-          mapboxMap.off('click', unclusteredPointLayerId);
-          mapboxMap.off('click', unclusteredPointLabelLayerId);
-          mapboxMap.off('mouseenter', unclusteredPointLayerId);
-          mapboxMap.off('mouseleave', unclusteredPointLayerId);
+          mapboxMap.off('click', pointLayerId);
+          mapboxMap.off('click', pointLabelLayerId);
+          mapboxMap.off('mouseenter', pointLayerId);
+          mapboxMap.off('mouseleave', pointLayerId);
         } catch (e) {
           // Handlers may not exist or map may be removed
         }

@@ -21,3 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_map_pins_media_url ON public.map_pins(media_url) 
 COMMENT ON COLUMN public.map_pins.media_url IS 'URL to photo or video associated with this pin (one media item per pin)';
 
 
+

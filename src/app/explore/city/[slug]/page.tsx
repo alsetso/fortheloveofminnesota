@@ -215,6 +215,79 @@ export default async function CityPage({ params }: Props) {
     website_url: string | null;
   }>;
 
+  // Fetch all atlas entities for this city
+  const cityId = cityData.id;
+  
+  // Neighborhoods
+  const { data: neighborhoods } = await supabase
+    .from('neighborhoods')
+    .select('id, name, slug, lat, lng, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Schools
+  const { data: schools } = await supabase
+    .from('schools')
+    .select('id, name, slug, lat, lng, school_type, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Parks
+  const { data: parks } = await supabase
+    .from('parks')
+    .select('id, name, slug, lat, lng, park_type, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Watertowers
+  const { data: watertowers } = await supabase
+    .from('watertowers')
+    .select('id, name, slug, lat, lng, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Cemeteries
+  const { data: cemeteries } = await supabase
+    .from('cemeteries')
+    .select('id, name, slug, lat, lng, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Golf Courses
+  const { data: golfCourses } = await supabase
+    .from('golf_courses')
+    .select('id, name, slug, lat, lng, course_type, holes, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Hospitals
+  const { data: hospitals } = await supabase
+    .from('hospitals')
+    .select('id, name, slug, lat, lng, hospital_type, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Airports
+  const { data: airports } = await supabase
+    .from('airports')
+    .select('id, name, slug, lat, lng, airport_type, iata_code, icao_code, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Churches
+  const { data: churches } = await supabase
+    .from('churches')
+    .select('id, name, slug, lat, lng, church_type, denomination, description')
+    .eq('city_id', cityId)
+    .order('name');
+
+  // Municipals
+  const { data: municipals } = await supabase
+    .from('municipals')
+    .select('id, name, slug, lat, lng, municipal_type, description')
+    .eq('city_id', cityId)
+    .order('name');
+
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" hideFooter={false}>
       <CityPageClient cityId={cityData.id} citySlug={cityData.slug || slug} />
@@ -483,7 +556,158 @@ export default async function CityPage({ params }: Props) {
           )}
         </div>
 
-        {/* Additional Information */}
+          {/* Atlas Entities Sections */}
+          {(neighborhoods && neighborhoods.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Neighborhoods ({neighborhoods.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {neighborhoods.map((n) => (
+                    <li key={n.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {n.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(schools && schools.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Schools ({schools.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {schools.map((s) => (
+                    <li key={s.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {s.name}{s.school_type && <span className="text-gray-500"> ({s.school_type})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(parks && parks.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Parks ({parks.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {parks.map((p) => (
+                    <li key={p.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {p.name}{p.park_type && <span className="text-gray-500"> ({p.park_type})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(watertowers && watertowers.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Watertowers ({watertowers.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {watertowers.map((w) => (
+                    <li key={w.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {w.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(cemeteries && cemeteries.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Cemeteries ({cemeteries.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {cemeteries.map((c) => (
+                    <li key={c.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {c.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(golfCourses && golfCourses.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Golf Courses ({golfCourses.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {golfCourses.map((g) => (
+                    <li key={g.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {g.name}{g.course_type && <span className="text-gray-500"> ({g.course_type})</span>}{g.holes && <span className="text-gray-500"> - {g.holes} holes</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(hospitals && hospitals.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Hospitals ({hospitals.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {hospitals.map((h) => (
+                    <li key={h.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {h.name}{h.hospital_type && <span className="text-gray-500"> ({h.hospital_type})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(airports && airports.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Airports ({airports.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {airports.map((a) => (
+                    <li key={a.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {a.name}{a.airport_type && <span className="text-gray-500"> ({a.airport_type})</span>}{a.iata_code && <span className="text-gray-500"> - {a.iata_code}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(churches && churches.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Churches ({churches.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {churches.map((c) => (
+                    <li key={c.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {c.name}{c.denomination && <span className="text-gray-500"> ({c.denomination})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(municipals && municipals.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Municipal Buildings ({municipals.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {municipals.map((m) => (
+                    <li key={m.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {m.name}{m.municipal_type && <span className="text-gray-500"> ({m.municipal_type})</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {/* Additional Information */}
         <section className="mt-3 pt-3 border-t border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Additional Information</h2>
           <p className="text-xs text-gray-600 mb-1.5">

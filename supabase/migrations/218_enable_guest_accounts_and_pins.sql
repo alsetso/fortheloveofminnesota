@@ -238,3 +238,4 @@ CREATE INDEX IF NOT EXISTS idx_accounts_guest_id_user_id
   WHERE guest_id IS NOT NULL AND user_id IS NULL;
 
 
+

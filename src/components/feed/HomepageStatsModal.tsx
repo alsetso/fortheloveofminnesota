@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 
 interface HomepageStatsModalProps {
   isOpen: boolean;
@@ -82,6 +83,19 @@ export default function HomepageStatsModal({ isOpen, onClose }: HomepageStatsMod
 
         {/* Content */}
         <div className="p-4 space-y-4">
+          {/* Logo and Share Message */}
+          <div className="flex flex-col items-center text-center space-y-3">
+            <Image
+              src="/logo.png"
+              alt="Minnesota with heart"
+              width={80}
+              height={80}
+              className="object-contain"
+            />
+            <p className="text-xs text-gray-600 leading-relaxed max-w-xs">
+              Help us grow this community! Share the map with friends and family who love Minnesota.
+            </p>
+          </div>
           {isLoading && (
             <div className="flex items-center justify-center py-8">
               <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
@@ -132,3 +146,5 @@ export default function HomepageStatsModal({ isOpen, onClose }: HomepageStatsMod
     </div>
   );
 }
+
+

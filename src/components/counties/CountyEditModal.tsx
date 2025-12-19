@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { County, UpdateCountyData } from '@/features/admin/services/countyAdminService';
-import DrawPolygonMap from '@/components/_archive/map/DrawPolygonMap';
 
 interface CountyEditModalProps {
   isOpen: boolean;
@@ -263,24 +262,28 @@ export default function CountyEditModal({
 
             {/* Polygon */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                County Boundary (Polygon)
+              <label htmlFor="county-polygon" className="block text-xs font-medium text-gray-700 mb-1.5">
+                County Boundary (GeoJSON Polygon)
               </label>
-              <DrawPolygonMap
-                initialPolygon={
-                  formData.polygon &&
-                  typeof formData.polygon === 'object' &&
-                  (formData.polygon as { type?: string }).type &&
-                  ((formData.polygon as { type?: string }).type === 'Polygon' || (formData.polygon as { type?: string }).type === 'MultiPolygon')
-                    ? (formData.polygon as GeoJSON.Polygon | GeoJSON.MultiPolygon)
-                    : null
-                }
-                onPolygonChange={(polygon) => {
-                  setFormData({ ...formData, polygon: polygon as GeoJSON.Polygon | GeoJSON.MultiPolygon | null });
+              <textarea
+                id="county-polygon"
+                rows={6}
+                value={formData.polygon ? JSON.stringify(formData.polygon, null, 2) : ''}
+                onChange={(e) => {
+                  try {
+                    const parsed = e.target.value.trim() ? JSON.parse(e.target.value) : null;
+                    setFormData({ ...formData, polygon: parsed });
+                  } catch {
+                    // Invalid JSON, keep current value
+                  }
                 }}
-                height="400px"
-                allowMultiPolygon={true}
+                className="w-full px-[10px] py-2 border border-gray-300 rounded-md text-xs font-mono focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                placeholder='{"type": "Polygon", "coordinates": [[[...]]]}' 
+                disabled={saving}
               />
+              <p className="mt-0.5 text-xs text-gray-500">
+                Paste valid GeoJSON Polygon or MultiPolygon
+              </p>
             </div>
 
             {/* Actions */}

@@ -179,3 +179,4 @@ Add `user_id` column to pins table, set it on insert, check directly in RLS.
 **The Helper Function Exists Because:**
 Accounts RLS doesn't allow anonymous users to query accounts for ownership checks. But the real issue is that accounts RLS should allow anonymous users to see accounts with public pins (for UX), not just public posts.
 
+

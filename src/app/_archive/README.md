@@ -42,32 +42,14 @@ This folder contains pages that are temporarily disabled but kept in the codebas
 ## Currently Archived
 
 ### account/ (Archived: 2024-12-XX)
-- **Routes**: `/account/settings`, `/account/billing`, `/account/analytics`, `/account/notifications`, `/account/onboarding`, `/account/change-plan`
+- **Routes**: `/account/settings`, `/account/billing`, `/account/notifications`, `/account/onboarding`, `/account/change-plan`
 - **Reason**: Account functionality migrated to modal-based UI on `/feed` page
-- **Files**: 
-  - `src/app/_archive/account/layout.tsx`
-  - `src/app/_archive/account/AccountLayoutWrapper.tsx`
-  - `src/app/_archive/account/loading.tsx`
-  - `src/app/_archive/account/analytics/AnalyticsClient.tsx`
+- **Active Components** (imported by `AccountModal.tsx`):
   - `src/app/_archive/account/billing/BillingClient.tsx`
-  - `src/app/_archive/account/change-plan/ChangePlanClient.tsx`
-  - `src/app/_archive/account/change-plan/layout.tsx`
   - `src/app/_archive/account/notifications/NotificationsClient.tsx`
   - `src/app/_archive/account/onboarding/OnboardingClient.tsx`
-  - `src/app/_archive/account/onboarding/layout.tsx`
-  - `src/app/_archive/account/onboarding/OnboardingAccountDetails.tsx`
-  - `src/app/_archive/account/onboarding/OnboardingStepper.tsx`
-  - `src/app/_archive/account/onboarding/OnboardingStepperForm.tsx`
-  - `src/app/_archive/account/onboarding/ProfilePreviewModal.tsx`
-  - `src/app/_archive/account/onboarding/utils/validation.ts`
   - `src/app/_archive/account/settings/SettingsClient.tsx`
-- **References Updated**:
-  - Updated imports in `src/components/feed/AccountModal.tsx` to point to archived location
-- **Note**: 
-  - Middleware redirects (`src/middleware.ts`) still redirect `/account/*` routes to `/feed?modal=account&tab=...`
-  - Client components are imported by `AccountModal` from archived location
-  - Navigation links in `src/config/navigation.ts` and `src/components/AccountSidebar.tsx` still reference account routes (they redirect via middleware)
-  - Account functionality is now accessed via modal on feed page
+- **Note**: Account functionality is accessed via modal on feed page
 
 ### business/ (Archived: 2024-12-12)
 - **Routes**: `/business`, `/business/directory`, `/business/[id]`
@@ -87,4 +69,5 @@ This folder contains pages that are temporarily disabled but kept in the codebas
   - Removed from `src/components/app/AppTop.tsx`
   - Removed from `src/components/app/AppTopClient.tsx`
 - **Note**: API routes (`/api/businesses/*`) remain active for backward compatibility
+
 

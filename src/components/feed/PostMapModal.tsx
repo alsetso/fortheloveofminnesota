@@ -5,7 +5,21 @@ import { loadMapboxGL, loadMapboxDraw } from '@/features/_archive/map/utils/mapb
 import { MAP_CONFIG } from '@/features/_archive/map/config';
 import { XMarkIcon, MapPinIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { AddressParser } from '@/features/_archive/map/services/addressParser';
-import { calculateCenter } from '@/features/_archive/map/utils/mapHelpers';
+
+// Inline helper function (was in mapHelpers.ts)
+function calculateCenter(coordinates: number[][][]): { lng: number; lat: number } {
+  let sumLng = 0;
+  let sumLat = 0;
+  let count = 0;
+  for (const ring of coordinates) {
+    for (const [lng, lat] of ring) {
+      sumLng += lng;
+      sumLat += lat;
+      count++;
+    }
+  }
+  return { lng: sumLng / count, lat: sumLat / count };
+}
 import type { MapboxMapInstance, MapboxMouseEvent, MapboxDrawEvent, MapboxSuggestion, MapboxFeature } from '@/types/mapbox-events';
 
 export interface PostMapData {

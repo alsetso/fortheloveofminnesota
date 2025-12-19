@@ -79,3 +79,4 @@ CREATE INDEX IF NOT EXISTS idx_pins_visibility_account_id
 COMMENT ON POLICY "Public read access for pins" ON public.pins IS
   'Allows anyone (authenticated or anonymous) to view public pins. Private pins (only_me) are only visible to their creator. Uses user_owns_account() helper function which bypasses RLS on accounts table and handles anonymous users gracefully.';
 
+

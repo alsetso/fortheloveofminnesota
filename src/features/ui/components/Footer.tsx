@@ -82,7 +82,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
               <ul className="space-y-1.5">
                 <li>
                   <Link 
-                    href="/?modal=account&tab=settings" 
+                    href="/?modal=welcome" 
                     className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                   >
                     Sign In

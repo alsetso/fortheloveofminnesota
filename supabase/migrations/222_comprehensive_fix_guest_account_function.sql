@@ -109,3 +109,4 @@ COMMENT ON FUNCTION public.get_or_create_guest_account IS
   'Gets or creates a guest account for anonymous users. Guest accounts have NULL user_id and are identified by guest_id (stored in local storage). Sets default guest image from Supabase storage. Returns account details as JSON (bypasses RLS via SECURITY DEFINER).';
 
 
+

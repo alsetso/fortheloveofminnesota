@@ -22,7 +22,7 @@ export default function AuthGuard({
   children,
   requireAuth = true,
   requireRole,
-  redirectTo = '/?modal=account&tab=settings',
+  redirectTo = '/?modal=welcome',
   fallback,
 }: AuthGuardProps) {
   const { user, isLoading } = useAuth();

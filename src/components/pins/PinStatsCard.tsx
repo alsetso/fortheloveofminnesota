@@ -193,3 +193,4 @@ export default function PinStatsCard({ pinId, hours = null, className = '', comp
     </div>
   );
 }
+

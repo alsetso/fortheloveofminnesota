@@ -14,7 +14,7 @@ export function LoginPromptModal({ isOpen, onClose }: LoginPromptModalProps) {
   if (!isOpen) return null;
 
   const handleLogin = () => {
-    router.push('/?modal=account&tab=settings');
+    router.push('/?modal=welcome');
   };
 
   return (

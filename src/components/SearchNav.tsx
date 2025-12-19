@@ -24,7 +24,7 @@ export default function SearchNav() {
         </Link>
       ) : (
         <Link
-          href="/?modal=account&tab=settings"
+          href="/?modal=welcome"
           className="px-4 py-1.5 text-sm font-medium border rounded transition-all duration-200 text-blue-600 border-blue-600 hover:bg-blue-50"
         >
           Sign In
@@ -51,7 +51,7 @@ export default function SearchNav() {
           </Link>
         ) : (
           <Link
-            href="/?modal=account&tab=settings"
+            href="/?modal=welcome"
             className="block px-3 py-2 text-base font-medium border-2 rounded-lg transition-colors text-center text-blue-600 border-blue-600 hover:bg-blue-50"
           >
             Sign In

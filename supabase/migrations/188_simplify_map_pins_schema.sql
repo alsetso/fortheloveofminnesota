@@ -18,3 +18,4 @@ ALTER TABLE public.map_pins
 
 COMMENT ON COLUMN public.map_pins.description IS 'Text content for the pin (single source of text)';
 
+

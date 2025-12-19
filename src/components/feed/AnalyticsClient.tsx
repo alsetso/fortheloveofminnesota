@@ -7,10 +7,8 @@ import { useAuth } from '@/features/auth';
 
 interface PinViewStats {
   pin_id: string;
-  pin_name: string;
   pin_description: string | null;
-  pin_emoji: string | null;
-  pin_address: string | null;
+  pin_type: string | null;
   pin_created_at: string;
   total_views: number;
   unique_viewers: number;
@@ -133,14 +131,11 @@ export default function AnalyticsClient() {
             <div key={pin.pin_id} className="px-[10px] py-2 hover:bg-gray-50 transition-colors">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    {pin.pin_emoji && <span className="text-xs">{pin.pin_emoji}</span>}
-                    <span className="text-xs font-medium text-gray-900 truncate">
-                      {pin.pin_name}
-                    </span>
-                  </div>
-                  {pin.pin_address && (
-                    <p className="text-[10px] text-gray-500 truncate mt-0.5">{pin.pin_address}</p>
+                  <span className="text-xs font-medium text-gray-900 truncate block">
+                    {pin.pin_description || 'Untitled Pin'}
+                  </span>
+                  {pin.pin_type && (
+                    <p className="text-[10px] text-gray-500 truncate mt-0.5">{pin.pin_type}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
@@ -171,3 +166,4 @@ export default function AnalyticsClient() {
     </div>
   );
 }
+

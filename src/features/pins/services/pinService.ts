@@ -1,7 +1,19 @@
 import { supabase } from '@/lib/supabase';
 import { withAuthRetry } from '@/lib/authHelpers';
 import type { PinData } from '@/types/pin';
-import { Tag } from '@/features/tags/services/tagService';
+
+// Tag type (previously from tagService)
+export interface Tag {
+  id: string;
+  slug: string;
+  label: string;
+  emoji: string | null;
+  description: string | null;
+  entity_type: string;
+  display_order: number;
+  is_active: boolean;
+  is_public: boolean;
+}
 
 export interface PinCategory {
   id: string;
@@ -62,6 +74,7 @@ export interface CreatePinData {
   tag_id: string; // Required for user-created pins
   subcategory?: string | null;
   media?: PinMedia[] | null; // Array of media objects (images/videos)
+  tags?: string[]; // User-defined labels for organizing pins
 }
 
 export interface UpdatePinData {
@@ -76,6 +89,7 @@ export interface UpdatePinData {
   tag_id?: string;
   subcategory?: string | null;
   media?: PinMedia[] | null; // Array of media objects (images/videos)
+  tags?: string[]; // User-defined labels for organizing pins
 }
 
 export interface PinQueryFilters {
@@ -519,6 +533,7 @@ export class PinService {
       visibility: data.visibility || 'public',
       status: 'active' as const,
       media: data.media || null,
+      tags: data.tags || [],
     };
 
     // Create the pin
@@ -593,6 +608,7 @@ export class PinService {
     if (data.tag_id !== undefined) updateData.tag_id = data.tag_id;
     if (data.subcategory !== undefined) updateData.subcategory = data.subcategory;
     if (data.media !== undefined) updateData.media = data.media;
+    if (data.tags !== undefined) (updateData as Record<string, unknown>).tags = data.tags;
 
     // Update pin fields
     const { data: pin, error } = await supabase
@@ -770,6 +786,44 @@ export class PinService {
       ...filters,
       status: filters.status || 'active',
     });
+  }
+
+  /**
+   * Get all unique tags used by a user's pins
+   */
+  static async getUserTags(accountId: string): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('pins')
+      .select('tags')
+      .eq('account_id', accountId)
+      .not('tags', 'is', null);
+
+    if (error) {
+      console.error('Error fetching user tags:', error);
+      return [];
+    }
+
+    // Flatten and dedupe tags
+    const allTags = data?.flatMap(pin => pin.tags || []) || [];
+    return [...new Set(allTags)].sort();
+  }
+
+  /**
+   * Get pins filtered by tag
+   */
+  static async getPinsByTag(accountId: string, tag: string): Promise<Pin[]> {
+    const { data, error } = await supabase
+      .from('pins')
+      .select('*')
+      .eq('account_id', accountId)
+      .contains('tags', [tag]);
+
+    if (error) {
+      console.error('Error fetching pins by tag:', error);
+      return [];
+    }
+
+    return data || [];
   }
 }
 

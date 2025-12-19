@@ -14,3 +14,4 @@ ALTER TABLE public.map_pins
 
 COMMENT ON COLUMN public.map_pins.emoji IS 'Emoji character(s) to display with the pin (e.g., 🏠, 📍, 🎯)';
 
+

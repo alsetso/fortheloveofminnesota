@@ -97,13 +97,13 @@ export default function BaseNav({
   const stickyClass = sticky ? 'sticky top-0 z-50' : '';
 
   return (
-    <nav className={`${bgColor} ${stickyClass} border-b ${borderColor} transition-all duration-200`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-3 items-center h-14 gap-4">
+    <nav className={`${bgColor} ${stickyClass} border-b ${borderColor} transition-all duration-200 h-14 flex-shrink-0`}>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 h-full">
+        <div className="grid grid-cols-3 items-center h-full gap-2">
           {/* Left Column: Navigation Links (Desktop) / Hamburger (Mobile) */}
-          <div className="flex items-center gap-0.5 sm:gap-1 lg:gap-2 min-w-0">
+          <div className="flex items-center gap-0 min-w-0 h-full">
             {/* Desktop: Show nav links */}
-            <div className="hidden md:flex items-center gap-0.5 sm:gap-1 lg:gap-2 min-w-0 justify-start">
+            <div className="hidden md:flex items-center gap-0 min-w-0 justify-start h-full">
               {navLinks.map((link, index) => {
                 const Icon = link.icon;
                 const active = isActive(link.href);
@@ -112,23 +112,22 @@ export default function BaseNav({
                 if (link.isNotification) {
                   const hasUnread = (link.unreadCount ?? 0) > 0;
                   return (
-                    <div key={`notification-${index}`} className="relative flex-shrink-0">
+                    <div key={`notification-${index}`} className="relative flex-shrink-0 h-full">
                       <button
                         onClick={onNotificationClick}
-                        className="flex flex-col items-center justify-center px-2 py-1 min-w-[60px] transition-all duration-200 text-gray-700 hover:text-gold-600"
+                        className="flex flex-col items-center justify-center px-2 h-full min-w-[44px] transition-colors text-gray-600 hover:text-gray-900"
                         aria-label={`Notifications${hasUnread ? ` (${link.unreadCount} unread)` : ''}`}
                       >
                         <div className="relative">
-                          <BellIcon className="w-5 h-5 mb-0.5" />
+                          <BellIcon className="w-4 h-4" />
                           {hasUnread && (
                             <span 
-                              className="absolute -top-0.5 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-gold-50"
+                              className="absolute -top-0.5 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full"
                               aria-label={`${link.unreadCount} unread notifications`}
                             />
                           )}
                         </div>
-                        <span className="text-[10px] font-medium mt-0.5 hidden lg:inline">Notifications</span>
-                        <span className="text-[10px] font-medium mt-0.5 lg:hidden">Notify</span>
+                        <span className="text-[9px] font-medium mt-0.5 leading-none">Notify</span>
                       </button>
                       {notificationDropdown}
                     </div>
@@ -139,15 +138,15 @@ export default function BaseNav({
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`flex flex-col items-center justify-center px-1.5 sm:px-2 py-1 min-w-[50px] sm:min-w-[60px] transition-all duration-200 flex-shrink-0 ${
+                    className={`flex flex-col items-center justify-center px-2 h-full min-w-[44px] transition-colors flex-shrink-0 ${
                       active
                         ? `${activeColor}`
-                        : `${textColor} hover:${activeColor}`
+                        : `${textColor} hover:text-gray-900`
                     }`}
                   >
-                    {Icon && <Icon className="w-5 h-5 mb-0.5" />}
-                    <span className={`text-[9px] sm:text-[10px] font-medium mt-0.5 ${
-                      active ? 'border-b-2 border-current pb-0.5' : ''
+                    {Icon && <Icon className="w-4 h-4" />}
+                    <span className={`text-[9px] font-medium mt-0.5 leading-none ${
+                      active ? 'border-b border-current' : ''
                     }`}>
                       {link.label}
                     </span>
@@ -159,30 +158,27 @@ export default function BaseNav({
             {/* Mobile: Show hamburger menu */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 transition-colors text-gray-600 hover:text-black flex-shrink-0"
+              className="md:hidden p-1.5 transition-colors text-gray-600 hover:text-gray-900 flex-shrink-0"
               aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? (
-                <XMarkIcon className="w-6 h-6" />
+                <XMarkIcon className="w-5 h-5" />
               ) : (
-                <Bars3Icon className="w-6 h-6" />
+                <Bars3Icon className="w-5 h-5" />
               )}
             </button>
           </div>
 
           {/* Center Column: Logo/Emblem (Always Centered) */}
-          <div className="flex items-center justify-center min-w-0">
+          <div className="flex items-center justify-center min-w-0 h-full">
             <Link href="/" className="hover:opacity-80 transition-opacity flex-shrink-0" aria-label="Home">
-              <div className="w-[50px] h-[50px] flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 relative overflow-hidden flex-shrink-0">
                 <Image
                   src={logo}
                   alt={logoAlt}
-                  width={logo.includes('emblem') ? 32 : 100}
-                  height={logo.includes('emblem') ? 32 : 20}
-                  className="max-w-full max-h-full w-auto h-auto object-contain"
-                  style={{ 
-                    display: 'block' 
-                  }}
+                  fill
+                  className="object-contain"
+                  sizes="32px"
                   priority
                 />
               </div>
@@ -190,7 +186,7 @@ export default function BaseNav({
           </div>
 
           {/* Right Column: Right Section (Desktop) / Me Icon (Mobile) */}
-          <div className="flex items-center justify-end gap-0.5 sm:gap-1 min-w-0">
+          <div className="flex items-center justify-end gap-0 min-w-0 h-full">
             {rightSection}
           </div>
         </div>

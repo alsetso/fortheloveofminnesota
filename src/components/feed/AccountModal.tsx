@@ -10,7 +10,6 @@ import AnalyticsClient from '@/components/feed/AnalyticsClient';
 import NotificationsClient from '@/app/_archive/account/notifications/NotificationsClient';
 import SettingsClient from '@/app/_archive/account/settings/SettingsClient';
 import BillingClient from '@/app/_archive/account/billing/BillingClient';
-import ChangePlanClient from '@/app/_archive/account/change-plan/ChangePlanClient';
 import OnboardingClient from '@/app/_archive/account/onboarding/OnboardingClient';
 
 interface AccountModalProps {
@@ -137,7 +136,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-[10px]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-[10px]">
       {/* Backdrop - No click to close, user must explicitly close */}
       <div 
         className="absolute inset-0 bg-black/40"
@@ -265,7 +264,15 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
                         <ArrowLeftIcon className="w-3 h-3" />
                         Back to Billing
                       </button>
-                      {billingData && <ChangePlanClient initialBillingData={billingData} />}
+                      <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+                        <div className="flex items-center gap-2 mb-2">
+                          <SparklesIcon className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-semibold text-gray-900">Coming Soon</span>
+                        </div>
+                        <p className="text-xs text-gray-600">
+                          Plan upgrades and downgrades are coming soon. Contact support if you need to make changes to your subscription.
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     billingData && (
@@ -284,5 +291,6 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
     </div>
   );
 }
+
 
 

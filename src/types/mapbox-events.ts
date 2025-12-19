@@ -18,22 +18,35 @@ export interface MapboxMapInstance {
   off: (event: string, handler?: unknown) => void;
   getCenter: () => { lng: number; lat: number };
   getZoom: () => number;
+  getBearing: () => number;
+  getPitch: () => number;
   setStyle: (style: string) => void;
   setCenter: (center: [number, number] | { lng: number; lat: number }) => void;
   setZoom: (zoom: number) => void;
+  setBearing: (bearing: number) => void;
+  setPitch: (pitch: number) => void;
+  zoomTo: (zoom: number, options?: { duration?: number }) => void;
+  rotateTo: (bearing: number, options?: { duration?: number }) => void;
   flyTo: (options: {
     center: [number, number];
     zoom: number;
     duration?: number;
+    bearing?: number;
+    pitch?: number;
   }) => void;
   easeTo: (options: {
-    pitch: number;
+    center?: [number, number];
+    zoom?: number;
+    bearing?: number;
+    pitch?: number;
     duration?: number;
   }) => void;
   remove: () => void;
   addSource: (id: string, source: { type: string; data: GeoJSON.FeatureCollection }) => void;
   addLayer: (layer: { id: string; type: string; source: string; [key: string]: unknown }) => void;
   getLayer: (id: string) => { id: string; type: string; [key: string]: unknown } | null;
+  getStyle: () => { layers?: Array<{ id: string; type: string; [key: string]: unknown }> } | undefined;
+  setLayoutProperty: (layerId: string, property: string, value: unknown) => void;
 }
 
 export interface MapboxMouseEvent {

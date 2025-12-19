@@ -92,3 +92,4 @@ GRANT INSERT, UPDATE, DELETE ON public.map_pins TO authenticated;
 -- Note: No sequence grant needed - we use gen_random_uuid() for id generation
 
 
+

@@ -82,3 +82,4 @@ CREATE INDEX IF NOT EXISTS idx_accounts_user_id
   ON public.accounts(user_id) 
   WHERE user_id IS NOT NULL;
 
+

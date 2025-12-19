@@ -82,3 +82,4 @@ CREATE POLICY "Public can view map pin media"
   USING (bucket_id = 'map-pins-media');
 
 
+

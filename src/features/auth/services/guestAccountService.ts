@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 
 const GUEST_ID_KEY = 'mnuda_guest_id';
 const GUEST_NAME_KEY = 'mnuda_guest_name';
+const ALL_GUEST_IDS_KEY = 'mnuda_all_guest_ids';
 
 export interface GuestAccount {
   id: string;
@@ -9,6 +10,7 @@ export interface GuestAccount {
   first_name: string;
   username: string | null;
   image_url: string | null;
+  plan?: string;
 }
 
 /**
@@ -43,9 +45,140 @@ export class GuestAccountService {
       // Generate a new guest ID
       guestId = this.generateGuestId();
       localStorage.setItem(GUEST_ID_KEY, guestId);
+      // Track this ID in all guest IDs list
+      this.addToAllGuestIds(guestId);
     }
 
     return guestId;
+  }
+
+  /**
+   * Get all guest IDs created on this device
+   */
+  static getAllGuestIds(): string[] {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const stored = localStorage.getItem(ALL_GUEST_IDS_KEY);
+    if (!stored) {
+      return [];
+    }
+
+    try {
+      const ids = JSON.parse(stored);
+      return Array.isArray(ids) ? ids : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Add a guest ID to the tracked list
+   */
+  private static addToAllGuestIds(guestId: string): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const ids = this.getAllGuestIds();
+    if (!ids.includes(guestId)) {
+      ids.push(guestId);
+      localStorage.setItem(ALL_GUEST_IDS_KEY, JSON.stringify(ids));
+    }
+  }
+
+  /**
+   * Ensure current guest ID is in the tracked list (for migration)
+   */
+  static ensureCurrentGuestIdTracked(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const currentId = localStorage.getItem(GUEST_ID_KEY);
+    if (currentId) {
+      this.addToAllGuestIds(currentId);
+    }
+  }
+
+  /**
+   * Get all guest accounts created on this device
+   */
+  static async getAllDeviceGuestAccounts(): Promise<GuestAccount[]> {
+    // Ensure current ID is tracked (migration for existing users)
+    this.ensureCurrentGuestIdTracked();
+    
+    const guestIds = this.getAllGuestIds();
+    if (guestIds.length === 0) {
+      return [];
+    }
+
+    try {
+      const { data: accounts, error } = await supabase
+        .from('accounts')
+        .select('id, guest_id, first_name, username, image_url, plan')
+        .in('guest_id', guestIds)
+        .is('user_id', null);
+
+      if (error || !accounts) {
+        console.error('[GuestAccountService] Error fetching device guest accounts:', error);
+        return [];
+      }
+
+      return accounts.map(account => ({
+        id: account.id,
+        guest_id: account.guest_id || '',
+        first_name: account.first_name || 'Guest',
+        username: account.username,
+        image_url: account.image_url || 'https://hfklpjuiuhbulztsqapv.supabase.co/storage/v1/object/public/logos/Guest%20Image.png',
+        plan: account.plan || 'hobby',
+      }));
+    } catch (error) {
+      console.error('[GuestAccountService] Error fetching device guest accounts:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a new guest profile (generates new guest ID)
+   */
+  static createNewGuestProfile(): string {
+    if (typeof window === 'undefined') {
+      throw new Error('Can only create guest profile in browser');
+    }
+
+    // Generate new guest ID
+    const newGuestId = this.generateGuestId();
+    
+    // Set as current guest ID
+    localStorage.setItem(GUEST_ID_KEY, newGuestId);
+    
+    // Clear the name for new profile
+    localStorage.removeItem(GUEST_NAME_KEY);
+    
+    // Add to tracked list
+    this.addToAllGuestIds(newGuestId);
+
+    return newGuestId;
+  }
+
+  /**
+   * Switch to a different guest account
+   */
+  static switchToGuestAccount(guestId: string): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    // Verify it's a tracked guest ID
+    const ids = this.getAllGuestIds();
+    if (!ids.includes(guestId)) {
+      console.warn('[GuestAccountService] Attempted to switch to untracked guest ID');
+      return;
+    }
+
+    localStorage.setItem(GUEST_ID_KEY, guestId);
   }
 
   /**
@@ -261,6 +394,127 @@ export class GuestAccountService {
       console.error('[GuestAccountService] Error getting guest account stats:', error);
       return null;
     }
+  }
+
+  /**
+   * Delete all pins for the current guest account
+   * Keeps the account but removes all pins
+   */
+  static async deleteAllPins(): Promise<{ success: boolean; pins_deleted: number }> {
+    const guestId = this.getGuestId();
+
+    const { data, error } = await supabase.rpc('delete_all_guest_pins', {
+      p_guest_id: guestId,
+    });
+
+    if (error) {
+      console.error('[GuestAccountService] Error deleting all pins:', error);
+      throw new Error(`Failed to delete pins: ${error.message}`);
+    }
+
+    return {
+      success: data?.success || false,
+      pins_deleted: data?.pins_deleted || 0,
+    };
+  }
+
+  /**
+   * Delete the current guest account and all associated data
+   * This is permanent and clears local storage
+   */
+  static async deleteAccount(): Promise<{ success: boolean; pins_deleted: number }> {
+    const guestId = this.getGuestId();
+
+    const { data, error } = await supabase.rpc('delete_guest_account', {
+      p_guest_id: guestId,
+    });
+
+    if (error) {
+      console.error('[GuestAccountService] Error deleting account:', error);
+      throw new Error(`Failed to delete account: ${error.message}`);
+    }
+
+    if (data?.success) {
+      // Clear local storage after successful deletion
+      this.clearGuestData();
+      
+      // Remove from tracked guest IDs
+      this.removeFromAllGuestIds(guestId);
+    }
+
+    return {
+      success: data?.success || false,
+      pins_deleted: data?.pins_deleted || 0,
+    };
+  }
+
+  /**
+   * Reset the current guest account (delete all pins, keep account)
+   * Optionally update the display name
+   */
+  static async resetAccount(newName?: string): Promise<{ success: boolean; pins_deleted: number }> {
+    const guestId = this.getGuestId();
+
+    const { data, error } = await supabase.rpc('reset_guest_account', {
+      p_guest_id: guestId,
+      p_new_name: newName || null,
+    });
+
+    if (error) {
+      console.error('[GuestAccountService] Error resetting account:', error);
+      throw new Error(`Failed to reset account: ${error.message}`);
+    }
+
+    // Update local name if provided
+    if (newName) {
+      this.setGuestName(newName);
+    }
+
+    return {
+      success: data?.success || false,
+      pins_deleted: data?.pins_deleted || 0,
+    };
+  }
+
+  /**
+   * Remove a guest ID from the tracked list
+   */
+  private static removeFromAllGuestIds(guestId: string): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const ids = this.getAllGuestIds();
+    const filtered = ids.filter(id => id !== guestId);
+    localStorage.setItem(ALL_GUEST_IDS_KEY, JSON.stringify(filtered));
+  }
+
+  /**
+   * Start fresh with a new guest account
+   * Optionally deletes the old account from the database
+   * 
+   * @param deleteOldAccount - If true, deletes old account from DB (default: false for backwards compat)
+   */
+  static async startFresh(deleteOldAccount: boolean = false): Promise<string> {
+    if (typeof window === 'undefined') {
+      throw new Error('Can only start fresh in browser');
+    }
+
+    // Optionally delete the old account from the database
+    if (deleteOldAccount) {
+      try {
+        const hasExisting = this.hasGuestData();
+        if (hasExisting) {
+          await this.deleteAccount();
+        }
+      } catch (error) {
+        console.warn('[GuestAccountService] Error deleting old account during startFresh:', error);
+        // Continue anyway - create new profile
+      }
+    }
+
+    // Create new guest profile (generates new ID, clears name)
+    return this.createNewGuestProfile();
   }
 }
 

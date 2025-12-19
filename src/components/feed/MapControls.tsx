@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { 
   MapPinIcon,
   PlusIcon,
   MinusIcon,
   CubeIcon,
   ViewColumnsIcon,
+  PlayIcon,
+  StopIcon,
 } from '@heroicons/react/24/outline';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
@@ -36,6 +38,7 @@ interface MapControlsProps {
   on3DToggle?: (enabled: boolean) => void;
   roadsVisible?: boolean;
   onRoadsToggle?: (visible: boolean) => void;
+  onRotationChange?: (isRotating: boolean) => void;
 }
 
 export default function MapControls({ 
@@ -45,7 +48,78 @@ export default function MapControls({
   on3DToggle,
   roadsVisible = true,
   onRoadsToggle,
+  onRotationChange,
 }: MapControlsProps) {
+  const [isRotating, setIsRotating] = useState(false);
+
+  // Notify parent when rotation state changes
+  useEffect(() => {
+    onRotationChange?.(isRotating);
+  }, [isRotating, onRotationChange]);
+  const rotationRef = useRef<{ startBearing: number; startTime: number } | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Full rotation animation - 360° over ~20 seconds
+  const ROTATION_DURATION = 20000;
+
+  useEffect(() => {
+    if (!isRotating || !map || !mapLoaded) return;
+
+    const startBearing = map.getBearing();
+    rotationRef.current = { startBearing, startTime: performance.now() };
+
+    const animate = (currentTime: number) => {
+      if (!rotationRef.current || !map || map.removed) {
+        setIsRotating(false);
+        return;
+      }
+
+      const elapsed = currentTime - rotationRef.current.startTime;
+      const progress = Math.min(elapsed / ROTATION_DURATION, 1);
+      
+      // Smooth easing (ease-in-out)
+      const eased = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      
+      const newBearing = rotationRef.current.startBearing + (360 * eased);
+      map.setBearing(newBearing % 360);
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        // Animation complete - reset to original bearing
+        map.setBearing(rotationRef.current.startBearing);
+        setIsRotating(false);
+        rotationRef.current = null;
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isRotating, map, mapLoaded]);
+
+  const handlePlayRotation = useCallback(() => {
+    if (!map || !mapLoaded) return;
+    
+    if (isRotating) {
+      // Stop rotation
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      setIsRotating(false);
+      rotationRef.current = null;
+    } else {
+      // Start rotation
+      setIsRotating(true);
+    }
+  }, [map, mapLoaded, isRotating]);
+
   const handleFindMe = useCallback(() => {
     if (!map || !mapLoaded || !navigator.geolocation) return;
     
@@ -105,13 +179,13 @@ export default function MapControls({
 
   return (
     <div 
-      className="fixed bottom-[10px] right-[10px] z-30 flex flex-col gap-2 bg-white/10 backdrop-blur border border-white/20 rounded-md p-[10px]"
+      className="absolute bottom-[10px] right-[10px] z-30 flex flex-col gap-2 bg-white border border-gray-200 rounded-md p-[10px]"
     >
       {/* User Location Button */}
       <button
         onClick={handleFindMe}
         disabled={!mapLoaded}
-        className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         title="Find My Location"
       >
         <MapPinIcon className="w-4 h-4" />
@@ -124,8 +198,8 @@ export default function MapControls({
           disabled={!mapLoaded}
           className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             is3DMode
-              ? 'bg-white/30 text-white'
-              : 'text-white hover:bg-white/20'
+              ? 'bg-gray-100 text-gray-900'
+              : 'text-gray-700 hover:bg-gray-50'
           }`}
           title={is3DMode ? 'Switch to 2D' : 'Switch to 3D'}
         >
@@ -144,8 +218,8 @@ export default function MapControls({
           disabled={!mapLoaded}
           className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             roadsVisible
-              ? 'text-white hover:bg-white/20'
-              : 'bg-white/30 text-white'
+              ? 'text-gray-700 hover:bg-gray-50'
+              : 'bg-gray-100 text-gray-900'
           }`}
           title={roadsVisible ? 'Hide Roads' : 'Show Roads'}
         >
@@ -153,11 +227,29 @@ export default function MapControls({
         </button>
       )}
 
+      {/* Rotate Animation Button */}
+      <button
+        onClick={handlePlayRotation}
+        disabled={!mapLoaded}
+        className={`flex items-center justify-center w-8 h-8 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          isRotating
+            ? 'bg-gray-100 text-gray-900'
+            : 'text-gray-700 hover:bg-gray-50'
+        }`}
+        title={isRotating ? 'Stop rotation' : 'Rotate 360°'}
+      >
+        {isRotating ? (
+          <StopIcon className="w-4 h-4" />
+        ) : (
+          <PlayIcon className="w-4 h-4" />
+        )}
+      </button>
+
       {/* Zoom In Button */}
       <button
         onClick={handleZoomIn}
         disabled={!mapLoaded}
-        className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         title="Zoom In"
       >
         <PlusIcon className="w-4 h-4" />
@@ -167,7 +259,7 @@ export default function MapControls({
       <button
         onClick={handleZoomOut}
         disabled={!mapLoaded}
-        className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-white hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center w-8 h-8 rounded-md transition-colors text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         title="Zoom Out"
       >
         <MinusIcon className="w-4 h-4" />

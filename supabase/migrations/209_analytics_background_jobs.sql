@@ -124,3 +124,4 @@ END $$;
 -- Backfill historical data (one-time):
 --   SELECT public.backfill_analytics_aggregates(30); -- Last 30 days
 
+

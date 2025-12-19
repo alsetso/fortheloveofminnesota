@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { XMarkIcon, PaperAirplaneIcon, ArrowLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
+import UpgradeToProModal from '@/components/UpgradeToProModal';
 
 interface Message {
   id: string;
@@ -30,6 +32,7 @@ interface FeatureMetadata {
   type: string;
   name?: string;
   properties: Record<string, any>;
+  showIntelligence?: boolean; // True for homes/houses - requires pro
 }
 
 interface IntelligenceModalProps {
@@ -42,6 +45,7 @@ interface IntelligenceModalProps {
 const MOCK_RESPONSE = "I can help you learn more about this location. What would you like to know?";
 
 export default function IntelligenceModal({ isOpen, onClose, locationData, pinFeature }: IntelligenceModalProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -49,9 +53,16 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
   const [isStreamingInitial, setIsStreamingInitial] = useState(false);
   const [streamedContent, setStreamedContent] = useState('');
   const [activeTasks, setActiveTasks] = useState<TaskStatus[]>([]);
+  const [userPlan, setUserPlan] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Check if this is a home/house (requires pro for messaging)
+  const isHomeLocation = pinFeature?.showIntelligence === true;
+  const isPro = userPlan === 'pro';
+  const requiresProUpgrade = isHomeLocation && !isPro;
 
   // Create stable reference for pinFeature to avoid dependency array issues
   const pinFeatureKey = useMemo(() => {
@@ -72,6 +83,25 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
       inputRef.current.focus();
     }
   }, [isOpen]);
+
+  // Check user plan on mount
+  useEffect(() => {
+    async function checkPlan() {
+      if (user) {
+        try {
+          const account = await AccountService.getCurrentAccount();
+          setUserPlan(account?.plan || 'hobby');
+        } catch {
+          setUserPlan('hobby');
+        }
+      } else {
+        setUserPlan(null);
+      }
+    }
+    if (isOpen) {
+      checkPlan();
+    }
+  }, [isOpen, user]);
 
   // Stream initial message when modal opens (simple greeting, not AI-generated)
   useEffect(() => {
@@ -131,6 +161,8 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
       setIsStreamingInitial(false);
       setStreamedContent('');
       setActiveTasks([]);
+      setUserPlan(null);
+      setShowUpgradeModal(false);
       if (streamingTimeoutRef.current) {
         clearTimeout(streamingTimeoutRef.current);
       }
@@ -139,6 +171,9 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isThinking) return;
+    
+    // Block messages for home locations without pro
+    if (requiresProUpgrade) return;
 
     const userMessageText = inputValue.trim();
     const userMessage: Message = {
@@ -473,29 +508,58 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
 
         {/* Input Area */}
         <div className="border-t border-gray-200 px-4 py-3 flex-shrink-0">
-          <div className="flex items-end gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask about this location..."
-              disabled={isThinking}
-              className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-md text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!inputValue.trim() || isThinking}
-              className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Send message"
-            >
-              <PaperAirplaneIcon className="w-4 h-4" />
-            </button>
-          </div>
+          {requiresProUpgrade ? (
+            // Pro upgrade prompt for home locations
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <SparklesIcon className="w-4 h-4 text-indigo-500" />
+                <span>Property intelligence requires Pro</span>
+              </div>
+              <button
+                onClick={() => setShowUpgradeModal(true)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+              >
+                Upgrade to Pro
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about this location..."
+                disabled={isThinking}
+                className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-md text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isThinking}
+                className="p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Send message"
+              >
+                <PaperAirplaneIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Upgrade to Pro Modal - overlays the intelligence sidebar */}
+      <UpgradeToProModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        onUpgrade={() => {
+          setShowUpgradeModal(false);
+          router.push('/settings?tab=billing');
+        }}
+        feature="Property Intelligence"
+        overlay="sidebar"
+      />
     </>
   );
 }
+
 

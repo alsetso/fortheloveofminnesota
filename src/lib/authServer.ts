@@ -1,7 +1,7 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import type { AccountRole, MemberRole } from '@/features/auth/services/memberService';
+import type { AccountRole } from '@/features/auth/services/memberService';
 import { Database } from '@/types/supabase';
 import { measureAuthCheck } from '@/lib/performance';
 

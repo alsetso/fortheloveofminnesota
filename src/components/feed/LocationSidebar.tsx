@@ -17,7 +17,7 @@ import PinAnalyticsModal from '@/components/pins/PinAnalyticsModal';
 import AtlasEntityModal, { type AtlasEntityData } from '@/components/atlas/AtlasEntityModal';
 import type { AtlasEntityType } from '@/features/atlas/services/atlasService';
 import { findCityByName, findCountyByName, updateCityCoordinates, deleteNeighborhood, deleteSchool, deletePark, deleteLake, deleteWatertower, deleteCemetery, deleteGolfCourse, deleteHospital, deleteAirport, deleteChurch, deleteMunicipal, deleteRoad } from '@/features/atlas/services/atlasService';
-import { useAuth } from '@/features/auth/contexts/AuthContext';
+import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { supabase } from '@/lib/supabase';
 import type { AtlasLayer } from '@/components/atlas/MapLayersPanel';
@@ -173,8 +173,18 @@ export default function LocationSidebar({
   layers,
   onToggleLayer,
 }: LocationSidebarProps) {
-  const { user } = useAuth();
+  // Auth state - use isLoading to ensure auth is initialized before making decisions
+  const { user, isLoading: authLoading } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
+  
+  // Ref to access current auth state in event handlers (avoids stale closures)
+  const userRef = useRef(user);
+  const authLoadingRef = useRef(authLoading);
+  
+  useEffect(() => {
+    userRef.current = user;
+    authLoadingRef.current = authLoading;
+  }, [user, authLoading]);
   const { openWindow } = useWindowManager();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -963,12 +973,15 @@ export default function LocationSidebar({
 
   const handlePinFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     // Require signed-in user (not guest) to upload media
-    if (!user) {
+    // Check ref to get current auth state (avoids stale closure issues)
+    if (authLoadingRef.current || !userRef.current) {
       e.preventDefault();
       if (pinFileInputRef.current) {
         pinFileInputRef.current.value = '';
       }
-      openWelcome();
+      if (!authLoadingRef.current) {
+        openWelcome();
+      }
       return;
     }
     
@@ -1021,7 +1034,13 @@ export default function LocationSidebar({
     }
 
     // Require authentication to create pins
-    if (!user) {
+    // Check ref to get current auth state (avoids stale closure issues)
+    if (authLoadingRef.current) {
+      setPinError('Checking authentication...');
+      return;
+    }
+    
+    if (!userRef.current) {
       setPinError('Please sign in to create pins');
       openWelcome();
       return;
@@ -1035,7 +1054,8 @@ export default function LocationSidebar({
 
       if (pinSelectedFile) {
         // Require signed-in user (not guest) to upload media server-side
-        if (!user) {
+        // Check ref to get current auth state (avoids stale closure issues)
+        if (!userRef.current) {
           throw new Error('Please sign in to upload photos and videos');
         }
         
@@ -1044,7 +1064,8 @@ export default function LocationSidebar({
         const fileExt = pinSelectedFile.name.split('.').pop();
         const timestamp = Date.now();
         const random = Math.random().toString(36).substring(7);
-        const accountId = user.id;
+        // userRef.current is guaranteed to be non-null here (checked earlier)
+        const accountId = userRef.current!.id;
         const fileName = `${accountId}/map-pins/${timestamp}-${random}.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
@@ -2496,7 +2517,11 @@ export default function LocationSidebar({
                     <button
                       onClick={() => {
                         // Require authentication to create pins
-                        if (!user) {
+                        // Check ref to get current auth state (avoids stale closure issues)
+                        if (authLoadingRef.current) {
+                          return; // Wait for auth to initialize
+                        }
+                        if (!userRef.current) {
                           openWelcome();
                           return;
                         }

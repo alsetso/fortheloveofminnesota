@@ -3,9 +3,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { XMarkIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
-import { GuestAccountService } from '@/features/auth/services/guestAccountService';
-import { buildGuestUrl } from '@/lib/urlParams';
-
 interface WelcomeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -17,9 +14,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   if (!isOpen) return null;
 
   const handleContinueAsGuest = () => {
-    // Ensure guest ID exists and use guest_id parameter
-    const guestId = GuestAccountService.getGuestId();
-    router.push(buildGuestUrl('/', guestId));
+    router.push('/');
     onClose();
   };
 
@@ -124,5 +119,6 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     </div>
   );
 }
+
 
 

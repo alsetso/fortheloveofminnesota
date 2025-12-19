@@ -198,3 +198,4 @@ COMMENT ON FUNCTION public.get_map_pin_stats IS
 
 COMMENT ON COLUMN public.map_pins.view_count IS 'Total number of times this pin has been viewed (incremented via record_page_view function)';
 
+

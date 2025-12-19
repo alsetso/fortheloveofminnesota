@@ -22,3 +22,4 @@ COMMENT ON COLUMN public.map_pins.city_id IS 'Optional reference to a city (stor
 COMMENT ON COLUMN public.map_pins.county_id IS 'Optional reference to a county (stored as UUID, no foreign key constraint)';
 
 
+

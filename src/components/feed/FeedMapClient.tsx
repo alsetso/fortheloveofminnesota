@@ -62,22 +62,23 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
     onOpenSidebar: () => setIsSidebarOpen(true),
   });
   
-  // Auth state from unified context
+  // Auth state from unified context - use isLoading to ensure auth is initialized
   const {
     user,
-    hasCompletedGuestProfile,
+    isLoading: authLoading,
   } = useAuthStateSafe();
 
   // Refs to access current auth state in map event callbacks
+  // These refs ensure we always have the latest auth state without re-rendering
   const userRef = useRef(user);
-  const hasCompletedGuestProfileRef = useRef(hasCompletedGuestProfile);
+  const authLoadingRef = useRef(authLoading);
   const openWelcomeRef = useRef(openWelcome);
   
   useEffect(() => {
     userRef.current = user;
-    hasCompletedGuestProfileRef.current = hasCompletedGuestProfile;
+    authLoadingRef.current = authLoading;
     openWelcomeRef.current = openWelcome;
-  }, [user, hasCompletedGuestProfile, openWelcome]);
+  }, [user, authLoading, openWelcome]);
 
   // Initialize guest mode (no auto-modal)
   useEffect(() => {
@@ -144,18 +145,10 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
         mapInstance.on('dblclick', (e: any) => {
           if (!mounted) return;
           
-          // Check if user has an account (authenticated OR completed guest profile)
-          const hasAccount = userRef.current || hasCompletedGuestProfileRef.current;
-          
-          if (!hasAccount) {
-            // No account - prompt to sign in/create profile
-            openWelcomeRef.current();
-            return;
-          }
-          
           const lng = e.lngLat.lng;
           const lat = e.lngLat.lat;
           // Dispatch event to show location in sidebar and expand pin form
+          // Location details can be shown without authentication - auth check happens when creating pin
           window.dispatchEvent(new CustomEvent('show-location-for-pin', {
             detail: { lat, lng }
           }));

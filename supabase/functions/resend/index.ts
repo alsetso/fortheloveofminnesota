@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
 
   try {
     const { user, email_data } = await req.json();
-
+    
     if (!user?.email || !email_data?.token) {
       return new Response(JSON.stringify({ success: false }), { status: 200, headers });
     }
@@ -92,15 +92,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false }), { status: 200, headers });
     }
 
-      const resend = new Resend(RESEND_API_KEY);
+    const resend = new Resend(RESEND_API_KEY);
     const html = getOtpTemplate(user.email, email_data.token);
-      
+
     await resend.emails.send({
-        from: 'For the Love of Minnesota <hi@fortheloveofminnesota.com>',
+      from: 'For the Love of Minnesota <hi@fortheloveofminnesota.com>',
       to: user.email,
-        subject: 'Your Access Code - For the Love of Minnesota',
-        html,
-      });
+      subject: 'Your Access Code - For the Love of Minnesota',
+      html,
+    });
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers });
   } catch (error) {

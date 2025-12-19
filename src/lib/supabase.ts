@@ -7,13 +7,42 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
+const GUEST_ID_KEY = 'mnuda_guest_id';
+
+/**
+ * Get guest ID from localStorage (browser only)
+ * Returns null on server or if not set
+ */
+function getGuestId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(GUEST_ID_KEY);
+}
+
 // Use SSR-compatible browser client for proper auth handling in Next.js App Router
 // Configure with auto-refresh to prevent token expiration issues
+// Include x-guest-id header for RLS policies to verify guest ownership
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      // Note: This is a static header set at client creation time.
+      // For dynamic guest ID, we use the custom fetch below.
+    },
+    fetch: (url, options = {}) => {
+      const guestId = getGuestId();
+      const headers = new Headers(options.headers);
+      
+      // Add x-guest-id header for RLS policies
+      if (guestId) {
+        headers.set('x-guest-id', guestId);
+      }
+      
+      return fetch(url, { ...options, headers });
+    },
   },
 });
 

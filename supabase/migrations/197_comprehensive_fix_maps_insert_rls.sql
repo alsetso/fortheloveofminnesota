@@ -66,3 +66,4 @@ CREATE POLICY "Users can create maps"
 GRANT INSERT ON public.maps TO authenticated;
 
 
+

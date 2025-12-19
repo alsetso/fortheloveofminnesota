@@ -134,3 +134,4 @@ Current `page_views` table supports:
 - **Client-Side**: All tracking is async and non-blocking
 - **Server-Side**: Efficient queries with proper indexes
 
+

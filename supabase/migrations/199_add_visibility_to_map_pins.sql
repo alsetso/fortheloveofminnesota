@@ -53,3 +53,4 @@ CREATE POLICY "Read map pins based on visibility"
 
 COMMENT ON COLUMN public.map_pins.visibility IS 'Pin visibility: ''public'' (visible to everyone) or ''only_me'' (visible only to creator). Extensible for future types.';
 
+

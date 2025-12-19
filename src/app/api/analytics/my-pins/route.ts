@@ -5,10 +5,8 @@ import type { Database } from '@/types/supabase';
 
 export interface PinViewStats {
   pin_id: string;
-  pin_name: string;
   pin_description: string | null;
-  pin_emoji: string | null;
-  pin_address: string | null;
+  pin_type: string | null;
   pin_created_at: string;
   total_views: number;
   unique_viewers: number;
@@ -69,7 +67,7 @@ export async function GET() {
     // Get all user's pins
     const { data: pins, error: pinsError } = await supabase
       .from('pins')
-      .select('id, name, description, emoji, address, created_at')
+      .select('id, description, type, created_at')
       .eq('account_id', accountId)
       .order('created_at', { ascending: false });
 
@@ -93,10 +91,8 @@ export async function GET() {
     for (const pin of pins) {
       const pinData = pin as {
         id: string;
-        name: string;
         description: string | null;
-        emoji: string | null;
-        address: string | null;
+        type: string | null;
         created_at: string;
       };
 
@@ -122,10 +118,8 @@ export async function GET() {
 
       pinStats.push({
         pin_id: pinData.id,
-        pin_name: pinData.name || 'Untitled Pin',
         pin_description: pinData.description,
-        pin_emoji: pinData.emoji,
-        pin_address: pinData.address,
+        pin_type: pinData.type,
         pin_created_at: pinData.created_at,
         total_views: statsData.total_views || 0,
         unique_viewers: statsData.unique_viewers || 0,
@@ -152,3 +146,4 @@ export async function GET() {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+

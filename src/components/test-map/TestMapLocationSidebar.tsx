@@ -397,10 +397,8 @@ export default function LocationSidebar({
     try {
       const mapboxMap = map as any;
       const layersToCheck = [
-        'map-pins-unclustered-point',
-        'map-pins-unclustered-point-label',
-        'map-pins-clusters',
-        'map-pins-cluster-count',
+        'map-pins-point',
+        'map-pins-point-label',
       ];
       
       const existingLayers = layersToCheck.filter(layerId => {
@@ -658,5 +656,6 @@ export default function LocationSidebar({
     </div>
   );
 }
+
 
 

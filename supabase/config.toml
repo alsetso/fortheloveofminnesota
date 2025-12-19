@@ -195,9 +195,11 @@ otp_expiry = 3600
 
 # Custom email hook for OTP emails
 # Configure in Dashboard: Authentication -> Hooks
-# [auth.hook.send_email]
-# enabled = true
-# uri = "http://127.0.0.1:54321/functions/v1/resend"
+# For production, enable this hook in Supabase Dashboard pointing to:
+# https://[your-project-ref].supabase.co/functions/v1/resend
+[auth.hook.send_email]
+enabled = true
+uri = "http://127.0.0.1:54321/functions/v1/resend"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

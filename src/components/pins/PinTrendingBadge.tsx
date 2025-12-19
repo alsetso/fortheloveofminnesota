@@ -57,3 +57,4 @@ export default function PinTrendingBadge({ pinId, hours = 24, minViews = 5, clas
     </div>
   );
 }
+

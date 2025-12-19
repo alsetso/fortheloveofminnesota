@@ -1,9 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { XMarkIcon, MagnifyingGlassIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { City, UpdateCityData } from '@/features/admin/services/cityAdminService';
-import AddCoordinatesMap from '@/components/_archive/map/AddCoordinatesMap';
+import { MAP_CONFIG } from '@/features/_archive/map/config';
+
+interface MapboxFeature {
+  id: string;
+  place_name: string;
+  center: [number, number];
+  text: string;
+}
 
 interface CityEditModalProps {
   isOpen: boolean;
@@ -31,6 +38,19 @@ export default function CityEditModal({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Location search state
+  const [locationSearch, setLocationSearch] = useState('');
+  const [suggestions, setSuggestions] = useState<MapboxFeature[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  
+  // Map state
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  const markerRef = useRef<any>(null);
 
   useEffect(() => {
     if (city) {
@@ -45,8 +65,168 @@ export default function CityEditModal({
         website_url: city.website_url,
         favorite: city.favorite,
       });
+      // Pre-populate search with city name for convenience
+      setLocationSearch(city.name + (city.county ? `, ${city.county} County, MN` : ', MN'));
     }
   }, [city]);
+
+  // Initialize map
+  useEffect(() => {
+    if (!isOpen || !mapContainerRef.current || mapRef.current) return;
+
+    const initMap = async () => {
+      const mapboxgl = (await import('mapbox-gl')).default;
+      await import('mapbox-gl/dist/mapbox-gl.css');
+
+      if (!MAP_CONFIG.MAPBOX_TOKEN) return;
+
+      mapboxgl.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
+
+      const initialLng = formData.lng ?? MAP_CONFIG.DEFAULT_CENTER[0];
+      const initialLat = formData.lat ?? MAP_CONFIG.DEFAULT_CENTER[1];
+      const initialZoom = formData.lat && formData.lng ? 12 : 6;
+
+      const map = new mapboxgl.Map({
+        container: mapContainerRef.current!,
+        style: MAP_CONFIG.MAPBOX_STYLE,
+        center: [initialLng, initialLat],
+        zoom: initialZoom,
+      });
+
+      mapRef.current = map;
+
+      // Add marker if coordinates exist
+      if (formData.lat && formData.lng) {
+        markerRef.current = new mapboxgl.Marker({ color: '#374151' })
+          .setLngLat([formData.lng, formData.lat])
+          .addTo(map);
+      }
+
+      // Click handler to set coordinates
+      map.on('click', (e: any) => {
+        const { lng, lat } = e.lngLat;
+        setFormData(prev => ({ ...prev, lat, lng }));
+        
+        // Update or create marker
+        if (markerRef.current) {
+          markerRef.current.setLngLat([lng, lat]);
+        } else {
+          markerRef.current = new mapboxgl.Marker({ color: '#374151' })
+            .setLngLat([lng, lat])
+            .addTo(map);
+        }
+      });
+    };
+
+    initMap();
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markerRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  // Update marker when coordinates change externally
+  useEffect(() => {
+    if (!mapRef.current || !formData.lat || !formData.lng) return;
+
+    const loadMapboxGL = async () => {
+      const mapboxgl = (await import('mapbox-gl')).default;
+      
+      if (markerRef.current) {
+        markerRef.current.setLngLat([formData.lng!, formData.lat!]);
+      } else {
+        markerRef.current = new mapboxgl.Marker({ color: '#374151' })
+          .setLngLat([formData.lng!, formData.lat!])
+          .addTo(mapRef.current);
+      }
+
+      // Fly to location
+      mapRef.current.flyTo({
+        center: [formData.lng!, formData.lat!],
+        zoom: 12,
+        duration: 1000,
+      });
+    };
+
+    loadMapboxGL();
+  }, [formData.lat, formData.lng]);
+
+  // Geocoding search
+  const searchLocation = useCallback(async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const params = new URLSearchParams({
+        access_token: MAP_CONFIG.MAPBOX_TOKEN,
+        types: 'place,locality,neighborhood,address',
+        country: 'us',
+        limit: '5',
+        bbox: '-97.5,43.5,-89.5,49.5', // Minnesota bounds
+      });
+
+      const response = await fetch(
+        `${MAP_CONFIG.GEOCODING_BASE_URL}/${encodeURIComponent(query)}.json?${params}`
+      );
+
+      if (!response.ok) throw new Error('Search failed');
+
+      const data = await response.json();
+      setSuggestions(data.features || []);
+      setShowSuggestions(data.features?.length > 0);
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      setSuggestions([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Debounced search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchLocation(locationSearch);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [locationSearch, searchLocation]);
+
+  // Handle suggestion selection
+  const handleSelectSuggestion = (feature: MapboxFeature) => {
+    const [lng, lat] = feature.center;
+    setFormData(prev => ({ ...prev, lat, lng }));
+    setLocationSearch(feature.place_name);
+    setShowSuggestions(false);
+    setSuggestions([]);
+  };
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,26 +349,92 @@ export default function CityEditModal({
               </div>
             </div>
 
-            {/* Coordinates Map */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Location Coordinates
+            {/* Location Search and Map */}
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-gray-700">
+                Location
               </label>
-              <AddCoordinatesMap
-                initialCoordinates={
-                  formData.lat && formData.lng
-                    ? { lat: parseFloat(formData.lat.toString()), lng: parseFloat(formData.lng.toString()) }
-                    : null
-                }
-                onCoordinatesChange={(coords) => {
-                  setFormData({
-                    ...formData,
-                    lat: coords?.lat || null,
-                    lng: coords?.lng || null,
-                  });
-                }}
-                height="300px"
+              
+              {/* Search Input */}
+              <div className="relative" ref={suggestionsRef}>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={locationSearch}
+                    onChange={(e) => setLocationSearch(e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                    placeholder="Search for a location..."
+                    className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                    disabled={saving}
+                  />
+                  {isSearching && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      <div className="w-3 h-3 border border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Suggestions Dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {suggestions.map((feature) => (
+                      <button
+                        key={feature.id}
+                        type="button"
+                        onClick={() => handleSelectSuggestion(feature)}
+                        className="w-full px-3 py-2 text-left text-xs hover:bg-gray-50 transition-colors flex items-start gap-2"
+                      >
+                        <MapPinIcon className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">{feature.place_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Mini Map */}
+              <div 
+                ref={mapContainerRef}
+                className="w-full h-48 rounded-md border border-gray-200 overflow-hidden"
               />
+              <p className="text-[10px] text-gray-500">
+                Search above or click the map to set coordinates
+              </p>
+            </div>
+
+            {/* Coordinates Display */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="city-lat" className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Latitude
+                </label>
+                <input
+                  id="city-lat"
+                  type="number"
+                  step="0.000001"
+                  value={formData.lat ?? ''}
+                  onChange={(e) => setFormData({ ...formData, lat: e.target.value ? parseFloat(e.target.value) : null })}
+                  className="w-full px-[10px] py-2 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-gray-50"
+                  placeholder="44.9778"
+                  disabled={saving}
+                />
+              </div>
+              <div>
+                <label htmlFor="city-lng" className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Longitude
+                </label>
+                <input
+                  id="city-lng"
+                  type="number"
+                  step="0.000001"
+                  value={formData.lng ?? ''}
+                  onChange={(e) => setFormData({ ...formData, lng: e.target.value ? parseFloat(e.target.value) : null })}
+                  className="w-full px-[10px] py-2 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-gray-50"
+                  placeholder="-93.2650"
+                  disabled={saving}
+                />
+              </div>
             </div>
 
             {/* SEO Fields */}

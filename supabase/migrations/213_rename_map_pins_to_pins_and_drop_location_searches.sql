@@ -359,3 +359,4 @@ CREATE POLICY "analytics_aggregates_select_own" ON public.analytics_aggregates
 
 DROP TABLE IF EXISTS public.location_searches CASCADE;
 
+

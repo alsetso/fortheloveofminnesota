@@ -24,7 +24,7 @@ export async function requireAdminAccess() {
  * Check admin access in API routes
  * Returns 403 response if not admin, or { auth, response: null } if authorized
  */
-export async function requireAdminApiAccess(request: NextRequest): Promise<{ auth: Awaited<ReturnType<typeof getServerAuth>>; response: null } | { auth: null; response: NextResponse }> {
+export async function requireAdminApiAccess(_request: NextRequest): Promise<{ auth: Awaited<ReturnType<typeof getServerAuth>>; response: null } | { auth: null; response: NextResponse }> {
   const auth = await getServerAuth();
   
   if (!auth || auth.role !== 'admin') {

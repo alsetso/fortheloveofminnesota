@@ -3,7 +3,6 @@ import Link from 'next/link';
 import SimplePageLayout from '@/components/SimplePageLayout';
 import { createServerClient } from '@/lib/supabaseServer';
 import BusinessesListClient from '@/components/businesses/BusinessesListClient';
-import PageStatsCard from '@/components/_archive/business/BusinessStatsCard';
 import type { Page } from '@/types/pages';
 
 export const metadata: Metadata = {
@@ -206,15 +205,6 @@ export default async function BusinessDirectoryPage() {
                 </div>
               </div>
 
-              {/* Directory Stats */}
-              <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-                <div className="px-[10px] py-[10px] border-b border-gray-200 bg-gray-50">
-                  <h2 className="text-xs font-semibold text-gray-900">Directory Statistics</h2>
-                </div>
-                <div className="p-[10px]">
-                  <PageStatsCard pageSlug="directory" />
-                </div>
-              </div>
             </div>
 
             {/* Center Column - Main Directory (6 columns) */}

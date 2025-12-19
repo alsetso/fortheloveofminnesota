@@ -11,12 +11,26 @@ import { useAuth } from '@/features/auth';
 import { GuestAccountService } from '@/features/auth/services/guestAccountService';
 import type { CreateMapPinData } from '@/types/map-pin';
 
+// Pin data returned after creation
+interface CreatedPin {
+  id: string;
+  lat: number;
+  lng: number;
+  description: string | null;
+  media_url: string | null;
+  visibility: string;
+  view_count: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface CreatePinModalProps {
   isOpen: boolean;
   onClose: () => void;
   coordinates: { lat: number; lng: number } | null;
-  onPinCreated: () => void;
+  onPinCreated: (pin?: CreatedPin) => void; // Optional pin data for optimistic updates
   onBack?: () => void; // Callback to open location details
+  onVisibilityChange?: (visibility: 'public' | 'only_me') => void; // Callback when visibility changes
 }
 
 
@@ -26,6 +40,7 @@ export default function CreatePinModal({
   coordinates,
   onPinCreated,
   onBack,
+  onVisibilityChange,
 }: CreatePinModalProps) {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +59,13 @@ export default function CreatePinModal({
   const [visibility, setVisibility] = useState<'public' | 'only_me'>('public');
   const [showVisibilityTooltip, setShowVisibilityTooltip] = useState(false);
   const [citySlug, setCitySlug] = useState<string | null>(null);
+
+  // Notify parent when visibility changes
+  useEffect(() => {
+    if (isOpen && onVisibilityChange) {
+      onVisibilityChange(visibility);
+    }
+  }, [visibility, isOpen, onVisibilityChange]);
 
   // Reverse geocode to get address
   const reverseGeocode = async (lng: number, lat: number): Promise<string | null> => {
@@ -289,8 +311,8 @@ export default function CreatePinModal({
         visibility: visibility,
       };
 
-      await PublicMapPinService.createPin(pinData);
-      onPinCreated();
+      const createdPin = await PublicMapPinService.createPin(pinData);
+      onPinCreated(createdPin as CreatedPin);
       onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create pin';

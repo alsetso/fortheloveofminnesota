@@ -164,7 +164,7 @@ export default async function CitiesListPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbData) }}
       />
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           {/* Breadcrumb Navigation */}
           <nav className="mb-3" aria-label="Breadcrumb">
             <ol className="flex items-center gap-2 text-xs text-gray-600">

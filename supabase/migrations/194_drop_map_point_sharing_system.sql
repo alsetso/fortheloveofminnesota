@@ -67,3 +67,4 @@ DROP FUNCTION IF EXISTS user_owns_map(UUID);
 DROP TYPE IF EXISTS public.map_permission CASCADE;
 
 
+

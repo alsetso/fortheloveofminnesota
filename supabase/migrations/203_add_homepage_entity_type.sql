@@ -115,3 +115,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 COMMENT ON FUNCTION public.record_page_view IS
   'Records a page view for various entity types including homepage, feed, map, posts, cities, counties, accounts, and map pins. Returns the updated view_count for entities with view_count columns, or 0 for page-level entities (homepage, feed, map).';
 
+

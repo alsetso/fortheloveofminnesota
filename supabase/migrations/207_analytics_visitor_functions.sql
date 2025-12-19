@@ -169,3 +169,4 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 COMMENT ON FUNCTION public.get_visitor_visit_history IS 
   'Returns detailed visit history for a specific visitor (account or session).';
 
+

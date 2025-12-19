@@ -232,7 +232,7 @@ export default async function CitiesListPage() {
             <h2 className="text-sm font-semibold text-gray-900 mb-3">Top Cities by Population</h2>
             <div className="space-y-1.5">
               {allCities
-                .sort((a, b) => b.population - a.population)
+                .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
                 .slice(0, 10)
                 .map((city, idx) => (
                   <div key={city.id} className="flex items-center justify-between text-xs">
@@ -251,7 +251,7 @@ export default async function CitiesListPage() {
                         <span className="text-gray-500">({city.county})</span>
                       )}
                     </div>
-                    <span className="text-gray-600">{formatNumber(city.population)}</span>
+                    <span className="text-gray-600">{city.population !== null ? formatNumber(city.population) : 'N/A'}</span>
                   </div>
                 ))}
             </div>

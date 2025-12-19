@@ -9,9 +9,9 @@ type City = {
   id: string;
   name: string;
   slug: string;
-  population: number;
-  county: string;
-  favorite?: boolean;
+  population: number | null;
+  county: string | null;
+  favorite?: boolean | null;
   website_url?: string | null;
 };
 
@@ -76,7 +76,7 @@ export function CitiesListView({ cities }: CitiesListViewProps) {
       if (sortBy === 'name') {
         comparison = a.name.localeCompare(b.name);
       } else if (sortBy === 'population') {
-        comparison = a.population - b.population;
+        comparison = (a.population ?? 0) - (b.population ?? 0);
       } else if (sortBy === 'county') {
         comparison = (a.county || '').localeCompare(b.county || '');
       }
@@ -197,7 +197,7 @@ export function CitiesListView({ cities }: CitiesListViewProps) {
                   </div>
                 </td>
                 <td className="px-[10px] py-[10px] text-xs text-gray-600">
-                  {formatNumber(city.population)}
+                  {city.population !== null ? formatNumber(city.population) : 'N/A'}
                 </td>
                 <td className="px-[10px] py-[10px] text-xs text-gray-600">
                   {city.county ? highlightMatch(city.county, searchQuery) : city.county}

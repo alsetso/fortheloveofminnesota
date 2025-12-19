@@ -155,11 +155,11 @@ export default function ProfilePinsLayer({
     }, 500);
   }, []);
 
-  // Handle URL parameters on mount/change (for shareable links)
+  // Handle URL parameters - this is the source of truth for popup state
   useEffect(() => {
-    if (!mapLoaded || !map || !clickHandlerRef.current) return;
+    if (!mapLoaded || !map) return;
     
-    // Skip if we just updated the URL ourselves
+    // Skip if we just updated the URL ourselves (brief delay to prevent loops)
     if (isUpdatingUrlRef.current) {
       return;
     }
@@ -170,12 +170,7 @@ export default function ProfilePinsLayer({
     // Create unique key for this URL state
     const urlKey = `${sel}-${pinId}`;
     
-    // Skip if we've already processed this exact URL state
-    if (urlKey === urlProcessedRef.current) {
-      return;
-    }
-    
-    // Process pin selection from URL (for shareable links)
+    // Process pin selection from URL
     if (sel === 'pin' && pinId) {
       // Don't reopen if already open for this pin
       if (currentOpenPinIdRef.current === pinId && popupRef.current) {
@@ -183,18 +178,13 @@ export default function ProfilePinsLayer({
         return;
       }
       
-      // Mark as processed before opening to prevent loops
-      urlProcessedRef.current = urlKey;
-      
-      // Find pin and trigger click handler (which will open popup)
+      // Find pin and open popup
       const pin = pinsRef.current.find(p => p.id === pinId);
-      if (pin && clickHandlerRef.current) {
-        const mapboxMap = map as any;
-        const mockEvent = {
-          point: mapboxMap.project([pin.lng, pin.lat]),
-        };
-        // Trigger the click handler to open popup
-        clickHandlerRef.current(mockEvent);
+      if (pin) {
+        // Mark as processed
+        urlProcessedRef.current = urlKey;
+        // Open popup for this pin
+        openPopupForPin(pin);
       }
     } else if (urlProcessedRef.current && (!sel || sel !== 'pin' || !pinId)) {
       // URL cleared - close popup if open
@@ -206,33 +196,76 @@ export default function ProfilePinsLayer({
       }
       urlProcessedRef.current = null;
     }
-  }, [mapLoaded, map, searchParams]);
+  }, [mapLoaded, map, searchParams, openPopupForPin]);
 
-  // Create stable click handler
-  const handlePinClick = useCallback(async (e: any) => {
-    const mapboxMap = map as any;
-    if (!mapboxMap) return;
+  // Helper function to setup popup handlers
+  const setupPopupHandlers = useCallback((pinId: string) => {
+    const menuBtn = document.getElementById(`pin-menu-btn-${pinId}`);
+    const dropdown = document.getElementById(`pin-menu-dropdown-${pinId}`);
+    const deleteBtn = document.getElementById(`pin-delete-btn-${pinId}`);
+    const closeBtn = document.getElementById(`pin-close-btn-${pinId}`);
 
-    const features = mapboxMap.queryRenderedFeatures(e.point, {
-      layers: [LAYER_IDS.points, LAYER_IDS.labels],
+    menuBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+      }
     });
 
-    if (features.length === 0) return;
+    deleteBtn?.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('Delete this pin? This cannot be undone.')) return;
+      
+      try {
+        const { error } = await supabase
+          .from('pins')
+          .update({ archived: true })
+          .eq('id', pinId)
+          .eq('archived', false);
+        
+        if (error) throw error;
+        
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+        }
+        currentOpenPinIdRef.current = null;
+        onPinDeletedRef.current?.(pinId);
+        
+        // Clear URL
+        clearUrlParams();
+      } catch (err) {
+        console.error('[ProfilePinsLayer] Delete failed:', err);
+        alert('Failed to delete pin.');
+      }
+    });
 
-    const feature = features[0];
-    const pinId = feature.properties?.id;
-    if (!pinId) return;
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+      }
+      currentOpenPinIdRef.current = null;
+      onPopupCloseRef.current?.();
+      
+      // Clear URL
+      clearUrlParams();
+    });
 
-    const pin = pinsRef.current.find(p => p.id === pinId);
-    if (!pin) {
-      console.warn('[ProfilePinsLayer] Pin not found:', pinId);
-      return;
-    }
+    // Close dropdown on outside click
+    const closeDropdown = (e: MouseEvent) => {
+      if (dropdown && !dropdown.contains(e.target as Node) && e.target !== menuBtn) {
+        dropdown.style.display = 'none';
+      }
+    };
+    document.addEventListener('click', closeDropdown, { once: true });
+  }, [clearUrlParams]);
 
-    // Don't reopen if already open
-    if (currentOpenPinIdRef.current === pinId && popupRef.current) {
-      return;
-    }
+  // Helper function to open popup for a pin
+  const openPopupForPin = useCallback(async (pin: ProfilePin) => {
+    const mapboxMap = map as any;
+    if (!mapboxMap) return;
 
     // Close existing popup
     if (popupRef.current) {
@@ -242,34 +275,14 @@ export default function ProfilePinsLayer({
 
     // Mark as current pin
     currentOpenPinIdRef.current = pin.id;
-    
-    // Update URL (mark as processed immediately to prevent effect loop)
-    updateUrlParams(pin.id);
 
     // Dispatch event to notify any location sidebar to close location details
     window.dispatchEvent(new CustomEvent('pin-popup-opening', {
       detail: { pinId: pin.id }
     }));
 
-    // Fly to pin
-    const currentZoom = mapboxMap.getZoom();
-    const targetZoom = Math.max(currentZoom, 14);
-    mapboxMap.flyTo({
-      center: [pin.lng, pin.lat],
-      zoom: targetZoom,
-      duration: 800,
-      essential: true,
-    });
-
-    // Create popup immediately (like homepage) - Mapbox handles positioning during flyTo
+    // Create popup
     const mapbox = await import('mapbox-gl');
-    
-    // Remove any existing popup first
-    if (popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
-    }
-    
     popupRef.current = new mapbox.default.Popup({
       offset: 25,
       closeButton: false,
@@ -298,70 +311,6 @@ export default function ProfilePinsLayer({
       // Clear URL when popup closes
       clearUrlParams();
     });
-
-    // Setup popup handlers function (needs to be accessible in moveend callback)
-    const setupPopupHandlers = (pinId: string) => {
-      const menuBtn = document.getElementById(`pin-menu-btn-${pinId}`);
-      const dropdown = document.getElementById(`pin-menu-dropdown-${pinId}`);
-      const deleteBtn = document.getElementById(`pin-delete-btn-${pinId}`);
-      const closeBtn = document.getElementById(`pin-close-btn-${pinId}`);
-
-      menuBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (dropdown) {
-          dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-        }
-      });
-
-      deleteBtn?.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!confirm('Delete this pin? This cannot be undone.')) return;
-        
-        try {
-          const { error } = await supabase
-            .from('pins')
-            .update({ archived: true })
-            .eq('id', pinId)
-            .eq('archived', false);
-          
-          if (error) throw error;
-          
-          if (popupRef.current) {
-            popupRef.current.remove();
-            popupRef.current = null;
-          }
-          currentOpenPinIdRef.current = null;
-          onPinDeletedRef.current?.(pinId);
-          
-          // Clear URL
-          clearUrlParams();
-        } catch (err) {
-          console.error('[ProfilePinsLayer] Delete failed:', err);
-          alert('Failed to delete pin.');
-        }
-      });
-
-      closeBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (popupRef.current) {
-          popupRef.current.remove();
-          popupRef.current = null;
-        }
-        currentOpenPinIdRef.current = null;
-        onPopupCloseRef.current?.();
-        
-        // Clear URL
-        clearUrlParams();
-      });
-
-      // Close dropdown on outside click
-      const closeDropdown = (e: MouseEvent) => {
-        if (dropdown && !dropdown.contains(e.target as Node) && e.target !== menuBtn) {
-          dropdown.style.display = 'none';
-        }
-      };
-      document.addEventListener('click', closeDropdown, { once: true });
-    };
 
     // Track pin view for non-owners (async, don't block popup)
     const isOwner = isOwnProfileRef.current;
@@ -422,7 +371,32 @@ export default function ProfilePinsLayer({
         }
       })();
     }
-  }, [map, createPopupHTML, updateUrlParams, clearUrlParams]);
+  }, [map, createPopupHTML, clearUrlParams, setupPopupHandlers]);
+
+  // Create stable click handler - just updates URL, popup opens via URL effect
+  const handlePinClick = useCallback((e: any) => {
+    const mapboxMap = map as any;
+    if (!mapboxMap) return;
+
+    const features = mapboxMap.queryRenderedFeatures(e.point, {
+      layers: [LAYER_IDS.points, LAYER_IDS.labels],
+    });
+
+    if (features.length === 0) return;
+
+    const feature = features[0];
+    const pinId = feature.properties?.id;
+    if (!pinId) return;
+
+    const pin = pinsRef.current.find(p => p.id === pinId);
+    if (!pin) {
+      console.warn('[ProfilePinsLayer] Pin not found:', pinId);
+      return;
+    }
+
+    // Just update URL - the URL effect will handle opening the popup
+    updateUrlParams(pin.id);
+  }, [updateUrlParams]);
 
   // Main effect for pins layer
   useEffect(() => {

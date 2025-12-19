@@ -176,6 +176,7 @@ export default function CityMap({
         };
       } catch (error) {
         console.error('Error initializing city map:', error);
+        return undefined;
       }
     };
 

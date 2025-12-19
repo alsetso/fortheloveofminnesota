@@ -6,7 +6,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import { isAccountComplete } from '@/lib/accountCompleteness';
 import { checkOnboardingStatus } from '@/lib/onboardingCheck';
-import OnboardingClient from '@/app/_archive/account/onboarding/OnboardingClient';
+import OnboardingClient from '@/app/account/onboarding/OnboardingClient';
 
 interface OnboardingModalProps {
   isOpen: boolean;

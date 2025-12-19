@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChartBarIcon, UserIcon, CreditCardIcon, ArrowLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChartBarIcon, UserIcon, CreditCardIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import type { BillingData } from '@/lib/billingServer';
 import AnalyticsClient from '@/components/feed/AnalyticsClient';
-import SettingsClient from '@/app/_archive/account/settings/SettingsClient';
-import BillingClient from '@/app/_archive/account/billing/BillingClient';
+import SettingsClient from '@/app/account/settings/SettingsClient';
+import BillingClient from '@/app/account/billing/BillingClient';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -191,14 +191,85 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
                         <ArrowLeftIcon className="w-3 h-3" />
                         Back to Billing
                       </button>
-                      <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
-                        <div className="flex items-center gap-2 mb-2">
-                          <SparklesIcon className="w-4 h-4 text-gray-500" />
-                          <span className="text-sm font-semibold text-gray-900">Coming Soon</span>
+                      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+                        <h3 className="text-sm font-semibold text-gray-900 mb-3">Plans & Pricing</h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-2 font-semibold text-gray-900">Name</th>
+                                <th className="text-center py-2 px-2 font-semibold text-gray-900">Hobby</th>
+                                <th className="text-center py-2 px-2 font-semibold text-gray-900">Pro</th>
+                                <th className="text-center py-2 px-2 font-semibold text-gray-900">Pro+</th>
+                              </tr>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-2 font-medium text-gray-700">Price</th>
+                                <td className="text-center py-2 px-2 text-gray-600">$0</td>
+                                <td className="text-center py-2 px-2 text-gray-600">$20</td>
+                                <td className="text-center py-2 px-2 text-gray-600">$80</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr className="border-b border-gray-100">
+                                <td colSpan={4} className="py-2 px-2 font-medium text-gray-900 bg-gray-50">Hobby</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">Public Pins</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">Private pins</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td colSpan={4} className="py-2 px-2 font-medium text-gray-900 bg-gray-50">Pro</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">Shareable Profile</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">Pin collections view</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">See who viewed your profile and pins</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">API: OpenAI</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td colSpan={4} className="py-2 px-2 font-medium text-gray-900 bg-gray-50">Pro+</td>
+                              </tr>
+                              <tr className="border-b border-gray-100">
+                                <td className="py-2 px-2 text-gray-600">API: Skip Trace</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                              <tr>
+                                <td className="py-2 px-2 text-gray-600">API: Zillow</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-500">❌</td>
+                                <td className="text-center py-2 px-2 text-gray-900">✔️</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                        <p className="text-xs text-gray-600">
-                          Plan upgrades and downgrades are coming soon. Contact support if you need to make changes to your subscription.
-                        </p>
                       </div>
                     </div>
                   ) : (

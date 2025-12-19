@@ -1,18 +1,18 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import SimpleNav from '@/components/SimpleNav';
-import LocationSidebar from './LocationSidebar';
-import PinsLayer from '@/components/_archive/map/PinsLayer';
+import FloatingMapContainer from './FloatingMapContainer';
+import PinsLayer from '@/components/map/PinsLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
-import { useAuthStateSafe } from '@/features/auth';
+import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAtlasLayers, AtlasLayersRenderer } from '@/components/atlas';
 import { useUrlMapState } from './hooks/useUrlMapState';
+import Sidebar from '@/components/sidebar/Sidebar';
 
 interface FeedMapClientProps {
   cities: Array<{
@@ -67,6 +67,29 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
     user,
     isLoading: authLoading,
   } = useAuthStateSafe();
+
+  // Account state for sidebar
+  const [account, setAccount] = useState<Account | null>(null);
+
+  // Load account data
+  useEffect(() => {
+    const loadAccount = async () => {
+      if (!user) {
+        setAccount(null);
+        return;
+      }
+
+      try {
+        const accountData = await AccountService.getCurrentAccount();
+        setAccount(accountData);
+      } catch (error) {
+        console.error('[FeedMapClient] Error loading account:', error);
+        setAccount(null);
+      }
+    };
+
+    loadAccount();
+  }, [user]);
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -206,16 +229,17 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
     updateUrlForLocation(coordinates.lat, coordinates.lng, 15);
   };
 
-  const NAV_HEIGHT = '3.5rem';
-
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden">
-      <SimpleNav />
-
       <div 
-        className="relative flex-1 w-full overflow-hidden"
-        style={{ height: `calc(100vh - ${NAV_HEIGHT})` }}
+        className="relative flex-1 w-full overflow-hidden flex"
+        style={{ height: '100vh' }}
       >
+        {/* Sidebar - shows on all screens, mobile nav is built into Sidebar */}
+        <Sidebar account={account} map={mapInstanceRef.current} />
+
+        {/* Map and other components */}
+        <div className="flex-1 relative overflow-hidden mt-14 lg:mt-0">
         {/* Mapbox Container */}
         <div 
           ref={mapContainer} 
@@ -240,7 +264,7 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
         )}
 
         {/* Left Sidebar */}
-        <LocationSidebar
+        <FloatingMapContainer
           map={mapInstanceRef.current}
           mapLoaded={mapLoaded}
           isOpen={isSidebarOpen && !isModalOpen}
@@ -248,6 +272,7 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
           layers={layers}
           onToggleLayer={toggleLayer}
         />
+
 
         {/* Homepage Stats Handle */}
         <HomepageStatsHandle />
@@ -279,6 +304,7 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}

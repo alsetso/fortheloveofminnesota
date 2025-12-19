@@ -38,6 +38,8 @@ export interface MapPin {
   view_count?: number;
   location_metadata?: LocationMetadata | null;
   atlas_metadata?: AtlasMetadata | null;
+  event_date?: string | null; // Date when the event/memory happened (can be in the past)
+  hide_location?: boolean; // When true, uses city coordinates instead of exact coordinates
   created_at: string;
   updated_at: string;
   account?: {
@@ -59,6 +61,8 @@ export interface CreateMapPinData {
   tags?: string[]; // User-defined labels for organizing pins
   location_metadata?: LocationMetadata | null;
   atlas_metadata?: AtlasMetadata | null;
+  event_date?: string | null; // ISO date string - can be up to 100 years in the past
+  hide_location?: boolean; // When true, uses city coordinates instead of exact coordinates
 }
 
 export interface UpdateMapPinData {
@@ -69,10 +73,12 @@ export interface UpdateMapPinData {
   city_id?: string | null;
   county_id?: string | null;
   tags?: string[]; // User-defined labels for organizing pins
+  event_date?: string | null; // ISO date string - can be up to 100 years in the past
 }
 
 export interface MapPinFilters {
   account_id?: string;
+  year?: number; // Filter by year of event_date
   bbox?: {
     minLat: number;
     maxLat: number;

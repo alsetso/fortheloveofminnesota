@@ -1,8 +1,11 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
-import ProfileMapClient from '@/components/profile/ProfileMapClient';
+import ProfileCard from '@/components/profile/ProfileCard';
+import ProfilePinsList from '@/components/profile/ProfilePinsList';
+import SimplePageLayout from '@/components/SimplePageLayout';
 import { Metadata } from 'next';
-import type { ProfileAccount, ProfilePin } from '@/types/profile';
+import type { ProfileAccount } from '@/types/profile';
+import type { MapPin } from '@/types/map-pin';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `${displayName} | MNUDA`,
-    description: `View ${displayName}'s pins on MNUDA - For the Love of Minnesota`,
+    description: `View ${displayName}'s profile on MNUDA - For the Love of Minnesota`,
   };
 }
 
@@ -100,41 +103,41 @@ export default async function ProfilePage({ params }: Props) {
     isOwnProfile = true;
   }
 
-
-  // Fetch the account's public pins (and private if own profile)
-  const pinsQuery = supabase
+  // Fetch pins for this account
+  // For visitors, only show public pins; for owners, show all non-archived pins
+  let pinsQuery = supabase
     .from('pins')
-    .select(`
-      id,
-      lat,
-      lng,
-      description,
-      media_url,
-      visibility,
-      view_count,
-      created_at,
-      updated_at
-    `)
+    .select('id, lat, lng, description, visibility, created_at, updated_at')
     .eq('account_id', accountData.id)
-    .eq('archived', false) // Exclude archived pins
+    .eq('archived', false)
     .order('created_at', { ascending: false });
 
-  // If viewing own profile, include private pins; otherwise only public
+  // If not owner, only show public pins
   if (!isOwnProfile) {
-    pinsQuery.eq('visibility', 'public');
+    pinsQuery = pinsQuery.eq('visibility', 'public');
   }
 
-  const { data: rawPins } = await pinsQuery;
+  const { data: pinsData } = await pinsQuery;
 
-  // Transform pins
-  const pins: ProfilePin[] = (rawPins || []).map((pin: any) => ({
+  const pins: MapPin[] = (pinsData || []).map((pin: {
+    id: string;
+    lat: number;
+    lng: number;
+    description: string | null;
+    visibility: 'public' | 'only_me';
+    created_at: string;
+    updated_at: string;
+  }) => ({
     id: pin.id,
     lat: pin.lat,
     lng: pin.lng,
     description: pin.description,
-    media_url: pin.media_url,
-    visibility: pin.visibility,
-    view_count: pin.view_count,
+    type: null,
+    media_url: null,
+    account_id: accountData.id,
+    city_id: null,
+    county_id: null,
+    visibility: pin.visibility || 'public',
     created_at: pin.created_at,
     updated_at: pin.updated_at,
   }));
@@ -157,11 +160,17 @@ export default async function ProfilePage({ params }: Props) {
   };
 
   return (
-    <ProfileMapClient 
-      account={profileAccountData}
-      pins={pins || []}
-      isOwnProfile={isOwnProfile}
-    />
+    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+      <div className="max-w-2xl mx-auto space-y-3">
+        <ProfileCard 
+          account={profileAccountData}
+          isOwnProfile={isOwnProfile}
+        />
+        {pins.length > 0 && (
+          <ProfilePinsList pins={pins} isOwnProfile={isOwnProfile} />
+        )}
+      </div>
+    </SimplePageLayout>
   );
 }
 

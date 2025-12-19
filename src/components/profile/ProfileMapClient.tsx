@@ -1,17 +1,21 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import CreatePinModal from '@/components/_archive/map/CreatePinModal';
+import CreatePinModal from '@/components/map/CreatePinModal';
 import SimpleNav from '@/components/SimpleNav';
 import { usePageView } from '@/hooks/usePageView';
-import { InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import ProfilePinsLayer from './ProfilePinsLayer';
 import ProfileMapControls from './ProfileMapControls';
 import ProfileMapToolbar from './ProfileMapToolbar';
+import ProfilePinsSidebar from './ProfilePinsSidebar';
 import { useProfileOwnership } from '@/hooks/useProfileOwnership';
+import { useTemporaryPinMarker } from './hooks/useTemporaryPinMarker';
+import { useDebounce } from './hooks/useDebounce';
+import { useProfileUrlState } from './hooks/useProfileUrlState';
 import type { 
   ProfilePin, 
   ProfileAccount,
@@ -22,35 +26,50 @@ interface ProfileMapClientProps {
   account: ProfileAccount;
   pins: ProfilePin[];
   isOwnProfile: boolean;
+  initialViewMode?: 'owner' | 'visitor'; // Initial view mode from URL query param
 }
 
 // Consolidated modal state type
 type ModalState = 
   | { type: 'none' }
-  | { type: 'create-pin'; coordinates: { lat: number; lng: number } }
-  | { type: 'debug' };
+  | { type: 'create-pin'; coordinates: { lat: number; lng: number } };
 
 export default function ProfileMapClient({ 
   account, 
   pins: initialPins, 
-  isOwnProfile: serverIsOwnProfile
+  isOwnProfile: serverIsOwnProfile,
+  initialViewMode = 'owner',
 }: ProfileMapClientProps) {
   usePageView();
+  
+  // Centralized URL state management
+  const { pinId: urlPinId, viewMode, setPinId, clearPinId, setView, setPinIdAndView } = useProfileUrlState();
   
   // Use ownership hook for consolidated ownership logic
   const ownership = useProfileOwnership({
     account,
     serverIsOwnProfile,
   });
+
+  // Local view mode state (synced with URL state)
+  const [localViewMode, setLocalViewMode] = useState<'owner' | 'visitor'>(initialViewMode);
+  
+  // Sync local view mode with URL state
+  useEffect(() => {
+    setLocalViewMode(viewMode);
+  }, [viewMode]);
+
+  // Determine if owner controls should be shown
+  const showOwnerControls = ownership.isOwner && localViewMode === 'owner';
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
-  const temporaryMarkerRef = useRef<any>(null);
   const [is3DMode, setIs3DMode] = useState(false);
   const [roadsVisible, setRoadsVisible] = useState(true);
   const [pinsRefreshKey, setPinsRefreshKey] = useState(0);
+  const [showPrivatePins, setShowPrivatePins] = useState(true); // Toggle for private pins visibility
   
   // Local pins state - starts with server-provided pins, can be updated client-side
   const [localPins, setLocalPins] = useState<ProfilePin[]>(initialPins);
@@ -58,119 +77,37 @@ export default function ProfileMapClient({
   // Consolidated modal state
   const [modalState, setModalState] = useState<ModalState>({ type: 'none' });
   
-  // Track active popup for coordination with modals
-  const [activePopupPinId, setActivePopupPinId] = useState<string | null>(null);
-  
   // Derived modal states for convenience
   const isCreatePinModalOpen = modalState.type === 'create-pin';
-  const isDebugModalOpen = modalState.type === 'debug';
   const createPinCoordinates = modalState.type === 'create-pin' ? modalState.coordinates : null;
 
-  // Filter pins for display based on ownership and view mode
-  const displayPins = ownership.canSeePrivatePins 
-    ? localPins 
+  // Filter pins for display based on ownership, view mode, and private pins toggle
+  // Server already filters pins, but we need client-side filtering for "visitor view mode" and private toggle
+  const displayPins = showOwnerControls 
+    ? (showPrivatePins ? localPins : filterPinsForVisitor(localPins))
     : filterPinsForVisitor(localPins);
 
-  // Add temporary pin marker on map
-  const addTemporaryPin = useCallback(async (coordinates: { lat: number; lng: number }) => {
-    if (!mapInstanceRef.current || !mapLoaded || (mapInstanceRef.current as any).removed) return;
+  // Temporary pin marker hook
+  const { addTemporaryPin, removeTemporaryPin, updateTemporaryPinColor } = useTemporaryPinMarker({
+    map: mapInstanceRef.current,
+    mapLoaded,
+  });
 
-    try {
-      const mapbox = await loadMapboxGL();
+  // Consolidated effect: Close modal and remove temporary marker when:
+  // 1. Switching to visitor view
+  // 2. pinId appears in URL (user clicked existing pin)
+  useEffect(() => {
+    if (!isCreatePinModalOpen) return;
 
-      // Remove existing temporary marker if any
-      if (temporaryMarkerRef.current) {
-        temporaryMarkerRef.current.remove();
-        temporaryMarkerRef.current = null;
-      }
+    const shouldClose = 
+      localViewMode === 'visitor' || // Switching to visitor view
+      (urlPinId !== null); // User clicked existing pin
 
-      // Create temporary marker element with pulsing animation
-      const el = document.createElement('div');
-      el.className = 'temporary-pin-marker';
-      el.style.cssText = `
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        background-color: #ef4444;
-        border: 3px solid #ffffff;
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        cursor: pointer;
-        pointer-events: none;
-      `;
-
-      // Add animation keyframes if not already added
-      if (!document.getElementById('temporary-marker-styles')) {
-        const style = document.createElement('style');
-        style.id = 'temporary-marker-styles';
-        style.textContent = `
-          @keyframes pulse {
-            0%, 100% {
-              box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-            }
-            50% {
-              box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
-            }
-          }
-        `;
-        document.head.appendChild(style);
-      }
-
-      // Create marker
-      const marker = new mapbox.Marker({
-        element: el,
-        anchor: 'center',
-      })
-        .setLngLat([coordinates.lng, coordinates.lat])
-        .addTo(mapInstanceRef.current);
-
-      temporaryMarkerRef.current = marker;
-    } catch (err) {
-      console.error('Error creating temporary pin:', err);
+    if (shouldClose) {
+      removeTemporaryPin();
+      setModalState({ type: 'none' });
     }
-  }, [mapLoaded]);
-
-  // Remove temporary pin marker
-  const removeTemporaryPin = useCallback(() => {
-    if (temporaryMarkerRef.current) {
-      temporaryMarkerRef.current.remove();
-      temporaryMarkerRef.current = null;
-    }
-  }, []);
-
-  // Update temporary pin color based on visibility
-  const updateTemporaryPinColor = useCallback((visibility: 'public' | 'only_me') => {
-    if (!temporaryMarkerRef.current) return;
-    
-    const el = temporaryMarkerRef.current.getElement();
-    if (!el) return;
-
-    if (visibility === 'only_me') {
-      // Grey color for private pins
-      el.style.backgroundColor = '#6b7280';
-      el.style.boxShadow = '0 0 0 0 rgba(107, 114, 128, 0.7)';
-    } else {
-      // Red color for public pins
-      el.style.backgroundColor = '#ef4444';
-      el.style.boxShadow = '0 0 0 0 rgba(239, 68, 68, 0.7)';
-    }
-
-    // Update keyframe animation colors
-    const styleEl = document.getElementById('temporary-marker-styles');
-    if (styleEl) {
-      const color = visibility === 'only_me' ? '107, 114, 128' : '239, 68, 68';
-      styleEl.textContent = `
-        @keyframes pulse {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(${color}, 0.7);
-          }
-          50% {
-            box-shadow: 0 0 0 12px rgba(${color}, 0);
-          }
-        }
-      `;
-    }
-  }, []);
+  }, [localViewMode, urlPinId, isCreatePinModalOpen, removeTemporaryPin]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !mapContainer.current) return;
@@ -205,7 +142,7 @@ export default function ProfileMapClient({
           ],
         });
 
-        mapInstanceRef.current = mapInstance;
+        mapInstanceRef.current = mapInstance as unknown as MapboxMapInstance;
 
         mapInstance.on('load', () => {
           if (mounted) {
@@ -308,29 +245,48 @@ export default function ProfileMapClient({
     };
   }, [initialPins]);
 
-  // Set up click handler for creating pins (only for owners)
+  // Debounced handler for creating pins (prevents rapid clicks from creating multiple markers)
+  const handleMapClickForPinCreation = useCallback((e: any) => {
+    const mapboxMap = mapInstanceRef.current as any;
+    if (!mapboxMap) return;
+
+    // Check if click hit a pin layer - if so, don't create new pin
+    // Pin click handlers will handle opening the popup
+    const pinLayers = ['profile-pins-point', 'profile-pins-point-label'];
+    const features = mapboxMap.queryRenderedFeatures(e.point, {
+      layers: pinLayers,
+    });
+
+    // If clicked on a pin, don't create new pin (pin click handler will handle it)
+    if (features.length > 0) {
+      return;
+    }
+
+    const lng = e.lngLat.lng;
+    const lat = e.lngLat.lat;
+    
+    // Add temporary pin marker at the clicked location
+    addTemporaryPin({ lat, lng });
+    
+    // Set coordinates and open modal
+    setModalState({ type: 'create-pin', coordinates: { lat, lng } });
+  }, [addTemporaryPin]);
+
+  // Debounce map clicks to prevent accidental multiple pin creation (300ms delay)
+  const debouncedHandleMapClick = useDebounce(handleMapClickForPinCreation, 300);
+
+  // Set up click handler for creating pins (only for owners, not in visitor view)
   useEffect(() => {
-    if (!mapInstanceRef.current || !mapLoaded || !ownership.canCreatePin) return;
+    if (!mapInstanceRef.current || !mapLoaded || !showOwnerControls || !ownership.canCreatePin) return;
 
-    const handleClick = (e: any) => {
-      const lng = e.lngLat.lng;
-      const lat = e.lngLat.lat;
-      
-      // Add temporary pin marker at the clicked location
-      addTemporaryPin({ lat, lng });
-      
-      // Set coordinates and open modal
-      setModalState({ type: 'create-pin', coordinates: { lat, lng } });
-    };
-
-    mapInstanceRef.current.on('click', handleClick);
+    mapInstanceRef.current.on('click', debouncedHandleMapClick);
 
     return () => {
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.off('click', handleClick);
+        mapInstanceRef.current.off('click', debouncedHandleMapClick);
       }
     };
-  }, [mapLoaded, ownership.canCreatePin, addTemporaryPin]);
+  }, [mapLoaded, showOwnerControls, ownership.canCreatePin, debouncedHandleMapClick]);
 
   const handle3DToggle = useCallback((enabled: boolean) => {
     if (!mapInstanceRef.current || !mapLoaded) return;
@@ -393,13 +349,29 @@ export default function ProfileMapClient({
     }
   }, [mapLoaded]);
 
-  const handlePinCreated = (newPin?: ProfilePin) => {
+  const handlePinCreated = (newPin?: ProfilePin | { id: string; lat: number; lng: number; description: string | null; media_url: string | null; visibility: string; view_count: number | null; created_at: string; updated_at: string }) => {
     // Remove temporary pin marker
     removeTemporaryPin();
     
     // If we received the new pin data, add it optimistically
     if (newPin) {
-      setLocalPins(prev => [newPin, ...prev]);
+      // Convert to ProfilePin format if needed
+      const profilePin: ProfilePin = {
+        id: newPin.id,
+        lat: newPin.lat,
+        lng: newPin.lng,
+        description: newPin.description,
+        media_url: newPin.media_url,
+        visibility: newPin.visibility as 'public' | 'only_me',
+        view_count: newPin.view_count,
+        created_at: newPin.created_at,
+        updated_at: newPin.updated_at,
+      };
+      
+      setLocalPins(prev => [profilePin, ...prev]);
+      
+      // Update URL with new pin ID to show it immediately
+      setPinId(newPin.id);
     }
     
     setPinsRefreshKey(prev => prev + 1);
@@ -411,30 +383,26 @@ export default function ProfileMapClient({
     // Remove temporary pin marker
     removeTemporaryPin();
     setModalState({ type: 'none' });
+    
+    // Clear any pinId from URL if modal was opened from a pin click
+    // (but not if we're in the middle of creating a pin)
+    if (urlPinId && !createPinCoordinates) {
+      clearPinId();
+    }
   };
 
-  // Stable callbacks for ProfilePinsLayer to prevent unnecessary re-renders
+  // Stable callback for ProfilePinsLayer to prevent unnecessary re-renders
   const handlePinDeleted = useCallback((pinId: string) => {
     setLocalPins(prev => prev.filter(p => p.id !== pinId));
-    setActivePopupPinId(null);
-  }, []);
-
-  const handlePopupOpen = useCallback((pinId: string) => {
-    setActivePopupPinId(pinId);
-  }, []);
-
-  const handlePopupClose = useCallback(() => {
-    setActivePopupPinId(null);
   }, []);
 
   return (
     <div className="fixed inset-0 w-screen h-screen overflow-hidden">
-      {/* Map Container - Full Viewport */}
+      {/* Map Container - Full Viewport, adjusted for sidebar on xl screens */}
       <div 
         ref={mapContainer} 
-        className="fixed inset-0 w-full h-full"
+        className="fixed inset-0 w-full h-full xl:w-[calc(100vw-225px)]"
         style={{ 
-          width: '100vw', 
           height: '100vh', 
           margin: 0, 
           padding: 0, 
@@ -443,8 +411,8 @@ export default function ProfileMapClient({
         }}
       />
 
-      {/* Owner Hint Overlay - Only show for owners */}
-      {ownership.canCreatePin && mapLoaded && (
+      {/* Owner Hint Overlay - Only show for owners (not in visitor view) */}
+      {showOwnerControls && ownership.canCreatePin && mapLoaded && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="px-3 py-1.5 bg-black/50 backdrop-blur-sm rounded-full">
             <p className="text-white text-[11px] font-medium">
@@ -461,10 +429,8 @@ export default function ProfileMapClient({
           map={mapInstanceRef.current}
           mapLoaded={mapLoaded}
           pins={displayPins}
-          isOwnProfile={ownership.canEdit}
+          isOwnProfile={showOwnerControls}
           onPinDeleted={handlePinDeleted}
-          onPopupOpen={handlePopupOpen}
-          onPopupClose={handlePopupClose}
         />
       )}
 
@@ -481,15 +447,38 @@ export default function ProfileMapClient({
         pins={displayPins}
         account={account}
         isOwnProfile={ownership.isOwner}
-        viewMode={ownership.isOwner ? ownership.viewMode : undefined}
-        onViewModeToggle={ownership.isOwner ? ownership.toggleViewMode : undefined}
+        isGuest={false}
+        viewMode={ownership.isOwner ? localViewMode : undefined}
+        onViewModeToggle={ownership.isOwner ? () => {
+          const newMode = localViewMode === 'owner' ? 'visitor' : 'owner';
+          
+          // Clean up modal and temporary marker if switching to visitor
+          if (newMode === 'visitor') {
+            removeTemporaryPin();
+            setModalState({ type: 'none' });
+          }
+          
+          // Update URL state (clears pinId when switching to visitor)
+          if (newMode === 'visitor') {
+            setPinIdAndView(null, 'visitor'); // Clear pinId, set view=visitor
+          } else {
+            setView('owner'); // Just set view (pinId can stay if set)
+          }
+        } : undefined}
+        showPrivatePins={showOwnerControls ? showPrivatePins : undefined}
+        onTogglePrivatePins={showOwnerControls ? () => {
+          setShowPrivatePins(prev => !prev);
+          // Clear pinId when toggling private pins (pin visibility changes)
+          if (urlPinId) {
+            clearPinId();
+          }
+        } : undefined}
         onLocationSelect={(coordinates) => {
           if (mapInstanceRef.current && mapLoaded) {
             mapInstanceRef.current.flyTo({
               center: [coordinates.lng, coordinates.lat],
               zoom: 14,
               duration: 1500,
-              essential: true,
             });
           }
         }}
@@ -498,8 +487,8 @@ export default function ProfileMapClient({
         }}
       />
 
-      {/* Visitor Mode Banner */}
-      {ownership.isOwner && ownership.viewMode === 'visitor' && (
+      {/* Visitor Mode Banner - Show when in visitor view */}
+      {ownership.isOwner && localViewMode === 'visitor' && (
         <div className="fixed top-[6rem] left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-xs font-medium rounded-full shadow-lg">
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
@@ -507,176 +496,14 @@ export default function ProfileMapClient({
           </svg>
           Viewing as Visitor
           <button 
-            onClick={() => ownership.setViewMode('owner')}
+            onClick={() => {
+              setView('owner');
+            }}
             className="ml-1 p-0.5 hover:bg-orange-600 rounded transition-colors"
             title="Exit visitor view"
           >
             <XMarkIcon className="w-4 h-4" />
           </button>
-        </div>
-      )}
-
-      {/* Debug Info Button - Bottom Left (Development Only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <button
-          onClick={() => setModalState({ type: 'debug' })}
-          className="fixed bottom-4 left-4 z-30 flex items-center gap-1.5 px-2 py-1.5 bg-gray-900/80 text-white text-[10px] font-medium rounded hover:bg-gray-900 transition-colors"
-          title="View profile debug info"
-        >
-          <InformationCircleIcon className="w-3.5 h-3.5" />
-          Debug
-        </button>
-      )}
-
-      {/* Debug Modal */}
-      {isDebugModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-900">Profile Debug Info</h3>
-              <button
-                onClick={() => setModalState({ type: 'none' })}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-              >
-                <XMarkIcon className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              {/* Profile Being Viewed */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Profile Being Viewed
-                </h4>
-                <div className="bg-gray-50 rounded p-3 space-y-1 text-xs">
-                  <div><span className="text-gray-500">Account ID:</span> <span className="font-mono text-gray-900">{account.id}</span></div>
-                  <div><span className="text-gray-500">Username:</span> <span className="font-mono text-gray-900">@{account.username || 'none'}</span></div>
-                  <div><span className="text-gray-500">User ID:</span> <span className="font-mono text-gray-900">{account.user_id || 'null (guest)'}</span></div>
-                  <div><span className="text-gray-500">Guest ID:</span> <span className="font-mono text-gray-900">{account.guest_id || 'null'}</span></div>
-                  <div><span className="text-gray-500">Name:</span> <span className="text-gray-900">{account.first_name} {account.last_name}</span></div>
-                </div>
-              </div>
-
-              {/* Current Viewer */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Current Viewer (You)
-                </h4>
-                <div className="bg-gray-50 rounded p-3 space-y-1 text-xs">
-                  {ownership.viewer ? (
-                    <>
-                      <div><span className="text-gray-500">Type:</span> <span className={`font-medium ${ownership.viewer.type === 'authenticated' ? 'text-green-600' : ownership.viewer.type === 'guest' ? 'text-blue-600' : 'text-gray-600'}`}>{ownership.viewer.type}</span></div>
-                      {ownership.viewer.userId && <div><span className="text-gray-500">User ID:</span> <span className="font-mono text-gray-900">{ownership.viewer.userId}</span></div>}
-                      {ownership.viewer.email && <div><span className="text-gray-500">Email:</span> <span className="text-gray-900">{ownership.viewer.email}</span></div>}
-                      {ownership.viewer.guestId && <div><span className="text-gray-500">Guest ID:</span> <span className="font-mono text-gray-900">{ownership.viewer.guestId}</span></div>}
-                    </>
-                  ) : (
-                    <div className="text-gray-500">Loading...</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Ownership Status */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Ownership Status
-                </h4>
-                <div className={`rounded p-3 text-xs ${ownership.canEdit ? 'bg-green-50 border border-green-200' : ownership.viewMode === 'visitor' ? 'bg-orange-50 border border-orange-200' : 'bg-red-50 border border-red-200'}`}>
-                  <div className={`font-semibold ${ownership.canEdit ? 'text-green-700' : ownership.isOwner ? 'text-orange-700' : 'text-red-700'}`}>
-                    {ownership.isOwner && ownership.viewMode === 'visitor'
-                      ? '👁 Viewing as Visitor (your profile)' 
-                      : ownership.canEdit 
-                        ? '✓ This is YOUR profile' 
-                        : '✗ This is NOT your profile'}
-                  </div>
-                  <div className="mt-1 text-gray-600 space-y-0.5">
-                    <div>Owner: {ownership.isOwner ? '✓ yes' : '✗ no'}</div>
-                    <div>View mode: {ownership.viewMode}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* View as Visitor Toggle (only show if owner) */}
-              {ownership.isOwner && (
-                <div>
-                  <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    View Mode
-                  </h4>
-                  <div className="bg-gray-50 rounded p-3">
-                    <button
-                      onClick={() => ownership.toggleViewMode()}
-                      className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded transition-colors ${
-                        ownership.viewMode === 'visitor' 
-                          ? 'bg-orange-500 text-white hover:bg-orange-600' 
-                          : 'bg-gray-900 text-white hover:bg-gray-800'
-                      }`}
-                    >
-                      {ownership.viewMode === 'visitor' ? (
-                        <>
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <line x1="1" y1="1" x2="23" y2="23"></line>
-                          </svg>
-                          Exit Visitor View
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                          </svg>
-                          View as Visitor
-                        </>
-                      )}
-                    </button>
-                    <p className="mt-2 text-[10px] text-gray-500 text-center">
-                      {ownership.viewMode === 'visitor'
-                        ? 'Currently viewing as a visitor would see your profile.' 
-                        : 'See how visitors view your profile.'}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Permissions */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Your Permissions
-                </h4>
-                <div className="bg-gray-50 rounded p-3 text-xs space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className={ownership.canCreatePin ? 'text-green-600' : 'text-red-600'}>{ownership.canCreatePin ? '✓' : '✗'}</span>
-                    <span className="text-gray-700">Can create pins (click map)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={ownership.canSeePrivatePins ? 'text-green-600' : 'text-red-600'}>{ownership.canSeePrivatePins ? '✓' : '✗'}</span>
-                    <span className="text-gray-700">Can see private pins</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={ownership.canEdit ? 'text-green-600' : 'text-red-600'}>{ownership.canEdit ? '✓' : '✗'}</span>
-                    <span className="text-gray-700">Can edit profile</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Pin Stats */}
-              <div>
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Pins Data
-                </h4>
-                <div className="bg-gray-50 rounded p-3 text-xs space-y-1">
-                  <div><span className="text-gray-500">Total pins loaded:</span> <span className="font-semibold text-gray-900">{localPins.length}</span></div>
-                  <div><span className="text-gray-500">Public:</span> <span className="text-gray-900">{localPins.filter(p => p.visibility === 'public').length}</span></div>
-                  <div><span className="text-gray-500">Private:</span> <span className="text-gray-900">{localPins.filter(p => p.visibility === 'only_me').length}</span></div>
-                  {ownership.viewMode === 'visitor' && (
-                    <div className="pt-1 border-t border-gray-200 mt-1">
-                      <span className="text-orange-600">Displayed (visitor mode):</span> <span className="font-semibold text-orange-700">{displayPins.length}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -690,8 +517,26 @@ export default function ProfileMapClient({
         onRoadsToggle={handleRoadsToggle}
       />
 
-      {/* Create Pin Modal (only for owners) */}
-      {ownership.canCreatePin && (
+      {/* Pins Sidebar - Right side, only visible on xl screens (1200px+) */}
+      <ProfilePinsSidebar
+        pins={displayPins}
+        isOwnProfile={ownership.isOwner}
+        onPinClick={(pin) => {
+          // Fly to pin location when clicked
+          if (mapInstanceRef.current && mapLoaded) {
+            mapInstanceRef.current.flyTo({
+              center: [pin.lng, pin.lat],
+              zoom: 14,
+              duration: 1500,
+            });
+            // Set pinId in URL to show popup
+            setPinId(pin.id);
+          }
+        }}
+      />
+
+      {/* Create Pin Modal (only for owners, not in visitor view) */}
+      {showOwnerControls && ownership.canCreatePin && (
         <CreatePinModal
           isOpen={isCreatePinModalOpen}
           onClose={handleCloseCreatePinModal}

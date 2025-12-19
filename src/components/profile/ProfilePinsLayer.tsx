@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { supabase } from '@/lib/supabase';
 import type { ProfilePin } from '@/types/profile';
 import { formatPinDate } from '@/types/profile';
+import { useProfileUrlState } from './hooks/useProfileUrlState';
 
 interface ProfilePinsLayerProps {
   map: MapboxMapInstance;
@@ -13,8 +13,6 @@ interface ProfilePinsLayerProps {
   pins: ProfilePin[];
   isOwnProfile: boolean;
   onPinDeleted?: (pinId: string) => void;
-  onPopupOpen?: (pinId: string) => void;
-  onPopupClose?: () => void;
 }
 
 const SOURCE_ID = 'profile-pins';
@@ -31,24 +29,19 @@ export default function ProfilePinsLayer({
   pins, 
   isOwnProfile, 
   onPinDeleted,
-  onPopupOpen,
-  onPopupClose,
 }: ProfilePinsLayerProps) {
-  const searchParams = useSearchParams();
+  // Centralized URL state management
+  const { pinId: urlPinId, setPinId, clearPinId } = useProfileUrlState();
   
   // Refs for current values (prevents stale closures)
   const pinsRef = useRef<ProfilePin[]>(pins);
   const isOwnProfileRef = useRef(isOwnProfile);
   const onPinDeletedRef = useRef(onPinDeleted);
-  const onPopupOpenRef = useRef(onPopupOpen);
-  const onPopupCloseRef = useRef(onPopupClose);
   
   // Update refs on each render
   pinsRef.current = pins;
   isOwnProfileRef.current = isOwnProfile;
   onPinDeletedRef.current = onPinDeleted;
-  onPopupOpenRef.current = onPopupOpen;
-  onPopupCloseRef.current = onPopupClose;
 
   // State refs
   const popupRef = useRef<any>(null);
@@ -58,8 +51,6 @@ export default function ProfilePinsLayer({
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHandlingStyleChangeRef = useRef<boolean>(false);
   const currentOpenPinIdRef = useRef<string | null>(null);
-  const urlProcessedRef = useRef<string | null>(null);
-  const isUpdatingUrlRef = useRef<boolean>(false);
 
   // Helper function to create popup HTML
   const createPopupHTML = useCallback((pin: ProfilePin, viewCount: number | null = null): string => {
@@ -123,80 +114,14 @@ export default function ProfilePinsLayer({
     `;
   }, []);
 
-  // Helper function to clear URL params
+  // URL state helpers (using centralized hook)
   const clearUrlParams = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('sel') || url.searchParams.has('pinId')) {
-      isUpdatingUrlRef.current = true;
-      url.searchParams.delete('sel');
-      url.searchParams.delete('pinId');
-      window.history.replaceState({}, '', url.pathname + (url.search || ''));
-      urlProcessedRef.current = null;
-      // Reset flag after a brief delay
-      setTimeout(() => {
-        isUpdatingUrlRef.current = false;
-      }, 100);
-    }
-  }, []);
+    clearPinId();
+  }, [clearPinId]);
 
-  // Helper function to update URL params
   const updateUrlParams = useCallback((pinId: string) => {
-    if (typeof window === 'undefined') return;
-    isUpdatingUrlRef.current = true;
-    const url = new URL(window.location.href);
-    url.searchParams.set('sel', 'pin');
-    url.searchParams.set('pinId', pinId);
-    window.history.replaceState({}, '', url.pathname + url.search);
-    urlProcessedRef.current = `pin-${pinId}`;
-    // Reset flag after a longer delay to ensure URL effect doesn't interfere
-    setTimeout(() => {
-      isUpdatingUrlRef.current = false;
-    }, 500);
-  }, []);
-
-  // Handle URL parameters - this is the source of truth for popup state
-  useEffect(() => {
-    if (!mapLoaded || !map) return;
-    
-    // Skip if we just updated the URL ourselves (brief delay to prevent loops)
-    if (isUpdatingUrlRef.current) {
-      return;
-    }
-
-    const sel = searchParams.get('sel');
-    const pinId = searchParams.get('pinId');
-    
-    // Create unique key for this URL state
-    const urlKey = `${sel}-${pinId}`;
-    
-    // Process pin selection from URL
-    if (sel === 'pin' && pinId) {
-      // Don't reopen if already open for this pin
-      if (currentOpenPinIdRef.current === pinId && popupRef.current) {
-        urlProcessedRef.current = urlKey;
-        return;
-      }
-      
-      // Find pin and open popup
-      const pin = pinsRef.current.find(p => p.id === pinId);
-      if (pin) {
-        // Mark as processed
-        urlProcessedRef.current = urlKey;
-        // Open popup for this pin
-        openPopupForPin(pin);
-      }
-    } else if (urlProcessedRef.current && (!sel || sel !== 'pin' || !pinId)) {
-      // URL cleared - close popup if open
-      if (popupRef.current) {
-        popupRef.current.remove();
-        popupRef.current = null;
-        currentOpenPinIdRef.current = null;
-        onPopupCloseRef.current?.();
-      }
-      urlProcessedRef.current = null;
-    }
-  }, [mapLoaded, map, searchParams, openPopupForPin]);
+    setPinId(pinId);
+  }, [setPinId]);
 
   // Helper function to setup popup handlers
   const setupPopupHandlers = useCallback((pinId: string) => {
@@ -214,7 +139,6 @@ export default function ProfilePinsLayer({
 
     deleteBtn?.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('Delete this pin? This cannot be undone.')) return;
       
       try {
         const { error } = await supabase
@@ -247,7 +171,6 @@ export default function ProfilePinsLayer({
         popupRef.current = null;
       }
       currentOpenPinIdRef.current = null;
-      onPopupCloseRef.current?.();
       
       // Clear URL
       clearUrlParams();
@@ -263,18 +186,31 @@ export default function ProfilePinsLayer({
   }, [clearUrlParams]);
 
   // Helper function to open popup for a pin
-  const openPopupForPin = useCallback(async (pin: ProfilePin) => {
+  const openPopupForPin = useCallback(async (pin: ProfilePin, updateUrl: boolean = true) => {
     const mapboxMap = map as any;
     if (!mapboxMap) return;
 
-    // Close existing popup
+    // Don't reopen if already open for this pin
+    if (currentOpenPinIdRef.current === pin.id && popupRef.current) {
+      return;
+    }
+
+    // Close existing popup BEFORE setting new pin ID
+    // This ensures the close handler knows we're switching (currentOpenPinIdRef won't match)
     if (popupRef.current) {
+      // Remove close handler to prevent URL clearing during switch
+      popupRef.current.off('close');
       popupRef.current.remove();
       popupRef.current = null;
     }
 
-    // Mark as current pin
+    // Mark as current pin AFTER closing old popup
     currentOpenPinIdRef.current = pin.id;
+
+    // Update URL for shareable links (unless called from URL effect)
+    if (updateUrl) {
+      updateUrlParams(pin.id);
+    }
 
     // Dispatch event to notify any location sidebar to close location details
     window.dispatchEvent(new CustomEvent('pin-popup-opening', {
@@ -300,16 +236,16 @@ export default function ProfilePinsLayer({
       setupPopupHandlers(pin.id);
     }, 0);
 
-    onPopupOpenRef.current?.(pin.id);
-
-    // Handle popup close
+    // Handle popup close (only fires when user manually closes, not when switching)
     popupRef.current.on('close', () => {
-      popupRef.current = null;
-      currentOpenPinIdRef.current = null;
-      onPopupCloseRef.current?.();
-      
-      // Clear URL when popup closes
-      clearUrlParams();
+      // Only clear URL if this is still the current popup (not replaced by another)
+      if (currentOpenPinIdRef.current === pin.id) {
+        currentOpenPinIdRef.current = null;
+        clearUrlParams();
+      }
+      if (popupRef.current) {
+        popupRef.current = null;
+      }
     });
 
     // Track pin view for non-owners (async, don't block popup)
@@ -371,12 +307,54 @@ export default function ProfilePinsLayer({
         }
       })();
     }
-  }, [map, createPopupHTML, clearUrlParams, setupPopupHandlers]);
+  }, [map, createPopupHTML, clearUrlParams, setupPopupHandlers, updateUrlParams]);
 
-  // Create stable click handler - just updates URL, popup opens via URL effect
+  // URL state is managed by useProfileUrlState hook (no manual sync needed)
+
+  // Handle URL parameters - open popup if pinId is in URL (for shareable links)
+  useEffect(() => {
+    if (!mapLoaded || !map || pins.length === 0) return;
+
+    const pinId = urlPinId;
+    
+    if (pinId) {
+      // If clicking the same pin that's already open, do nothing (handled by click handler)
+      if (currentOpenPinIdRef.current === pinId && popupRef.current) {
+        return;
+      }
+      
+      // Find pin first
+      const pin = pinsRef.current.find(p => p.id === pinId);
+      if (!pin) return;
+      
+      // Close existing popup if different pin (seamless switch)
+      // Do this synchronously before opening new popup to prevent flicker
+      if (currentOpenPinIdRef.current && currentOpenPinIdRef.current !== pinId && popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+        currentOpenPinIdRef.current = null;
+      }
+      
+      // Open new popup (don't update URL since it's already in URL)
+      // openPopupForPin already handles closing existing popups, so we can call it directly
+      openPopupForPin(pin, false); // false = don't update URL (already in URL)
+    } else {
+      // URL cleared - close popup if open
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+        currentOpenPinIdRef.current = null;
+      }
+    }
+  }, [mapLoaded, map, urlPinId, openPopupForPin, pins.length]);
+
+  // Direct click handler - toggles popup or switches pins
   const handlePinClick = useCallback((e: any) => {
     const mapboxMap = map as any;
     if (!mapboxMap) return;
+
+    // Stop event propagation to prevent map click handler from firing
+    e.originalEvent?.stopPropagation?.();
 
     const features = mapboxMap.queryRenderedFeatures(e.point, {
       layers: [LAYER_IDS.points, LAYER_IDS.labels],
@@ -394,9 +372,15 @@ export default function ProfilePinsLayer({
       return;
     }
 
-    // Just update URL - the URL effect will handle opening the popup
+    // If clicking the same pin that's already open, close it (toggle)
+    if (currentOpenPinIdRef.current === pinId && popupRef.current) {
+      clearUrlParams();
+      return;
+    }
+
+    // Otherwise, update URL to open this pin (or switch from another pin)
     updateUrlParams(pin.id);
-  }, [updateUrlParams]);
+  }, [updateUrlParams, clearUrlParams]);
 
   // Main effect for pins layer
   useEffect(() => {
@@ -444,11 +428,27 @@ export default function ProfilePinsLayer({
       const existingSource = mapboxMap.getSource(SOURCE_ID);
       if (existingSource) {
         (existingSource as any).setData(geoJSON);
+        // Ensure click handlers are attached even if source already exists
+        // (they might have been removed during cleanup or layer recreation)
+        if (!clickHandlerRef.current) {
+          clickHandlerRef.current = handlePinClick;
+          mapboxMap.on('click', LAYER_IDS.points, handlePinClick);
+          mapboxMap.on('click', LAYER_IDS.labels, handlePinClick);
+        }
         return;
       }
 
       // Only do full initialization once per component instance
-      if (initializedRef.current) return;
+      if (initializedRef.current) {
+        // Source exists but we're here, meaning layers might not exist
+        // Ensure click handlers are attached
+        if (!clickHandlerRef.current) {
+          clickHandlerRef.current = handlePinClick;
+          mapboxMap.on('click', LAYER_IDS.points, handlePinClick);
+          mapboxMap.on('click', LAYER_IDS.labels, handlePinClick);
+        }
+        return;
+      }
       initializedRef.current = true;
 
       // Add source
@@ -539,14 +539,19 @@ export default function ProfilePinsLayer({
         });
       }
 
-      // Add click handlers (only once)
-      if (!clickHandlerRef.current) {
-        clickHandlerRef.current = handlePinClick;
-        mapboxMap.on('click', LAYER_IDS.points, handlePinClick);
-        mapboxMap.on('click', LAYER_IDS.labels, handlePinClick);
+      // Add click handlers - always ensure they're attached
+      // Remove old handlers first to prevent duplicates
+      if (clickHandlerRef.current) {
+        mapboxMap.off('click', LAYER_IDS.points, clickHandlerRef.current);
+        mapboxMap.off('click', LAYER_IDS.labels, clickHandlerRef.current);
       }
+      clickHandlerRef.current = handlePinClick;
+      mapboxMap.on('click', LAYER_IDS.points, handlePinClick);
+      mapboxMap.on('click', LAYER_IDS.labels, handlePinClick);
 
-      // Cursor handlers
+      // Cursor handlers (re-attach on each run to ensure they work)
+      mapboxMap.off('mouseenter', LAYER_IDS.points);
+      mapboxMap.off('mouseleave', LAYER_IDS.points);
       mapboxMap.on('mouseenter', LAYER_IDS.points, () => {
         mapboxMap.getCanvas().style.cursor = 'pointer';
       });
@@ -560,7 +565,6 @@ export default function ProfilePinsLayer({
           popupRef.current.remove();
           popupRef.current = null;
           currentOpenPinIdRef.current = null;
-          onPopupCloseRef.current?.();
           clearUrlParams();
         }
       };
@@ -616,23 +620,21 @@ export default function ProfilePinsLayer({
         if (clickHandlerRef.current) {
           mapboxMap.off('click', LAYER_IDS.points, clickHandlerRef.current);
           mapboxMap.off('click', LAYER_IDS.labels, clickHandlerRef.current);
+          clickHandlerRef.current = null; // Clear ref so handlers can be re-attached
         }
         
         popupRef.current?.remove();
         popupRef.current = null;
         currentOpenPinIdRef.current = null;
         
-        Object.values(LAYER_IDS).forEach(id => {
-          if (mapboxMap.getLayer(id)) mapboxMap.removeLayer(id);
-        });
-        if (mapboxMap.getSource(SOURCE_ID)) {
-          mapboxMap.removeSource(SOURCE_ID);
-        }
+        // Don't remove layers/source on pins change - only on unmount
+        // This allows pins to update without losing click handlers
       } catch (e) {
         // Ignore cleanup errors
       }
       
-      initializedRef.current = false;
+      // Only reset initialized flag if we're actually removing everything
+      // (which happens on unmount, not on pins change)
     };
   }, [map, mapLoaded, pins, handlePinClick, clearUrlParams]);
 

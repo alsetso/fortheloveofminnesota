@@ -1,4 +1,4 @@
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { MAP_CONFIG } from '@/features/map/config';
 
 interface MapData {
   type: 'pin' | 'area' | 'both';

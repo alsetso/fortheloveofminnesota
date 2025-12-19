@@ -115,6 +115,11 @@ export default function ProfileCard({ account }: ProfileCardProps) {
             <h3 className="text-lg font-bold text-gray-900">
               {displayName}
             </h3>
+            {account?.plan === 'plus' && (
+              <span className="px-1.5 py-0.5 bg-[#D4AF37] text-white text-[10px] font-semibold rounded uppercase tracking-wide" title="Pro+ Member">
+                Pro+
+              </span>
+            )}
             {account?.plan === 'pro' && (
               <span className="px-1.5 py-0.5 bg-[#D4AF37] text-white text-[10px] font-semibold rounded uppercase tracking-wide" title="Pro Member">
                 Pro

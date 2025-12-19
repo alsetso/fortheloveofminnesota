@@ -125,7 +125,7 @@ export function ToastContainer() {
   const displayToasts = toasts.slice(-3);
 
   return (
-    <div className="fixed bottom-4 left-4 z-50 space-y-2 max-w-xs">
+    <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 space-y-2 max-w-xs">
       {displayToasts.map((toast) => (
         <Toast key={toast.id} toast={toast} />
       ))}

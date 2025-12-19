@@ -18,7 +18,7 @@ export type AccountTrait =
   | 'renter'
   | 'businessowner';
 
-export type Plan = 'hobby' | 'pro';
+export type Plan = 'hobby' | 'pro' | 'plus';
 export type BillingMode = 'standard' | 'trial';
 
 export interface Account {

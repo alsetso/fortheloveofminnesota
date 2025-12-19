@@ -20,7 +20,7 @@ export interface BillingData {
   hasCustomer: boolean;
   customerId: string | null;
   paymentMethods: PaymentMethod[];
-  plan: 'hobby' | 'pro';
+  plan: 'hobby' | 'pro' | 'plus';
   billing_mode: 'standard' | 'trial';
   subscription_status: string | null;
   stripe_subscription_id: string | null;
@@ -99,7 +99,7 @@ export const getServerBillingData = cache(async (): Promise<BillingData> => {
     };
   }
 
-  const plan = (account.plan as 'hobby' | 'pro') || 'hobby';
+  const plan = (account.plan as 'hobby' | 'pro' | 'plus') || 'hobby';
   const billingMode = (account.billing_mode as 'standard' | 'trial') || 'standard';
   const subscriptionStatus = account.subscription_status || null;
   const stripeSubscriptionId = account.stripe_subscription_id || null;

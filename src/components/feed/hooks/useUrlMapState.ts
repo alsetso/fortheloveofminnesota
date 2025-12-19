@@ -24,6 +24,7 @@ interface UrlMapState {
   lng: number | null;
   zoom: number | null;
   pinId: string | null;
+  year: number | null; // Filter pins by year
 }
 
 /**
@@ -61,12 +62,14 @@ export function useUrlMapState({
     const lngParam = searchParams.get('lng');
     const zoomParam = searchParams.get('zoom');
     const pinIdParam = searchParams.get('pin');
+    const yearParam = searchParams.get('year');
 
     return {
       lat: latParam ? parseFloat(latParam) : null,
       lng: lngParam ? parseFloat(lngParam) : null,
       zoom: zoomParam ? parseFloat(zoomParam) : null,
       pinId: pinIdParam,
+      year: yearParam ? parseInt(yearParam, 10) : null,
     };
   }, [searchParams]);
 
@@ -107,6 +110,14 @@ export function useUrlMapState({
         url.searchParams.delete('pin');
       }
     }
+    
+    if (params.year !== undefined) {
+      if (params.year !== null && !isNaN(params.year)) {
+        url.searchParams.set('year', params.year.toString());
+      } else {
+        url.searchParams.delete('year');
+      }
+    }
 
     const newUrl = url.pathname + url.search;
     if (replace) {
@@ -118,7 +129,7 @@ export function useUrlMapState({
 
   // Clear all map-related URL params
   const clearUrlParams = useCallback(() => {
-    updateUrl({ lat: null, lng: null, zoom: null, pinId: null });
+    updateUrl({ lat: null, lng: null, zoom: null, pinId: null, year: null });
   }, [updateUrl]);
 
   // Update URL for a specific location

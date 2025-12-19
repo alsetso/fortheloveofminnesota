@@ -89,7 +89,7 @@ export interface FeedPostData {
     last_name?: string | null;
     image_url?: string | null;
     username?: string | null;
-    plan?: 'hobby' | 'pro';
+    plan?: 'hobby' | 'pro' | 'plus';
   } | null;
 }
 
@@ -103,7 +103,7 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
   const router = useRouter();
 
   // Memoize derived data for performance
-  const account = useMemo(() => (post as { accounts?: { id: string; first_name: string | null; last_name: string | null; image_url: string | null; username: string | null; plan?: 'hobby' | 'pro' } | null }).accounts, [(post as { accounts?: { id: string; first_name: string | null; last_name: string | null; image_url: string | null; username: string | null; plan?: 'hobby' | 'pro' } | null }).accounts]);
+  const account = useMemo(() => (post as { accounts?: { id: string; first_name: string | null; last_name: string | null; image_url: string | null; username: string | null; plan?: 'hobby' | 'pro' | 'plus' } | null }).accounts, [(post as { accounts?: { id: string; first_name: string | null; last_name: string | null; image_url: string | null; username: string | null; plan?: 'hobby' | 'pro' | 'plus' } | null }).accounts]);
   // Display name from account (first_name + last_name) or fallback to 'User'
   const displayName = useMemo(() => {
     if (account?.first_name || account?.last_name) {
@@ -200,6 +200,11 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
                     <h3 className="font-medium text-gray-900 inline text-xs">
                       {displayName}
                     </h3>
+                    {account?.plan === 'plus' && (
+                      <span className="px-1.5 py-0.5 bg-[#D4AF37] text-white text-[10px] font-semibold rounded uppercase tracking-wide" title="Pro+ Member">
+                        Pro+
+                      </span>
+                    )}
                     {account?.plan === 'pro' && (
                       <span className="px-1.5 py-0.5 bg-[#D4AF37] text-white text-[10px] font-semibold rounded uppercase tracking-wide" title="Pro Member">
                         Pro

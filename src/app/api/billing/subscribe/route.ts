@@ -10,7 +10,7 @@ async function updateAccountPlan(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
   updates: {
-    plan?: 'hobby' | 'pro';
+    plan?: 'hobby' | 'pro' | 'plus';
     billing_mode?: 'standard' | 'trial';
   }
 ) {

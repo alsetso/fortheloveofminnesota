@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { MAP_CONFIG } from '@/features/map/config';
 
 // Types for atlas entities
 export type AtlasEntityType = 'neighborhood' | 'school' | 'park' | 'lake' | 'watertower' | 'cemetery' | 'golf_course' | 'hospital' | 'airport' | 'church' | 'municipal' | 'road' | 'radio_and_news';

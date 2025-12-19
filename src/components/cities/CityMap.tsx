@@ -1,8 +1,8 @@
 'use client';
 
 import { useRef, useEffect, useState } from 'react';
-import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/map/config';
 
 interface CityMapProps {
   coordinates?: { lat: number; lng: number } | null;

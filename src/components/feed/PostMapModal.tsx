@@ -1,10 +1,10 @@
 'use client';
 
 import { useRef, useEffect, useState, useCallback, useReducer } from 'react';
-import { loadMapboxGL, loadMapboxDraw } from '@/features/_archive/map/utils/mapboxLoader';
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { loadMapboxGL, loadMapboxDraw } from '@/features/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/map/config';
 import { XMarkIcon, MapPinIcon, PencilIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { AddressParser } from '@/features/_archive/map/services/addressParser';
+import { AddressParser } from '@/features/map/services/addressParser';
 
 // Inline helper function (was in mapHelpers.ts)
 function calculateCenter(coordinates: number[][][]): { lng: number; lat: number } {

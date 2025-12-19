@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { XMarkIcon, MagnifyingGlassIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { City, UpdateCityData } from '@/features/admin/services/cityAdminService';
-import { MAP_CONFIG } from '@/features/_archive/map/config';
+import { MAP_CONFIG } from '@/features/map/config';
 
 interface MapboxFeature {
   id: string;

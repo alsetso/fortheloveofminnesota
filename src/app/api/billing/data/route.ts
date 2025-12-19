@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const plan = (account.plan as 'hobby' | 'pro') || 'hobby';
+    const plan = (account.plan as 'hobby' | 'pro' | 'plus') || 'hobby';
     const billingMode = (account.billing_mode as 'standard' | 'trial') || 'standard';
     const subscriptionStatus = account.subscription_status || null;
     const stripeSubscriptionId = account.stripe_subscription_id || null;

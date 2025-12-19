@@ -31,6 +31,17 @@
   animation: fade-in 0.5s ease-in-out;
 }
 
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes pulse-grey {
   0%, 100% {
     background-color: #d1d5db; /* gray-300 */

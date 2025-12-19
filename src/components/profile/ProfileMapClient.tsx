@@ -464,7 +464,6 @@ export default function ProfileMapClient({
           onPinDeleted={handlePinDeleted}
           onPopupOpen={handlePopupOpen}
           onPopupClose={handlePopupClose}
-          closePopup={modalState.type !== 'none'}
         />
       )}
 

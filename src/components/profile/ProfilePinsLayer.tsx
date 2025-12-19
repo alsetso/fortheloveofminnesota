@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { supabase } from '@/lib/supabase';
 import type { ProfilePin } from '@/types/profile';
@@ -14,7 +15,6 @@ interface ProfilePinsLayerProps {
   onPinDeleted?: (pinId: string) => void;
   onPopupOpen?: (pinId: string) => void;
   onPopupClose?: () => void;
-  closePopup?: boolean;
 }
 
 const SOURCE_ID = 'profile-pins';
@@ -33,8 +33,10 @@ export default function ProfilePinsLayer({
   onPinDeleted,
   onPopupOpen,
   onPopupClose,
-  closePopup,
 }: ProfilePinsLayerProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  
   // Refs for current values (prevents stale closures)
   const pinsRef = useRef<ProfilePin[]>(pins);
   const isOwnProfileRef = useRef(isOwnProfile);
@@ -56,17 +58,63 @@ export default function ProfilePinsLayer({
   const locationSelectedHandlerRef = useRef<(() => void) | null>(null);
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHandlingStyleChangeRef = useRef<boolean>(false);
+  const currentOpenPinIdRef = useRef<string | null>(null);
+  const urlProcessedRef = useRef<string | null>(null);
 
-  // Close popup when parent signals
+  // Handle URL parameters on mount/change (for shareable links)
+  // Only processes external URL changes, not our own updates
   useEffect(() => {
-    if (closePopup && popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
-      onPopupCloseRef.current?.();
-    }
-  }, [closePopup]);
+    if (!mapLoaded || !map || !clickHandlerRef.current) return;
 
-  // Create a stable click handler that uses refs
+    const sel = searchParams.get('sel');
+    const pinId = searchParams.get('pinId');
+    
+    // Create unique key for this URL state
+    const urlKey = `${sel}-${pinId}`;
+    
+    // Skip if we've already processed this exact URL state
+    if (urlKey === urlProcessedRef.current) {
+      return;
+    }
+    
+    // Process pin selection from URL
+    if (sel === 'pin' && pinId) {
+      // Don't reopen if already open for this pin
+      if (currentOpenPinIdRef.current === pinId && popupRef.current) {
+        urlProcessedRef.current = urlKey;
+        return;
+      }
+      
+      // Mark as processed before opening to prevent loops
+      urlProcessedRef.current = urlKey;
+      
+      // Find pin and open popup
+      const pin = pinsRef.current.find(p => p.id === pinId);
+      if (pin) {
+        // Small delay to ensure map is ready
+        setTimeout(() => {
+          const mapboxMap = map as any;
+          if (!mapboxMap || !clickHandlerRef.current) return;
+          
+          const mockEvent = {
+            point: mapboxMap.project([pin.lng, pin.lat]),
+          };
+          clickHandlerRef.current(mockEvent);
+        }, 100);
+      }
+    } else if (urlProcessedRef.current && (!sel || sel !== 'pin' || !pinId)) {
+      // URL cleared - close popup if open
+      if (popupRef.current) {
+        popupRef.current.remove();
+        popupRef.current = null;
+        currentOpenPinIdRef.current = null;
+        onPopupCloseRef.current?.();
+      }
+      urlProcessedRef.current = null;
+    }
+  }, [mapLoaded, map, searchParams]);
+
+  // Create stable click handler
   const handlePinClick = useCallback(async (e: any) => {
     const mapboxMap = map as any;
     if (!mapboxMap) return;
@@ -87,6 +135,31 @@ export default function ProfilePinsLayer({
       return;
     }
 
+    // Don't reopen if already open
+    if (currentOpenPinIdRef.current === pinId && popupRef.current) {
+      return;
+    }
+
+    // Close existing popup
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+
+    // Mark as current pin before URL update
+    currentOpenPinIdRef.current = pin.id;
+    
+    // Update URL (using history API directly to avoid router loops)
+    // Mark as processed immediately to prevent effect from re-processing
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('sel', 'pin');
+      url.searchParams.set('pinId', pin.id);
+      window.history.replaceState({}, '', url.pathname + url.search);
+      // Mark URL as processed immediately to prevent effect loop
+      urlProcessedRef.current = `pin-${pin.id}`;
+    }
+
     // Fly to pin
     const currentZoom = mapboxMap.getZoom();
     mapboxMap.flyTo({
@@ -104,17 +177,15 @@ export default function ProfilePinsLayer({
       return div.innerHTML;
     };
 
-    // Use shared formatPinDate utility
     const formatDate = formatPinDate;
-
     const isOwner = isOwnProfileRef.current;
 
-    // Build popup HTML
+    // Build popup HTML (same style as homepage)
     const popupContent = `
       <div class="map-pin-popup-content" style="min-width: 180px; max-width: 250px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; position: relative;">
         ${isOwner ? `
         <div style="position: absolute; top: 6px; right: 6px;">
-          <button id="pin-menu-btn-${pin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280;">
+          <button id="pin-menu-btn-${pin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="12" cy="5" r="2"></circle>
               <circle cx="12" cy="12" r="2"></circle>
@@ -122,14 +193,14 @@ export default function ProfilePinsLayer({
             </svg>
           </button>
           <div id="pin-menu-dropdown-${pin.id}" style="display: none; position: absolute; top: 28px; right: 0; min-width: 120px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 100; overflow: hidden;">
-            <button id="pin-delete-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left;">
+            <button id="pin-delete-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
               Delete
             </button>
-            <button id="pin-close-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; border-top: 1px solid #e5e7eb;">
+            <button id="pin-close-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
                 <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -158,12 +229,6 @@ export default function ProfilePinsLayer({
         </div>
       </div>
     `;
-
-    // Remove existing popup
-    if (popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
-    }
 
     // Dispatch event to notify any location sidebar to close location details
     window.dispatchEvent(new CustomEvent('pin-popup-opening', {
@@ -203,18 +268,29 @@ export default function ProfilePinsLayer({
         if (!confirm('Delete this pin? This cannot be undone.')) return;
         
         try {
-          // Soft delete: set archived = true
           const { error } = await supabase
             .from('pins')
             .update({ archived: true })
             .eq('id', pin.id)
-            .eq('archived', false); // Only archive pins that aren't already archived
+            .eq('archived', false);
           
           if (error) throw error;
           
-          popupRef.current?.remove();
-          popupRef.current = null;
+          if (popupRef.current) {
+            popupRef.current.remove();
+            popupRef.current = null;
+          }
+          currentOpenPinIdRef.current = null;
           onPinDeletedRef.current?.(pin.id);
+          
+          // Clear URL
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('sel');
+            url.searchParams.delete('pinId');
+            window.history.replaceState({}, '', url.pathname + (url.search || ''));
+            urlProcessedRef.current = null;
+          }
         } catch (err) {
           console.error('[ProfilePinsLayer] Delete failed:', err);
           alert('Failed to delete pin.');
@@ -223,8 +299,21 @@ export default function ProfilePinsLayer({
 
       closeBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
-        popupRef.current?.remove();
-        popupRef.current = null;
+        if (popupRef.current) {
+          popupRef.current.remove();
+          popupRef.current = null;
+        }
+        currentOpenPinIdRef.current = null;
+        onPopupCloseRef.current?.();
+        
+        // Clear URL
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('sel');
+          url.searchParams.delete('pinId');
+          window.history.replaceState({}, '', url.pathname + (url.search || ''));
+          urlProcessedRef.current = null;
+        }
       });
 
       // Close dropdown on outside click
@@ -238,9 +327,22 @@ export default function ProfilePinsLayer({
 
     onPopupOpenRef.current?.(pin.id);
 
+    // Handle popup close
     popupRef.current.on('close', () => {
       popupRef.current = null;
+      currentOpenPinIdRef.current = null;
       onPopupCloseRef.current?.();
+      
+      // Clear URL when popup closes
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('sel') || url.searchParams.has('pinId')) {
+          url.searchParams.delete('sel');
+          url.searchParams.delete('pinId');
+          window.history.replaceState({}, '', url.pathname + (url.search || ''));
+          urlProcessedRef.current = null;
+        }
+      }
     });
   }, [map]);
 
@@ -253,7 +355,6 @@ export default function ProfilePinsLayer({
 
     const initializePinsLayer = async () => {
       if (!mapboxMap.isStyleLoaded()) {
-        // Wait for style to load
         await new Promise<void>(resolve => {
           const checkStyle = () => {
             if (mapboxMap.isStyleLoaded()) {
@@ -291,14 +392,14 @@ export default function ProfilePinsLayer({
       const existingSource = mapboxMap.getSource(SOURCE_ID);
       if (existingSource) {
         (existingSource as any).setData(geoJSON);
-        return; // Layers and handlers already exist
+        return;
       }
 
       // Only do full initialization once per component instance
       if (initializedRef.current) return;
       initializedRef.current = true;
 
-      // Add source (with existence check for race conditions)
+      // Add source
       if (!mapboxMap.getSource(SOURCE_ID)) {
         mapboxMap.addSource(SOURCE_ID, {
           type: 'geojson',
@@ -306,7 +407,7 @@ export default function ProfilePinsLayer({
         });
       }
 
-      // Load pin icons (public and private)
+      // Load pin icons
       const loadPinIcon = async (imageId: string, src: string) => {
         if (mapboxMap.hasImage(imageId)) return;
         try {
@@ -328,13 +429,11 @@ export default function ProfilePinsLayer({
             ctx.drawImage(img, 0, 0, 32, 32);
             const imageData = ctx.getImageData(0, 0, 32, 32);
             
-            // Double-check before adding (race condition protection)
             if (!mapboxMap.hasImage(imageId)) {
               mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
             }
           }
         } catch (error) {
-          // Ignore "image already exists" errors
           if (!(error instanceof Error && error.message.includes('already exists'))) {
             console.error(`[ProfilePinsLayer] Failed to load pin icon ${imageId}:`, error);
           }
@@ -346,7 +445,7 @@ export default function ProfilePinsLayer({
         loadPinIcon(PIN_PRIVATE_IMAGE_ID, '/map_pin_private.svg'),
       ]);
 
-      // Add points layer with visibility-based icon selection
+      // Add points layer
       if (!mapboxMap.getLayer(LAYER_IDS.points)) {
         mapboxMap.addLayer({
           id: LAYER_IDS.points,
@@ -388,7 +487,7 @@ export default function ProfilePinsLayer({
         });
       }
 
-      // Add click handlers (only once per component instance)
+      // Add click handlers (only once)
       if (!clickHandlerRef.current) {
         clickHandlerRef.current = handlePinClick;
         mapboxMap.on('click', LAYER_IDS.points, handlePinClick);
@@ -408,6 +507,7 @@ export default function ProfilePinsLayer({
         if (popupRef.current) {
           popupRef.current.remove();
           popupRef.current = null;
+          currentOpenPinIdRef.current = null;
           onPopupCloseRef.current?.();
         }
       };
@@ -416,33 +516,24 @@ export default function ProfilePinsLayer({
 
     initializePinsLayer();
 
-    // Handle style changes (re-add layers after style reload)
-    // 'styledata' fires multiple times during style change - debounce to handle only the final one
+    // Handle style changes
     const handleStyleData = () => {
       if (!mounted) return;
       
-      // Clear any pending timeout to debounce multiple styledata events
       if (styleChangeTimeoutRef.current) {
         clearTimeout(styleChangeTimeoutRef.current);
       }
       
-      // Debounce style change handling - wait 100ms after last styledata event
       styleChangeTimeoutRef.current = setTimeout(() => {
         if (!mounted) return;
         if (!mapboxMap.isStyleLoaded()) return;
         
-        // Check if our source was removed by the style change
         const sourceExists = !!mapboxMap.getSource(SOURCE_ID);
-        if (sourceExists) {
-          // Source still exists, no need to re-add
-          return;
-        }
+        if (sourceExists) return;
         
-        // Prevent concurrent re-initialization
         if (isHandlingStyleChangeRef.current) return;
         isHandlingStyleChangeRef.current = true;
         
-        // Style changed - layers are gone, need to reinitialize
         initializedRef.current = false;
         
         initializePinsLayer().finally(() => {
@@ -456,13 +547,11 @@ export default function ProfilePinsLayer({
     return () => {
       mounted = false;
       
-      // Clear style change timeout
       if (styleChangeTimeoutRef.current) {
         clearTimeout(styleChangeTimeoutRef.current);
         styleChangeTimeoutRef.current = null;
       }
       
-      // Remove window event listener
       if (locationSelectedHandlerRef.current) {
         window.removeEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
         locationSelectedHandlerRef.current = null;
@@ -471,17 +560,15 @@ export default function ProfilePinsLayer({
       try {
         mapboxMap.off('styledata', handleStyleData);
         
-        // Remove click handlers
         if (clickHandlerRef.current) {
           mapboxMap.off('click', LAYER_IDS.points, clickHandlerRef.current);
           mapboxMap.off('click', LAYER_IDS.labels, clickHandlerRef.current);
         }
         
-        // Cleanup popup
         popupRef.current?.remove();
         popupRef.current = null;
+        currentOpenPinIdRef.current = null;
         
-        // Cleanup layers and source
         Object.values(LAYER_IDS).forEach(id => {
           if (mapboxMap.getLayer(id)) mapboxMap.removeLayer(id);
         });

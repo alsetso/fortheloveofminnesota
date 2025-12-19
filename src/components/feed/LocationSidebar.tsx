@@ -2973,12 +2973,7 @@ export default function LocationSidebar({
                           {locationData.cityId && !locationData.parentCity && (
                             <button
                               onClick={() => {
-                                openWindow({
-                                  id: `city-${locationData.citySlug}`,
-                                  title: `${locationData.locality} - Explore`,
-                                  url: `/explore/city/${locationData.citySlug}`,
-                                  initialSize: { width: 420, height: 550 },
-                                });
+                                window.open(`/explore/city/${locationData.citySlug}`, '_blank');
                               }}
                               className="text-[10px] text-gray-400 hover:text-gray-900 underline transition-colors"
                             >
@@ -3008,12 +3003,7 @@ export default function LocationSidebar({
                           {locationData.citySlug && (
                             <button
                               onClick={() => {
-                                openWindow({
-                                  id: `city-${locationData.citySlug}`,
-                                  title: `${locationData.city} - Explore`,
-                                  url: `/explore/city/${locationData.citySlug}`,
-                                  initialSize: { width: 420, height: 550 },
-                                });
+                                router.push(`/explore/city/${locationData.citySlug}`);
                               }}
                               className="text-[10px] text-gray-400 hover:text-gray-900 underline transition-colors"
                             >
@@ -3069,12 +3059,7 @@ export default function LocationSidebar({
                           {locationData.parentCitySlug && (
                             <button
                               onClick={() => {
-                                openWindow({
-                                  id: `city-${locationData.parentCitySlug}`,
-                                  title: `${locationData.parentCity} - Explore`,
-                                  url: `/explore/city/${locationData.parentCitySlug}`,
-                                  initialSize: { width: 420, height: 550 },
-                                });
+                                window.open(`/explore/city/${locationData.parentCitySlug}`, '_blank');
                               }}
                               className="text-[10px] text-gray-400 hover:text-gray-900 underline transition-colors"
                             >
@@ -3094,12 +3079,7 @@ export default function LocationSidebar({
                           {locationData.countySlug && (
                             <button
                               onClick={() => {
-                                openWindow({
-                                  id: `county-${locationData.countySlug}`,
-                                  title: `${locationData.county} - Explore`,
-                                  url: `/explore/county/${locationData.countySlug}`,
-                                  initialSize: { width: 420, height: 550 },
-                                });
+                                window.open(`/explore/county/${locationData.countySlug}`, '_blank');
                               }}
                               className="text-[10px] text-gray-400 hover:text-gray-900 underline transition-colors"
                             >
@@ -3147,12 +3127,7 @@ export default function LocationSidebar({
                       <button
                         onClick={() => {
                           const citySlug = pinFeature.name!.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-                          openWindow({
-                            id: `city-${citySlug}`,
-                            title: `${pinFeature.name} - Explore`,
-                            url: `/explore/city/${citySlug}`,
-                            initialSize: { width: 420, height: 550 },
-                          });
+                          window.open(`/explore/city/${citySlug}`, '_blank');
                         }}
                         className="text-[10px] text-gray-400 hover:text-gray-900 underline transition-colors"
                       >

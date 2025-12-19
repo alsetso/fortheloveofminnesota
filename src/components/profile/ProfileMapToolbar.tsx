@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
-import AppSearch from '@/components/app/AppSearch';
 import ProfileSidebar from './ProfileSidebar';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
@@ -90,55 +89,6 @@ export default function ProfileMapToolbar({
     }
   }, [isDropdownOpen]);
 
-  // Inject search styles
-  useEffect(() => {
-    const styleId = 'profile-toolbar-search-styles';
-    if (document.getElementById(styleId)) return;
-
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
-      .profile-toolbar-search form {
-        width: 100%;
-      }
-      .profile-toolbar-search input {
-        height: 1.75rem !important;
-        font-size: 0.75rem !important;
-        padding-left: 1.75rem !important;
-        padding-right: 0.5rem !important;
-        background-color: #f9fafb !important;
-        border: 1px solid #e5e7eb !important;
-        color: #1f2937 !important;
-        border-radius: 0.25rem !important;
-      }
-      .profile-toolbar-search input::placeholder {
-        color: #9ca3af !important;
-      }
-      .profile-toolbar-search input:focus {
-        background-color: white !important;
-        border-color: #c2b289 !important;
-        outline: none !important;
-        box-shadow: none !important;
-      }
-      .profile-toolbar-search .absolute.inset-y-0.left-0 {
-        padding-left: 0.375rem !important;
-      }
-      .profile-toolbar-search .absolute.inset-y-0.left-0 svg {
-        width: 0.875rem !important;
-        height: 0.875rem !important;
-        color: #9ca3af !important;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      const existingStyle = document.getElementById(styleId);
-      if (existingStyle) {
-        existingStyle.remove();
-      }
-    };
-  }, []);
-
   // Calculate dropdown position relative to button
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   
@@ -209,18 +159,6 @@ export default function ProfileMapToolbar({
                 </div>
               </div>
             )}
-
-            {/* Right: Search */}
-            <div className="w-48 sm:w-56 lg:w-64 flex-shrink-0">
-              <div className="profile-toolbar-search">
-                <AppSearch
-                  placeholder="Search location"
-                  onLocationSelect={(coordinates, placeName) => {
-                    onLocationSelect?.(coordinates, placeName);
-                  }}
-                />
-              </div>
-            </div>
           </div>
         </div>
       </div>

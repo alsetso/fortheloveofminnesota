@@ -140,16 +140,16 @@ export default async function CitiesListPage() {
   const { data: cities, error } = await supabase
     .from('cities')
     .select('id, name, slug, population, county, favorite, website_url')
-    .order('population', { ascending: false });
+    .order('population', { ascending: false }) as { data: { id: string; name: string; slug: string; population: number | null; county: string | null; favorite: boolean | null; website_url: string | null }[] | null; error: any };
 
   if (error) {
     // Log error but continue with empty array to prevent page crash
     console.error('[CitiesListPage] Error fetching cities:', error);
   }
 
-  const allCities = cities || [];
-  const totalPopulation = allCities.reduce((sum, c) => sum + c.population, 0);
-  const structuredData = generateStructuredData(allCities);
+  const allCities = (cities || []) as { id: string; name: string; slug: string; population: number | null; county: string | null; favorite: boolean | null; website_url: string | null }[];
+  const totalPopulation = allCities.reduce((sum, c) => sum + (c.population || 0), 0);
+  const structuredData = generateStructuredData(allCities.filter(c => c.population !== null) as { id: string; name: string; slug: string; population: number; county: string | null }[]);
   const breadcrumbData = generateBreadcrumbStructuredData();
 
   return (

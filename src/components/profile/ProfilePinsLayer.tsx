@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { supabase } from '@/lib/supabase';
 import type { ProfilePin } from '@/types/profile';
@@ -34,7 +34,6 @@ export default function ProfilePinsLayer({
   onPopupOpen,
   onPopupClose,
 }: ProfilePinsLayerProps) {
-  const pathname = usePathname();
   const searchParams = useSearchParams();
   
   // Refs for current values (prevents stale closures)
@@ -60,11 +59,110 @@ export default function ProfilePinsLayer({
   const isHandlingStyleChangeRef = useRef<boolean>(false);
   const currentOpenPinIdRef = useRef<string | null>(null);
   const urlProcessedRef = useRef<string | null>(null);
+  const isUpdatingUrlRef = useRef<boolean>(false);
+
+  // Helper function to create popup HTML
+  const createPopupHTML = useCallback((pin: ProfilePin, viewCount: number | null = null): string => {
+    const escapeHtml = (text: string | null): string => {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    const formatDate = formatPinDate;
+    const isOwner = isOwnProfileRef.current;
+
+    return `
+      <div class="map-pin-popup-content" style="min-width: 180px; max-width: 250px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; position: relative;">
+        ${isOwner ? `
+        <div style="position: absolute; top: 6px; right: 6px;">
+          <button id="pin-menu-btn-${pin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="5" r="2"></circle>
+              <circle cx="12" cy="12" r="2"></circle>
+              <circle cx="12" cy="19" r="2"></circle>
+            </svg>
+          </button>
+          <div id="pin-menu-dropdown-${pin.id}" style="display: none; position: absolute; top: 28px; right: 0; min-width: 120px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 100; overflow: hidden;">
+            <button id="pin-delete-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            </button>
+            <button id="pin-close-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Close
+            </button>
+          </div>
+        </div>
+        ` : ''}
+        ${pin.visibility === 'only_me' && isOwner ? `
+          <div style="margin-bottom: 6px;${isOwner ? ' margin-right: 30px;' : ''}">
+            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: #f3f4f6; border-radius: 4px; font-size: 10px; color: #6b7280;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              Private
+            </span>
+          </div>
+        ` : ''}
+        ${pin.description ? `<div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: 8px; word-wrap: break-word;${isOwner ? ' margin-right: 30px;' : ''}">${escapeHtml(pin.description)}</div>` : ''}
+        ${pin.media_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `<div style="margin-bottom: 8px;"><img src="${escapeHtml(pin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 100px; object-fit: cover; display: block;" /></div>` : ''}
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #6b7280; padding-top: 6px; border-top: 1px solid #e5e7eb;">
+          <span>${formatDate(pin.created_at)}</span>
+          ${viewCount !== null ? `<span style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>${viewCount}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }, []);
+
+  // Helper function to clear URL params
+  const clearUrlParams = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('sel') || url.searchParams.has('pinId')) {
+      isUpdatingUrlRef.current = true;
+      url.searchParams.delete('sel');
+      url.searchParams.delete('pinId');
+      window.history.replaceState({}, '', url.pathname + (url.search || ''));
+      urlProcessedRef.current = null;
+      // Reset flag after a brief delay
+      setTimeout(() => {
+        isUpdatingUrlRef.current = false;
+      }, 100);
+    }
+  }, []);
+
+  // Helper function to update URL params
+  const updateUrlParams = useCallback((pinId: string) => {
+    if (typeof window === 'undefined') return;
+    isUpdatingUrlRef.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.set('sel', 'pin');
+    url.searchParams.set('pinId', pinId);
+    window.history.replaceState({}, '', url.pathname + url.search);
+    urlProcessedRef.current = `pin-${pinId}`;
+    // Reset flag after a longer delay to ensure URL effect doesn't interfere
+    setTimeout(() => {
+      isUpdatingUrlRef.current = false;
+    }, 500);
+  }, []);
 
   // Handle URL parameters on mount/change (for shareable links)
-  // Only processes external URL changes, not our own updates
   useEffect(() => {
     if (!mapLoaded || !map || !clickHandlerRef.current) return;
+    
+    // Skip if we just updated the URL ourselves
+    if (isUpdatingUrlRef.current) {
+      return;
+    }
 
     const sel = searchParams.get('sel');
     const pinId = searchParams.get('pinId');
@@ -77,7 +175,7 @@ export default function ProfilePinsLayer({
       return;
     }
     
-    // Process pin selection from URL
+    // Process pin selection from URL (for shareable links)
     if (sel === 'pin' && pinId) {
       // Don't reopen if already open for this pin
       if (currentOpenPinIdRef.current === pinId && popupRef.current) {
@@ -88,19 +186,15 @@ export default function ProfilePinsLayer({
       // Mark as processed before opening to prevent loops
       urlProcessedRef.current = urlKey;
       
-      // Find pin and open popup
+      // Find pin and trigger click handler (which will open popup)
       const pin = pinsRef.current.find(p => p.id === pinId);
-      if (pin) {
-        // Small delay to ensure map is ready
-        setTimeout(() => {
-          const mapboxMap = map as any;
-          if (!mapboxMap || !clickHandlerRef.current) return;
-          
-          const mockEvent = {
-            point: mapboxMap.project([pin.lng, pin.lat]),
-          };
-          clickHandlerRef.current(mockEvent);
-        }, 100);
+      if (pin && clickHandlerRef.current) {
+        const mapboxMap = map as any;
+        const mockEvent = {
+          point: mapboxMap.project([pin.lng, pin.lat]),
+        };
+        // Trigger the click handler to open popup
+        clickHandlerRef.current(mockEvent);
       }
     } else if (urlProcessedRef.current && (!sel || sel !== 'pin' || !pinId)) {
       // URL cleared - close popup if open
@@ -146,97 +240,36 @@ export default function ProfilePinsLayer({
       popupRef.current = null;
     }
 
-    // Mark as current pin before URL update
+    // Mark as current pin
     currentOpenPinIdRef.current = pin.id;
     
-    // Update URL (using history API directly to avoid router loops)
-    // Mark as processed immediately to prevent effect from re-processing
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('sel', 'pin');
-      url.searchParams.set('pinId', pin.id);
-      window.history.replaceState({}, '', url.pathname + url.search);
-      // Mark URL as processed immediately to prevent effect loop
-      urlProcessedRef.current = `pin-${pin.id}`;
-    }
-
-    // Fly to pin
-    const currentZoom = mapboxMap.getZoom();
-    mapboxMap.flyTo({
-      center: [pin.lng, pin.lat],
-      zoom: Math.max(currentZoom, 14),
-      duration: 800,
-      essential: true,
-    });
-
-    // Helper functions
-    const escapeHtml = (text: string | null): string => {
-      if (!text) return '';
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    };
-
-    const formatDate = formatPinDate;
-    const isOwner = isOwnProfileRef.current;
-
-    // Build popup HTML (same style as homepage)
-    const popupContent = `
-      <div class="map-pin-popup-content" style="min-width: 180px; max-width: 250px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; position: relative;">
-        ${isOwner ? `
-        <div style="position: absolute; top: 6px; right: 6px;">
-          <button id="pin-menu-btn-${pin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="5" r="2"></circle>
-              <circle cx="12" cy="12" r="2"></circle>
-              <circle cx="12" cy="19" r="2"></circle>
-            </svg>
-          </button>
-          <div id="pin-menu-dropdown-${pin.id}" style="display: none; position: absolute; top: 28px; right: 0; min-width: 120px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 100; overflow: hidden;">
-            <button id="pin-delete-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-              </svg>
-              Delete
-            </button>
-            <button id="pin-close-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-              Close
-            </button>
-          </div>
-        </div>
-        ` : ''}
-        ${pin.visibility === 'only_me' && isOwner ? `
-          <div style="margin-bottom: 6px;${isOwner ? ' margin-right: 30px;' : ''}">
-            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; background: #f3f4f6; border-radius: 4px; font-size: 10px; color: #6b7280;">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-              </svg>
-              Private
-            </span>
-          </div>
-        ` : ''}
-        ${pin.description ? `<div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: 8px; word-wrap: break-word;${isOwner ? ' margin-right: 30px;' : ''}">${escapeHtml(pin.description)}</div>` : ''}
-        ${pin.media_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `<div style="margin-bottom: 8px;"><img src="${escapeHtml(pin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 100px; object-fit: cover; display: block;" /></div>` : ''}
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #6b7280; padding-top: 6px; border-top: 1px solid #e5e7eb;">
-          <span>${formatDate(pin.created_at)}</span>
-          ${pin.view_count ? `<span style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>${pin.view_count}</span>` : ''}
-        </div>
-      </div>
-    `;
+    // Update URL (mark as processed immediately to prevent effect loop)
+    updateUrlParams(pin.id);
 
     // Dispatch event to notify any location sidebar to close location details
     window.dispatchEvent(new CustomEvent('pin-popup-opening', {
       detail: { pinId: pin.id }
     }));
 
-    // Create popup
+    // Fly to pin
+    const currentZoom = mapboxMap.getZoom();
+    const targetZoom = Math.max(currentZoom, 14);
+    mapboxMap.flyTo({
+      center: [pin.lng, pin.lat],
+      zoom: targetZoom,
+      duration: 800,
+      essential: true,
+    });
+
+    // Create popup immediately (like homepage) - Mapbox handles positioning during flyTo
     const mapbox = await import('mapbox-gl');
+    
+    // Remove any existing popup first
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
+    
     popupRef.current = new mapbox.default.Popup({
       offset: 25,
       closeButton: false,
@@ -246,15 +279,32 @@ export default function ProfilePinsLayer({
       anchor: 'bottom',
     })
       .setLngLat([pin.lng, pin.lat])
-      .setHTML(popupContent)
+      .setHTML(createPopupHTML(pin, null))
       .addTo(mapboxMap);
 
-    // Wire up popup event handlers
+    // Setup handlers immediately after popup is created
     setTimeout(() => {
-      const menuBtn = document.getElementById(`pin-menu-btn-${pin.id}`);
-      const dropdown = document.getElementById(`pin-menu-dropdown-${pin.id}`);
-      const deleteBtn = document.getElementById(`pin-delete-btn-${pin.id}`);
-      const closeBtn = document.getElementById(`pin-close-btn-${pin.id}`);
+      setupPopupHandlers(pin.id);
+    }, 0);
+
+    onPopupOpenRef.current?.(pin.id);
+
+    // Handle popup close
+    popupRef.current.on('close', () => {
+      popupRef.current = null;
+      currentOpenPinIdRef.current = null;
+      onPopupCloseRef.current?.();
+      
+      // Clear URL when popup closes
+      clearUrlParams();
+    });
+
+    // Setup popup handlers function (needs to be accessible in moveend callback)
+    const setupPopupHandlers = (pinId: string) => {
+      const menuBtn = document.getElementById(`pin-menu-btn-${pinId}`);
+      const dropdown = document.getElementById(`pin-menu-dropdown-${pinId}`);
+      const deleteBtn = document.getElementById(`pin-delete-btn-${pinId}`);
+      const closeBtn = document.getElementById(`pin-close-btn-${pinId}`);
 
       menuBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -271,7 +321,7 @@ export default function ProfilePinsLayer({
           const { error } = await supabase
             .from('pins')
             .update({ archived: true })
-            .eq('id', pin.id)
+            .eq('id', pinId)
             .eq('archived', false);
           
           if (error) throw error;
@@ -281,16 +331,10 @@ export default function ProfilePinsLayer({
             popupRef.current = null;
           }
           currentOpenPinIdRef.current = null;
-          onPinDeletedRef.current?.(pin.id);
+          onPinDeletedRef.current?.(pinId);
           
           // Clear URL
-          if (typeof window !== 'undefined') {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('sel');
-            url.searchParams.delete('pinId');
-            window.history.replaceState({}, '', url.pathname + (url.search || ''));
-            urlProcessedRef.current = null;
-          }
+          clearUrlParams();
         } catch (err) {
           console.error('[ProfilePinsLayer] Delete failed:', err);
           alert('Failed to delete pin.');
@@ -307,13 +351,7 @@ export default function ProfilePinsLayer({
         onPopupCloseRef.current?.();
         
         // Clear URL
-        if (typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('sel');
-          url.searchParams.delete('pinId');
-          window.history.replaceState({}, '', url.pathname + (url.search || ''));
-          urlProcessedRef.current = null;
-        }
+        clearUrlParams();
       });
 
       // Close dropdown on outside click
@@ -323,28 +361,68 @@ export default function ProfilePinsLayer({
         }
       };
       document.addEventListener('click', closeDropdown, { once: true });
-    }, 0);
+    };
 
-    onPopupOpenRef.current?.(pin.id);
+    // Track pin view for non-owners (async, don't block popup)
+    const isOwner = isOwnProfileRef.current;
+    if (!isOwner) {
+      (async () => {
+        try {
+          const referrer = typeof document !== 'undefined' ? document.referrer : null;
+          const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+          let sessionId: string | null = null;
+          if (typeof window !== 'undefined') {
+            sessionId = sessionStorage.getItem('analytics_session_id');
+            if (!sessionId) {
+              sessionId = crypto.randomUUID();
+              sessionStorage.setItem('analytics_session_id', sessionId);
+            }
+          }
 
-    // Handle popup close
-    popupRef.current.on('close', () => {
-      popupRef.current = null;
-      currentOpenPinIdRef.current = null;
-      onPopupCloseRef.current?.();
-      
-      // Clear URL when popup closes
-      if (typeof window !== 'undefined') {
-        const url = new URL(window.location.href);
-        if (url.searchParams.has('sel') || url.searchParams.has('pinId')) {
-          url.searchParams.delete('sel');
-          url.searchParams.delete('pinId');
-          window.history.replaceState({}, '', url.pathname + (url.search || ''));
-          urlProcessedRef.current = null;
+          // Track the view
+          const trackResponse = await fetch('/api/analytics/pin-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pin_id: pin.id,
+              referrer_url: referrer || null,
+              user_agent: userAgent || null,
+              session_id: sessionId,
+            }),
+            keepalive: true,
+          });
+
+          if (trackResponse.ok) {
+            // Dispatch event to notify any components to refetch stats
+            window.dispatchEvent(new CustomEvent('pin-view-tracked', {
+              detail: { pin_id: pin.id }
+            }));
+
+            // Fetch updated view count
+            const statsResponse = await fetch(`/api/analytics/pin-stats?pin_id=${pin.id}`);
+            if (statsResponse.ok) {
+              const statsData = await statsResponse.json();
+              const viewCount = statsData.stats?.total_views || 0;
+              
+              // Update popup content with view count (only if popup still exists and is for this pin)
+              if (popupRef.current && currentOpenPinIdRef.current === pin.id) {
+                popupRef.current.setHTML(createPopupHTML(pin, viewCount));
+                // Re-setup handlers after content update
+                setTimeout(() => {
+                  setupPopupHandlers(pin.id);
+                }, 0);
+              }
+            }
+          }
+        } catch (error) {
+          // Silently fail - don't break the page
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[ProfilePinsLayer] Failed to track/fetch pin view:', error);
+          }
         }
-      }
-    });
-  }, [map]);
+      })();
+    }
+  }, [map, createPopupHTML, updateUrlParams, clearUrlParams]);
 
   // Main effect for pins layer
   useEffect(() => {
@@ -509,6 +587,7 @@ export default function ProfilePinsLayer({
           popupRef.current = null;
           currentOpenPinIdRef.current = null;
           onPopupCloseRef.current?.();
+          clearUrlParams();
         }
       };
       window.addEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
@@ -581,7 +660,7 @@ export default function ProfilePinsLayer({
       
       initializedRef.current = false;
     };
-  }, [map, mapLoaded, pins, handlePinClick]);
+  }, [map, mapLoaded, pins, handlePinClick, clearUrlParams]);
 
   return null;
 }

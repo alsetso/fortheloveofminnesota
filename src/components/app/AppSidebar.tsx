@@ -108,6 +108,8 @@ export default function AppSidebar({
                 const Icon = item.icon;
                 const active = isActive(item.href);
 
+                if (!Icon) return null;
+
                 return (
                   <li key={item.href}>
                     <Link
@@ -204,6 +206,8 @@ export default function AppSidebar({
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
+
+                  if (!Icon) return null;
 
                   return (
                     <li key={item.href}>

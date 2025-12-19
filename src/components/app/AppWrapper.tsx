@@ -31,7 +31,7 @@ export default function AppWrapper({
   const [isLoadingAccount, setIsLoadingAccount] = useState(!serverAccount);
 
   // Use server data if provided, otherwise fetch client-side
-  const user = serverUser || (clientUser ? { id: clientUser.id, email: clientUser.email } : null);
+  const user: { id: string; email: string } | null = serverUser || (clientUser ? { id: clientUser.id, email: clientUser.email || '' } : null);
   const profiles = serverProfiles;
 
   // Fetch account data when user is authenticated (only if not provided server-side)

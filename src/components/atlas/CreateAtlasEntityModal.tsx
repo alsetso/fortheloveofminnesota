@@ -107,7 +107,7 @@ export default function CreateAtlasEntityModal({
   const [citiesLoaded, setCitiesLoaded] = useState(false);
   const [countiesLoaded, setCountiesLoaded] = useState(false);
 
-  const config = entityConfig[entityType];
+  const config = entityConfig[entityType as keyof typeof entityConfig];
 
   // Load cities and counties
   useEffect(() => {
@@ -233,7 +233,7 @@ export default function CreateAtlasEntityModal({
       }
 
       // Refresh the corresponding atlas layer on the map (autoEnable for new entities)
-      const layerIdMap: Record<AtlasEntityType, string> = {
+      const layerIdMap: Partial<Record<AtlasEntityType, string>> = {
         neighborhood: 'neighborhoods',
         school: 'schools',
         park: 'parks',

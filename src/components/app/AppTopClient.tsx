@@ -32,7 +32,7 @@ export default function AppTopClient({
   const { profiles: contextProfiles, selectedProfile, setSelectedProfile } = useProfile();
   
   // Use server data as initial state, but allow client updates
-  const user = clientUser || (serverUser ? { id: serverUser.id, email: serverUser.email } : null);
+  const user: { id: string; email: string } | null = clientUser ? { id: clientUser.id, email: clientUser.email || '' } : (serverUser ? { id: serverUser.id, email: serverUser.email || '' } : null);
   const account = serverAccount;
   const profiles = contextProfiles.length > 0 ? contextProfiles : serverProfiles;
   
@@ -151,6 +151,8 @@ export default function AppTopClient({
                         const Icon = item.icon;
                         const active = isActive(item.href);
 
+                        if (!Icon) return null;
+
                         return (
                           <Link
                             key={item.href}
@@ -255,7 +257,7 @@ export default function AppTopClient({
                     className="flex items-center space-x-2 flex-1 min-w-0"
                     onClick={() => setIsAccountMenuOpen(false)}
                   >
-                    <ProfilePhoto profile={selectedProfile} account={account} size="sm" />
+                    <ProfilePhoto account={account} size="sm" />
                     <span className="hidden sm:inline text-xs max-w-[100px] truncate">{displayName}</span>
                   </Link>
                   <button

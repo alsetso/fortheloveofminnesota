@@ -649,7 +649,8 @@ export default function PostMapModal({
 
     const initMap = async () => {
       try {
-        await import('mapbox-gl/dist/mapbox-gl.css');
+        // @ts-ignore - CSS import
+      await import('mapbox-gl/dist/mapbox-gl.css');
         // Always load draw CSS since we support drawing mode
           await import('@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css');
 

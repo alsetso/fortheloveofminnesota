@@ -162,7 +162,7 @@ export default function AppTop({
                     className="flex items-center space-x-2 flex-1 min-w-0"
                     onClick={() => setIsAccountMenuOpen(false)}
                   >
-                    <ProfilePhoto profile={selectedProfile} account={account} size="sm" />
+                    <ProfilePhoto account={account} size="sm" />
                     <span className="hidden sm:inline text-xs max-w-[100px] truncate">{displayName}</span>
                   </Link>
                   <button

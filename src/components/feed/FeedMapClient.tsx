@@ -114,7 +114,8 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
 
       try {
         // @ts-expect-error - CSS import doesn't have type declarations
-        await import('mapbox-gl/dist/mapbox-gl.css');
+        // @ts-ignore - CSS import
+      await import('mapbox-gl/dist/mapbox-gl.css');
         const mapbox = await loadMapboxGL();
         mapbox.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
 

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { MagnifyingGlassIcon, ClockIcon, XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { saveLocationSearch } from '@/features/location-searches/services/locationSearchService';
 import type { MapPin } from '@/types/map-pin';
+import type { MapboxMetadata } from '@/types/mapbox';
 
 // Search type definitions - extensible for future search types
 type SearchType = 'locations' | 'pins' | 'areas' | 'general';
@@ -252,7 +253,7 @@ export default function AppSearch({
     }
     
     if (onLocationSelect) {
-      onLocationSelect({ lat, lng }, suggestion.place_name, suggestion);
+      onLocationSelect({ lat, lng }, suggestion.place_name, suggestion as unknown as MapboxMetadata);
     }
   };
 

@@ -186,7 +186,8 @@ export default function ProfileMapClient({
       if (!mounted || !mapContainer.current) return;
 
       try {
-        await import('mapbox-gl/dist/mapbox-gl.css');
+        // @ts-ignore - CSS import
+      await import('mapbox-gl/dist/mapbox-gl.css');
         const mapbox = await loadMapboxGL();
         mapbox.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
 

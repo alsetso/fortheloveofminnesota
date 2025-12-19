@@ -27,9 +27,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const displayName = account.first_name 
-    ? `${account.first_name}${account.last_name ? ` ${account.last_name}` : ''}`
-    : account.username || 'User';
+  const accountMeta = account as {
+    username: string | null;
+    first_name: string | null;
+    last_name: string | null;
+  };
+
+  const displayName = accountMeta.first_name 
+    ? `${accountMeta.first_name}${accountMeta.last_name ? ` ${accountMeta.last_name}` : ''}`
+    : accountMeta.username || 'User';
 
   return {
     title: `${displayName} | MNUDA`,
@@ -69,11 +75,28 @@ export default async function ProfilePage({ params }: Props) {
     notFound();
   }
 
+  const accountData = account as {
+    id: string;
+    username: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+    image_url: string | null;
+    cover_image_url: string | null;
+    bio: string | null;
+    city_id: string | null;
+    view_count: number | null;
+    traits: any;
+    user_id: string;
+    created_at: string;
+  };
+
   // Get the current authenticated user to check if this is their profile
   const { data: { user } } = await supabase.auth.getUser();
   
   let isOwnProfile = false;
-  if (user && account.user_id === user.id) {
+  if (user && accountData.user_id === user.id) {
     isOwnProfile = true;
   }
 
@@ -92,7 +115,7 @@ export default async function ProfilePage({ params }: Props) {
       created_at,
       updated_at
     `)
-    .eq('account_id', account.id)
+    .eq('account_id', accountData.id)
     .eq('archived', false) // Exclude archived pins
     .order('created_at', { ascending: false });
 
@@ -116,26 +139,26 @@ export default async function ProfilePage({ params }: Props) {
     updated_at: pin.updated_at,
   }));
 
-  const accountData: ProfileAccount = {
-    id: account.id,
-    username: account.username,
-    first_name: account.first_name,
-    last_name: account.last_name,
-    email: account.email,
-    phone: account.phone,
-    image_url: account.image_url,
-    cover_image_url: account.cover_image_url,
-    bio: account.bio,
-    city_id: account.city_id,
-    view_count: account.view_count || 0,
-    traits: account.traits,
-    user_id: account.user_id,
-    created_at: account.created_at,
+  const profileAccountData: ProfileAccount = {
+    id: accountData.id,
+    username: accountData.username,
+    first_name: accountData.first_name,
+    last_name: accountData.last_name,
+    email: accountData.email,
+    phone: accountData.phone,
+    image_url: accountData.image_url,
+    cover_image_url: accountData.cover_image_url,
+    bio: accountData.bio,
+    city_id: accountData.city_id,
+    view_count: accountData.view_count || 0,
+    traits: accountData.traits,
+    user_id: accountData.user_id,
+    created_at: accountData.created_at,
   };
 
   return (
     <ProfileMapClient 
-      account={accountData}
+      account={profileAccountData}
       pins={pins || []}
       isOwnProfile={isOwnProfile}
     />

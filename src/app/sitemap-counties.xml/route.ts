@@ -26,9 +26,16 @@ export async function GET() {
 
   const now = new Date().toISOString();
   
+  // Type assertion for counties with non-null slugs
+  const countiesWithSlugs = (allCounties || []) as Array<{
+    slug: string;
+    favorite: boolean | null;
+    updated_at: string | null;
+  }>;
+  
   // Separate favorites and non-favorites for priority ordering
-  const favoriteCounties = allCounties.filter(county => county.favorite);
-  const otherCounties = allCounties.filter(county => !county.favorite);
+  const favoriteCounties = countiesWithSlugs.filter(county => county.favorite);
+  const otherCounties = countiesWithSlugs.filter(county => !county.favorite);
   
   // Combine: favorites first (higher priority), then others
   const sortedCounties = [...favoriteCounties, ...otherCounties];

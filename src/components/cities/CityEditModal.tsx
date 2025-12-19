@@ -76,6 +76,7 @@ export default function CityEditModal({
 
     const initMap = async () => {
       const mapboxgl = (await import('mapbox-gl')).default;
+      // @ts-ignore - CSS import
       await import('mapbox-gl/dist/mapbox-gl.css');
 
       if (!MAP_CONFIG.MAPBOX_TOKEN) return;

@@ -117,7 +117,7 @@ export default function EditPostModal({ isOpen, post, onClose, onUpdate }: EditP
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleMapSave = (newMapData: PostMapData) => {
+  const handleMapSave = (newMapData: PostMapData | null) => {
     setMapData(newMapData);
     setShowMapModal(false);
   };

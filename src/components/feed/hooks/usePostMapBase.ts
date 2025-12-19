@@ -4,7 +4,7 @@ import { MAP_CONFIG } from '@/features/_archive/map/config';
 import type { MapboxFeature, MapboxSuggestion } from '@/types/mapbox-events';
 
 export interface UsePostMapBaseReturn {
-  mapContainer: React.RefObject<HTMLDivElement>;
+  mapContainer: React.RefObject<HTMLDivElement | null>;
   map: React.MutableRefObject<import('mapbox-gl').Map | null>;
   mapLoaded: boolean;
   searchQuery: string;
@@ -122,7 +122,7 @@ export function usePostMapBase(isOpen: boolean): UsePostMapBaseReturn {
 
         mapInstance.on('load', () => {
           setTimeout(() => {
-            if (mapInstance && !mapInstance.removed) {
+            if (mapInstance && !(mapInstance as any)._removed) {
               mapInstance.resize();
             }
           }, 100);

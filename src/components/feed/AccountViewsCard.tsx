@@ -15,8 +15,8 @@ interface AccountViewsCardProps {
 export default function AccountViewsCard({ account }: AccountViewsCardProps) {
   const { user } = useAuth();
   
-  // Use city string directly from account (no need to fetch)
-  const cityName = account?.city || null;
+  // Account doesn't have city property, only city_id
+  const cityName = null;
 
   if (!user || !account) {
     return null;

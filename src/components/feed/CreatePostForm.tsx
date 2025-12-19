@@ -284,7 +284,6 @@ export default function CreatePostForm({ onPostCreated }: CreatePostFormProps) {
             className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-text hover:border-gray-400 transition-colors"
           >
             <ProfilePhoto 
-              profile={selectedProfile} 
               account={account}
               size="md" 
             />
@@ -331,7 +330,6 @@ export default function CreatePostForm({ onPostCreated }: CreatePostFormProps) {
             )}
             <div className="flex items-start gap-3">
               <ProfilePhoto 
-                profile={selectedProfile} 
                 account={account}
                 size="md" 
               />

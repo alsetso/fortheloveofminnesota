@@ -15,8 +15,10 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import ProfilePhoto from '@/components/ProfilePhoto';
+import { Account } from '@/features/auth';
 import { formatProfileType } from '@/features/profiles/constants/profileTypes';
 import Views from '@/components/ui/Views';
+import { PostMapData } from './PostMapModal';
 import { 
   filterValidMedia, 
   isVideo, 
@@ -163,10 +165,29 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
               <ProfilePhoto
                 account={account ? {
                   id: account.id,
-                  image_url: account.image_url,
+                  user_id: null,
+                  username: account.username,
                   first_name: account.first_name,
                   last_name: account.last_name,
-                } : null}
+                  email: null,
+                  phone: null,
+                  image_url: account.image_url,
+                  cover_image_url: null,
+                  bio: null,
+                  city_id: null,
+                  view_count: 0,
+                  role: 'general',
+                  traits: null,
+                  stripe_customer_id: null,
+                  plan: account.plan || 'hobby',
+                  billing_mode: 'standard',
+                  subscription_status: null,
+                  stripe_subscription_id: null,
+                  onboarded: false,
+                  created_at: '',
+                  updated_at: '',
+                  last_visit: null,
+                } as Account : null}
                 size="sm"
               />
             </div>
@@ -333,41 +354,42 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
             mapData={{
               type: (() => {
                 // map_data is the source of truth - use its type directly
-                if (post.map_data?.type) {
-                  return post.map_data.type;
+                const mapData = post.map_data as PostMapData | undefined;
+                if (mapData && 'type' in mapData && mapData.type) {
+                  return mapData.type;
                 }
                 // Fallback to explicit map_type from database columns
                 if (post.map_type) {
                   return post.map_type;
                 }
                 // Infer from geometry if no type specified
-                if (post.map_data?.geometry) {
-                  const geometry = post.map_data.geometry;
-                  if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
+                if (mapData && 'geometry' in mapData && mapData.geometry) {
+                  const geometry = mapData.geometry;
+                  if ('type' in geometry && (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon')) {
                     // If there's also a center, it's 'both', otherwise 'area'
-                    return post.map_data.center ? 'both' : 'area';
+                    return mapData.center ? 'both' : 'area';
                   }
-                  if (geometry.type === 'Point') {
+                  if ('type' in geometry && geometry.type === 'Point') {
                     return 'pin';
                   }
                 }
                 // Check new format columns
-                if (post.map_geometry) {
-                  if (post.map_geometry.type === 'Polygon' || post.map_geometry.type === 'MultiPolygon') {
+                if (post.map_geometry && typeof post.map_geometry === 'object' && post.map_geometry !== null && 'type' in post.map_geometry) {
+                  const geometry = post.map_geometry as { type: string };
+                  if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
                     return post.map_center ? 'both' : 'area';
                   }
-                  if (post.map_geometry.type === 'Point') {
+                  if (geometry.type === 'Point') {
                     return 'pin';
                   }
                 }
                 // Default fallback
                 return 'pin';
               })(),
-              geometry: post.map_geometry || post.map_data?.geometry,
-              center: post.map_data?.center || undefined,
-              screenshot: post.map_screenshot || post.map_data?.screenshot,
-              hidePin: post.map_hide_pin || post.map_data?.hidePin || false,
-              polygon: post.map_data?.polygon,
+              geometry: (post.map_geometry || (post.map_data as PostMapData | undefined)?.geometry || { type: 'Point', coordinates: [0, 0] }) as GeoJSON.Point | GeoJSON.Polygon | GeoJSON.MultiPolygon,
+              center: (post.map_data as PostMapData | undefined)?.center || undefined,
+              screenshot: post.map_screenshot || (post.map_data as PostMapData | undefined)?.screenshot,
+              polygon: (post.map_data as PostMapData | undefined)?.polygon,
             }}
             height="300px"
             onClick={() => !disableNavigation && router.push(postUrl)}

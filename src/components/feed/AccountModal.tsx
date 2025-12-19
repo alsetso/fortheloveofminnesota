@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChartBarIcon, UserIcon, CreditCardIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChartBarIcon, UserIcon, CreditCardIcon, ArrowLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import type { BillingData } from '@/lib/billingServer';
 import AnalyticsClient from '@/components/feed/AnalyticsClient';

@@ -214,7 +214,7 @@ export default function PostMapModal({
       
       if (allCoords.length === 0) return null;
       
-      const center = calculateCenter(allCoords);
+      const center = calculateCenter([allCoords]);
       return [center.lng, center.lat];
     } catch (error) {
       console.error('Error calculating polygon centroid:', error);
@@ -465,17 +465,21 @@ export default function PostMapModal({
     // Remove existing handlers if any
     const existingHandler = (mapInstance as MapboxMapInstance)._pinDragHandler;
     if (existingHandler) {
-      mapInstance.off('mousedown', sourceId, existingHandler.mousedown);
-      mapInstance.off('mousemove', existingHandler.mousemove);
-      mapInstance.off('mouseup', existingHandler.mouseup);
+      mapInstance.off('mousedown', existingHandler.mousedown as any);
+      mapInstance.off('mousemove', existingHandler.mousemove as any);
+      mapInstance.off('mouseup', existingHandler.mouseup as any);
+      // @ts-ignore - mouseenter/mouseleave may not be in types
       mapInstance.off('mouseenter', sourceId, existingHandler.mouseenter);
+      // @ts-ignore - mouseleave may not be in types
       mapInstance.off('mouseleave', sourceId, existingHandler.mouseleave);
     }
 
     const mousedownHandler = (e: MapboxMouseEvent) => {
-      e.preventDefault();
+      if ('preventDefault' in e && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
       isDraggingPinRef.current = true;
-      mapInstance.getCanvas().style.cursor = 'grabbing';
+      (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = 'grabbing';
     };
 
     const mousemoveHandler = (e: MapboxMouseEvent) => {
@@ -497,36 +501,38 @@ export default function PostMapModal({
     const mouseupHandler = async (e: MapboxMouseEvent) => {
       if (!isDraggingPinRef.current) return;
       isDraggingPinRef.current = false;
-      mapInstance.getCanvas().style.cursor = '';
+      (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
       await onDragEnd(e.lngLat.lng, e.lngLat.lat);
     };
 
     const mouseenterHandler = () => {
       if (!isDraggingPinRef.current) {
-        mapInstance.getCanvas().style.cursor = 'pointer';
+        (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = 'pointer';
       }
     };
 
     const mouseleaveHandler = () => {
       if (!isDraggingPinRef.current) {
-        mapInstance.getCanvas().style.cursor = '';
+        (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
       }
     };
 
-    mapInstance.on('mousedown', sourceId, mousedownHandler);
-    mapInstance.on('mousemove', mousemoveHandler);
-    mapInstance.on('mouseup', mouseupHandler);
+    mapInstance.on('mousedown', sourceId, mousedownHandler as any);
+    mapInstance.on('mousemove', mousemoveHandler as any);
+    mapInstance.on('mouseup', mouseupHandler as any);
+    // @ts-ignore - mouseenter/mouseleave may not be in types
     mapInstance.on('mouseenter', sourceId, mouseenterHandler);
+    // @ts-ignore - mouseleave may not be in types
     mapInstance.on('mouseleave', sourceId, mouseleaveHandler);
 
     // Store handlers for cleanup
-    (mapInstance as MapboxMapInstance)._pinDragHandler = {
-      mousedown: mousedownHandler,
-      mousemove: mousemoveHandler,
-      mouseup: mouseupHandler,
-      mouseenter: mouseenterHandler,
-      mouseleave: mouseleaveHandler,
-    };
+      (mapInstance as MapboxMapInstance)._pinDragHandler = {
+        mousedown: mousedownHandler,
+        mousemove: mousemoveHandler,
+        mouseup: mouseupHandler,
+        mouseenter: mouseenterHandler as any,
+        mouseleave: mouseleaveHandler as any,
+      } as any;
   }, []);
 
   // Helper function to update pin visibility
@@ -564,9 +570,17 @@ export default function PostMapModal({
       duration: 1000,
     });
 
-    if (!state.isDrawing && draw.current && draw.current.getMode() !== 'draw_polygon' && map.current) {
+    if (!state.isDrawing && draw.current && (draw.current.getMode?.() || '') !== 'draw_polygon' && map.current) {
       // Preserve polygon if it exists
-      const currentPolygon = state.mapData?.polygon || (state.mapData?.type === 'area' || state.mapData?.type === 'both' ? state.mapData.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon : undefined);
+      let currentPolygon: GeoJSON.Polygon | GeoJSON.MultiPolygon | undefined = undefined;
+      if (state.mapData?.polygon) {
+        currentPolygon = state.mapData.polygon;
+      } else if ((state.mapData?.type === 'area' || state.mapData?.type === 'both') && state.mapData?.geometry) {
+        const geometry = state.mapData.geometry;
+        if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
+          currentPolygon = geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon;
+        }
+      }
 
       // Add pin to canvas
       addPinToCanvas(map.current, lng, lat, state.hidePin);
@@ -762,7 +776,15 @@ export default function PostMapModal({
                   coordinates: [newLng, newLat],
                 };
 
-                const currentPolygon = state.mapData?.polygon || (state.mapData?.type === 'area' || state.mapData?.type === 'both' ? state.mapData.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon : undefined);
+                let currentPolygon: GeoJSON.Polygon | GeoJSON.MultiPolygon | undefined = undefined;
+                if (state.mapData?.polygon) {
+                  currentPolygon = state.mapData.polygon;
+                } else if ((state.mapData?.type === 'area' || state.mapData?.type === 'both') && state.mapData?.geometry) {
+                  const geometry = state.mapData.geometry;
+                  if (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') {
+                    currentPolygon = geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon;
+                  }
+                }
 
                 const updatedMapData: PostMapData = currentPolygon ? {
                   type: 'both',
@@ -1028,7 +1050,7 @@ export default function PostMapModal({
                   
                   // Reset cursor to default
                   if (mapInstance) {
-                    mapInstance.getCanvas().style.cursor = '';
+                    (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
                   }
                 }
               }
@@ -1126,7 +1148,7 @@ export default function PostMapModal({
               
               // Reset cursor to default
               if (mapInstance) {
-                mapInstance.getCanvas().style.cursor = '';
+                (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
               }
             });
 
@@ -1447,7 +1469,7 @@ export default function PostMapModal({
       // Small delay to ensure everything is rendered
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
 
-      const canvas = map.current.getCanvas();
+      const canvas = map.current.getCanvas() as HTMLCanvasElement;
       if (!canvas) {
         throw new Error('Canvas not available');
       }
@@ -1526,7 +1548,7 @@ export default function PostMapModal({
     
     // Change cursor to crosshair for drawing
     if (map.current) {
-      map.current.getCanvas().style.cursor = 'crosshair';
+      (map.current.getCanvas() as HTMLCanvasElement).style.cursor = 'crosshair';
     }
   }, [state.mapData]);
 

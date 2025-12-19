@@ -80,7 +80,7 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-function generateStructuredData(cityCount: number, countyCount: number, favoriteCounties: Array<{ name: string; slug: string; website_url: string | null }>) {
+function generateStructuredData(cityCount: number, countyCount: number, favoriteCounties: Array<{ name: string; slug: string | null; website_url: string | null }>) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
@@ -121,12 +121,15 @@ function generateStructuredData(cityCount: number, countyCount: number, favorite
       '@id': 'https://www.wikidata.org/wiki/Q1527',
       sameAs: 'https://en.wikipedia.org/wiki/Minnesota',
     },
-    hasPart: favoriteCounties.slice(0, 10).map((county, index) => ({
-      '@type': 'County',
-      name: county.name,
-      url: `${baseUrl}/explore/county/${county.slug}`,
-      ...(county.website_url && { sameAs: county.website_url }),
-    })),
+    hasPart: favoriteCounties
+      .filter(c => c.slug !== null)
+      .slice(0, 10)
+      .map((county, index) => ({
+        '@type': 'County',
+        name: county.name,
+        url: `${baseUrl}/explore/county/${county.slug}`,
+        ...(county.website_url && { sameAs: county.website_url }),
+      })),
   };
 }
 
@@ -171,12 +174,29 @@ export default async function ExplorePage() {
     .order('population', { ascending: false })
     .limit(21);
 
+  const favoriteCountiesData = (favoriteCounties || []) as Array<{
+    name: string;
+    slug: string | null;
+    website_url: string | null;
+    population: number;
+    area_sq_mi: number | null;
+  }>;
+
   // Fetch top cities by population for quick links
   const { data: topCities } = await supabase
     .from('cities')
     .select('name, slug, population, favorite, website_url')
+    .not('population', 'is', null)
     .order('population', { ascending: false })
     .limit(10);
+
+  const topCitiesData = (topCities || []) as Array<{
+    name: string;
+    slug: string | null;
+    population: number;
+    favorite: boolean | null;
+    website_url: string | null;
+  }>;
 
   // Fetch top counties by population
   const { data: topCounties } = await supabase
@@ -185,6 +205,13 @@ export default async function ExplorePage() {
     .order('population', { ascending: false })
     .limit(10);
 
+  const topCountiesData = (topCounties || []) as Array<{
+    name: string;
+    slug: string | null;
+    population: number;
+    area_sq_mi: number | null;
+  }>;
+
   // Fetch largest counties by area
   const { data: largestCounties } = await supabase
     .from('counties')
@@ -192,16 +219,23 @@ export default async function ExplorePage() {
     .order('area_sq_mi', { ascending: false })
     .limit(5);
 
+  const largestCountiesData = (largestCounties || []) as Array<{
+    name: string;
+    slug: string | null;
+    area_sq_mi: number | null;
+    population: number;
+  }>;
+
   // Calculate total population
   const { data: allCounties } = await supabase
     .from('counties')
     .select('population');
-  const totalPopulation = allCounties?.reduce((sum, c) => sum + c.population, 0) || 0;
+  const totalPopulation = (allCounties || [] as Array<{ population: number }>).reduce((sum, c) => sum + c.population, 0);
 
   const structuredData = generateStructuredData(
     cityCount || 0,
     countyCount || 87,
-    favoriteCounties || []
+    favoriteCountiesData
   );
   const breadcrumbData = generateBreadcrumbStructuredData();
 
@@ -346,7 +380,7 @@ export default async function ExplorePage() {
                 <h2 className="text-xs font-semibold text-gray-900">Top Cities by Population</h2>
               </div>
               <ul className="space-y-1">
-                {topCities?.map((city, idx) => (
+                {topCitiesData.map((city, idx) => (
                   <li key={city.slug}>
                     <div className="flex items-center justify-between group">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -372,7 +406,7 @@ export default async function ExplorePage() {
                         )}
                       </div>
                       <span className="text-xs text-gray-500 group-hover:text-gray-700 flex-shrink-0 ml-2">
-                        {city.population.toLocaleString()}
+                        {city.population !== null ? city.population.toLocaleString() : 'N/A'}
                       </span>
                     </div>
                   </li>
@@ -393,20 +427,32 @@ export default async function ExplorePage() {
                 <h2 className="text-xs font-semibold text-gray-900">Top Counties by Population</h2>
               </div>
               <ul className="space-y-1">
-                {topCounties?.map((county, idx) => (
-                  <li key={county.slug}>
-                    <Link
-                      href={`/explore/county/${county.slug}`}
-                      className="text-xs text-gray-700 hover:text-gray-900 hover:underline flex items-center justify-between group"
-                    >
-                      <span>
-                        <span className="text-gray-500 mr-1.5">{idx + 1}.</span>
-                        {county.name.replace(/\s+County$/, '')}
-                      </span>
-                      <span className="text-xs text-gray-500 group-hover:text-gray-700">
-                        {county.population.toLocaleString()}
-                      </span>
-                    </Link>
+                {topCountiesData.map((county, idx) => (
+                  <li key={county.slug || idx}>
+                    {county.slug ? (
+                      <Link
+                        href={`/explore/county/${county.slug}`}
+                        className="text-xs text-gray-700 hover:text-gray-900 hover:underline flex items-center justify-between group"
+                      >
+                        <span>
+                          <span className="text-gray-500 mr-1.5">{idx + 1}.</span>
+                          {county.name.replace(/\s+County$/, '')}
+                        </span>
+                        <span className="text-xs text-gray-500 group-hover:text-gray-700">
+                          {county.population.toLocaleString()}
+                        </span>
+                      </Link>
+                    ) : (
+                      <div className="text-xs text-gray-700 flex items-center justify-between">
+                        <span>
+                          <span className="text-gray-500 mr-1.5">{idx + 1}.</span>
+                          {county.name.replace(/\s+County$/, '')}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {county.population.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -424,19 +470,23 @@ export default async function ExplorePage() {
             <div className="bg-white rounded-md border border-gray-200 p-[10px] mb-3">
               <h2 className="text-sm font-semibold text-gray-900 mb-3">Largest Counties by Area</h2>
               <div className="space-y-1.5">
-                {largestCounties.map((county, idx) => (
-                  <div key={county.slug} className="flex items-center justify-between text-xs">
+                {largestCountiesData.map((county, idx) => (
+                  <div key={county.slug || idx} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <span className="text-gray-500 w-4">{idx + 1}.</span>
-                      <Link
-                        href={`/explore/county/${county.slug}`}
-                        className="text-gray-700 hover:text-gray-900 transition-colors"
-                      >
-                        {county.name.replace(/\s+County$/, '')}
-                      </Link>
+                      {county.slug ? (
+                        <Link
+                          href={`/explore/county/${county.slug}`}
+                          className="text-gray-700 hover:text-gray-900 transition-colors"
+                        >
+                          {county.name.replace(/\s+County$/, '')}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-700">{county.name.replace(/\s+County$/, '')}</span>
+                      )}
                     </div>
                     <div className="text-gray-600">
-                      {county.area_sq_mi?.toLocaleString()} sq mi
+                      {county.area_sq_mi !== null ? `${county.area_sq_mi.toLocaleString()} sq mi` : 'N/A'}
                       {county.population && (
                         <span className="text-gray-500 ml-2">
                           ({county.population.toLocaleString()} residents)

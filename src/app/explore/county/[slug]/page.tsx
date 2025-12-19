@@ -23,8 +23,8 @@ export async function generateStaticParams() {
     .select('slug')
     .not('slug', 'is', null);
   
-  return (counties || []).map((county) => ({
-    slug: county.slug!,
+  return ((counties || []) as Array<{ slug: string }>).map((county) => ({
+    slug: county.slug,
   }));
 }
 
@@ -162,8 +162,8 @@ export default async function CountyPage({ params }: Props) {
     id: string;
     name: string;
     slug: string | null;
-    population: number;
-    favorite: boolean;
+    population: number | null;
+    favorite: boolean | null;
     website_url: string | null;
   }>;
 
@@ -269,7 +269,7 @@ export default async function CountyPage({ params }: Props) {
           {countyData.favorite && countyData.polygon && (
             <div className="mb-3">
               <CountyMap
-                polygon={(countyData.polygon as GeoJSON.Polygon | GeoJSON.MultiPolygon | null) || null}
+                polygon={(countyData.polygon as unknown as GeoJSON.Polygon | GeoJSON.MultiPolygon | null) || null}
                 countyName={countyData.name}
                 height="300px"
               />
@@ -289,9 +289,13 @@ export default async function CountyPage({ params }: Props) {
                     <span key={city.id}>
                       {idx > 0 && idx < citiesData.slice(0, 5).length - 1 && ', '}
                       {idx === citiesData.slice(0, 5).length - 1 && citiesData.length > 1 && ' and '}
-                      <Link href={`/explore/city/${city.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors">
-                        {city.name}
-                      </Link>
+                      {city.slug ? (
+                        <Link href={`/explore/city/${city.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors">
+                          {city.name}
+                        </Link>
+                      ) : (
+                        <span>{city.name}</span>
+                      )}
                     </span>
                   ))}
                   {citiesData.length > 5 && (
@@ -374,13 +378,17 @@ export default async function CountyPage({ params }: Props) {
                     <li key={city.id} className="leading-relaxed">
                       <span className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-gray-400">•</span>
-                        <Link href={`/explore/city/${city.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors font-medium">
-                          {city.name}
-                        </Link>
+                        {city.slug ? (
+                          <Link href={`/explore/city/${city.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors font-medium">
+                            {city.name}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-700 font-medium">{city.name}</span>
+                        )}
                         {city.favorite && (
                           <StarIcon className="w-3 h-3 text-gray-700 flex-shrink-0" aria-label="Featured city" />
                         )}
-                        {city.population > 0 && (
+                        {city.population !== null && city.population > 0 && (
                           <span className="text-gray-500">({formatNumber(city.population)} residents)</span>
                         )}
                         {city.website_url && (

@@ -26,9 +26,16 @@ export async function GET() {
 
   const now = new Date().toISOString();
   
+  // Type assertion for cities with non-null slugs
+  const citiesWithSlugs = (allCities || []) as Array<{
+    slug: string;
+    favorite: boolean | null;
+    updated_at: string | null;
+  }>;
+  
   // Separate favorites and non-favorites for priority ordering
-  const favoriteCities = allCities.filter(city => city.favorite);
-  const otherCities = allCities.filter(city => !city.favorite);
+  const favoriteCities = citiesWithSlugs.filter(city => city.favorite);
+  const otherCities = citiesWithSlugs.filter(city => !city.favorite);
   
   // Combine: favorites first (higher priority), then others
   const sortedCities = [...favoriteCities, ...otherCities];

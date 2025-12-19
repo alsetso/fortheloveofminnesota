@@ -70,7 +70,7 @@ function formatArea(area: number): string {
   return `${formatNumber(area)} sq mi`;
 }
 
-function generateStructuredData(counties: Array<{ id: string; name: string; slug: string; population: number; area_sq_mi: number | null }>) {
+function generateStructuredData(counties: Array<{ id: string; name: string; slug: string | null; population: number; area_sq_mi: number | null }>) {
   const totalPopulation = counties.reduce((sum, c) => sum + c.population, 0);
   const totalArea = counties.reduce((sum, c) => sum + Number(c.area_sq_mi || 0), 0);
   
@@ -83,21 +83,24 @@ function generateStructuredData(counties: Array<{ id: string; name: string; slug
     mainEntity: {
       '@type': 'ItemList',
       numberOfItems: counties.length,
-      itemListElement: counties.slice(0, 50).map((county, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
-        item: {
-          '@type': 'County',
-          name: county.name,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/county/${county.slug}`,
-          population: county.population,
-          area: county.area_sq_mi ? {
-            '@type': 'QuantitativeValue',
-            value: county.area_sq_mi,
-            unitCode: 'MI2',
-          } : undefined,
-        },
-      })),
+      itemListElement: counties
+        .filter(c => c.slug !== null)
+        .slice(0, 50)
+        .map((county, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          item: {
+            '@type': 'County',
+            name: county.name,
+            url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/county/${county.slug}`,
+            population: county.population,
+            area: county.area_sq_mi ? {
+              '@type': 'QuantitativeValue',
+              value: county.area_sq_mi,
+              unitCode: 'MI2',
+            } : undefined,
+          },
+        })),
     },
     about: {
       '@type': 'State',
@@ -154,7 +157,14 @@ export default async function CountiesListPage() {
     console.error('[CountiesListPage] Error fetching counties:', error);
   }
 
-  const allCounties = counties || [];
+  const allCounties = (counties || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    population: number;
+    area_sq_mi: number | null;
+    favorite: boolean | null;
+  }>;
   const totalPopulation = allCounties.reduce((sum, c) => sum + c.population, 0);
   const totalArea = allCounties.reduce((sum, c) => sum + Number(c.area_sq_mi || 0), 0);
   const structuredData = generateStructuredData(allCounties);

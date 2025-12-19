@@ -23,8 +23,8 @@ export async function generateStaticParams() {
     .select('slug')
     .not('slug', 'is', null);
   
-  return (cities || []).map((city) => ({
-    slug: city.slug!,
+  return ((cities || []) as Array<{ slug: string }>).map((city) => ({
+    slug: city.slug,
   }));
 }
 
@@ -54,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const cityMeta = city as {
     name: string;
-    population: number;
+    population: number | null;
     county: string | null;
     meta_title: string | null;
     meta_description: string | null;
@@ -63,7 +63,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const url = `${baseUrl}/explore/city/${slug}`;
   const title = cityMeta.meta_title || `${cityMeta.name}, Minnesota | City Information`;
-  const description = cityMeta.meta_description || `${cityMeta.name}, Minnesota. Population: ${cityMeta.population.toLocaleString()}${cityMeta.county ? `, County: ${cityMeta.county}` : ''}. Information about ${cityMeta.name} including demographics, location, and resources.`;
+  const populationText = cityMeta.population !== null ? cityMeta.population.toLocaleString() : 'N/A';
+  const description = cityMeta.meta_description || `${cityMeta.name}, Minnesota. Population: ${populationText}${cityMeta.county ? `, County: ${cityMeta.county}` : ''}. Information about ${cityMeta.name} including demographics, location, and resources.`;
 
   return {
     title,
@@ -134,7 +135,11 @@ export default async function CityPage({ params }: Props) {
   }
 
   // Type assertion for city data - matches City interface from admin service
-  const cityData = city as City & { boundary_lines?: GeoJSON.Polygon | GeoJSON.MultiPolygon | null };
+  const cityData = city as City & { 
+    boundary_lines?: GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
+    population: number | null;
+    county: string | null;
+  };
 
   // Find county by name to get county slug
   let countySlug: string | null = null;
@@ -148,7 +153,7 @@ export default async function CityPage({ params }: Props) {
       .ilike('name', countyName)
       .single();
     if (county) {
-      countySlug = county.slug;
+      countySlug = (county as { slug: string | null }).slug;
     }
   }
 
@@ -157,8 +162,8 @@ export default async function CityPage({ params }: Props) {
     id: string;
     name: string;
     slug: string | null;
-    population: number;
-    favorite: boolean;
+    population: number | null;
+    favorite: boolean | null;
     website_url: string | null;
   }> = [];
   
@@ -185,8 +190,8 @@ export default async function CityPage({ params }: Props) {
       id: string;
       name: string;
       slug: string | null;
-      population: number;
-      favorite: boolean;
+      population: number | null;
+      favorite: boolean | null;
       website_url: string | null;
     }>;
   }
@@ -209,9 +214,9 @@ export default async function CityPage({ params }: Props) {
     id: string;
     name: string;
     slug: string | null;
-    population: number;
+    population: number | null;
     county: string | null;
-    favorite: boolean;
+    favorite: boolean | null;
     website_url: string | null;
   }>;
 
@@ -288,6 +293,108 @@ export default async function CityPage({ params }: Props) {
     .eq('city_id', cityId)
     .order('name');
 
+  // Type assertions for atlas entities
+  const neighborhoodsData = (neighborhoods || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    description: string | null;
+  }>;
+
+  const schoolsData = (schools || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    school_type: string | null;
+    description: string | null;
+  }>;
+
+  const parksData = (parks || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    park_type: string | null;
+    description: string | null;
+  }>;
+
+  const watertowersData = (watertowers || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    description: string | null;
+  }>;
+
+  const cemeteriesData = (cemeteries || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    description: string | null;
+  }>;
+
+  const golfCoursesData = (golfCourses || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    course_type: string | null;
+    holes: number | null;
+    description: string | null;
+  }>;
+
+  const hospitalsData = (hospitals || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    hospital_type: string | null;
+    description: string | null;
+  }>;
+
+  const airportsData = (airports || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    airport_type: string | null;
+    iata_code: string | null;
+    icao_code: string | null;
+    description: string | null;
+  }>;
+
+  const churchesData = (churches || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    church_type: string | null;
+    denomination: string | null;
+    description: string | null;
+  }>;
+
+  const municipalsData = (municipals || []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    lat: number | null;
+    lng: number | null;
+    municipal_type: string | null;
+    description: string | null;
+  }>;
+
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" hideFooter={false}>
       <CityPageClient cityId={cityData.id} citySlug={cityData.slug || slug} />
@@ -347,7 +454,7 @@ export default async function CityPage({ params }: Props) {
                 </Link>
               )}
             </div>
-            {cityData.view_count !== undefined && cityData.view_count > 0 && (
+            {cityData.view_count !== undefined && cityData.view_count !== null && cityData.view_count > 0 && (
               <Views count={cityData.view_count} size="sm" className="text-gray-500" />
             )}
           </div>
@@ -357,7 +464,7 @@ export default async function CityPage({ params }: Props) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
           <div className="bg-white rounded-md border border-gray-200 p-[10px]">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-0.5">Population</p>
-            <p className="text-sm font-semibold text-gray-900">{formatNumber(cityData.population)}</p>
+            <p className="text-sm font-semibold text-gray-900">{cityData.population !== null ? formatNumber(cityData.population) : 'N/A'}</p>
           </div>
           {cityData.county && (
             <div className="bg-white rounded-md border border-gray-200 p-[10px]">
@@ -415,7 +522,7 @@ export default async function CityPage({ params }: Props) {
                   )}
                 </>
               )}
-              {' '}with a population of <strong className="text-gray-900">{formatNumber(cityData.population)}</strong> residents.
+              {' '}with a population of <strong className="text-gray-900">{cityData.population !== null ? formatNumber(cityData.population) : 'N/A'}</strong> residents.
               {sameCountyCitiesData.length > 0 && (
                 <span>
                   {' '}The city is part of {cityData.county || 'the county'}, which includes {sameCountyCitiesData.length} other {sameCountyCitiesData.length === 1 ? 'city' : 'cities'}, including{' '}
@@ -423,9 +530,13 @@ export default async function CityPage({ params }: Props) {
                     <span key={city.id}>
                       {idx > 0 && idx < Math.min(sameCountyCitiesData.length, 3) - 1 && ', '}
                       {idx === Math.min(sameCountyCitiesData.length, 3) - 1 && sameCountyCitiesData.length > 1 && ' and '}
-                      <Link href={`/explore/city/${city.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors">
-                        {city.name}
-                      </Link>
+                      {city.slug ? (
+                        <Link href={`/explore/city/${city.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors">
+                          {city.name}
+                        </Link>
+                      ) : (
+                        <span>{city.name}</span>
+                      )}
                     </span>
                   ))}
                   {sameCountyCitiesData.length > 3 && (
@@ -482,23 +593,27 @@ export default async function CityPage({ params }: Props) {
                   {(() => {
                     // Combine current city with county cities, ensuring no duplicates
                     const allCountyCities = [
-                      { id: cityData.id, name: cityData.name, slug: cityData.slug, population: cityData.population, favorite: cityData.favorite, website_url: cityData.website_url },
+                      { id: cityData.id, name: cityData.name, slug: cityData.slug, population: cityData.population ?? null, favorite: cityData.favorite ?? null, website_url: cityData.website_url },
                       ...sameCountyCitiesData.filter(c => c.id !== cityData.id)
                     ];
                     
                     return allCountyCities
-                      .sort((a, b) => b.population - a.population)
+                      .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
                       .map((c) => (
                         <li key={c.id} className="leading-relaxed">
                           <span className="flex items-center gap-1.5 flex-wrap">
                             <span className="text-gray-400">•</span>
-                            <Link href={`/explore/city/${c.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors font-medium">
-                              {c.name}
-                            </Link>
+                            {c.slug ? (
+                              <Link href={`/explore/city/${c.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors font-medium">
+                                {c.name}
+                              </Link>
+                            ) : (
+                              <span className="text-gray-700 font-medium">{c.name}</span>
+                            )}
                             {c.favorite && (
                               <StarIcon className="w-3 h-3 text-gray-700 flex-shrink-0" aria-label="Featured city" />
                             )}
-                            {c.population > 0 && (
+                            {c.population !== null && c.population > 0 && (
                               <span className="text-gray-500">({formatNumber(c.population)} residents)</span>
                             )}
                             {c.website_url && (
@@ -542,9 +657,13 @@ export default async function CityPage({ params }: Props) {
                   {favoriteCitiesData.slice(0, 15).map((c, idx) => (
                     <span key={c.id}>
                       {idx > 0 && ', '}
-                      <Link href={`/explore/city/${c.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors">
-                        {c.name}
-                      </Link>
+                      {c.slug ? (
+                        <Link href={`/explore/city/${c.slug}`} className="text-gray-700 underline hover:text-gray-900 transition-colors">
+                          {c.name}
+                        </Link>
+                      ) : (
+                        <span>{c.name}</span>
+                      )}
                     </span>
                   ))}
                   {favoriteCitiesData.length > 15 && (
@@ -557,12 +676,12 @@ export default async function CityPage({ params }: Props) {
         </div>
 
           {/* Atlas Entities Sections */}
-          {(neighborhoods && neighborhoods.length > 0) && (
+          {(neighborhoodsData && neighborhoodsData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Neighborhoods ({neighborhoods.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Neighborhoods ({neighborhoodsData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {neighborhoods.map((n) => (
+                  {neighborhoodsData.map((n) => (
                     <li key={n.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {n.name}
                     </li>
@@ -572,12 +691,28 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(schools && schools.length > 0) && (
+          {/* Atlas Entities Sections */}
+          {(neighborhoodsData && neighborhoodsData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Schools ({schools.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Neighborhoods ({neighborhoodsData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {schools.map((s) => (
+                  {neighborhoodsData.map((n) => (
+                    <li key={n.id} className="leading-relaxed">
+                      <span className="text-gray-400">•</span> {n.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          )}
+
+          {(schoolsData && schoolsData.length > 0) && (
+            <section>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Schools ({schoolsData.length})</h2>
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <ul className="list-none space-y-1 text-xs text-gray-600">
+                  {schoolsData.map((s) => (
                     <li key={s.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {s.name}{s.school_type && <span className="text-gray-500"> ({s.school_type})</span>}
                     </li>
@@ -587,12 +722,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(parks && parks.length > 0) && (
+          {(parksData && parksData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Parks ({parks.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Parks ({parksData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {parks.map((p) => (
+                  {parksData.map((p) => (
                     <li key={p.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {p.name}{p.park_type && <span className="text-gray-500"> ({p.park_type})</span>}
                     </li>
@@ -602,12 +737,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(watertowers && watertowers.length > 0) && (
+          {(watertowersData && watertowersData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Watertowers ({watertowers.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Watertowers ({watertowersData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {watertowers.map((w) => (
+                  {watertowersData.map((w) => (
                     <li key={w.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {w.name}
                     </li>
@@ -617,12 +752,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(cemeteries && cemeteries.length > 0) && (
+          {(cemeteriesData && cemeteriesData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Cemeteries ({cemeteries.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Cemeteries ({cemeteriesData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {cemeteries.map((c) => (
+                  {cemeteriesData.map((c) => (
                     <li key={c.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {c.name}
                     </li>
@@ -632,12 +767,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(golfCourses && golfCourses.length > 0) && (
+          {(golfCoursesData && golfCoursesData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Golf Courses ({golfCourses.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Golf Courses ({golfCoursesData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {golfCourses.map((g) => (
+                  {golfCoursesData.map((g) => (
                     <li key={g.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {g.name}{g.course_type && <span className="text-gray-500"> ({g.course_type})</span>}{g.holes && <span className="text-gray-500"> - {g.holes} holes</span>}
                     </li>
@@ -647,12 +782,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(hospitals && hospitals.length > 0) && (
+          {(hospitalsData && hospitalsData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Hospitals ({hospitals.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Hospitals ({hospitalsData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {hospitals.map((h) => (
+                  {hospitalsData.map((h) => (
                     <li key={h.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {h.name}{h.hospital_type && <span className="text-gray-500"> ({h.hospital_type})</span>}
                     </li>
@@ -662,12 +797,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(airports && airports.length > 0) && (
+          {(airportsData && airportsData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Airports ({airports.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Airports ({airportsData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {airports.map((a) => (
+                  {airportsData.map((a) => (
                     <li key={a.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {a.name}{a.airport_type && <span className="text-gray-500"> ({a.airport_type})</span>}{a.iata_code && <span className="text-gray-500"> - {a.iata_code}</span>}
                     </li>
@@ -677,12 +812,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(churches && churches.length > 0) && (
+          {(churchesData && churchesData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Churches ({churches.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Churches ({churchesData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {churches.map((c) => (
+                  {churchesData.map((c) => (
                     <li key={c.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {c.name}{c.denomination && <span className="text-gray-500"> ({c.denomination})</span>}
                     </li>
@@ -692,12 +827,12 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
 
-          {(municipals && municipals.length > 0) && (
+          {(municipalsData && municipalsData.length > 0) && (
             <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Municipal Buildings ({municipals.length})</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Municipal Buildings ({municipalsData.length})</h2>
               <div className="bg-white rounded-md border border-gray-200 p-[10px]">
                 <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {municipals.map((m) => (
+                  {municipalsData.map((m) => (
                     <li key={m.id} className="leading-relaxed">
                       <span className="text-gray-400">•</span> {m.name}{m.municipal_type && <span className="text-gray-500"> ({m.municipal_type})</span>}
                     </li>

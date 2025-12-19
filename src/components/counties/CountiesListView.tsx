@@ -8,10 +8,10 @@ import React from 'react';
 type County = {
   id: string;
   name: string;
-  slug: string;
+  slug: string | null;
   population: number;
-  area_sq_mi: number;
-  favorite?: boolean;
+  area_sq_mi: number | null;
+  favorite?: boolean | null;
 };
 
 interface CountiesListViewProps {
@@ -75,7 +75,7 @@ export function CountiesListView({ counties }: CountiesListViewProps) {
       } else if (sortBy === 'population') {
         comparison = a.population - b.population;
       } else if (sortBy === 'area') {
-        comparison = a.area_sq_mi - b.area_sq_mi;
+        comparison = (a.area_sq_mi ?? 0) - (b.area_sq_mi ?? 0);
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -169,8 +169,8 @@ export function CountiesListView({ counties }: CountiesListViewProps) {
             {sortedCounties.map((county) => (
               <tr
                 key={county.id}
-                onClick={() => router.push(`/explore/county/${county.slug}`)}
-                className="hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => county.slug && router.push(`/explore/county/${county.slug}`)}
+                className={county.slug ? "hover:bg-gray-50 transition-colors cursor-pointer" : ""}
               >
                 <td className="px-[10px] py-[10px]">
                   <div className="flex items-center gap-1.5">
@@ -186,7 +186,7 @@ export function CountiesListView({ counties }: CountiesListViewProps) {
                   {formatNumber(county.population)}
                 </td>
                 <td className="px-[10px] py-[10px] text-xs text-gray-600">
-                  {formatArea(county.area_sq_mi)}
+                  {county.area_sq_mi !== null ? formatArea(county.area_sq_mi) : 'N/A'}
                 </td>
               </tr>
             ))}

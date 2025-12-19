@@ -169,7 +169,7 @@ export default function CityMap({
         map.current = mapInstance;
 
         return () => {
-          if (map.current && !map.current.removed) {
+          if (map.current && !(map.current as any)._removed) {
             map.current.remove();
             map.current = null;
           }

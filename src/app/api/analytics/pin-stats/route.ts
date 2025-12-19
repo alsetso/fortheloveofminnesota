@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     const { data: stats, error: statsError } = await supabase.rpc('get_pin_stats', {
       p_pin_id: pinId,
       p_hours: hours,
-    });
+    } as any);
 
     if (statsError) {
       console.error('Error fetching pin stats:', statsError);
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       .eq('pin_id', pinId)
       .order('viewed_at', { ascending: true })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle() as { data: { viewed_at: string } | null; error: any };
 
     const { data: lastView } = await supabase
       .from('pin_views')
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       .eq('pin_id', pinId)
       .order('viewed_at', { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle() as { data: { viewed_at: string } | null; error: any };
 
     // Get recent viewers if requested
     let viewers = null;
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
     // Group by date
     const dailyViews: Record<string, number> = {};
     if (trendData) {
-      trendData.forEach((view) => {
+      (trendData as { viewed_at: string }[]).forEach((view) => {
         const date = new Date(view.viewed_at).toISOString().split('T')[0];
         dailyViews[date] = (dailyViews[date] || 0) + 1;
       });
@@ -157,8 +157,8 @@ export async function GET(request: NextRequest) {
         accounts_viewed: statsData.accounts_viewed || 0,
       },
       time_ranges: timeRangeStats,
-      first_viewed_at: firstView?.viewed_at || null,
-      last_viewed_at: lastView?.viewed_at || null,
+      first_viewed_at: (firstView as { viewed_at: string } | null)?.viewed_at || null,
+      last_viewed_at: (lastView as { viewed_at: string } | null)?.viewed_at || null,
       viewers: viewers,
       view_trend: viewTrend,
     });

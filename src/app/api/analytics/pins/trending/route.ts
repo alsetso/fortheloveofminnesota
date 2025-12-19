@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     // Count views per pin
     const pinViewCounts: Record<string, number> = {};
-    (recentViews || []).forEach((view) => {
+    ((recentViews || []) as { pin_id: string }[]).forEach((view) => {
       pinViewCounts[view.pin_id] = (pinViewCounts[view.pin_id] || 0) + 1;
     });
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     // Combine pin data with view counts
     const result = trendingPins.map((trending) => {
-      const pin = pins?.find((p) => p.id === trending.pin_id);
+      const pin = (pins as { id: string; name: string | null; description: string | null; created_at: string; account_id: string }[] | null)?.find((p) => p.id === trending.pin_id);
       return {
         pin_id: trending.pin_id,
         view_count: trending.view_count,

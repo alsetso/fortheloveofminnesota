@@ -10,7 +10,7 @@ async function updateAccountFromSubscription(
   customerId: string,
   subscription: Stripe.Subscription | null
 ): Promise<void> {
-  const supabase = createServiceClient();
+  const supabase = createServiceClient() as any;
 
   // Map Stripe subscription status to our subscription_status
   const statusMap: Record<string, string> = {
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         
         // If invoice has a subscription, fetch it
         // invoice.subscription can be a string (subscription ID) or Subscription object
-        const subscriptionId = invoice.subscription;
+        const subscriptionId = (invoice as any).subscription;
         if (subscriptionId) {
           const subId = typeof subscriptionId === 'string' 
             ? subscriptionId 

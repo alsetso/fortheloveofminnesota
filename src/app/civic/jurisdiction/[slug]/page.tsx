@@ -15,9 +15,9 @@ export async function generateStaticParams() {
   const { data: jurisdictions } = await supabase
     .from('jurisdictions')
     .select('slug')
-    .not('slug', 'is', null);
+    .not('slug', 'is', null) as { data: { slug: string }[] | null; error: any };
 
-  return (jurisdictions || []).map((jurisdiction) => ({
+  return ((jurisdictions || []) as { slug: string }[]).map((jurisdiction) => ({
     slug: jurisdiction.slug!,
   }));
 }
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { data: jurisdiction } = await supabase
     .from('jurisdictions')
     .select('name, type')
-    .eq('slug', slug)
-    .single();
+    .eq('slug', slug as any)
+    .single() as { data: { name: string; type: string | null } | null; error: any };
 
   if (!jurisdiction) {
     return { title: 'Jurisdiction Not Found | Minnesota Civic Directory' };
@@ -66,34 +66,34 @@ export default async function JurisdictionPage({ params }: Props) {
   const { data: jurisdiction, error } = await supabase
     .from('jurisdictions')
     .select('*')
-    .eq('slug', slug)
-    .single();
+    .eq('slug', slug as any)
+    .single() as { data: { id: string; name: string; type: string | null; parent_id: string | null; slug: string } | null; error: any };
 
   if (error || !jurisdiction) {
     notFound();
   }
 
   // Fetch parent jurisdiction if exists
-  let parent = null;
+  let parent: { id: string; name: string; slug: string; type: string | null } | null = null;
   if (jurisdiction.parent_id) {
-    const { data } = await supabase
+    const { data } = await (supabase
       .from('jurisdictions')
       .select('id, name, slug, type')
-      .eq('id', jurisdiction.parent_id)
-      .single();
+      .eq('id', jurisdiction.parent_id as any)
+      .single() as any) as { data: { id: string; name: string; slug: string; type: string | null } | null; error: any };
     parent = data;
   }
 
   // Fetch child jurisdictions
-  const { data: children } = await supabase
+  const { data: children } = await (supabase
     .from('jurisdictions')
     .select('id, name, slug, type')
-    .eq('parent_id', jurisdiction.id)
+    .eq('parent_id', jurisdiction.id as any)
     .order('type')
-    .order('name');
+    .order('name') as any) as { data: { id: string; name: string; slug: string; type: string | null }[] | null; error: any };
 
   // Fetch current officials
-  const { data: currentTerms } = await supabase
+  const { data: currentTerms } = await (supabase
     .from('terms')
     .select(`
       id,
@@ -102,24 +102,24 @@ export default async function JurisdictionPage({ params }: Props) {
       leader:leaders(id, full_name, slug, party),
       position:positions(id, title, slug, authority_rank)
     `)
-    .eq('jurisdiction_id', jurisdiction.id)
-    .eq('is_current', true)
-    .order('is_leadership', { ascending: false });
+    .eq('jurisdiction_id', jurisdiction.id as any)
+    .eq('is_current', true as any)
+    .order('is_leadership', { ascending: false }) as any) as { data: any[] | null; error: any };
 
   // Sort by authority_rank
-  const sortedTerms = (currentTerms || []).sort((a: any, b: any) => {
+  const sortedTerms = ((currentTerms || []) as any[]).sort((a: any, b: any) => {
     const rankA = a.position?.authority_rank ?? 999;
     const rankB = b.position?.authority_rank ?? 999;
     return rankA - rankB;
   });
 
   // Group children by type
-  const childrenByType = (children || []).reduce((acc, child) => {
+  const childrenByType = ((children || []) as { id: string; name: string; slug: string; type: string | null }[]).reduce((acc, child) => {
     const type = child.type || 'Other';
     if (!acc[type]) acc[type] = [];
     acc[type].push(child);
     return acc;
-  }, {} as Record<string, typeof children>);
+  }, {} as Record<string, { id: string; name: string; slug: string; type: string | null }[]>);
 
   const childTypeOrder = ['County', 'City', 'Congressional District', 'Judicial District', 'Legislative', 'Executive', 'Judicial', 'Other'];
 

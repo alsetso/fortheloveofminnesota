@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
     // Save to database
     const { data, error } = await supabase
       .from('skip_tracing')
-      .insert(insertData)
+      .insert(insertData as any)
       .select()
       .single();
 

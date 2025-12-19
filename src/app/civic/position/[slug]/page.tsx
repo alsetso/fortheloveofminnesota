@@ -15,9 +15,9 @@ export async function generateStaticParams() {
   const { data: positions } = await supabase
     .from('positions')
     .select('slug')
-    .not('slug', 'is', null);
+    .not('slug', 'is', null) as { data: { slug: string }[] | null; error: any };
 
-  return (positions || []).map((position) => ({
+  return ((positions || []) as { slug: string }[]).map((position) => ({
     slug: position.slug!,
   }));
 }
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { data: position } = await supabase
     .from('positions')
     .select('title, branch, level')
-    .eq('slug', slug)
-    .single();
+    .eq('slug', slug as any)
+    .single() as { data: { title: string; branch: string | null; level: string | null } | null; error: any };
 
   if (!position) {
     return { title: 'Position Not Found | Minnesota Civic Directory' };
@@ -59,8 +59,8 @@ export default async function PositionPage({ params }: Props) {
   const { data: position, error } = await supabase
     .from('positions')
     .select('*')
-    .eq('slug', slug)
-    .single();
+    .eq('slug', slug as any)
+    .single() as { data: { id: string; title: string; branch: string | null; level: string | null } | null; error: any };
 
   if (error || !position) {
     notFound();
@@ -77,9 +77,9 @@ export default async function PositionPage({ params }: Props) {
       leader:leaders(id, full_name, slug, party),
       jurisdiction:jurisdictions(id, name, slug, type)
     `)
-    .eq('position_id', position.id)
-    .eq('is_current', true)
-    .order('start_date', { ascending: false });
+    .eq('position_id', position.id as any)
+    .eq('is_current', true as any)
+    .order('start_date', { ascending: false }) as { data: any[] | null; error: any };
 
   const holderCount = currentTerms?.length || 0;
 

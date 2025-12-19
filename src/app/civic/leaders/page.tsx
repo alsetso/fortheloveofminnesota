@@ -25,13 +25,14 @@ export default async function LeadersPage() {
   const { data: leaders } = await supabase
     .from('leaders')
     .select('id, mn_id, full_name, slug, party, is_active, notes')
-    .eq('is_active', true)
-    .order('full_name');
+    .eq('is_active', true as any)
+    .order('full_name') as { data: { id: string; mn_id: string | null; full_name: string; slug: string; party: string | null; is_active: boolean; notes: string | null }[] | null; error: any };
 
   // Group by party
-  const dflLeaders = leaders?.filter(l => l.party === 'DFL') || [];
-  const republicanLeaders = leaders?.filter(l => l.party === 'Republican') || [];
-  const otherLeaders = leaders?.filter(l => !l.party || (l.party !== 'DFL' && l.party !== 'Republican')) || [];
+  const leadersArray = (leaders || []) as { id: string; mn_id: string | null; full_name: string; slug: string; party: string | null; is_active: boolean; notes: string | null }[];
+  const dflLeaders = leadersArray.filter(l => l.party === 'DFL');
+  const republicanLeaders = leadersArray.filter(l => l.party === 'Republican');
+  const otherLeaders = leadersArray.filter(l => !l.party || (l.party !== 'DFL' && l.party !== 'Republican'));
 
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
@@ -55,7 +56,7 @@ export default async function LeadersPage() {
         <div className="mb-3">
           <h1 className="text-sm font-semibold text-gray-900 mb-1.5">Minnesota Elected Officials</h1>
           <p className="text-xs text-gray-600 mb-1.5">
-            Meet the {leaders?.length || 0} officials currently serving Minnesota—from the Governor&apos;s office 
+            Meet the {leadersArray.length} officials currently serving Minnesota—from the Governor&apos;s office 
             and U.S. Congress to the State Legislature and beyond.
           </p>
           <p className="text-xs text-gray-500">
@@ -80,9 +81,9 @@ export default async function LeadersPage() {
 
         {/* Leaders List */}
         <div className="bg-white rounded-md border border-gray-200">
-          {leaders && leaders.length > 0 ? (
+          {leadersArray.length > 0 ? (
             <ul className="divide-y divide-gray-200">
-              {leaders.map((leader) => (
+              {leadersArray.map((leader) => (
                 <li key={leader.id}>
                   <Link
                     href={`/civic/leader/${leader.slug}`}

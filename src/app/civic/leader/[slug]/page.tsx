@@ -15,9 +15,9 @@ export async function generateStaticParams() {
   const { data: leaders } = await supabase
     .from('leaders')
     .select('slug')
-    .not('slug', 'is', null);
+    .not('slug', 'is', null) as { data: { slug: string }[] | null; error: any };
 
-  return (leaders || []).map((leader) => ({
+  return ((leaders || []) as { slug: string }[]).map((leader) => ({
     slug: leader.slug!,
   }));
 }
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { data: leader } = await supabase
     .from('leaders')
     .select('full_name, party, notes')
-    .eq('slug', slug)
-    .single();
+    .eq('slug', slug as any)
+    .single() as { data: { full_name: string; party: string | null; notes: string | null } | null; error: any };
 
   if (!leader) {
     return { title: 'Official Not Found | Minnesota Civic Directory' };
@@ -64,8 +64,8 @@ export default async function LeaderPage({ params }: Props) {
   const { data: leader, error } = await supabase
     .from('leaders')
     .select('*')
-    .eq('slug', slug)
-    .single();
+    .eq('slug', slug as any)
+    .single() as { data: { id: string; full_name: string; party: string | null; notes: string | null; is_active: boolean; official_url: string | null } | null; error: any };
 
   if (error || !leader) {
     notFound();
@@ -83,9 +83,9 @@ export default async function LeaderPage({ params }: Props) {
       position:positions(id, title, slug, branch, level),
       jurisdiction:jurisdictions(id, name, slug, type)
     `)
-    .eq('leader_id', leader.id)
+    .eq('leader_id', leader.id as any)
     .order('is_current', { ascending: false })
-    .order('start_date', { ascending: false });
+    .order('start_date', { ascending: false }) as { data: any[] | null; error: any };
 
   const currentTerms = terms?.filter((t: any) => t.is_current) || [];
   const pastTerms = terms?.filter((t: any) => !t.is_current) || [];

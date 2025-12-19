@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
         .from('accounts')
         .select('id')
         .eq('user_id', user.id)
-        .maybeSingle();
-      accountId = account?.id || null;
+        .maybeSingle() as { data: { id: string } | null; error: any };
+      accountId = (account as { id: string } | null)?.id || null;
     }
 
     // Record page view using the new simplified function
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       p_user_agent: user_agent || null,
       p_referrer_url: referrer_url || null,
       p_session_id: session_id || null,
-    });
+    } as any) as { data: string | null; error: any };
 
     if (error) {
       console.error('Error recording page view:', error);

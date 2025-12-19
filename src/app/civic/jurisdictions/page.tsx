@@ -35,15 +35,15 @@ export default async function JurisdictionsPage({ searchParams }: Props) {
     .from('jurisdictions')
     .select('id, name, slug, type, parent_id')
     .order('type')
-    .order('name');
+    .order('name') as { data: { id: string; name: string; slug: string; type: string | null; parent_id: string | null }[] | null; error: any };
 
   // Group by type
-  const grouped = (jurisdictions || []).reduce((acc, j) => {
+  const grouped = ((jurisdictions || []) as { id: string; name: string; slug: string; type: string | null; parent_id: string | null }[]).reduce((acc, j) => {
     const type = j.type || 'Other';
     if (!acc[type]) acc[type] = [];
     acc[type].push(j);
     return acc;
-  }, {} as Record<string, typeof jurisdictions>);
+  }, {} as Record<string, { id: string; name: string; slug: string; type: string | null; parent_id: string | null }[]>);
 
   // Get all types and counts
   const allTypes = ['Federal', 'State', 'County', 'City', 'Congressional District', 'Legislative', 'Executive', 'Judicial', 'Judicial District', 'District', 'Other'];

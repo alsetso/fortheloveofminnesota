@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       .from('accounts')
       .select('id')
       .eq('user_id', user.id)
-      .single();
+      .single() as { data: { id: string } | null; error: any };
 
     // Insert search record
     // Use location_searches table (simplified structure)
@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
       .from('location_searches')
       .insert({
         user_id: user.id,
-        account_id: account?.id || null,
+        account_id: (account as { id: string } | null)?.id || null,
         place_name,
         lat: coordinates.lat,
         lng: coordinates.lng,
         mapbox_data,
         search_query: search_query || null,
         page_source: page_source || 'map',
-      });
+      } as any);
 
     if (insertError) {
       console.error('Error saving location search:', insertError);

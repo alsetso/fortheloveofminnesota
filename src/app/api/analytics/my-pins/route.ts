@@ -116,7 +116,7 @@ export async function GET() {
         .eq('pin_id', pinData.id)
         .order('viewed_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .maybeSingle() as { data: { viewed_at: string } | null; error: any };
 
       pinStats.push({
         pin_id: pinData.id,
@@ -125,7 +125,7 @@ export async function GET() {
         pin_created_at: pinData.created_at,
         total_views: statsData.total_views || 0,
         unique_viewers: statsData.unique_viewers || 0,
-        last_viewed_at: lastView?.viewed_at || null,
+        last_viewed_at: (lastView as { viewed_at: string } | null)?.viewed_at || null,
       });
 
       totalViews += statsData.total_views || 0;

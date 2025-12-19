@@ -145,7 +145,7 @@ export default function AppTopClient({
 
                 {/* Menu Dropdown - iOS Blur Style */}
                 {isSidebarOpen && (
-                  <div className="absolute left-0 top-full mt-2 w-56 bg-black/80 backdrop-blur-xl backdrop-saturate-150 rounded-lg border border-white/20 z-50 overflow-hidden">
+                  <div className="absolute left-0 top-full mt-2 w-56 bg-black rounded-lg border border-white/20 z-50 overflow-hidden">
                     <nav className="py-1">
                       {appNavItems.map((item) => {
                         const Icon = item.icon;

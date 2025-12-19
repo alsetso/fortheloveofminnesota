@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
         .from('pins')
         .select('account_id')
         .eq('id', pin_id)
-        .single();
-      isOwner = pin?.account_id === account.id;
+        .single() as { data: { account_id: string } | null; error: any };
+      isOwner = (pin as { account_id: string } | null)?.account_id === account.id;
     }
 
     if (!isOwner) {

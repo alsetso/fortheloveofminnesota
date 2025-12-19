@@ -3,26 +3,23 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth, AccountService, Account } from '@/features/auth';
-import { GuestAccountService, type GuestAccount } from '@/features/auth/services/guestAccountService';
-import ProfilePhoto from '@/components/ProfilePhoto';
+import AccountSwitcherDropdown from './AccountSwitcherDropdown';
 
 interface TopNavProps {
   onLocationSelect?: (coordinates: { lat: number; lng: number }) => void;
   isAccountModalOpen?: boolean;
   onAccountModalOpen?: () => void;
   onWelcomeModalOpen?: () => void;
-  hasCompletedGuestProfile?: boolean;
+  variant?: 'homepage' | 'profile';
 }
 
 export default function TopNav({ 
   isAccountModalOpen = false, 
   onAccountModalOpen, 
   onWelcomeModalOpen,
-  hasCompletedGuestProfile = false,
+  variant = 'homepage',
 }: TopNavProps) {
   const [account, setAccount] = useState<Account | null>(null);
-  const [guestAccount, setGuestAccount] = useState<GuestAccount | null>(null);
-  const [guestName, setGuestName] = useState<string | null>(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -31,82 +28,52 @@ export default function TopNav({
         try {
           const accountData = await AccountService.getCurrentAccount();
           setAccount(accountData);
-          setGuestAccount(null);
-          setGuestName(null);
         } catch (error) {
           console.error('Error fetching account:', error);
         }
       } else {
-        // Load guest name for display
-        const name = GuestAccountService.getGuestName();
-        setGuestName(name);
         setAccount(null);
-
-        // If profile is complete, fetch guest account from Supabase
-        if (hasCompletedGuestProfile) {
-          try {
-            const guestId = GuestAccountService.getGuestId();
-            const account = await GuestAccountService.getGuestAccountByGuestId(guestId);
-            if (account) {
-              setGuestAccount(account);
-            } else {
-              // Account doesn't exist yet, try to create it
-              try {
-                const newAccount = await GuestAccountService.getOrCreateGuestAccount();
-                setGuestAccount(newAccount);
-              } catch (error) {
-                console.error('[TopNav] Error creating guest account:', error);
-              }
-            }
-          } catch (error) {
-            console.error('[TopNav] Error fetching guest account:', error);
-          }
-        } else {
-          setGuestAccount(null);
-        }
       }
     };
 
     fetchAccount();
-  }, [user, hasCompletedGuestProfile]);
+  }, [user]);
+
+  // Get the profile URL based on account username
+  const profileUrl = account?.username ? `/profile/${account.username}` : null;
+
+  // Handle account selection from dropdown
+  const handleAccountSelect = () => {
+    onAccountModalOpen?.();
+  };
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-end px-4 py-3 bg-transparent">
-      {/* Account/Guest Button */}
-      {!user ? (
-        hasCompletedGuestProfile && guestAccount ? (
-          // Show guest account image after profile completion
-          <button
-            onClick={() => onAccountModalOpen?.()}
-            className="flex items-center px-2 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-white hover:text-white hover:bg-white/10"
-          >
-            <ProfilePhoto 
-              account={guestAccount as Account}
-              size="sm"
-              editable={false}
-            />
-          </button>
-        ) : (
-          // Show "Guest" button until profile is complete
-          <button
-            onClick={() => onAccountModalOpen?.()}
-            className="px-4 py-2 text-sm text-white hover:text-white/80 hover:bg-white/10 rounded-lg transition-colors border border-white/20"
-          >
-            Guest
-          </button>
-        )
-      ) : (
-        <button
-          onClick={() => onAccountModalOpen?.()}
-          className="flex items-center px-2 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-white hover:text-white hover:bg-white/10"
+    <div className="fixed top-0 left-0 right-0 z-30 flex items-center justify-end gap-2 px-4 py-3 bg-transparent">
+      {/* Navigation Link - Profile on homepage, Community on profile page */}
+      {variant === 'profile' ? (
+        <Link
+          href="/"
+          className="text-xs text-white/90 hover:text-white transition-colors"
         >
-          <ProfilePhoto 
-            account={account}
-            size="sm"
-            editable={false}
-          />
-        </button>
+          Community
+        </Link>
+      ) : (
+        profileUrl && (
+          <Link
+            href={profileUrl}
+            className="text-xs text-white/90 hover:text-white transition-colors"
+          >
+            Profile
+          </Link>
+        )
       )}
+
+      {/* Account Switcher Dropdown */}
+      <AccountSwitcherDropdown 
+        variant="dark"
+        onAccountSelect={handleAccountSelect}
+        onCreateNew={() => onAccountModalOpen?.()}
+      />
     </div>
   );
 }

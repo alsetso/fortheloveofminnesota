@@ -1,26 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
 import { loadMapboxGL } from '@/features/_archive/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/_archive/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import TopNav from './TopNav';
-import MapControls from './MapControls';
+import SimpleNav from '@/components/SimpleNav';
 import LocationSidebar from './LocationSidebar';
-import WelcomeModal from './WelcomeModal';
-import AccountModal from './AccountModal';
 import PinsLayer from '@/components/_archive/map/PinsLayer';
-import CreatePinModal from '@/components/_archive/map/CreatePinModal';
-import GuestDetailsModal from '@/components/auth/GuestDetailsModal';
-import GuestAccountMergeModal from '@/components/auth/GuestAccountMergeModal';
 import HomepageStatsHandle from './HomepageStatsHandle';
-import { useAuth } from '@/features/auth';
+import { useAuthStateSafe } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
-import { useHomepageState } from './useHomepageState';
-import { useGuestAccountMerge } from '@/features/auth/hooks/useGuestAccountMerge';
-import { GuestAccountService } from '@/features/auth/services/guestAccountService';
-import { MapLayersPanel, useAtlasLayers, AtlasLayersRenderer } from '@/components/atlas';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useAtlasLayers, AtlasLayersRenderer } from '@/components/atlas';
+import { useUrlMapState } from './hooks/useUrlMapState';
 
 interface FeedMapClientProps {
   cities: Array<{
@@ -43,193 +35,70 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
   // Track page view
   usePageView();
   
+  // Map state
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
-  const [is3DMode, setIs3DMode] = useState(false);
-  const [roadsVisible, setRoadsVisible] = useState(true);
   const [pinsRefreshKey, setPinsRefreshKey] = useState(0);
-  const removeTemporaryPinRef = useRef<(() => void) | null>(null);
-  const updateTemporaryPinColorRef = useRef<((visibility: 'public' | 'only_me') => void) | null>(null);
-  const searchParams = useSearchParams();
-  const { user } = useAuth();
-  const [isGuestDetailsModalOpen, setIsGuestDetailsModalOpen] = useState(false);
-  const [hasCompletedGuestProfile, setHasCompletedGuestProfile] = useState(false);
-  const [isLayersPanelCollapsed, setIsLayersPanelCollapsed] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const initializedRef = useRef(false);
+  
+  // Atlas layers
   const { layers, toggleLayer, setLayerCount } = useAtlasLayers();
-
-  // Centralized state management for all homepage modals and UI states
+  
+  // Modal controls (modals rendered globally, but we need access to open functions)
+  const { isModalOpen, openWelcome } = useAppModalContextSafe();
+  
+  // URL-based map state (deep linking for shareable URLs)
+  const { 
+    updateUrlForLocation, 
+    updateUrlForPin,
+    getShareableUrl,
+    getShareablePinUrl,
+  } = useUrlMapState({
+    map: mapInstanceRef.current,
+    mapLoaded,
+    onOpenSidebar: () => setIsSidebarOpen(true),
+  });
+  
+  // Auth state from unified context
   const {
-    state,
-    openWelcomeModal,
-    closeWelcomeModal,
-    openAccountModal,
-    closeAccountModal,
-    openCreatePinModal,
-    closeCreatePinModal,
-    backFromCreatePin,
-    setSidebarOpen,
-    openSidebarForMapClick,
-    refreshAccount,
-  } = useHomepageState();
+    user,
+    hasCompletedGuestProfile,
+  } = useAuthStateSafe();
 
-  // Guest account merge hook
-  const { state: mergeState } = useGuestAccountMerge();
-  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
-
-  // Check if guest profile is complete on mount
+  // Refs to access current auth state in map event callbacks
+  const userRef = useRef(user);
+  const hasCompletedGuestProfileRef = useRef(hasCompletedGuestProfile);
+  const openWelcomeRef = useRef(openWelcome);
+  
   useEffect(() => {
-    const checkGuestProfile = async () => {
-      if (!user && typeof window !== 'undefined') {
-        const guestName = localStorage.getItem('mnuda_guest_name');
-        // Profile is complete if name exists and is not just "Guest"
-        if (guestName && guestName.trim() && guestName !== 'Guest') {
-          // Verify account exists in Supabase
-          try {
-            const guestId = GuestAccountService.getGuestId();
-            const account = await GuestAccountService.getGuestAccountByGuestId(guestId);
-            if (account) {
-              setHasCompletedGuestProfile(true);
-            } else {
-              // Account doesn't exist, but name is set - create it
-              try {
-                await GuestAccountService.getOrCreateGuestAccount();
-                setHasCompletedGuestProfile(true);
-              } catch (error) {
-                console.error('[FeedMapClient] Error creating guest account:', error);
-              }
-            }
-          } catch (error) {
-            console.error('[FeedMapClient] Error checking guest account:', error);
-          }
-        }
-      }
-    };
+    userRef.current = user;
+    hasCompletedGuestProfileRef.current = hasCompletedGuestProfile;
+    openWelcomeRef.current = openWelcome;
+  }, [user, hasCompletedGuestProfile, openWelcome]);
 
-    checkGuestProfile();
+  // Initialize guest mode (no auto-modal)
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
   }, [user]);
 
-  // Open guest details modal on first click/interaction if profile not complete
+  // Listen for pin-created event from inline form to refresh pins layer
   useEffect(() => {
-    if (!user && !hasCompletedGuestProfile && !isGuestDetailsModalOpen && state.modalState !== 'welcome') {
-      const handleFirstInteraction = () => {
-        setIsGuestDetailsModalOpen(true);
-        // Remove listeners after first interaction
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('touchstart', handleFirstInteraction);
-      };
-
-      // Wait a bit after welcome modal closes
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleFirstInteraction, { once: true });
-        document.addEventListener('touchstart', handleFirstInteraction, { once: true });
-      }, 300);
-
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleFirstInteraction);
-        document.removeEventListener('touchstart', handleFirstInteraction);
-      };
-    }
-  }, [user, hasCompletedGuestProfile, isGuestDetailsModalOpen, state.modalState]);
-
-  // Merge functionality disabled - guest accounts remain separate from user accounts
-  // When user logs in, guest data is not merged automatically
-  // useEffect(() => {
-  //   if (user && mergeState.hasGuestData && mergeState.guestAccount && mergeState.pinCount !== null && mergeState.pinCount > 0 && !isMergeModalOpen) {
-  //     setIsMergeModalOpen(true);
-  //   }
-  // }, [user, mergeState.hasGuestData, mergeState.guestAccount, mergeState.pinCount, isMergeModalOpen]);
-
-  // Handle URL params for account modal
-  useEffect(() => {
-    const modal = searchParams.get('modal');
-    const tab = searchParams.get('tab');
-    
-    if (modal === 'account' && user && state.modalState !== 'account') {
-      openAccountModal(tab || undefined);
-    }
-  }, [searchParams, user, state.modalState, openAccountModal]);
-
-
-  // Listen for map clicks to update temporary pin when create pin modal is open
-  useEffect(() => {
-    const handleMapClickUpdatePin = (event: CustomEvent) => {
-      const { lat, lng } = event.detail;
-      
-      // Only update if create pin modal is open
-      if (state.modalState === 'create-pin' && state.createPinCoordinates) {
-        // Update coordinates in state (this will update the modal)
-        openCreatePinModal({ lat, lng });
-        
-        // Update temporary pin position via event
-        window.dispatchEvent(new CustomEvent('update-temporary-pin', {
-          detail: { lat, lng }
-        }));
-      }
+    const handlePinCreatedEvent = () => {
+      setPinsRefreshKey(prev => prev + 1);
     };
 
-    window.addEventListener('map-click-update-pin', handleMapClickUpdatePin as EventListener);
+    window.addEventListener('pin-created', handlePinCreatedEvent);
     return () => {
-      window.removeEventListener('map-click-update-pin', handleMapClickUpdatePin as EventListener);
+      window.removeEventListener('pin-created', handlePinCreatedEvent);
     };
-  }, [state.modalState, state.createPinCoordinates, openCreatePinModal]);
+  }, []);
 
-  // Handle URL params for pin navigation (lat, lng, pin)
-  useEffect(() => {
-    if (!mapLoaded || !mapInstanceRef.current) return;
-
-    const latParam = searchParams.get('lat');
-    const lngParam = searchParams.get('lng');
-    const pinIdParam = searchParams.get('pin');
-
-    if (latParam && lngParam) {
-      const lat = parseFloat(latParam);
-      const lng = parseFloat(lngParam);
-
-      if (!isNaN(lat) && !isNaN(lng)) {
-        // Fly to the location
-        mapInstanceRef.current.flyTo({
-          center: [lng, lat],
-          zoom: 15,
-          duration: 1500,
-        });
-
-        // If a pin ID is provided, dispatch a custom event to trigger pin selection
-        if (pinIdParam) {
-          // Dispatch event after a short delay to ensure map has flown to location
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('select-pin-by-id', {
-              detail: { pinId: pinIdParam }
-            }));
-          }, 1600);
-        } else {
-          // Just show location without pin selection
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('show-location', {
-              detail: { lat, lng }
-            }));
-          }, 1600);
-        }
-
-        // Open sidebar
-        setSidebarOpen(true);
-      }
-    }
-  }, [searchParams, mapLoaded, setSidebarOpen]);
-
-  // Handle account modal open from TopNav
-  const handleAccountModalOpen = () => {
-    if (user) {
-      // Authenticated user: open account modal
-      openAccountModal();
-    } else {
-      // Guest: open guest details modal
-      setIsGuestDetailsModalOpen(true);
-    }
-  };
-
+  // Initialize map
   useEffect(() => {
     if (typeof window === 'undefined' || !mapContainer.current) return;
 
@@ -252,9 +121,10 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
 
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
-          style: MAP_CONFIG.STRATEGIC_STYLES.satellite,
+          style: MAP_CONFIG.MAPBOX_STYLE,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
+          pitch: 60, // Start in 3D mode
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
@@ -270,30 +140,23 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
           }
         });
 
-        // Handle map clicks to show location (temporary pin only, no modal)
-        // Modal will only open when user clicks "Create Pin" button
-
-        // Handle double-click to open create pin modal
+        // Handle double-click to select location and expand inline pin form
         mapInstance.on('dblclick', (e: any) => {
           if (!mounted) return;
           
-          // Get coordinates from the click event
-          const lng = e.lngLat.lng;
-          const lat = e.lngLat.lat;
+          // Check if user has an account (authenticated OR completed guest profile)
+          const hasAccount = userRef.current || hasCompletedGuestProfileRef.current;
           
-          // Open create pin modal with coordinates
-          openCreatePinModal({ lat, lng });
-        });
-
-        // Handle single click to update temporary pin position when create pin modal is open
-        mapInstance.on('click', (e: any) => {
-          if (!mounted) return;
+          if (!hasAccount) {
+            // No account - prompt to sign in/create profile
+            openWelcomeRef.current();
+            return;
+          }
           
           const lng = e.lngLat.lng;
           const lat = e.lngLat.lat;
-          
-          // Dispatch event - FeedMapClient will check if modal is open and update accordingly
-          window.dispatchEvent(new CustomEvent('map-click-update-pin', {
+          // Dispatch event to show location in sidebar and expand pin form
+          window.dispatchEvent(new CustomEvent('show-location-for-pin', {
             detail: { lat, lng }
           }));
         });
@@ -307,14 +170,13 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
             ? e
             : 'Unknown map error';
           
-          console.error('[FeedMap] Map error:', errorMessage, e);
+          console.error('[FeedMap] Map error:', errorMessage);
           if (mounted) {
             setMapError('load-error');
           }
         });
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize map';
-        console.error('Failed to initialize map:', errorMessage, err);
+        console.error('Failed to initialize map:', err);
         if (mounted) {
           setMapError('init-error');
         }
@@ -330,10 +192,8 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
           if (!mapInstanceRef.current.removed) {
             mapInstanceRef.current.remove();
           }
-        } catch (err) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[FeedMap] Error removing map instance:', err);
-          }
+        } catch {
+          // Ignore cleanup errors
         }
         mapInstanceRef.current = null;
       }
@@ -348,316 +208,87 @@ export default function FeedMapClient({ cities, counties }: FeedMapClientProps) 
       zoom: 15,
       duration: 1500,
     });
+    
+    // Update URL for shareable deep links
+    updateUrlForLocation(coordinates.lat, coordinates.lng, 15);
   };
 
-  const handle3DToggle = useCallback((enabled: boolean) => {
-    if (!mapInstanceRef.current || !mapLoaded) return;
-    setIs3DMode(enabled);
-    
-    mapInstanceRef.current.easeTo({
-      pitch: enabled ? 60 : 0,
-      duration: 800,
-    });
-  }, [mapLoaded]);
-
-  // Toggle road layers visibility
-  const handleRoadsToggle = useCallback((visible: boolean) => {
-    if (!mapInstanceRef.current || !mapLoaded) return;
-    setRoadsVisible(visible);
-    
-    const map = mapInstanceRef.current;
-    
-    // Road layer patterns in Mapbox styles
-    const roadLayerPatterns = [
-      'road',
-      'bridge',
-      'tunnel',
-      'highway',
-      'motorway',
-      'trunk',
-      'primary',
-      'secondary',
-      'tertiary',
-      'street',
-      'path',
-      'pedestrian',
-      'cycleway',
-      'track',
-    ];
-    
-    try {
-      const style = map.getStyle();
-      if (!style?.layers) return;
-      
-      style.layers.forEach((layer) => {
-        const layerId = layer.id.toLowerCase();
-        const isRoadLayer = roadLayerPatterns.some(pattern =>
-          layerId.includes(pattern)
-        );
-        
-        if (isRoadLayer) {
-          try {
-            map.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
-          } catch {
-            // Layer might not support visibility, ignore
-          }
-        }
-      });
-    } catch (e) {
-      console.warn('[FeedMap] Error toggling road layers:', e);
-    }
-  }, [mapLoaded]);
-
-  const handlePinCreated = () => {
-    // Refresh pins layer
-    setPinsRefreshKey(prev => prev + 1);
-    closeCreatePinModal();
-    // Remove temporary pin after pin is created
-    if (removeTemporaryPinRef.current) {
-      removeTemporaryPinRef.current();
-      removeTemporaryPinRef.current = null;
-    }
-  };
+  const NAV_HEIGHT = '3.5rem';
 
   return (
-    <div className="fixed inset-0 w-screen h-screen overflow-hidden">
-      {/* Map Container - Full Viewport */}
+    <div className="flex flex-col h-screen w-screen overflow-hidden">
+      <SimpleNav />
+
       <div 
-        ref={mapContainer} 
-        className="fixed inset-0 w-full h-full"
-        style={{ 
-          width: '100vw', 
-          height: '100vh', 
-          margin: 0, 
-          padding: 0, 
-          overflow: 'hidden',
-          zIndex: 1
-        }}
-      />
+        className="relative flex-1 w-full overflow-hidden"
+        style={{ height: `calc(100vh - ${NAV_HEIGHT})` }}
+      >
+        {/* Mapbox Container */}
+        <div 
+          ref={mapContainer} 
+          className="absolute inset-0 w-full h-full"
+          style={{ margin: 0, padding: 0, overflow: 'hidden', zIndex: 1 }}
+        />
 
-      {/* Pins Layer */}
-      {mapLoaded && mapInstanceRef.current && (
-        <PinsLayer key={pinsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
-      )}
+        {/* Pins Layer */}
+        {mapLoaded && mapInstanceRef.current && (
+          <PinsLayer key={pinsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+        )}
 
-      {/* Atlas Layers (Cities, Counties, Neighborhoods, Schools, Parks, Lakes) */}
-      {mapLoaded && mapInstanceRef.current && (
-        <AtlasLayersRenderer
+        {/* Atlas Layers */}
+        {mapLoaded && mapInstanceRef.current && (
+          <AtlasLayersRenderer
+            map={mapInstanceRef.current}
+            mapLoaded={mapLoaded}
+            layers={layers}
+            onLayerCountUpdate={setLayerCount}
+            onToggleLayer={toggleLayer}
+          />
+        )}
+
+        {/* Left Sidebar */}
+        <LocationSidebar
           map={mapInstanceRef.current}
           mapLoaded={mapLoaded}
-          layers={layers}
-          onLayerCountUpdate={setLayerCount}
-          onToggleLayer={toggleLayer}
-        />
-      )}
-
-      {/* Left Sidebar with Search and Location Details - Always visible, expands on mobile when data exists */}
-      <LocationSidebar 
-        map={mapInstanceRef.current} 
-        mapLoaded={mapLoaded}
-        isOpen={state.isSidebarOpen && state.modalState !== 'create-pin'}
-        onLocationSelect={handleLocationSelect}
-        onCreatePin={(coordinates) => {
-          openCreatePinModal(coordinates);
-        }}
-        onSkipTrace={(coordinates) => {
-          // TODO: Implement skip trace functionality
-          console.log('Skip trace at:', coordinates);
-        }}
-        onDrawArea={(coordinates) => {
-          // TODO: Implement draw area functionality
-          console.log('Draw area at:', coordinates);
-        }}
-        onRemoveTemporaryPin={(removeFn) => {
-          removeTemporaryPinRef.current = removeFn;
-        }}
-        onUpdateTemporaryPinColor={(updateFn) => {
-          updateTemporaryPinColorRef.current = updateFn;
-        }}
-        onCloseCreatePinModal={() => {
-          closeCreatePinModal();
-        }}
-        onMapClick={() => {
-          // If guest hasn't completed profile, open guest details modal on first click
-          if (!user && !hasCompletedGuestProfile && !isGuestDetailsModalOpen) {
-            setIsGuestDetailsModalOpen(true);
-            return;
-          }
-          // Only open sidebar if no modal is open
-          openSidebarForMapClick();
-        }}
-      />
-
-      {/* Top Navigation */}
-      <TopNav 
-        isAccountModalOpen={state.modalState === 'account'}
-        onAccountModalOpen={handleAccountModalOpen}
-        onWelcomeModalOpen={openWelcomeModal}
-        hasCompletedGuestProfile={hasCompletedGuestProfile}
-      />
-
-      {/* Homepage Stats Handle - Small handle at top center */}
-      <HomepageStatsHandle />
-
-      {/* Map Controls - Bottom Right */}
-      <MapControls 
-        map={mapInstanceRef.current} 
-        mapLoaded={mapLoaded}
-        is3DMode={is3DMode}
-        on3DToggle={handle3DToggle}
-        roadsVisible={roadsVisible}
-        onRoadsToggle={handleRoadsToggle}
-      />
-
-      {/* Atlas Layers Panel - Bottom Left */}
-      <div className="fixed bottom-4 left-4 z-30">
-        <MapLayersPanel
+          isOpen={isSidebarOpen && !isModalOpen}
+          onLocationSelect={handleLocationSelect}
           layers={layers}
           onToggleLayer={toggleLayer}
-          isCollapsed={isLayersPanelCollapsed}
-          onToggleCollapse={() => setIsLayersPanelCollapsed(!isLayersPanelCollapsed)}
         />
+
+        {/* Homepage Stats Handle */}
+        <HomepageStatsHandle />
+
+        {/* Loading/Error Overlay */}
+        {!mapLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+            <div className="text-center">
+              {mapError === 'missing-token' ? (
+                <div className="bg-white border-2 border-red-500 rounded-lg p-6 max-w-md mx-4">
+                  <div className="text-red-600 font-bold text-lg mb-2">⚠️ Mapbox Token Missing</div>
+                  <div className="text-gray-700 text-sm mb-4">
+                    Please set <code className="bg-gray-100 px-2 py-1 rounded text-xs">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> in your <code className="bg-gray-100 px-2 py-1 rounded text-xs">.env.local</code> file.
+                  </div>
+                </div>
+              ) : mapError ? (
+                <div className="bg-white border-2 border-red-500 rounded-lg p-6 max-w-md mx-4">
+                  <div className="text-red-600 font-bold text-lg mb-2">⚠️ Map Error</div>
+                  <div className="text-gray-700 text-sm mb-4">
+                    Failed to initialize the map. Check browser console for details.
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                  <div className="text-white font-medium">Loading map...</div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Welcome Modal */}
-      <WelcomeModal 
-        isOpen={state.modalState === 'welcome'} 
-        onClose={closeWelcomeModal}
-        onGuestContinue={() => {
-          // Open guest details modal after welcome modal closes
-          if (!user) {
-            setIsGuestDetailsModalOpen(true);
-          }
-        }}
-      />
-
-      {/* Account Modal */}
-      <AccountModal 
-        isOpen={state.modalState === 'account'} 
-        onClose={() => {
-          closeAccountModal();
-          // Clean up URL params
-          if (typeof window !== 'undefined') {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('modal');
-            url.searchParams.delete('tab');
-            window.history.replaceState({}, '', url.pathname + url.search);
-          }
-        }}
-        initialTab={state.accountModalTab as any}
-        onAccountUpdate={async () => {
-          await refreshAccount();
-        }}
-      />
-
-      {/* Create Pin Modal */}
-      <CreatePinModal
-        isOpen={state.modalState === 'create-pin'}
-        onClose={() => {
-          closeCreatePinModal();
-          // Remove temporary pin when modal is closed (cancelled)
-          if (removeTemporaryPinRef.current) {
-            removeTemporaryPinRef.current();
-            removeTemporaryPinRef.current = null;
-          }
-        }}
-        coordinates={state.createPinCoordinates}
-        onPinCreated={handlePinCreated}
-        onBack={() => {
-          // Go back to location sidebar (temporary pin remains visible)
-          backFromCreatePin();
-        }}
-        onVisibilityChange={(visibility) => {
-          if (updateTemporaryPinColorRef.current) {
-            updateTemporaryPinColorRef.current(visibility);
-          }
-        }}
-      />
-
-      {/* Guest Details Modal */}
-      <GuestDetailsModal
-        isOpen={isGuestDetailsModalOpen}
-        onClose={() => {
-          // Only allow closing if profile is complete
-          const guestName = typeof window !== 'undefined' 
-            ? localStorage.getItem('mnuda_guest_name') 
-            : null;
-          if (guestName && guestName.trim() && guestName !== 'Guest') {
-            setIsGuestDetailsModalOpen(false);
-            setHasCompletedGuestProfile(true);
-          }
-        }}
-        onComplete={async () => {
-          // Verify account was created and mark profile as complete
-          try {
-            const guestId = GuestAccountService.getGuestId();
-            const account = await GuestAccountService.getGuestAccountByGuestId(guestId);
-            if (account) {
-              setHasCompletedGuestProfile(true);
-            } else {
-              // Account doesn't exist yet, but name is set - create it
-              await GuestAccountService.getOrCreateGuestAccount();
-              setHasCompletedGuestProfile(true);
-            }
-            // Close modal after completion
-            setIsGuestDetailsModalOpen(false);
-          } catch (error) {
-            console.error('[FeedMapClient] Error completing guest profile:', error);
-            // Still set as complete if name is valid
-            const guestName = GuestAccountService.getGuestName();
-            if (guestName && guestName.trim() && guestName !== 'Guest') {
-              setHasCompletedGuestProfile(true);
-              setIsGuestDetailsModalOpen(false);
-            }
-          }
-        }}
-        onSignIn={() => {
-          // Open welcome modal for sign-in/sign-up
-          openWelcomeModal();
-        }}
-      />
-
-      {/* Guest Account Merge Modal - Disabled: Guest accounts remain separate from user accounts */}
-      {/* <GuestAccountMergeModal
-        isOpen={isMergeModalOpen}
-        onClose={() => {
-          setIsMergeModalOpen(false);
-          // After closing, refresh pins if merge was successful
-          if (mergeState.pinCount === 0 || !mergeState.hasGuestData) {
-            setPinsRefreshKey(prev => prev + 1);
-          }
-        }}
-      /> */}
-
-      {/* Loading/Error Overlay */}
-      {!mapLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
-          <div className="text-center">
-            {mapError === 'missing-token' ? (
-              <div className="bg-white border-2 border-red-500 rounded-lg p-6 max-w-md mx-4">
-                <div className="text-red-600 font-bold text-lg mb-2">⚠️ Mapbox Token Missing</div>
-                <div className="text-gray-700 text-sm mb-4">
-                  Please set <code className="bg-gray-100 px-2 py-1 rounded text-xs">NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN</code> in your <code className="bg-gray-100 px-2 py-1 rounded text-xs">.env.local</code> file.
-                </div>
-              </div>
-            ) : mapError ? (
-              <div className="bg-white border-2 border-red-500 rounded-lg p-6 max-w-md mx-4">
-                <div className="text-red-600 font-bold text-lg mb-2">⚠️ Map Error</div>
-                <div className="text-gray-700 text-sm mb-4">
-                  Failed to initialize the map. Check browser console for details.
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <div className="text-white font-medium">Loading map...</div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Modals handled globally via AppModalContext/GlobalModals */}
     </div>
   );
 }
-
-

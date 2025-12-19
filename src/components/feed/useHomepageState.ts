@@ -4,14 +4,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import { isAccountComplete as checkAccountComplete } from '@/lib/accountCompleteness';
-import { GuestAccountService } from '@/features/auth/services/guestAccountService';
-import { cleanAuthParams, getGuestIdFromUrl } from '@/lib/urlParams';
+import { cleanAuthParams } from '@/lib/urlParams';
 
 export type HomepageModalState = 
   | 'none'
   | 'welcome'
-  | 'account'
-  | 'create-pin';
+  | 'account';
 
 export interface HomepageState {
   // Modal states
@@ -20,9 +18,6 @@ export interface HomepageState {
   
   // Sidebar state
   isSidebarOpen: boolean;
-  
-  // Pin creation state
-  createPinCoordinates: { lat: number; lng: number } | null;
   
   // Account state
   account: Account | null;
@@ -42,7 +37,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     modalState: 'none',
     accountModalTab: null,
     isSidebarOpen: true,
-    createPinCoordinates: null,
     account: null,
     isAccountComplete: true,
     isCheckingAccount: false,
@@ -65,7 +59,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     updateState({
       modalState: 'none',
       accountModalTab: null,
-      createPinCoordinates: null,
     });
   }, [updateState]);
 
@@ -110,37 +103,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
       });
     }
   }, [state.modalState, state.isAccountComplete, updateState]);
-
-  // Open create pin modal
-  const openCreatePinModal = useCallback((coordinates: { lat: number; lng: number }) => {
-    updateState({
-      modalState: 'create-pin',
-      createPinCoordinates: coordinates,
-      isSidebarOpen: false,
-    });
-  }, [updateState]);
-
-  // Close create pin modal
-  const closeCreatePinModal = useCallback(() => {
-    if (state.modalState === 'create-pin') {
-      updateState({
-        modalState: 'none',
-        createPinCoordinates: null,
-        isSidebarOpen: true,
-      });
-    }
-  }, [state.modalState, updateState]);
-
-  // Go back from create pin modal to location sidebar
-  const backFromCreatePin = useCallback(() => {
-    if (state.modalState === 'create-pin') {
-      updateState({
-        modalState: 'none',
-        isSidebarOpen: true,
-        // Keep createPinCoordinates so temporary pin remains
-      });
-    }
-  }, [state.modalState, updateState]);
 
   // Toggle sidebar
   const toggleSidebar = useCallback(() => {
@@ -228,23 +190,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       if (!user) {
-        // Check if guest_id is in URL and sync with localStorage
-        const urlGuestId = getGuestIdFromUrl(searchParams);
-        if (urlGuestId && typeof window !== 'undefined') {
-          // Sync URL guest_id with localStorage
-          localStorage.setItem('mnuda_guest_id', urlGuestId);
-        }
-        
-        // Force guest mode: ensure guest ID exists
-        try {
-          GuestAccountService.getGuestId();
-          // If no guest name, set default
-          if (!GuestAccountService.getGuestName()) {
-            GuestAccountService.setGuestName('Guest');
-          }
-        } catch (error) {
-          console.error('[useHomepageState] Error initializing guest:', error);
-        }
         openWelcomeModal();
         return;
       }
@@ -253,15 +198,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     // User logged out: reinitialize guest mode
     if (userChanged && !user) {
       closeAllModals();
-      // Reinitialize guest mode
-      try {
-        GuestAccountService.getGuestId();
-        if (!GuestAccountService.getGuestName()) {
-          GuestAccountService.setGuestName('Guest');
-        }
-      } catch (error) {
-        console.error('[useHomepageState] Error reinitializing guest:', error);
-      }
       openWelcomeModal();
       return;
     }
@@ -301,9 +237,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     closeWelcomeModal,
     openAccountModal,
     closeAccountModal,
-    openCreatePinModal,
-    closeCreatePinModal,
-    backFromCreatePin,
     closeAllModals,
     
     // Sidebar controls
@@ -316,5 +249,6 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
     refreshAccount,
   };
 }
+
 
 

@@ -4,6 +4,25 @@
 
 export type MapPinVisibility = 'public' | 'only_me';
 
+// Mapbox feature metadata captured at pin creation
+export interface LocationMetadata {
+  layerId: string;
+  sourceLayer: string | null;
+  name: string | null;
+  category: string;
+  class?: string | null;
+  type?: string | null;
+  properties: Record<string, any>;
+}
+
+// Atlas entity metadata captured at pin creation
+export interface AtlasMetadata {
+  entityId: string;
+  entityType: string;
+  name: string;
+  emoji?: string;
+}
+
 export interface MapPin {
   id: string;
   lat: number;
@@ -16,6 +35,8 @@ export interface MapPin {
   county_id: string | null;
   visibility: MapPinVisibility;
   view_count?: number;
+  location_metadata?: LocationMetadata | null;
+  atlas_metadata?: AtlasMetadata | null;
   created_at: string;
   updated_at: string;
   account?: {
@@ -34,6 +55,9 @@ export interface CreateMapPinData {
   city_id?: string | null;
   county_id?: string | null;
   visibility?: MapPinVisibility;
+  tags?: string[]; // User-defined labels for organizing pins
+  location_metadata?: LocationMetadata | null;
+  atlas_metadata?: AtlasMetadata | null;
 }
 
 export interface UpdateMapPinData {
@@ -43,6 +67,7 @@ export interface UpdateMapPinData {
   media_url?: string | null;
   city_id?: string | null;
   county_id?: string | null;
+  tags?: string[]; // User-defined labels for organizing pins
 }
 
 export interface MapPinFilters {
@@ -81,5 +106,6 @@ export interface MapPinGeoJSONCollection {
   type: 'FeatureCollection';
   features: MapPinGeoJSONFeature[];
 }
+
 
 

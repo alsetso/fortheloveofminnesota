@@ -1,15 +1,30 @@
 import { supabase } from '@/lib/supabase';
 import type { MapPin, CreateMapPinData, UpdateMapPinData, MapPinFilters, MapPinGeoJSONCollection, MapPinGeoJSONFeature } from '@/types/map-pin';
-import { GuestAccountService } from '@/features/auth/services/guestAccountService';
 import { MAP_CONFIG } from '@/features/_archive/map/config';
 import { AddressParser } from '@/features/_archive/map/services/addressParser';
 import { minnesotaBoundsService } from '@/features/_archive/map/services/minnesotaBoundsService';
 
 /**
  * Service for managing public map pins
- * Supports both authenticated users and guest accounts
+ * Requires authenticated users
  */
 export class PublicMapPinService {
+  /**
+   * Get pin count for an account
+   */
+  static async getPinCount(accountId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('pins')
+      .select('*', { count: 'exact', head: true })
+      .eq('account_id', accountId);
+
+    if (error) {
+      console.error('[PublicMapPinService] Error getting pin count:', error);
+      return 0;
+    }
+
+    return count || 0;
+  }
   /**
    * Fetch all public map pins
    * Optionally filter by type, account_id, or bounding box
@@ -75,7 +90,7 @@ export class PublicMapPinService {
         visibility: pin.visibility || 'public', // Default to 'public' for backward compatibility
         account: account ? {
           id: account.id,
-          username: account.username || account.first_name || 'Guest',
+          username: account.username || account.first_name || 'User',
           image_url: account.image_url,
         } : null,
         // Remove the raw accounts field if it exists
@@ -113,10 +128,16 @@ export class PublicMapPinService {
 
   /**
    * Create a new map pin
-   * Supports both authenticated users and guest accounts
+   * Requires authenticated user
    * Validates that the pin location is within Minnesota
    */
   static async createPin(data: CreateMapPinData): Promise<MapPin> {
+    // Require authentication
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('You must be signed in to create pins');
+    }
+
     // Validate location is in Minnesota
     const token = MAP_CONFIG.MAPBOX_TOKEN;
     if (token && token !== 'your_mapbox_token_here') {
@@ -151,34 +172,23 @@ export class PublicMapPinService {
       }
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    let accountId: string;
+    // Get account_id from authenticated user
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
 
-    if (user) {
-      // Authenticated user: get account_id from user
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (accountError || !account) {
-        throw new Error('Account not found. Please complete your profile setup.');
-      }
-
-      accountId = account.id;
-    } else {
-      // Guest user: get or create guest account
-      const guestAccount = await GuestAccountService.getOrCreateGuestAccount();
-      accountId = guestAccount.id;
+    if (accountError || !account) {
+      throw new Error('Account not found. Please complete your profile setup.');
     }
 
     const { data: pin, error } = await supabase
       .from('pins')
       .insert({
         ...data,
-        account_id: accountId,
-        visibility: data.visibility || 'public', // Default to public for guests
+        account_id: account.id,
+        visibility: data.visibility || 'public',
       })
       .select()
       .single();

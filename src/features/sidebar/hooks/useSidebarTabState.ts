@@ -15,7 +15,7 @@ interface UseSidebarTabStateOptions {
 /**
  * Hook for managing sidebar tab state with URL synchronization.
  * 
- * URL parameter: `?tab=explore|mentions|controls|poi|faqs|news`
+ * URL parameter: `?tab=explore|controls|poi|faqs|news`
  * 
  * - When tab is active, URL shows `?tab=tabname`
  * - When URL has `?tab=tabname`, tab opens automatically
@@ -53,7 +53,7 @@ export function useSidebarTabState(options: UseSidebarTabStateOptions = {}) {
     const url = new URL(window.location.href);
     
     // Set URL param for all tabs
-    if (tab === 'explore' || tab === 'mentions' || tab === 'controls' || tab === 'poi' || tab === 'faqs' || tab === 'news') {
+    if (tab === 'explore' || tab === 'controls' || tab === 'poi' || tab === 'faqs' || tab === 'news') {
       url.searchParams.set('tab', tab);
     } else {
       // Remove tab param when closing

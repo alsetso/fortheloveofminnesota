@@ -7,16 +7,6 @@ import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollecti
  */
 export class MentionService {
   /**
-   * Normalize event date to January 2nd of the year (for year filtering)
-   * Using 01-02 instead of 01-01 to avoid timezone issues
-   */
-  private static normalizePostDate(dateString: string): string {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    return `${year}-01-02T00:00:00.000Z`;
-  }
-
-  /**
    * Fetch all public mentions
    * Optionally filter by account_id, year, or bounding box
    * Includes account information (username, image_url) when available
@@ -98,7 +88,7 @@ export class MentionService {
       throw new Error('Account not found. Please complete your profile setup.');
     }
 
-    // Validate and normalize post_date if provided (max 100 years in the past)
+    // Validate post_date if provided (max 100 years in the past)
     let normalizedPostDate: string | null = null;
     if (data.post_date) {
       const postDate = new Date(data.post_date);
@@ -113,8 +103,8 @@ export class MentionService {
         throw new Error('Post date cannot be more than 100 years in the past');
       }
       
-      // Normalize to January 2nd of the year (to avoid timezone issues)
-      normalizedPostDate = this.normalizePostDate(data.post_date);
+      // Preserve full date timestamp
+      normalizedPostDate = postDate.toISOString();
     }
 
     // Auto-detect city_id if not provided

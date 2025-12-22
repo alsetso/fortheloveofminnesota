@@ -1,7 +1,6 @@
 // Atlas feature exports
 
 // Components
-export { default as AtlasLayersRenderer } from './components/AtlasLayersRenderer';
 export { default as MapLayersPanel, useAtlasLayers } from './components/MapLayersPanel';
 export type { AtlasLayer } from './components/MapLayersPanel';
 

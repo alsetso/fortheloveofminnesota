@@ -30,8 +30,6 @@ export default function CreateMentionModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'public' | 'only_me'>('public');
-  const [postDate, setPostDate] = useState<string>('');
-  const [showPostDateInput, setShowPostDateInput] = useState(false);
 
   // Notify parent when visibility changes
   useEffect(() => {
@@ -46,8 +44,6 @@ export default function CreateMentionModal({
       setDescription('');
       setError(null);
       setVisibility('public');
-      setPostDate('');
-      setShowPostDateInput(false);
     }
   }, [isOpen]);
 
@@ -64,16 +60,11 @@ export default function CreateMentionModal({
     setError(null);
 
     try {
-      const postDateValue = postDate 
-        ? `${postDate}-01-02T00:00:00.000Z`
-        : null;
-
       const mentionData = {
         lat: coordinates.lat,
         lng: coordinates.lng,
         description: description.trim() || null,
         visibility,
-        post_date: postDateValue,
       };
 
       const createdMention = await MentionService.createMention(mentionData);
@@ -139,57 +130,6 @@ export default function CreateMentionModal({
                   {description.length}/240
                 </span>
               </div>
-            </div>
-
-            {/* Year Selector - Collapsible */}
-            <div>
-              {!showPostDateInput ? (
-                <button
-                  type="button"
-                  onClick={() => setShowPostDateInput(true)}
-                  className="text-xs text-gray-600 hover:text-gray-900 underline"
-                  disabled={isSubmitting}
-                >
-                  Post Date
-                </button>
-              ) : (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">
-                    When did this happen? (optional)
-                  </label>
-                  <input
-                    type="number"
-                    value={postDate}
-                    onChange={(e) => {
-                      const yearValue = e.target.value;
-                      setPostDate(yearValue);
-                      
-                      if (yearValue && yearValue.length === 4) {
-                        const year = parseInt(yearValue, 10);
-                        const currentYear = new Date().getFullYear();
-                        const hundredYearsAgo = currentYear - 100;
-                        
-                        if (isNaN(year) || year > currentYear || year < hundredYearsAgo) {
-                          setError('Please enter a valid year');
-                        } else {
-                          setError(null);
-                        }
-                      } else if (!yearValue) {
-                        setError(null);
-                      }
-                    }}
-                    min={new Date().getFullYear() - 100}
-                    max={new Date().getFullYear()}
-                    placeholder="e.g., 2025"
-                    className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                    disabled={isSubmitting}
-                    autoFocus
-                  />
-                  <p className="text-[10px] text-gray-500 mt-0.5">
-                    Enter a year to filter this mention by year on the map
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Visibility Toggle */}

@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import ExplorePageClient from '@/features/atlas/components/ExplorePageClient';
+import YearFilter from '@/features/atlas/components/YearFilter';
 import { BuildingOffice2Icon, RectangleGroupIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -274,10 +275,11 @@ export default async function ExplorePage() {
               Discover the great state of Minnesota through comprehensive directories of cities and counties. 
               Explore population data, geographic information, demographics, and unique characteristics of each location.
             </p>
-            <p className="text-xs text-gray-500 max-w-3xl">
+            <p className="text-xs text-gray-500 max-w-3xl mb-3">
               Whether you&apos;re researching demographics, planning a visit, or looking for detailed information about Minnesota locations, 
               our directories provide access to comprehensive data about all cities and counties in the Land of 10,000 Lakes.
             </p>
+            <YearFilter />
           </div>
 
           {/* Enhanced Quick Stats */}

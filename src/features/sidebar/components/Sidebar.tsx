@@ -8,7 +8,6 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { 
   GlobeAltIcon,
   BuildingLibraryIcon,
-  HeartIcon,
   Bars3Icon,
   XMarkIcon,
   AdjustmentsHorizontalIcon,
@@ -22,7 +21,6 @@ import { Account, AccountService, useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SecondarySidebar from './SecondarySidebar';
 import ExploreSecondaryContent from './ExploreSecondaryContent';
-import MentionsSecondaryContent from './MentionsSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
 import POISecondaryContent from './POISecondaryContent';
 import FAQsSecondaryContent from './FAQsSecondaryContent';
@@ -46,7 +44,6 @@ interface NavItem {
 // Map href to tab identifier for URL params
 const hrefToTab: Record<string, SidebarTab> = {
   '#explore': 'explore' as SidebarTab,
-  '#mentions': 'mentions' as SidebarTab,
   '#controls': 'controls' as SidebarTab,
   '#poi': 'poi' as SidebarTab,
   '#faqs': 'faqs' as SidebarTab,
@@ -113,12 +110,6 @@ const allNavItems: NavItem[] = [
     secondaryContent: <ExploreSecondaryContent />,
   },
   { 
-    href: '#mentions', 
-    label: 'Mentions', 
-    icon: HeartIcon,
-    secondaryContent: <MentionsSecondaryContent />,
-  },
-  { 
     href: '#controls', 
     label: 'Controls', 
     icon: AdjustmentsHorizontalIcon,
@@ -175,8 +166,6 @@ export default function Sidebar({ account, map }: SidebarProps) {
       
       if (tab === 'explore') {
         setClickedNavItem('#explore');
-      } else if (tab === 'mentions') {
-        setClickedNavItem('#mentions');
       } else if (tab === 'controls') {
         setClickedNavItem('#controls');
       } else if (tab === 'poi') {

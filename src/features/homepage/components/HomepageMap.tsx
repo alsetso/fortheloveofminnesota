@@ -11,7 +11,7 @@ import HomepageStatsHandle from './HomepageStatsHandle';
 import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useAtlasLayers, AtlasLayersRenderer } from '@/features/atlas/components';
+import { useAtlasLayers } from '@/features/atlas/components';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/features/sidebar/components/Sidebar';
@@ -322,16 +322,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
         )}
 
-        {/* Atlas Layers */}
-        {mapLoaded && mapInstanceRef.current && (
-          <AtlasLayersRenderer
-            map={mapInstanceRef.current}
-            mapLoaded={mapLoaded}
-            layers={layers}
-            onLayerCountUpdate={setLayerCount}
-            onToggleLayer={toggleLayer}
-          />
-        )}
 
         {/* Left Sidebar */}
         <FloatingMapContainer
@@ -339,8 +329,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           mapLoaded={mapLoaded}
           isOpen={isSidebarOpen && !isModalOpen}
           onLocationSelect={handleLocationSelect}
-          layers={layers}
-          onToggleLayer={toggleLayer}
         />
 
 

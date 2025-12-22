@@ -38,6 +38,35 @@ export type Database = {
         Insert: Record<string, any>
         Update: Record<string, any>
       }
+      faqs: {
+        Row: {
+          id: string
+          question: string
+          answer: string | null
+          is_visible: boolean
+          account_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          question: string
+          answer?: string | null
+          is_visible?: boolean
+          account_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          question?: string
+          answer?: string | null
+          is_visible?: boolean
+          account_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [key: string]: {

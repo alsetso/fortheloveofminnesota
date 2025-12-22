@@ -265,8 +265,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               // Check if current user owns this pin
               const isOwnPin = accountRef.current && currentPin.account_id === accountRef.current.id;
               
-              // Always show account info - even if account is null, show placeholder
-              const accountInfo = `
+              // Check if user is authenticated
+              const isAuthenticated = !!accountRef.current;
+              
+              // Only show account info if user is authenticated
+              const accountInfo = isAuthenticated ? `
                 <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
                   ${currentPin.account?.image_url ? `
                     <img src="${escapeHtml(currentPin.account.image_url)}" alt="${escapeHtml(displayName)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e7eb;" />
@@ -281,7 +284,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     </span>
                   </div>
                 </a>
-              `;
+              ` : '';
               
               // Manage button (only for own pins)
               const manageButton = isOwnPin ? `
@@ -333,7 +336,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
 
               return `
                 <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
-                  <!-- Header with account info, manage button, and close button -->
+                  <!-- Header with account info (if authenticated), manage button, and close button -->
+                  ${isAuthenticated || manageButton ? `
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
                     ${accountInfo}
                     <div style="display: flex; align-items: center; gap: 4px;">
@@ -341,6 +345,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                       <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px; line-height: 1; flex-shrink: 0; transition: color 0.15s;" onmouseover="this.style.color='#111827'" onmouseout="this.style.color='#6b7280'" aria-label="Close popup">×</button>
                     </div>
                   </div>
+                  ` : `
+                  <div style="display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                    <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px; line-height: 1; flex-shrink: 0; transition: color 0.15s;" onmouseover="this.style.color='#111827'" onmouseout="this.style.color='#6b7280'" aria-label="Close popup">×</button>
+                  </div>
+                  `}
                   
                   <!-- Content -->
                   <div style="margin-bottom: 8px;">

@@ -27,11 +27,9 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: [
-      { url: '/fav.png', type: 'image/png' },
-    ],
-    shortcut: [{ url: '/fav.png', type: 'image/png' }],
-    apple: [{ url: '/fav.png', type: 'image/png' }],
+    icon: '/fav.png',
+    shortcut: '/fav.png',
+    apple: '/fav.png',
   },
   openGraph: {
     title: 'For the Love of Minnesota',

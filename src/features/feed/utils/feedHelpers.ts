@@ -1,4 +1,4 @@
-import { FeedPostData } from '../FeedPost';
+import { FeedPostData } from '../components/FeedPost';
 
 /**
  * Validate if a URL is safe for display
@@ -60,7 +60,7 @@ export function formatLocationBreadcrumb(
  * @returns Post URL path
  * @deprecated Feed post detail page has been archived
  */
-export function getPostUrl(post: Pick<FeedPostData, 'id' | 'slug'>): string {
+export function getPostUrl(post: Pick<FeedPostData, 'id'>): string {
   // Feed post detail page archived - return hash to prevent navigation
   return '#';
 }
@@ -82,11 +82,14 @@ export function getProfileUrl(username?: string | null): string {
  */
 export function isValidPost(post: unknown): post is FeedPostData {
   return (
-    post &&
-    typeof post.id === 'string' &&
-    typeof post.account_id === 'string' &&
-    typeof post.content === 'string' &&
-    typeof post.created_at === 'string'
+    typeof post === 'object' &&
+    post !== null &&
+    'id' in post &&
+    'account_id' in post &&
+    typeof (post as any).id === 'string' &&
+    typeof (post as any).account_id === 'string' &&
+    typeof (post as any).content === 'string' &&
+    typeof (post as any).created_at === 'string'
   );
 }
 

@@ -120,7 +120,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
 
   // Watch for mention URL parameter and select mention
   useEffect(() => {
-    if (!mapLoaded || !mapInstanceRef.current) return;
+    if (!mapLoaded || !mapInstanceRef.current) return undefined;
 
     const mentionId = searchParams.get('mention');
     
@@ -135,6 +135,8 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
       
       return () => clearTimeout(timeoutId);
     }
+    
+    return undefined;
   }, [mapLoaded, searchParams]);
 
   // Listen for mention hover events to prevent mention creation

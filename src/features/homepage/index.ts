@@ -7,6 +7,6 @@ export { default as HomepageStatsHandle } from './components/HomepageStatsHandle
 export { default as HomepageStatsModal } from './components/HomepageStatsModal';
 
 // Hooks
-export { default as useHomepageState } from './hooks/useHomepageState';
-export { default as useUrlMapState } from './hooks/useUrlMapState';
+export { useHomepageState } from './hooks/useHomepageState';
+export { useUrlMapState } from './hooks/useUrlMapState';
 

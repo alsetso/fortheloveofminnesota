@@ -170,7 +170,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
         : [...currentTraits, traitId];
 
       const updatedAccount = await AccountService.updateCurrentAccount({
-        traits: newTraits.length > 0 ? newTraits : null,
+        traits: newTraits.length > 0 ? (newTraits as any) : null,
       });
 
       setAccount(updatedAccount);
@@ -490,12 +490,12 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
         <div className="flex flex-wrap gap-1.5 items-center">
           {/* Show selected traits */}
           {selectedTraits.length > 0 ? (
-            selectedTraits.map((trait) => (
+            selectedTraits.filter(Boolean).map((trait) => (
               <span
-                key={trait.id}
+                key={trait!.id}
                 className="px-2 py-0.5 bg-black/20 text-xs text-gray-900 rounded"
               >
-                {trait.label}
+                {trait!.label}
               </span>
             ))
           ) : (

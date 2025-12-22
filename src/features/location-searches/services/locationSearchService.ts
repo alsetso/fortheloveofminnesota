@@ -6,7 +6,7 @@
 export interface LocationSearchData {
   place_name: string;
   coordinates: { lat: number; lng: number };
-  mapbox_data: MapboxFeature; // Full Mapbox geocoding feature
+  mapbox_data: any; // Full Mapbox geocoding feature
   search_query?: string;
   page_source?: 'map' | 'my-homes';
 }

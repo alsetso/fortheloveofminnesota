@@ -12,9 +12,8 @@ export const BLOCKED_POI_CATEGORIES: Set<FeatureCategory> = new Set([
   'path',
   'bridge',
   'tunnel',
-  'water',
   'unknown',
-]);
+] as FeatureCategory[]);
 
 // Feature types (from properties.type) that should be blocked
 export const BLOCKED_POI_TYPES: Set<string> = new Set([
@@ -93,19 +92,9 @@ export function getAllowedPOICategories(): FeatureCategory[] {
     'neighborhood',
     'poi',
     'restaurant',
-    'shop',
-    'cafe',
-    'bar',
     'hotel',
     'gas_station',
-    'bank',
-    'pharmacy',
-    'gym',
-    'museum',
-    'theater',
-    'stadium',
-    'zoo',
-    'aquarium',
+    'entertainment',
   ];
 
   return allCategories.filter(cat => !BLOCKED_POI_CATEGORIES.has(cat));

@@ -1,5 +1,5 @@
 // Address parsing service for Mapbox features
-import { Address, MapboxFeature } from '../types';
+import { Address, MapboxFeature } from '@/types/mapbox';
 
 export class AddressParser {
   private static trim(v?: string) { return (v ?? '').trim(); }

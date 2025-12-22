@@ -145,15 +145,12 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
             // Capture popup using html2canvas
             try {
               const popupCanvas = await html2canvas(popupElement, {
-                backgroundColor: null,
-                scale: 1,
+                background: undefined,
                 width: popupWidth,
                 height: popupHeight,
                 useCORS: true,
                 logging: false,
                 allowTaint: true,
-                windowWidth: popupWidth,
-                windowHeight: popupHeight,
               });
               
               ctx.drawImage(popupCanvas, x, y, popupWidth, popupHeight);

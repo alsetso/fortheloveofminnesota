@@ -14,13 +14,14 @@ import ProfileMapControls from './ProfileMapControls';
 import ProfileMapToolbar from './ProfileMapToolbar';
 import ProfilePinsSidebar from './ProfilePinsSidebar';
 import { useProfileOwnership } from '@/hooks/useProfileOwnership';
-import { useTemporaryPinMarker } from './hooks/useTemporaryPinMarker';
-import { useDebounce } from './hooks/useDebounce';
-import { useProfileUrlState } from './hooks/useProfileUrlState';
+import { useTemporaryPinMarker } from '../hooks/useTemporaryPinMarker';
+import { useDebounce } from '../hooks/useDebounce';
+import { useProfileUrlState } from '../hooks/useProfileUrlState';
 import type { 
   ProfilePin, 
   ProfileAccount,
 } from '@/types/profile';
+import type { Mention } from '@/types/mention';
 import { filterPinsForVisitor } from '@/types/profile';
 
 interface ProfileMapClientProps {
@@ -108,7 +109,7 @@ export default function ProfileMapClient({
       removeTemporaryPin();
       setModalState({ type: 'none' });
     }
-  }, [localViewMode, urlPinId, isCreatePinModalOpen, removeTemporaryPin]);
+  }, [localViewMode, urlMentionId, isCreatePinModalOpen, removeTemporaryPin]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !mapContainer.current) return;
@@ -150,7 +151,7 @@ export default function ProfileMapClient({
             setMapLoaded(true);
             
             // Add 3D building extrusions
-            addBuildingExtrusions(mapInstance);
+            addBuildingExtrusions(mapInstance as any);
             
             // If there are pins, fly to fit all of them in view
             if (initialPins.length > 0) {
@@ -395,8 +396,8 @@ export default function ProfileMapClient({
     
     // Clear any pinId from URL if modal was opened from a pin click
     // (but not if we're in the middle of creating a pin)
-    if (urlPinId && !createPinCoordinates) {
-      clearPinId();
+    if (urlMentionId && !createPinCoordinates) {
+      clearMentionId();
     }
   };
 
@@ -453,7 +454,7 @@ export default function ProfileMapClient({
         pinCount={displayPins.length}
         map={mapInstanceRef.current}
         mapLoaded={mapLoaded}
-        pins={displayPins}
+        pins={displayPins as any}
         account={account}
         isOwnProfile={ownership.isOwner}
         isGuest={false}

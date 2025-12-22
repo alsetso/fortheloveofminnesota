@@ -639,7 +639,7 @@ export default function LocationSidebar({
     if (map && !map.removed) {
       const point = (map as any).project([coordinates.lng, coordinates.lat]);
       const pinMetadata = queryFeatureAtPoint(map, point);
-      setPinFeature(pinMetadata);
+      setPinFeature(pinMetadata && 'feature' in pinMetadata ? pinMetadata.feature : pinMetadata);
     }
 
     // Don't automatically search for POIs - user must click "Search Nearby" button
@@ -775,6 +775,7 @@ export default function LocationSidebar({
         description: pinDescription.trim() || null,
         visibility: pinVisibility,
         post_date: postDate,
+        map_meta: locationData || null,
       };
 
       const createdMention = await MentionService.createMention(mentionData);
@@ -1269,7 +1270,8 @@ export default function LocationSidebar({
     if (isPOIMode) {
       try {
         // Query map metadata layer for POI label
-        const feature = queryFeatureAtPoint(map, e.point);
+        const featureResult = queryFeatureAtPoint(map, e.point);
+        const feature = featureResult && 'feature' in featureResult ? featureResult.feature : featureResult;
         
         if (feature && feature.hasUsefulData && feature.name) {
           // POI label found - show drop pin button
@@ -1497,12 +1499,12 @@ export default function LocationSidebar({
         category: poiFeature.category,
         type: poiFeature.properties.type || poiFeature.category,
         location: poiClickLocation,
-        emoji: poiFeature.icon || null,
+        emoji: poiFeature.icon || undefined,
         description: poiFeature.displayLabel,
-        mapbox_source: poiFeature.sourceLayer || null,
-        mapbox_source_layer: poiFeature.sourceLayer || null,
-        mapbox_layer_id: poiFeature.layerId || null,
-        mapbox_properties: poiFeature.properties || null,
+        mapbox_source: poiFeature.sourceLayer || undefined,
+        mapbox_source_layer: poiFeature.sourceLayer || undefined,
+        mapbox_layer_id: poiFeature.layerId || undefined,
+        mapbox_properties: poiFeature.properties || undefined,
         metadata: {
           category: poiFeature.category,
           label: poiFeature.label,

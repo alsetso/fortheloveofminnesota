@@ -76,8 +76,8 @@ export abstract class BaseAdminService<T, CreateT, UpdateT> {
       const supabase = this.getServiceClient();
       
       const { data: record, error } = await supabase
-        .from(this.tableName)
-        .insert(data as Record<string, unknown>)
+        .from(this.tableName as any)
+        .insert(data as any)
         .select()
         .single();
       
@@ -105,9 +105,9 @@ export abstract class BaseAdminService<T, CreateT, UpdateT> {
       console.log(`[BaseAdminService] Updating ${this.tableName} with service role client`);
     }
     
-    const { data: record, error } = await supabase
-      .from(this.tableName)
-      .update(data as Record<string, unknown>)
+    const query = supabase.from(this.tableName as any) as any;
+    const { data: record, error } = await query
+      .update(data as any)
       .eq('id', id)
       .select()
       .single();

@@ -19,6 +19,19 @@ export interface MapboxFeature {
     text: string;
     [key: string]: unknown;
   }>;
+  place_name?: string;
+  text?: string;
+}
+
+export interface Address {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 

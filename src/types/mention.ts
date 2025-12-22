@@ -14,6 +14,7 @@ export interface Mention {
   visibility: MentionVisibility;
   archived?: boolean;
   post_date?: string | null; // Date when the event/memory happened (for year filtering)
+  map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
   created_at: string;
   updated_at: string;
   account?: {
@@ -30,6 +31,7 @@ export interface CreateMentionData {
   city_id?: string | null; // Optional city ID - can be set during creation or auto-detected
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
+  map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
 }
 
 export interface MentionFilters {

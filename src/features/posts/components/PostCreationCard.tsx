@@ -33,7 +33,7 @@ export default function PostCreationCard({
   className = '',
 }: PostCreationCardProps) {
   const { user } = useAuth();
-  const [account, setAccount] = useState<Account | null>(providedAccount || null);
+  const [account, setAccount] = useState<Account | null>(providedAccount && 'user_id' in providedAccount && providedAccount.user_id !== undefined ? providedAccount as Account : null);
   const [showPostModal, setShowPostModal] = useState(false);
   const [showMediaEditor, setShowMediaEditor] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
@@ -139,12 +139,9 @@ export default function PostCreationCard({
       {showPostModal && (
         <PostPublisherModal
           isOpen={showPostModal}
-          mode={postModalMode}
           onClose={resetState}
           initialFiles={pendingFiles}
           account={account}
-          cityId={cityId}
-          countyId={countyId}
           onPostCreated={onPostCreated}
           initialMedia={pendingMedia}
           initialMapData={pendingMapData}

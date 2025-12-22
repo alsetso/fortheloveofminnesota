@@ -69,7 +69,7 @@ export function usePostCreation(
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [visibility, setVisibility] = useState<PostVisibility>('members_only');
+  const [visibility, setVisibility] = useState<PostVisibility>('public');
   const [media, setMedia] = useState<MediaPreview[]>(initialMedia);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
@@ -176,7 +176,7 @@ export function usePostCreation(
       setTitle('');
       setContent('');
       setMedia([]);
-      setVisibility('members_only');
+      setVisibility('public');
       setUploadProgress({ stage: 'idle', progress: 0 });
 
       onPostCreated?.();
@@ -195,7 +195,7 @@ export function usePostCreation(
     setTitle('');
     setContent('');
     setMedia([]);
-    setVisibility('members_only');
+    setVisibility('public');
     setError(null);
     setUploadProgress({ stage: 'idle', progress: 0 });
     setIsSubmitting(false);

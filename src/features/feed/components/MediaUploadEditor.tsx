@@ -53,7 +53,7 @@ export default function MediaUploadEditor({
             let poster: string | undefined;
             if (isVideo) {
               try {
-                const { generateVideoThumbnail } = await import('./utils/videoThumbnail');
+                const { generateVideoThumbnail } = await import('../utils/videoThumbnail');
                 const result = await generateVideoThumbnail(file);
                 poster = result.dataUrl;
               } catch (err) {
@@ -153,7 +153,7 @@ export default function MediaUploadEditor({
       let poster: string | undefined;
       if (isVideo) {
         try {
-          const { generateVideoThumbnail } = await import('./utils/videoThumbnail');
+          const { generateVideoThumbnail } = await import('../utils/videoThumbnail');
           const result = await generateVideoThumbnail(file);
           poster = result.dataUrl;
         } catch (err) {
@@ -281,7 +281,7 @@ export default function MediaUploadEditor({
         
         if (isVideo) {
           try {
-            const { generateVideoThumbnail } = await import('./utils/videoThumbnail');
+            const { generateVideoThumbnail } = await import('../utils/videoThumbnail');
             const thumbnail = await generateVideoThumbnail(file);
             
             const thumbFileName = `${user.id}/feed/thumbnails/${timestamp}-${random}.jpg`;

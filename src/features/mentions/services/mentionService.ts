@@ -140,6 +140,7 @@ export class MentionService {
         account_id: account.id,
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
+        map_meta: data.map_meta || null,
       })
       .select(`
         *,

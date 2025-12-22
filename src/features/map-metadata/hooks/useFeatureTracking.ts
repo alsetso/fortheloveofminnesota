@@ -84,7 +84,8 @@ export function useFeatureTracking(
       throttle((e: any) => {
         if (!map || map.removed) return;
 
-        const feature = queryFeatureAtPoint(map, e.point);
+        const featureResult = queryFeatureAtPoint(map, e.point);
+        const feature = featureResult && 'feature' in featureResult ? featureResult.feature : featureResult;
         hoverFeatureRef.current = feature;
         setHoverFeature(feature);
       }, throttleMs),

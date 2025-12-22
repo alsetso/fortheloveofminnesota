@@ -24,7 +24,7 @@ import {
   isVideo, 
   getPostUrl, 
   getProfileUrl
-} from './utils/feedHelpers';
+} from '../utils/feedHelpers';
 import PostMapRenderer from './PostMapRenderer';
 
 // Simple video player
@@ -123,7 +123,7 @@ export default function FeedPost({ post, onUpdate, disableNavigation = false }: 
   const validMedia = useMemo(() => filterValidMedia(post.images), [post.images]);
   const hasMap = useMemo(() => !!(post.map_geometry || post.map_data || post.map_screenshot), [post.map_geometry, post.map_data, post.map_screenshot]);
   const showMediaLink = useMemo(() => validMedia.length > 0 && hasMap, [validMedia.length, hasMap]);
-  const postUrl = useMemo(() => getPostUrl({ id: post.id, slug: undefined }), [post.id]);
+  const postUrl = useMemo(() => getPostUrl({ id: post.id }), [post.id]);
   // Profile URL - profiles removed, use account settings instead
   const profileUrl = useMemo(() => {
     return '#';

@@ -737,7 +737,7 @@ export default function PostMapModal({
               defaultMode: 'simple_select',
             });
 
-            mapInstance.addControl(drawInstance);
+            mapInstance.addControl(drawInstance as any);
           // Hide all draw controls immediately and on any future additions
           const hideDrawControls = () => {
               const container = mapInstance.getContainer();
@@ -1123,8 +1123,8 @@ export default function PostMapModal({
                     drawInstance.deleteAll();
                     if (completedAreaSourceRef.current && mapInstance.getSource(completedAreaSourceRef.current)) {
                       const source = mapInstance.getSource(completedAreaSourceRef.current);
-                      if (source) {
-                        source.setData({
+                      if (source && 'setData' in source) {
+                        (source as any).setData({
                           type: 'Feature',
                           geometry: polygon,
                         });
@@ -1789,9 +1789,9 @@ export default function PostMapModal({
                 ref={suggestionsRef}
                 className="absolute z-40 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
               >
-                {suggestions.map((suggestion, idx) => (
-                  <button
-                    key={suggestion.id || idx}
+                 {suggestions.map((suggestion, idx) => (
+                   <button
+                     key={String(suggestion.id || idx)}
                     type="button"
                     onClick={() => handleSuggestionSelect(suggestion)}
                     className="w-full px-3 py-1.5 text-left hover:bg-gray-100 transition-colors border-b border-gray-100 last:border-b-0 text-sm"

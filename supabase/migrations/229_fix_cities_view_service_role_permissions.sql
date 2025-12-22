@@ -15,3 +15,4 @@ GRANT ALL ON public.counties TO service_role;
 COMMENT ON VIEW public.cities IS 'Public-facing view of atlas.cities with INSTEAD OF triggers for CRUD operations. Service role has full access.';
 COMMENT ON VIEW public.counties IS 'Public-facing view of atlas.counties with INSTEAD OF triggers for CRUD operations. Service role has full access.';
 
+

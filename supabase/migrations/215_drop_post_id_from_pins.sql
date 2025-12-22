@@ -22,3 +22,4 @@ ALTER TABLE public.pins
   DROP COLUMN IF EXISTS post_id;
 
 
+

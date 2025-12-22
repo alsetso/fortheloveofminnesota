@@ -59,3 +59,4 @@ export function cleanAuthParams(router: { replace: (url: string, options?: { scr
     router.replace(newUrl, { scroll: false });
   }
 }
+

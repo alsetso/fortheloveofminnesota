@@ -265,3 +265,4 @@ SELECT * FROM get_pin_stats('pin-uuid-here', 24); -- Last 24 hours
 5. ⚠️ **TODO**: Add `usePinView()` calls when pins are opened/viewed
 6. ✅ Admin dashboard created - Can view all page and pin views
 
+

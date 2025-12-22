@@ -246,3 +246,4 @@ WHERE l.slug = 'pete-stauber'
   AND p.slug = 'us-representative'
   AND j.slug = 'mn-08';
 
+

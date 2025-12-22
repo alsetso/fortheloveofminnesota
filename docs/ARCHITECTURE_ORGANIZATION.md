@@ -238,3 +238,4 @@ import { PostCreationCard } from '@/features/posts'; // ❌
 **Is it specific to one feature?**
 - ✅ Yes → `features/[feature-name]/components/`
 - ❌ No → `components/[domain]/` (temporary, migrate later)
+

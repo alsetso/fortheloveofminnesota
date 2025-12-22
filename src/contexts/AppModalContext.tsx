@@ -2,7 +2,7 @@
 
 import { createContext, useContext, ReactNode } from 'react';
 import { useAppModals, UseAppModalsReturn } from '@/hooks/useAppModals';
-import GlobalModals from '@/components/GlobalModals';
+import GlobalModals from '@/components/modals/GlobalModals';
 
 const AppModalContext = createContext<UseAppModalsReturn | null>(null);
 
@@ -44,6 +44,8 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openAnalytics: () => {},
       openAtlas: () => {},
       openComingSoon: () => {},
+      openSuccessPin: () => {},
+      updateSuccessPin: () => {},
       closeModal: () => {},
       getIntelligenceContext: () => null,
       getAtlasContext: () => undefined,
@@ -52,3 +54,4 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
   
   return context;
 }
+

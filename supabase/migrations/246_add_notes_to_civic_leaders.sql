@@ -96,3 +96,4 @@ WHERE slug = 'michelle-fischbach';
 UPDATE civic.leaders SET notes = 'U.S. Representative since 2019. Former Duluth police officer and detective. Former professional hockey player. Represents Iron Range and northeastern Minnesota.'
 WHERE slug = 'pete-stauber';
 
+

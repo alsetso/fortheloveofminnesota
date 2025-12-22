@@ -214,3 +214,4 @@ See `/mapbox/hoverentities.md` for complete mapping of:
 - POI classes and types
 - Water feature types
 - Land use categories
+

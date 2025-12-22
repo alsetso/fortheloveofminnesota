@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import { SessionData } from '../services/sessionStorage';
 import { useAuth } from '@/features/auth';
-import { useServerAuth } from '@/components/ServerAuthProvider';
+import { useServerAuth } from '@/components/providers/ServerAuthProvider';
 import type { ServerAuthUser } from '@/lib/authServer';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 

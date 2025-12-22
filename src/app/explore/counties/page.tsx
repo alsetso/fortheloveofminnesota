@@ -1,10 +1,9 @@
 import { Metadata } from 'next';
-import SimplePageLayout from '@/components/SimplePageLayout';
+import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { createServerClient } from '@/lib/supabaseServer';
-import { CountiesListView } from '@/components/counties/CountiesListView';
+import { CountiesListView } from '@/features/atlas/components/CountiesListView';
 import Link from 'next/link';
 import { StarIcon } from '@heroicons/react/24/solid';
-import CountiesListClient from './CountiesListClient';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -172,7 +171,6 @@ export default async function CountiesListPage() {
 
   return (
     <>
-      <CountiesListClient />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}

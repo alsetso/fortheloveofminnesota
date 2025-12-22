@@ -30,3 +30,4 @@ export { useFeatureTracking } from './hooks/useFeatureTracking';
 // Components
 export { default as CursorTracker } from './components/CursorTracker';
 export { default as FeatureCard } from './components/FeatureCard';
+

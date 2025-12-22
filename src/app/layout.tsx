@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { ToastContainer } from '@/features/ui/components/Toast'
-import { Providers } from '@/components/Providers'
-import { ErrorBoundary } from '@/components/ErrorBoundary'
-import LocalStorageCleanup from '@/components/LocalStorageCleanup'
+import { Providers } from '@/components/providers/Providers'
+import { ErrorBoundary } from '@/components/errors/ErrorBoundary'
+import LocalStorageCleanup from '@/components/utils/LocalStorageCleanup'
 // Removed usage/billing context and modals after simplifying app
 // Footer moved to PageLayout component for consistent page structure
 

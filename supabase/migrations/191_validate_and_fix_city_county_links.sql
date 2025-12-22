@@ -272,3 +272,4 @@ GRANT EXECUTE ON FUNCTION public.get_city_counties(UUID) TO authenticated, anon;
 COMMENT ON FUNCTION public.get_city_counties(UUID) IS 'Returns all counties associated with a city, with primary county first';
 
 
+

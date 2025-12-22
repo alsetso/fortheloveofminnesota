@@ -123,3 +123,4 @@ WHERE l.slug = 'lisa-demuth'
   AND p.slug = 'house-speaker'
   AND j.slug = 'mn-house';
 
+

@@ -143,3 +143,4 @@ COMMENT ON TRIGGER page_views_update_visitor_session ON public.page_views IS
   'Automatically updates visitor_sessions when a page view with session_id is recorded.';
 
 
+

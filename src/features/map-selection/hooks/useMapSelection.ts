@@ -232,3 +232,4 @@ export function updateSelectionCache(
 export function clearSelectionCache() {
   selectionCache.clear();
 }
+

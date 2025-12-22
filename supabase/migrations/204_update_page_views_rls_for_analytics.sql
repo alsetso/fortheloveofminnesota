@@ -33,3 +33,4 @@ COMMENT ON POLICY "page_views_select_own" ON public.page_views IS
   'Allows users to view page_views for their own content (accounts, posts, pages, map_pins) and homepage views (shared, all authenticated users can see).';
 
 
+

@@ -83,3 +83,4 @@ CREATE POLICY "Public can view map pin media"
 
 
 
+

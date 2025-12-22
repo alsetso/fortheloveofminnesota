@@ -67,3 +67,4 @@ GRANT INSERT ON public.maps TO authenticated;
 
 
 
+

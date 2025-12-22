@@ -2,11 +2,8 @@
 User-agent: *
 Allow: /
 
-# Sitemaps
+# Sitemap
 Sitemap: https://fortheloveofminnesota.com/sitemap.xml
-Sitemap: https://fortheloveofminnesota.com/sitemap-cities.xml
-Sitemap: https://fortheloveofminnesota.com/sitemap-counties.xml
-Sitemap: https://fortheloveofminnesota.com/sitemap-pages.xml
 
 # Disallow admin and API routes
 Disallow: /api/

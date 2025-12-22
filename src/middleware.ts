@@ -12,7 +12,6 @@ const ROUTE_PROTECTION: Record<string, {
   '/account/settings': { auth: true },
   '/account/billing': { auth: true },
   '/map-test': { auth: true },
-  '/admin': { auth: true, roles: ['admin'] },
 };
 
 /**

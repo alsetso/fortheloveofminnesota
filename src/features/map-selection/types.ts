@@ -164,3 +164,4 @@ export interface UseModalManagerReturn {
   openAtlasEntity: (mode: 'create' | 'edit', entityType: string, data?: unknown) => void;
   closeModal: () => void;
 }
+

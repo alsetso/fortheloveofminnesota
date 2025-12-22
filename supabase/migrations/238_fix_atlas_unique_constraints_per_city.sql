@@ -62,3 +62,4 @@ COMMENT ON CONSTRAINT municipals_name_city_unique ON atlas.municipals IS 'Ensure
 COMMENT ON CONSTRAINT schools_name_city_unique ON atlas.schools IS 'Ensures school names are unique per city, allowing same name in different cities';
 COMMENT ON CONSTRAINT parks_name_city_unique ON atlas.parks IS 'Ensures park names are unique per city, allowing same name in different cities';
 
+

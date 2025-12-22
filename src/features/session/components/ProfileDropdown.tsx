@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth, AccountService, Account } from '@/features/auth';
-import ProfilePhoto from '@/components/ProfilePhoto';
+import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { CheckIcon } from '@heroicons/react/24/outline';
 
 interface ProfileDropdownProps {

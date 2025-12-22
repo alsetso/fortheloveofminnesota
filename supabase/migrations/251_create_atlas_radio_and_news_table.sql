@@ -409,3 +409,4 @@ BEGIN
   RAISE NOTICE '  Unique constraint on name+city_id to prevent duplicates within same city';
 END;
 $$;
+

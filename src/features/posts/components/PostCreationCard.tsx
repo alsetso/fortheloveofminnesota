@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import PostCreationTrigger from './PostCreationTrigger';
-import PostPublisherModal from '@/components/feed/PostPublisherModal';
-import MediaUploadEditor from '@/components/feed/MediaUploadEditor';
-import PostMapModal, { PostMapData } from '@/components/feed/PostMapModal';
+import PostPublisherModal from '@/features/feed/components/PostPublisherModal';
+import MediaUploadEditor from '@/features/feed/components/MediaUploadEditor';
+import PostMapModal, { PostMapData } from '@/features/feed/components/PostMapModal';
 
 // Allow partial account data for flexibility
 type PartialAccount = Partial<Account> & {

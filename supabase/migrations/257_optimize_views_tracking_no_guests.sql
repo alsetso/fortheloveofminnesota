@@ -119,3 +119,4 @@ COMMENT ON INDEX idx_page_views_authenticated IS
 COMMENT ON INDEX idx_pin_views_authenticated IS
   'Optimized index for authenticated user queries (most common case). Partial index excludes NULL account_id.';
 
+

@@ -1,3 +1,28 @@
 // Atlas feature exports
+
+// Components
+export { default as AtlasEntityModal } from './components/AtlasEntityModal';
+export type { AtlasEntityData } from './components/AtlasEntityModal';
+export { default as AtlasLayersRenderer } from './components/AtlasLayersRenderer';
+export { default as MapLayersPanel, useAtlasLayers } from './components/MapLayersPanel';
+export type { AtlasLayer } from './components/MapLayersPanel';
+
+// Explore/Cities/Counties Components
+export { default as ExplorePageClient } from './components/ExplorePageClient';
+export { CitiesListView } from './components/CitiesListView';
+export { CountiesListView } from './components/CountiesListView';
+export { default as CityPageClient } from './components/CityPageClient';
+export { default as CountyPageClient } from './components/CountyPageClient';
+export { default as LocationPageClient } from './components/LocationPageClient';
+export { default as CityMap } from './components/CityMap';
+export { default as CityEditButton } from './components/CityEditButton';
+export { default as CityEditModal } from './components/CityEditModal';
+export { default as CountyMap } from './components/CountyMap';
+export { default as CountyEditButton } from './components/CountyEditButton';
+export { default as CountyEditModal } from './components/CountyEditModal';
+
+// Services
 export * from './services/atlasService';
 
+// Types
+export type * from './types';

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import SimplePageLayout from '@/components/SimplePageLayout';
-import ExplorePageClient from './ExplorePageClient';
+import SimplePageLayout from '@/components/layout/SimplePageLayout';
+import ExplorePageClient from '@/features/atlas/components/ExplorePageClient';
 import { BuildingOffice2Icon, RectangleGroupIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -595,20 +595,12 @@ export default async function ExplorePage() {
           <div className="mt-3 pt-3 border-t border-gray-200">
             <h2 className="text-xs font-semibold text-gray-900 mb-2">Related</h2>
             <div className="flex flex-wrap gap-2">
-              <Link href="/civic" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
-                Civic Leaders
-              </Link>
-              <span className="text-gray-300">•</span>
-              <Link href="/civic/leaders" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
-                Government Officials
-              </Link>
-              <span className="text-gray-300">•</span>
-              <Link href="/civic/jurisdictions" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
-                Jurisdictions
-              </Link>
-              <span className="text-gray-300">•</span>
               <Link href="/faqs" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
                 FAQs
+              </Link>
+              <span className="text-gray-300">•</span>
+              <Link href="/contact" className="text-xs text-gray-600 hover:text-gray-900 underline transition-colors">
+                Contact Us
               </Link>
             </div>
           </div>

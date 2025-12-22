@@ -314,13 +314,38 @@ export function extractFeature(mapboxFeature: any): ExtractedFeature | null {
 }
 
 /**
+ * Feature query priority modes
+ */
+export type FeaturePriorityMode = 'labels-first' | 'geometry-first' | 'labels-only';
+
+/**
  * Query and extract the best feature at a map point
  * Filters out custom layers (pins, atlas, etc.)
+ * Returns both the extracted feature and the raw mapbox feature for geometry access
  */
 export function queryFeatureAtPoint(
   map: any,
-  point: { x: number; y: number }
-): ExtractedFeature | null {
+  point: { x: number; y: number },
+  priorityModeOrReturnRaw?: FeaturePriorityMode | boolean,
+  returnRawOrDummyMode?: boolean,
+  dummyMode?: boolean
+): ExtractedFeature | { feature: ExtractedFeature; rawFeature: any } | null {
+  // Handle old signature: queryFeatureAtPoint(map, point, returnRaw)
+  // where returnRaw is boolean
+  let priorityMode: FeaturePriorityMode = 'labels-first';
+  let returnRaw: boolean = false;
+  let actualDummyMode: boolean = false;
+  
+  if (typeof priorityModeOrReturnRaw === 'boolean') {
+    // Old signature: queryFeatureAtPoint(map, point, returnRaw)
+    returnRaw = priorityModeOrReturnRaw;
+    actualDummyMode = returnRawOrDummyMode || false;
+  } else {
+    priorityMode = priorityModeOrReturnRaw || 'labels-first';
+    returnRaw = returnRawOrDummyMode || false;
+    actualDummyMode = dummyMode || false;
+  }
+  
   if (!map || map.removed) return null;
 
   try {
@@ -328,8 +353,8 @@ export function queryFeatureAtPoint(
 
     if (!features || features.length === 0) return null;
 
-    // Find the first Mapbox base layer feature (not our custom layers)
-    const mapFeature = features.find((f: any) => {
+    // Filter out our custom layers
+    let mapboxFeatures = features.filter((f: any) => {
       const layerId = f.layer?.id || '';
       const source = f.source || '';
 
@@ -341,9 +366,135 @@ export function queryFeatureAtPoint(
       return true;
     });
 
+    // Dummy mode: only POI label layers (primary icons like supermarkets, parks, churches)
+    // Exclude building-number-label, road labels, place labels, etc.
+    if (actualDummyMode) {
+      mapboxFeatures = mapboxFeatures.filter((f: any) => {
+        const layerId = f.layer?.id || '';
+        // Only POI label layers (primary icons)
+        if (layerId.includes('poi-label') || layerId.includes('poi-scalerank')) {
+          return true;
+        }
+        // Exclude building number labels, road labels, place labels
+        if (layerId.includes('building-number') || 
+            layerId.includes('housenum') ||
+            layerId.includes('road-label') ||
+            layerId.includes('street-label') ||
+            layerId.includes('place-label') ||
+            layerId.includes('settlement')) {
+          return false;
+        }
+        // Allow other label types that might be POIs (but be conservative)
+        if (layerId.includes('label') && !layerId.includes('building') && !layerId.includes('road')) {
+          return true;
+        }
+        return false;
+      });
+    }
+
+    if (mapboxFeatures.length === 0) return null;
+
+    let mapFeature: any = null;
+
+    // Apply priority mode
+    if (priorityMode === 'labels-only') {
+      // Only return label features
+      mapFeature = mapboxFeatures.find((f: any) => {
+        const layerId = f.layer?.id || '';
+        return layerId.includes('label') || layerId.includes('number');
+      });
+    } else if (priorityMode === 'labels-first') {
+      // Priority: labels → POI points → geometry
+      // 1. Label features
+      mapFeature = mapboxFeatures.find((f: any) => {
+        const layerId = f.layer?.id || '';
+        return layerId.includes('label') || layerId.includes('number');
+      });
+      // 2. POI point features
+      if (!mapFeature) {
+        mapFeature = mapboxFeatures.find((f: any) => {
+          const layerId = f.layer?.id || '';
+          const geometry = f.geometry;
+          if (geometry && geometry.type === 'Point') {
+            return layerId.includes('poi') || layerId.includes('place');
+          }
+          return false;
+        });
+      }
+      // 3. Building geometry
+      if (!mapFeature) {
+        mapFeature = mapboxFeatures.find((f: any) => {
+          const layerId = f.layer?.id || '';
+          if (layerId.includes('building') && !layerId.includes('label') && !layerId.includes('number')) {
+            return true;
+          }
+          if (layerId.includes('building') && (layerId.includes('fill') || layerId.includes('extrusion'))) {
+            return true;
+          }
+          return false;
+        });
+      }
+      // 4. Other polygons
+      if (!mapFeature) {
+        mapFeature = mapboxFeatures.find((f: any) => {
+          const geometry = f.geometry;
+          return geometry && (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon');
+        });
+      }
+    } else if (priorityMode === 'geometry-first') {
+      // Priority: geometry → labels → POI points
+      // 1. Building geometry
+      mapFeature = mapboxFeatures.find((f: any) => {
+        const layerId = f.layer?.id || '';
+        if (layerId.includes('building') && !layerId.includes('label') && !layerId.includes('number')) {
+          return true;
+        }
+        if (layerId.includes('building') && (layerId.includes('fill') || layerId.includes('extrusion'))) {
+          return true;
+        }
+        return false;
+      });
+      // 2. Other polygons
+      if (!mapFeature) {
+        mapFeature = mapboxFeatures.find((f: any) => {
+          const geometry = f.geometry;
+          return geometry && (geometry.type === 'Polygon' || geometry.type === 'MultiPolygon');
+        });
+      }
+      // 3. Label features
+      if (!mapFeature) {
+        mapFeature = mapboxFeatures.find((f: any) => {
+          const layerId = f.layer?.id || '';
+          return layerId.includes('label') || layerId.includes('number');
+        });
+      }
+      // 4. POI point features
+      if (!mapFeature) {
+        mapFeature = mapboxFeatures.find((f: any) => {
+          const layerId = f.layer?.id || '';
+          const geometry = f.geometry;
+          if (geometry && geometry.type === 'Point') {
+            return layerId.includes('poi') || layerId.includes('place');
+          }
+          return false;
+        });
+      }
+    }
+
+    // Fall back to first available feature
+    if (!mapFeature) {
+      mapFeature = mapboxFeatures[0];
+    }
+
     if (!mapFeature) return null;
 
-    return extractFeature(mapFeature);
+    const extracted = extractFeature(mapFeature);
+
+    if (returnRaw) {
+      return { feature: extracted!, rawFeature: mapFeature };
+    }
+
+    return extracted;
   } catch (error) {
     console.debug('[FeatureService] Error querying features:', error);
     return null;
@@ -401,3 +552,4 @@ export function clearCategoryCache(): void {
 
 // Re-export helpers from categories
 export { getAtlasTypeFromCategory, shouldShowIntelligence };
+

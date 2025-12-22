@@ -1,13 +1,13 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Link from 'next/link';
-import SimplePageLayout from '@/components/SimplePageLayout';
+import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { createServerClient } from '@/lib/supabaseServer';
 import { getServerAuth } from '@/lib/authServer';
 import Views from '@/components/ui/Views';
-import CityPageClient from './CityPageClient';
-import CityEditButton from '@/components/cities/CityEditButton';
-import CityMap from '@/components/cities/CityMap';
+import CityPageClient from '@/features/atlas/components/CityPageClient';
+import CityEditButton from '@/features/atlas/components/CityEditButton';
+import CityMap from '@/features/atlas/components/CityMap';
 import { City } from '@/features/admin/services/cityAdminService';
 import { StarIcon } from '@heroicons/react/24/solid';
 

@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
-import SimplePageLayout from '@/components/SimplePageLayout';
+import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { EnvelopeIcon } from '@heroicons/react/24/outline';
-import ContactPageClient from './ContactPageClient';
+import ContactPageClient from '@/features/contact/components/ContactPageClient';
 
 export const metadata: Metadata = {
   title: 'Contact Us | For the Love of Minnesota',

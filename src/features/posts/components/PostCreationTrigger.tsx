@@ -1,7 +1,7 @@
 'use client';
 
 import { PhotoIcon, MapPinIcon } from '@heroicons/react/24/outline';
-import ProfilePhoto from '@/components/ProfilePhoto';
+import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { Account } from '@/features/auth';
 
 interface PostCreationTriggerProps {

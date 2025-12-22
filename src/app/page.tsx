@@ -1,5 +1,5 @@
 import { createServerClient } from '@/lib/supabaseServer';
-import FeedMapClient from '@/components/feed/FeedMapClient';
+import HomepageMap from '@/features/homepage/components/HomepageMap';
 import { cache } from 'react';
 
 // Configure route segment for optimal caching
@@ -87,7 +87,7 @@ export default async function Home() {
     }));
 
   return (
-    <FeedMapClient cities={cities} counties={counties} />
+      <HomepageMap cities={cities} counties={counties} />
   );
 }
 

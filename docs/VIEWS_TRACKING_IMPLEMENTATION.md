@@ -116,3 +116,4 @@ The hook automatically:
 - Sends to `/api/analytics/view`
 - Handles errors gracefully (won't break the page)
 
+

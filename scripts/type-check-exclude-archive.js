@@ -29,3 +29,4 @@ try {
   console.error('❌ Type check failed');
   process.exit(1);
 }
+

@@ -1,25 +1,9 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useCallback, useState } from 'react';
 
 /**
- * Unified URL-based modal state management
- * 
- * All app modals are controlled via URL parameters for:
- * - Deep linking (shareable URLs)
- * - Browser back button support
- * - Consistent state across refreshes
- * 
- * URL patterns:
- * - /?modal=welcome
- * - /?modal=onboarding
- * - /?modal=account&tab=settings
- * - /?modal=account&tab=billing
- * - /?modal=upgrade&feature=intelligence
- * - /?modal=intelligence
- * - /?modal=analytics&pinId=abc123
- * - /?modal=atlas&mode=create&entityType=park
+ * Unified modal state management (local state, not in URL)
  */
 
 // All modal types in the app
@@ -34,7 +18,8 @@ export type AppModalType =
   | 'intelligence'
   | 'analytics'
   | 'atlas'
-  | 'coming-soon';
+  | 'coming-soon'
+  | 'successPin';
 
 // Modal state with context
 export interface AppModalState {
@@ -51,6 +36,16 @@ export interface AppModalState {
   entityType?: string;
   // Coming soon
   comingSoonFeature?: string;
+  // Success pin modal
+  successPinData?: {
+    id?: string;
+    lat: number;
+    lng: number;
+    description: string | null;
+    media_url: string | null;
+    status?: 'loading' | 'success' | 'error';
+    error?: string;
+  };
 }
 
 // Non-serializable context (stored in memory, not URL)
@@ -80,6 +75,8 @@ export interface UseAppModalsReturn {
   openAnalytics: (pinId: string, pinName?: string) => void;
   openAtlas: (mode: 'create' | 'edit', entityType: string, data?: unknown) => void;
   openComingSoon: (feature: string) => void;
+  openSuccessPin: (pinData: { id?: string; lat: number; lng: number; description: string | null; media_url: string | null; status?: 'loading' | 'success' | 'error'; error?: string }) => void;
+  updateSuccessPin: (updates: { id?: string; status?: 'loading' | 'success' | 'error'; error?: string; media_url?: string | null }) => void;
   
   // Close
   closeModal: () => void;
@@ -90,156 +87,88 @@ export interface UseAppModalsReturn {
 }
 
 export function useAppModals(): UseAppModalsReturn {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  // Parse modal state from URL
-  const modal = useMemo((): AppModalState => {
-    const modalType = searchParams.get('modal') as AppModalType | null;
-    
-    if (!modalType || modalType === 'none') {
-      return { type: 'none' };
-    }
-
-    switch (modalType) {
-      case 'welcome':
-        return { type: 'welcome' };
-        
-      case 'onboarding':
-        return { type: 'onboarding' };
-        
-      case 'account':
-        return {
-          type: 'account',
-          tab: searchParams.get('tab') || 'settings',
-        };
-        
-      case 'upgrade':
-        return {
-          type: 'upgrade',
-          feature: searchParams.get('feature') || undefined,
-        };
-        
-      case 'intelligence':
-        return { type: 'intelligence' };
-        
-      case 'analytics': {
-        const pinId = searchParams.get('pinId');
-        if (!pinId) return { type: 'none' };
-        return {
-          type: 'analytics',
-          pinId,
-          pinName: modalContext.analyticsPinName,
-        };
-      }
-        
-      case 'atlas': {
-        const mode = searchParams.get('mode') as 'create' | 'edit' | null;
-        const entityType = searchParams.get('entityType');
-        if (!mode || !entityType) return { type: 'none' };
-        return {
-          type: 'atlas',
-          mode,
-          entityType,
-        };
-      }
-        
-      case 'coming-soon':
-        return {
-          type: 'coming-soon',
-          comingSoonFeature: searchParams.get('feature') || 'Feature',
-        };
-        
-      default:
-        return { type: 'none' };
-    }
-  }, [searchParams]);
+  const [modal, setModal] = useState<AppModalState>({ type: 'none' });
 
   const isModalOpen = modal.type !== 'none';
 
-  // Update URL with modal params
-  const updateUrl = useCallback((params: Record<string, string | null>, replace = false) => {
-    const newParams = new URLSearchParams(searchParams.toString());
-    
-    // Clear all modal-related params first
-    ['modal', 'tab', 'feature', 'pinId', 'mode', 'entityType'].forEach(key => {
-      newParams.delete(key);
-    });
-    
-    // Set new params
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        newParams.set(key, value);
-      }
-    });
-    
-    const queryString = newParams.toString();
-    const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
-    
-    if (replace) {
-      router.replace(newUrl, { scroll: false });
-    } else {
-      router.push(newUrl, { scroll: false });
-    }
-  }, [searchParams, pathname, router]);
-
   // Auth modals
   const openWelcome = useCallback(() => {
-    updateUrl({ modal: 'welcome' });
-  }, [updateUrl]);
+    setModal({ type: 'welcome' });
+  }, []);
 
   const openOnboarding = useCallback(() => {
-    updateUrl({ modal: 'onboarding' });
-  }, [updateUrl]);
+    setModal({ type: 'onboarding' });
+  }, []);
 
   const openAccount = useCallback((tab?: string) => {
-    updateUrl({
-      modal: 'account',
+    setModal({
+      type: 'account',
       tab: tab || 'settings',
     });
-  }, [updateUrl]);
+  }, []);
 
   const openUpgrade = useCallback((feature?: string) => {
-    updateUrl({
-      modal: 'upgrade',
-      feature: feature || null,
+    setModal({
+      type: 'upgrade',
+      feature,
     });
-  }, [updateUrl]);
-
-  const openGuestDetails = useCallback(() => {
-    updateUrl({ modal: 'guest-details' });
-  }, [updateUrl]);
+  }, []);
 
   // Feature modals
   const openIntelligence = useCallback((location?: { lat: number; lng: number; placeName?: string; address?: string }) => {
     modalContext.intelligenceLocation = location || null;
-    updateUrl({ modal: 'intelligence' });
-  }, [updateUrl]);
+    setModal({ type: 'intelligence' });
+  }, []);
 
   const openAnalytics = useCallback((pinId: string, pinName?: string) => {
     modalContext.analyticsPinName = pinName;
-    updateUrl({
-      modal: 'analytics',
+    setModal({
+      type: 'analytics',
       pinId,
+      pinName,
     });
-  }, [updateUrl]);
+  }, []);
 
   const openAtlas = useCallback((mode: 'create' | 'edit', entityType: string, data?: unknown) => {
     modalContext.atlasEntityData = data;
-    updateUrl({
-      modal: 'atlas',
+    setModal({
+      type: 'atlas',
       mode,
       entityType,
     });
-  }, [updateUrl]);
+  }, []);
 
   const openComingSoon = useCallback((feature: string) => {
-    updateUrl({
-      modal: 'coming-soon',
-      feature,
+    setModal({
+      type: 'coming-soon',
+      comingSoonFeature: feature,
     });
-  }, [updateUrl]);
+  }, []);
+
+  const openSuccessPin = useCallback((pinData: { id?: string; lat: number; lng: number; description: string | null; media_url: string | null; status?: 'loading' | 'success' | 'error'; error?: string }) => {
+    setModal({
+      type: 'successPin',
+      successPinData: {
+        ...pinData,
+        status: pinData.status || 'loading',
+      },
+    });
+  }, []);
+
+  const updateSuccessPin = useCallback((updates: { id?: string; status?: 'loading' | 'success' | 'error'; error?: string; media_url?: string | null }) => {
+    setModal((prev) => {
+      if (prev.type === 'successPin' && prev.successPinData) {
+        return {
+          ...prev,
+          successPinData: {
+            ...prev.successPinData,
+            ...updates,
+          },
+        };
+      }
+      return prev;
+    });
+  }, []);
 
   // Close modal
   const closeModal = useCallback(() => {
@@ -248,8 +177,8 @@ export function useAppModals(): UseAppModalsReturn {
     modalContext.atlasEntityData = undefined;
     modalContext.analyticsPinName = undefined;
     
-    updateUrl({ modal: null }, true);
-  }, [updateUrl]);
+    setModal({ type: 'none' });
+  }, []);
 
   // Context getters
   const getIntelligenceContext = useCallback(() => modalContext.intelligenceLocation, []);
@@ -266,8 +195,11 @@ export function useAppModals(): UseAppModalsReturn {
     openAnalytics,
     openAtlas,
     openComingSoon,
+    openSuccessPin,
+    updateSuccessPin,
     closeModal,
     getIntelligenceContext,
     getAtlasContext,
   };
 }
+

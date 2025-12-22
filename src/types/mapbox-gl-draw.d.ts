@@ -40,3 +40,4 @@ declare module '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css' {
   const content: string;
   export default content;
 }
+

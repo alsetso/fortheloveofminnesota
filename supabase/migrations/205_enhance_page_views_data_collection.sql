@@ -155,3 +155,4 @@ ALTER TABLE public.page_views
   CHECK (entity_type IN ('post', 'article', 'city', 'county', 'account', 'business', 'page', 'feed', 'map', 'map_pin', 'homepage', 'explore', 'cities_list', 'counties_list', 'contact'));
 
 
+

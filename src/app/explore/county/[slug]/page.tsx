@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import Link from 'next/link';
-import SimplePageLayout from '@/components/SimplePageLayout';
+import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { createServerClient } from '@/lib/supabaseServer';
 import { getServerAuth } from '@/lib/authServer';
-import CountyPageClient from './CountyPageClient';
-import CountyMap from '@/components/counties/CountyMap';
-import CountyEditButton from '@/components/counties/CountyEditButton';
+import CountyPageClient from '@/features/atlas/components/CountyPageClient';
+import CountyMap from '@/features/atlas/components/CountyMap';
+import CountyEditButton from '@/features/atlas/components/CountyEditButton';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { County } from '@/features/admin/services/countyAdminService';
 import Views from '@/components/ui/Views';

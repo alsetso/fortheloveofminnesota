@@ -108,3 +108,4 @@ COMMENT ON COLUMN public.pin_collections.is_default IS 'If true, new pins are au
 COMMENT ON COLUMN public.pin_collections.display_order IS 'Order in which collections appear in lists/dropdowns';
 COMMENT ON COLUMN public.pins.collection_id IS 'Optional reference to a pin_collection for grouping pins';
 
+

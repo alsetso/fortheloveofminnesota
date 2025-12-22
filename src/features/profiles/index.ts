@@ -1,7 +1,18 @@
-// Profile feature exports
-// Stub implementation - profiles table has been removed
+// Components
+export { default as ProfileCard } from './components/ProfileCard';
+export { default as ProfileMapClient } from './components/ProfileMapClient';
+export { default as ProfileMapControls } from './components/ProfileMapControls';
+export { default as ProfileMapToolbar } from './components/ProfileMapToolbar';
+export { default as ProfilePinsLayer } from './components/ProfilePinsLayer';
+export { default as ProfilePinsList } from './components/ProfilePinsList';
+export { default as ProfilePinsSidebar } from './components/ProfilePinsSidebar';
+export { default as ProfileSidebar } from './components/ProfileSidebar';
 
+// Hooks
+export { useTemporaryPinMarker } from './hooks/useTemporaryPinMarker';
+export { useProfileUrlState } from './hooks/useProfileUrlState';
+export { useDebounce } from './hooks/useDebounce';
+
+// Contexts & Constants
 export { ProfileProvider, useProfile } from './contexts/ProfileContext';
-export type { Profile } from './contexts/ProfileContext';
-export { formatProfileType, getAllProfileTypes, isValidProfileType } from './constants/profileTypes';
-export type { ProfileType } from './constants/profileTypes';
+export * from './constants/profileTypes';

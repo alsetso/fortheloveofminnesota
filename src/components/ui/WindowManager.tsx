@@ -107,3 +107,4 @@ export function WindowManagerProvider({ children }: WindowManagerProviderProps) 
     </WindowManagerContext.Provider>
   );
 }
+

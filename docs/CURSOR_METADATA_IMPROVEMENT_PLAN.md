@@ -440,3 +440,4 @@ src/
 5. **Integration**: Pass metadata through pin creation flow, display on popups
 
 **Result**: Users can see what they're hovering over, that context is captured when they click, saved with their pin, and queryable later.
+

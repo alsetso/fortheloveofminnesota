@@ -123,3 +123,4 @@ COMMENT ON COLUMN public.collections.is_default IS 'If true, new pins are automa
 COMMENT ON COLUMN public.collections.display_order IS 'Order in which collections appear in lists';
 COMMENT ON COLUMN public.pins.collection_id IS 'Optional reference to a collection for grouping pins';
 
+

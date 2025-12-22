@@ -483,3 +483,4 @@ export function getAtlasTypeFromCategory(category: FeatureCategory): string | nu
 export function shouldShowIntelligence(category: FeatureCategory): boolean {
   return CATEGORY_CONFIG[category]?.showIntelligence === true;
 }
+

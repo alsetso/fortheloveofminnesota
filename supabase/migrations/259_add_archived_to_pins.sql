@@ -28,3 +28,4 @@ CREATE INDEX IF NOT EXISTS idx_pins_active
 COMMENT ON COLUMN public.pins.archived IS 
   'Soft delete flag. When true, pin is archived (treated as deleted but data is preserved). Archived pins are excluded from all public queries.';
 
+

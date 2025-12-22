@@ -208,3 +208,4 @@ Always check authentication before joining accounts table in queries that need t
 See `216_fix_pins_rls_use_helper_function.sql` for the complete migration.
 
 
+

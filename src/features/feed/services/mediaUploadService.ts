@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '@/lib/supabase';
-import { generateVideoThumbnail } from '@/components/feed/utils/videoThumbnail';
+import { generateVideoThumbnail } from '@/features/feed/utils/videoThumbnail';
 import type {
   UploadedMedia,
   MediaUploadOptions,

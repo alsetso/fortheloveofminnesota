@@ -153,3 +153,4 @@ export function countPinsByVisibility(pins: ProfilePin[]): {
 export function filterPinsForVisitor(pins: ProfilePin[]): ProfilePin[] {
   return pins.filter(p => p.visibility === 'public');
 }
+

@@ -186,3 +186,4 @@ GRANT INSERT, UPDATE, DELETE ON public.lakes TO authenticated;
 COMMENT ON VIEW public.lakes IS 'View pointing to atlas.lakes for Supabase client compatibility';
 
 
+

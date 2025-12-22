@@ -357,3 +357,4 @@ export function useAuthStateSafe(): AuthStateContextType {
   
   return context;
 }
+

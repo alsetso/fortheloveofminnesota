@@ -62,3 +62,4 @@ DROP INDEX IF EXISTS idx_pin_collections_visibility;
 DROP TRIGGER IF EXISTS update_pin_collections_updated_at ON public.pin_collections;
 
 DROP TABLE IF EXISTS public.pin_collections CASCADE;
+

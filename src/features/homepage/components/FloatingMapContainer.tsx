@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { XMarkIcon, MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, AdjustmentsHorizontalIcon, PlusIcon, MinusIcon, ArrowPathIcon, CubeIcon, MapIcon, PlayIcon, StopIcon, HomeIcon, HeartIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MagnifyingGlassIcon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, ArrowPathIcon, HomeIcon, HeartIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import MapScreenshotEditor from './MapScreenshotEditor';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { LocationLookupService } from '@/features/map/services/locationLookupService';
@@ -16,7 +16,6 @@ import { findCityByName, findCountyByName, updateCityCoordinates, deleteNeighbor
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { supabase } from '@/lib/supabase';
-import type { AtlasLayer } from '@/features/atlas/components/MapLayersPanel';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useWindowManager } from '@/components/ui/WindowManager';
 import {
@@ -120,9 +119,6 @@ interface LocationSidebarProps {
   isOpen?: boolean;
   onLocationSelect?: (coordinates: { lat: number; lng: number }) => void;
   onPinClick?: (pinData: { id: string; name: string; coordinates: { lat: number; lng: number }; address?: string; description?: string }) => void;
-  // Atlas layers
-  layers?: AtlasLayer[];
-  onToggleLayer?: (layerId: string) => void;
 }
 
 export default function LocationSidebar({ 
@@ -131,8 +127,6 @@ export default function LocationSidebar({
   isOpen = true,
   onLocationSelect,
   onPinClick,
-  layers,
-  onToggleLayer,
 }: LocationSidebarProps) {
   // Auth state - use isLoading to ensure auth is initialized before making decisions
   const { user, account, isLoading: authLoading } = useAuthStateSafe();
@@ -222,16 +216,10 @@ export default function LocationSidebar({
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   // Single state for active panel - only one can be open at a time
-  const [activePanel, setActivePanel] = useState<'none' | 'menu' | 'controls'>('none');
-  
-  // Derived state for backward compatibility
-  const isMenuOpen = activePanel === 'menu';
-  const isMapControlsOpen = activePanel === 'controls';
+  const [activePanel, setActivePanel] = useState<'none'>('none');
   const [is3DMode, setIs3DMode] = useState(true); // Default to 3D
   const [showRoadLabels, setShowRoadLabels] = useState(true);
   const [isSpinning, setIsSpinning] = useState(false);
-  const [activeTab, setActiveTab] = useState<'about' | 'moderation' | 'press'>('about');
-  const [mapControlsTab, setMapControlsTab] = useState<'controls' | 'layers'>('controls');
   const [currentUserAccountId, setCurrentUserAccountId] = useState<string | null>(null);
   const [currentUserPlan, setCurrentUserPlan] = useState<'hobby' | 'pro' | 'plus'>('hobby');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -252,6 +240,8 @@ export default function LocationSidebar({
   const [isDropHeartExpanded, setIsDropHeartExpanded] = useState(false);
   const [pinDescription, setPinDescription] = useState('');
   const [pinSelectedFile, setPinSelectedFile] = useState<File | null>(null);
+  const [pinEventMonth, setPinEventMonth] = useState<string>('');
+  const [pinEventDay, setPinEventDay] = useState<string>('');
   const [pinEventYear, setPinEventYear] = useState<string>('');
   const [showPostDateInput, setShowPostDateInput] = useState(false);
   
@@ -300,10 +290,6 @@ export default function LocationSidebar({
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuPanelRef = useRef<HTMLDivElement>(null);
-  const mapControlsRef = useRef<HTMLDivElement>(null);
-  const mapControlsPanelRef = useRef<HTMLDivElement>(null);
   const spinAnimationRef = useRef<number | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const temporaryMarkerRef = useRef<any>(null);
@@ -670,6 +656,8 @@ export default function LocationSidebar({
     setPinSelectedFile(null);
     setPinFilePreview(null);
     setPinVisibility('public');
+    setPinEventMonth('');
+    setPinEventDay('');
     setPinEventYear('');
     setShowPostDateInput(false);
     setPinError(null);
@@ -764,10 +752,41 @@ export default function LocationSidebar({
     setPinError(null);
 
     try {
-      // Convert year to date string (January 2nd of that year - avoids timezone issues)
-      const postDate = pinEventYear 
-        ? `${pinEventYear}-01-02T00:00:00.000Z`
-        : null;
+      // Build timestamp from optional month, day, year
+      let postDate: string | null = null;
+      
+      if (pinEventYear) {
+        const year = parseInt(pinEventYear, 10);
+        const month = pinEventMonth ? parseInt(pinEventMonth, 10) : 1;
+        const day = pinEventDay ? parseInt(pinEventDay, 10) : 1;
+        
+        // Validate date
+        const date = new Date(year, month - 1, day);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+          setPinError('Please enter a valid date');
+          setIsPinSubmitting(false);
+          return;
+        }
+        
+        // Check if date is in the future
+        const now = new Date();
+        if (date > now) {
+          setPinError('Date cannot be in the future');
+          setIsPinSubmitting(false);
+          return;
+        }
+        
+        // Check if date is more than 100 years ago
+        const hundredYearsAgo = new Date(now.getFullYear() - 100, now.getMonth(), now.getDate());
+        if (date < hundredYearsAgo) {
+          setPinError('Date cannot be more than 100 years in the past');
+          setIsPinSubmitting(false);
+          return;
+        }
+        
+        // Convert to ISO string
+        postDate = date.toISOString();
+      }
 
       const mentionData: CreateMentionData = {
         lat: locationData.coordinates.lat,
@@ -797,7 +816,7 @@ export default function LocationSidebar({
       setIsPinSubmitting(false);
       setIsPinUploading(false);
     }
-  }, [locationData, pinDescription, pinEventYear, pinVisibility, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome]);
+  }, [locationData, pinDescription, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome]);
 
   // Map control handlers
   const handleZoomIn = useCallback(() => {
@@ -905,25 +924,6 @@ export default function LocationSidebar({
       }
     };
   }, []);
-
-  // Close map controls dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const isInsideButton = mapControlsRef.current?.contains(target);
-      const isInsidePanel = mapControlsPanelRef.current?.contains(target);
-      
-      if (!isInsideButton && !isInsidePanel) {
-        setActivePanel('none');
-      }
-    };
-
-    if (isMapControlsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-    return undefined;
-  }, [isMapControlsOpen]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -1569,57 +1569,12 @@ export default function LocationSidebar({
   // Handle keyboard navigation
   const [selectedIndex, setSelectedIndex] = useState(-1);
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      const isInsideButton = menuRef.current?.contains(target);
-      const isInsidePanel = menuPanelRef.current?.contains(target);
-      
-      if (!isInsideButton && !isInsidePanel) {
-        setActivePanel('none');
-      }
-    };
-
-    if (isMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-    return undefined;
-  }, [isMenuOpen]);
-
-  // Close location details when menu opens (but keep selected pin if it exists)
-  useEffect(() => {
-    if (isMenuOpen && locationData) {
-      clearSelection();
-      removeTemporaryPin();
-    }
-  }, [isMenuOpen, locationData, removeTemporaryPin, clearSelection]);
-
-  // Close menu when any data opens
   // Close all dropdowns when location data appears
   useEffect(() => {
     if (locationData) {
       setActivePanel('none');
     }
   }, [locationData]);
-
-  // Fast panel switching - single state update clears location and switches panel
-  const openMenu = useCallback(() => {
-    setShowSuggestions(false);
-    setLocationData(null);
-    setSelectedAtlasEntity(null);
-    setPinFeature(null);
-    setActivePanel('menu');
-  }, []);
-
-  const openMapControls = useCallback(() => {
-    setShowSuggestions(false);
-    setLocationData(null);
-    setSelectedAtlasEntity(null);
-    setPinFeature(null);
-    setActivePanel('controls');
-  }, []);
 
   const closeAllDropdowns = useCallback(() => {
     setActivePanel('none');
@@ -1660,10 +1615,7 @@ export default function LocationSidebar({
   
   // Determine width based on state: panels open = wider, expanded = medium, collapsed = narrow
   const getSidebarWidth = () => {
-    if (isMenuOpen || isMapControlsOpen) {
-      // Panels open - widest
-      return 'w-full lg:w-[500px]';
-    } else if (isExpanded) {
+    if (isExpanded) {
       // Has data or search focused - medium
       return 'w-full lg:w-[500px]';
     } else {
@@ -1701,289 +1653,6 @@ export default function LocationSidebar({
         
         {/* Sidebar Card Container - Unified container for toolbar and all dropdowns */}
         <div className="relative bg-white border border-gray-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out" style={{ pointerEvents: 'auto', zIndex: 50 }}>
-          {/* Inline Panels - Menu, Controls, or Suggestions - Above toolbar */}
-          {isMenuOpen && (
-            <div ref={menuPanelRef} className="border-b border-gray-200 transition-all duration-300 ease-in-out" onClick={(e) => e.stopPropagation()}>
-              {/* Tabs */}
-              <div className="flex border-b border-gray-200">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setActiveTab('about'); }}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
-                    activeTab === 'about'
-                      ? 'text-gray-900 border-gray-900'
-                      : 'text-gray-500 hover:text-gray-700 border-transparent'
-                  }`}
-                >
-                  About
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setActiveTab('moderation'); }}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
-                    activeTab === 'moderation'
-                      ? 'text-gray-900 border-gray-900'
-                      : 'text-gray-500 hover:text-gray-700 border-transparent'
-                  }`}
-                >
-                  Moderation
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setActiveTab('press'); }}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
-                    activeTab === 'press'
-                      ? 'text-gray-900 border-gray-900'
-                      : 'text-gray-500 hover:text-gray-700 border-transparent'
-                  }`}
-                >
-                  Press
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              <div className="max-h-80 overflow-y-auto">
-                {activeTab === 'about' && (
-                  <div className="p-4 space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">About Us</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.
-                    </p>
-                  </div>
-                )}
-
-                {activeTab === 'moderation' && (
-                  <div className="p-4 space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Moderation Guidelines</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed mb-3">
-                      Posts are moderated to maintain a safe and respectful environment for the For the Love of Minnesota community.
-                    </p>
-                    <div className="space-y-2">
-                      <div className="text-xs text-gray-600">
-                        <span className="font-medium">1. Breaches of Privacy:</span> Posts containing personal identifying information (names, phone numbers, email addresses, social media handles, exact addresses) without consent.
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        <span className="font-medium">2. Hate Speech:</span> Posts that degrade or threaten based on race, ethnicity, citizenship, ability, sexuality, sex, gender, or class.
-                      </div>
-                      <div className="text-xs text-gray-600">
-                        <span className="font-medium">3. Spam/Unauthorized Advertising:</span> Spam posts or unauthorized advertisements that don&apos;t align with our community guidelines.
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-600 leading-relaxed mt-3">
-                      Moderation is in place to ensure a safe and respectful environment for all Minnesota residents, neighbors, and professionals.
-                    </p>
-                    <div className="mt-4">
-                      <h4 className="text-xs font-semibold text-gray-900 mb-1">Request Removal</h4>
-                      <p className="text-xs text-gray-600 leading-relaxed">
-                        To request removal of a post or report content concerns, please contact{' '}
-                        <a href="mailto:hi@fortheloveofminnesota.com" className="text-gray-900 hover:underline">
-                          hi@fortheloveofminnesota.com
-                        </a>
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'press' && (
-                  <div className="p-4 space-y-4">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Press</h3>
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      For media inquiries, press releases, or interview requests about For the Love of Minnesota, please contact our team.
-                    </p>
-                    <div className="mt-3">
-                      <p className="text-xs text-gray-600 leading-relaxed">
-                        Press Contact:{' '}
-                        <a href="mailto:hi@fortheloveofminnesota.com" className="text-gray-900 hover:underline">
-                          hi@fortheloveofminnesota.com
-                        </a>
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
-          )}
-
-          {/* Map Controls Panel - Inline */}
-          {isMapControlsOpen && (
-            <div ref={mapControlsPanelRef} className="border-b border-gray-200 transition-all duration-300 ease-in-out" onClick={(e) => e.stopPropagation()}>
-              {/* Tabs */}
-              <div className="flex border-b border-gray-200">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setMapControlsTab('controls'); }}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
-                    mapControlsTab === 'controls'
-                      ? 'text-gray-900 border-gray-900'
-                      : 'text-gray-500 hover:text-gray-700 border-transparent'
-                  }`}
-                >
-                  Controls
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setMapControlsTab('layers'); }}
-                  className={`flex-1 px-2 py-1.5 text-xs font-medium transition-colors border-b-2 ${
-                    mapControlsTab === 'layers'
-                      ? 'text-gray-900 border-gray-900'
-                      : 'text-gray-500 hover:text-gray-700 border-transparent'
-                  }`}
-                >
-                  Layers
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              <div className="p-2">
-                {mapControlsTab === 'controls' && (
-                  <>
-                    {/* Zoom Controls */}
-                    <div className="flex items-center gap-1 mb-2">
-                      <button
-                        onClick={handleZoomIn}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded transition-colors"
-                        title="Zoom In"
-                      >
-                        <PlusIcon className="w-3.5 h-3.5" />
-                        <span>Zoom In</span>
-                      </button>
-                      <button
-                        onClick={handleZoomOut}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded transition-colors"
-                        title="Zoom Out"
-                      >
-                        <MinusIcon className="w-3.5 h-3.5" />
-                        <span>Zoom Out</span>
-                      </button>
-                    </div>
-
-                    {/* 3D Toggle */}
-                    <button
-                      onClick={handleToggle3D}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded transition-colors ${
-                        is3DMode 
-                          ? 'text-gray-900 bg-gray-100' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                      title={is3DMode ? 'Switch to 2D' : 'Switch to 3D'}
-                    >
-                      <CubeIcon className="w-3.5 h-3.5" />
-                      <span>{is3DMode ? '3D View' : '2D View'}</span>
-                      {is3DMode && <span className="ml-auto text-[9px] text-gray-500">ON</span>}
-                    </button>
-
-                    {/* Reset Rotation */}
-                    <button
-                      onClick={handleResetRotation}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded transition-colors"
-                      title="Reset Rotation"
-                    >
-                      <ArrowPathIcon className="w-3.5 h-3.5" />
-                      <span>Reset Rotation</span>
-                    </button>
-
-                    {/* Divider */}
-                    <div className="my-1.5 border-t border-gray-100" />
-
-                    {/* Road Labels Toggle */}
-                    <button
-                      onClick={handleToggleRoadLabels}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded transition-colors ${
-                        showRoadLabels 
-                          ? 'text-gray-900 bg-gray-100' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                      title={showRoadLabels ? 'Hide Road Labels' : 'Show Road Labels'}
-                    >
-                      <MapIcon className="w-3.5 h-3.5" />
-                      <span>Road Labels</span>
-                      {showRoadLabels && <span className="ml-auto text-[9px] text-gray-500">ON</span>}
-                    </button>
-
-                    {/* Spin Map Toggle */}
-                    <button
-                      onClick={handleToggleSpin}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded transition-colors ${
-                        isSpinning 
-                          ? 'text-gray-900 bg-gray-100' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                      title={isSpinning ? 'Stop Spinning' : 'Start Spinning'}
-                    >
-                      {isSpinning ? (
-                        <StopIcon className="w-3.5 h-3.5" />
-                      ) : (
-                        <PlayIcon className="w-3.5 h-3.5" />
-                      )}
-                      <span>{isSpinning ? 'Stop Spin' : 'Spin Map'}</span>
-                    </button>
-
-                    {/* Divider */}
-                    <div className="my-1.5 border-t border-gray-100" />
-
-                    {/* Year Filter */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Filter by Year
-                      </label>
-                      <input
-                        type="number"
-                        min={new Date().getFullYear() - 50}
-                        max={new Date().getFullYear()}
-                        value={searchParams.get('year') || ''}
-                        onChange={(e) => {
-                          const year = e.target.value ? parseInt(e.target.value, 10) : null;
-                          const url = new URL(window.location.href);
-                          if (year && !isNaN(year)) {
-                            url.searchParams.set('year', year.toString());
-                            // Trigger mentions reload by dispatching event
-                            window.dispatchEvent(new CustomEvent('mention-created'));
-                          } else {
-                            url.searchParams.delete('year');
-                            window.dispatchEvent(new CustomEvent('mention-created'));
-                          }
-                          router.push(url.pathname + url.search);
-                        }}
-                        placeholder="All years"
-                        className="w-full px-2 py-1.5 text-xs text-gray-900 border border-gray-200 rounded transition-colors focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                      />
-                      <p className="text-[10px] text-gray-500 mt-0.5">
-                        Show only pins from this year
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {mapControlsTab === 'layers' && (
-                  <div>
-                    {layers && layers.length > 0 ? (
-                      <div className="space-y-0.5">
-                        {layers.map((layer) => (
-                          <button
-                            key={layer.id}
-                            onClick={() => onToggleLayer?.(layer.id)}
-                            className="w-full flex items-center justify-between px-2 py-1.5 hover:bg-gray-50 rounded transition-colors"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">{layer.icon}</span>
-                              <span className="text-xs text-gray-900">{layer.name}</span>
-                              {layer.count !== undefined && (
-                                <span className="text-[10px] text-gray-500">({layer.count})</span>
-                              )}
-                            </div>
-                            {layer.visible ? (
-                              <EyeIcon className="w-4 h-4 text-gray-700" />
-                            ) : (
-                              <EyeSlashIcon className="w-4 h-4 text-gray-400" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-500 px-2">No layers available</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Suggestions Panel - Inline */}
           {showSuggestions && suggestions.length > 0 && (
             <div
@@ -2011,52 +1680,6 @@ export default function LocationSidebar({
 
           {/* Toolbar Row */}
           <div className="relative flex items-center">
-            {/* Hamburger Menu Icon */}
-            <div ref={menuRef}>
-              <button
-                className={`flex items-center justify-center w-11 h-11 text-gray-700 hover:bg-gray-50 transition-all duration-150 pointer-events-auto ${
-                  isMenuOpen ? 'bg-gray-100' : ''
-                }`}
-                title={isMenuOpen ? 'Close Menu' : 'Menu'}
-                aria-label={isMenuOpen ? 'Close Menu' : 'Menu'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isMenuOpen) {
-                    setActivePanel('none');
-                  } else {
-                    openMenu();
-                  }
-                }}
-              >
-                {isMenuOpen ? (
-                  <XMarkIcon className="w-5 h-5" />
-                ) : (
-                  <Bars3Icon className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-
-            {/* Map Controls Icon */}
-            <div ref={mapControlsRef} className="border-l border-gray-200">
-              <button
-                className={`flex items-center justify-center w-11 h-11 text-gray-700 hover:bg-gray-50 transition-all duration-150 pointer-events-auto ${
-                  isMapControlsOpen ? 'bg-gray-100' : ''
-                }`}
-                title="Map Controls"
-                aria-label="Map Controls"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isMapControlsOpen) {
-                    setActivePanel('none');
-                  } else {
-                    openMapControls();
-                  }
-                }}
-              >
-                <AdjustmentsHorizontalIcon className="w-5 h-5" />
-              </button>
-            </div>
-
               {/* Screenshot Editor */}
             <MapScreenshotEditor map={map} mapLoaded={mapLoaded} />
 
@@ -2099,7 +1722,7 @@ export default function LocationSidebar({
           </div>
 
           {/* Content Sections - Only shown when expanded and no panel is open */}
-          {isExpanded && !isMenuOpen && !isMapControlsOpen && !showSuggestions && (
+          {isExpanded && !showSuggestions && (
             <div
               className="border-t border-gray-200 overflow-y-auto"
               style={{ 
@@ -2185,7 +1808,7 @@ export default function LocationSidebar({
                         </div>
                       </div>
 
-                      {/* Event Year Selector - Collapsible */}
+                      {/* Date Selector - Collapsible */}
                       <div>
                         {!showPostDateInput ? (
                           <button
@@ -2197,54 +1820,67 @@ export default function LocationSidebar({
                             Post Date
                           </button>
                         ) : (
-                          <div>
+                          <div className="space-y-2">
                             <label className="block text-xs font-medium text-gray-700 mb-1">
                               When did this happen? (optional)
                             </label>
-                            <input
-                              type="number"
-                              value={pinEventYear}
-                              onChange={(e) => {
-                                const yearValue = e.target.value;
-                                setPinEventYear(yearValue);
-                                
-                                // Only validate when 4 digits are entered
-                                if (yearValue && yearValue.length === 4) {
-                                  const year = parseInt(yearValue, 10);
-                                  const currentYear = new Date().getFullYear();
-                                  const hundredYearsAgo = currentYear - 100;
-                                  
-                                  if (isNaN(year)) {
-                                    setPinError('Please enter a valid year');
-                                    return;
-                                  }
-                                  
-                                  if (year > currentYear) {
-                                    setPinError('Year cannot be in the future');
-                                    return;
-                                  }
-                                  
-                                  if (year < hundredYearsAgo) {
-                                    setPinError('Year cannot be more than 100 years in the past');
-                                    return;
-                                  }
-                                  
-                                  setPinError(null);
-                                } else if (!yearValue) {
-                                  // Clear error when field is empty
-                                  setPinError(null);
-                                }
-                                // Don't validate while typing (1-3 digits)
-                              }}
-                              min={new Date().getFullYear() - 100}
-                              max={new Date().getFullYear()}
-                              placeholder="e.g., 2025"
-                              className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                              disabled={isPinSubmitting || isPinUploading}
-                              autoFocus
-                            />
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <input
+                                  type="number"
+                                  value={pinEventMonth}
+                                  onChange={(e) => {
+                                    const monthValue = e.target.value;
+                                    if (!monthValue || (monthValue >= '1' && monthValue <= '12')) {
+                                      setPinEventMonth(monthValue);
+                                      setPinError(null);
+                                    }
+                                  }}
+                                  min="1"
+                                  max="12"
+                                  placeholder="Month"
+                                  className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                  disabled={isPinSubmitting || isPinUploading}
+                                  autoFocus
+                                />
+                              </div>
+                              <div>
+                                <input
+                                  type="number"
+                                  value={pinEventDay}
+                                  onChange={(e) => {
+                                    const dayValue = e.target.value;
+                                    if (!dayValue || (dayValue >= '1' && dayValue <= '31')) {
+                                      setPinEventDay(dayValue);
+                                      setPinError(null);
+                                    }
+                                  }}
+                                  min="1"
+                                  max="31"
+                                  placeholder="Day"
+                                  className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                  disabled={isPinSubmitting || isPinUploading}
+                                />
+                              </div>
+                              <div>
+                                <input
+                                  type="number"
+                                  value={pinEventYear}
+                                  onChange={(e) => {
+                                    const yearValue = e.target.value;
+                                    setPinEventYear(yearValue);
+                                    setPinError(null);
+                                  }}
+                                  min={new Date().getFullYear() - 100}
+                                  max={new Date().getFullYear()}
+                                  placeholder="Year"
+                                  className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                  disabled={isPinSubmitting || isPinUploading}
+                                />
+                              </div>
+                            </div>
                             <p className="text-[10px] text-gray-500 mt-0.5">
-                              Enter a year to filter this mention by year on the map
+                              Enter month, day, and/or year to filter this mention by date on the map
                             </p>
                           </div>
                         )}

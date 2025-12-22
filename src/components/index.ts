@@ -16,7 +16,7 @@ export { default as AuthGuard } from './providers/AuthGuard';
 
 // Error Handling Components
 export { ErrorBoundary } from './errors/ErrorBoundary';
-export { default as SuspenseBoundary } from './errors/SuspenseBoundary';
+export { SuspenseBoundary, PageSuspense, AuthSuspense } from './errors/SuspenseBoundary';
 
 // Modal Components
 export { default as GlobalModals } from './modals/GlobalModals';

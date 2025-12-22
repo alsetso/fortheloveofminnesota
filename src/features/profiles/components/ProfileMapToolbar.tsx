@@ -4,36 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, LockClosedIcon, EyeIcon } from '@heroicons/react/24/outline';
 import ProfileSidebar from './ProfileSidebar';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-
-interface Pin {
-  id: string;
-  lat: number;
-  lng: number;
-  description: string | null;
-  media_url: string | null;
-  visibility: string;
-  view_count: number | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface AccountData {
-  id: string;
-  username: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  phone: string | null;
-  image_url: string | null;
-  cover_image_url: string | null;
-  bio: string | null;
-  city_id: string | null;
-  view_count: number;
-  traits: string[] | null;
-  guest_id?: string | null;
-  user_id: string | null;
-  created_at: string;
-}
+import type { ProfilePin, ProfileAccount } from '@/types/profile';
 
 interface ProfileMapToolbarProps {
   accountUsername: string | null;
@@ -41,8 +12,8 @@ interface ProfileMapToolbarProps {
   pinCount: number;
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
-  pins: Pin[];
-  account: AccountData;
+  pins: ProfilePin[];
+  account: ProfileAccount;
   isOwnProfile: boolean;
   isGuest: boolean;
   viewMode?: 'owner' | 'visitor';
@@ -50,7 +21,7 @@ interface ProfileMapToolbarProps {
   showPrivatePins?: boolean;
   onTogglePrivatePins?: () => void;
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string) => void;
-  onAccountUpdate?: (updates: Partial<AccountData>) => void;
+  onAccountUpdate?: (updates: Partial<ProfileAccount>) => void;
 }
 
 export default function ProfileMapToolbar({

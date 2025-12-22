@@ -333,9 +333,6 @@ export default function ProfileSidebar({
                     className="w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex items-start gap-2">
-                      {pin.media_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) && (
-                        <img src={pin.media_url} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0" />
-                      )}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-gray-900 line-clamp-1">{pin.description || 'Unnamed pin'}</div>
                         <div className="flex items-center gap-2 mt-0.5">

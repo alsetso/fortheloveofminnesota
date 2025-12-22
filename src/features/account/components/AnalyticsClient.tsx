@@ -43,12 +43,23 @@ export default function AnalyticsClient() {
 
       try {
         const response = await fetch('/api/analytics/my-pins', { credentials: 'include' });
-        const json = await response.json();
-
+        
         if (!response.ok) {
-          throw new Error(json.error || 'Failed to load analytics');
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const json = await response.json();
+            throw new Error(json.error || 'Failed to load analytics');
+          } else {
+            throw new Error(`Failed to load analytics: ${response.status} ${response.statusText}`);
+          }
         }
 
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Invalid response format from server');
+        }
+
+        const json = await response.json();
         setData(json);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load analytics');

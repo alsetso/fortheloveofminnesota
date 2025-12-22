@@ -5,7 +5,7 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { supabase } from '@/lib/supabase';
 import type { ProfilePin } from '@/types/profile';
 import { formatPinDate } from '@/types/profile';
-import { useProfileUrlState } from './hooks/useProfileUrlState';
+import { useProfileUrlState } from '../hooks/useProfileUrlState';
 
 interface ProfilePinsLayerProps {
   map: MapboxMapInstance;
@@ -53,7 +53,7 @@ export default function ProfilePinsLayer({
   const currentOpenPinIdRef = useRef<string | null>(null);
 
   // Helper function to create popup HTML
-  const createPopupHTML = useCallback((pin: ProfilePin, viewCount: number | null = null): string => {
+  const createPopupHTML = useCallback((pin: ProfilePin): string => {
     const escapeHtml = (text: string | null): string => {
       if (!text) return '';
       const div = document.createElement('div');
@@ -105,10 +105,8 @@ export default function ProfilePinsLayer({
           </div>
         ` : ''}
         ${pin.description ? `<div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: 8px; word-wrap: break-word;${isOwner ? ' margin-right: 30px;' : ''}">${escapeHtml(pin.description)}</div>` : ''}
-        ${pin.media_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `<div style="margin-bottom: 8px;"><img src="${escapeHtml(pin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 100px; object-fit: cover; display: block;" /></div>` : ''}
         <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #6b7280; padding-top: 6px;">
           <span>${formatDate(pin.created_at)}</span>
-          ${viewCount !== null ? `<span style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>${viewCount}</span>` : ''}
         </div>
       </div>
     `;
@@ -228,7 +226,7 @@ export default function ProfilePinsLayer({
       anchor: 'bottom',
     })
       .setLngLat([pin.lng, pin.lat])
-      .setHTML(createPopupHTML(pin, null))
+      .setHTML(createPopupHTML(pin))
       .addTo(mapboxMap);
 
     // Setup handlers immediately after popup is created
@@ -283,21 +281,7 @@ export default function ProfilePinsLayer({
               detail: { pin_id: pin.id }
             }));
 
-            // Fetch updated view count
-            const statsResponse = await fetch(`/api/analytics/pin-stats?pin_id=${pin.id}`);
-            if (statsResponse.ok) {
-              const statsData = await statsResponse.json();
-              const viewCount = statsData.stats?.total_views || 0;
-              
-              // Update popup content with view count (only if popup still exists and is for this pin)
-              if (popupRef.current && currentOpenPinIdRef.current === pin.id) {
-                popupRef.current.setHTML(createPopupHTML(pin, viewCount));
-                // Re-setup handlers after content update
-                setTimeout(() => {
-                  setupPopupHandlers(pin.id);
-                }, 0);
-              }
-            }
+            // Popup content is already set, no need to fetch stats
           }
         } catch (error) {
           // Silently fail - don't break the page
@@ -415,9 +399,7 @@ export default function ProfilePinsLayer({
             properties: {
               id: pin.id,
               description: pin.description,
-              media_url: pin.media_url,
               visibility: pin.visibility,
-              view_count: pin.view_count,
               created_at: pin.created_at,
             },
           };

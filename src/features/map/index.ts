@@ -1,8 +1,7 @@
 // Components
-export { default as PinsLayer } from './components/PinsLayer';
+export { default as MentionsLayer } from './components/MentionsLayer';
+export { default as CreateMentionModal } from './components/CreateMentionModal';
 export { default as POIsLayer } from './components/POIsLayer';
-export { default as CreatePinModal } from './components/CreatePinModal';
-export { default as PinPreviewModal } from './components/PinPreviewModal';
 
 // Services & Utils
 export { MAP_CONFIG } from './config';

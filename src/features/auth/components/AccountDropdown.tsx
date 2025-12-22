@@ -82,6 +82,20 @@ export default function AccountDropdown({
 
   const isDark = variant === 'dark';
 
+  // When not authenticated and not loading, show red sign-in button (no dropdown)
+  if (!isLoading && !account) {
+    return (
+      <button
+        onClick={handleSignIn}
+        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors"
+        aria-label="Sign in"
+      >
+        Sign In
+      </button>
+    );
+  }
+
+  // When authenticated or loading, show profile dropdown
   return (
     <div ref={containerRef} className="relative">
       {/* Trigger Button */}

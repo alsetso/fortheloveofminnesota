@@ -3,35 +3,35 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
-import { PublicMapPinService } from '@/features/map-pins/services/publicMapPinService';
+import { MentionService } from '@/features/mentions/services/mentionService';
 import HomepageStatsModal from './HomepageStatsModal';
 
 export default function HomepageStatsHandle() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pinCount, setPinCount] = useState<number | null>(null);
+  const [mentionCount, setMentionCount] = useState<number | null>(null);
   const searchParams = useSearchParams();
   const currentYearParam = searchParams.get('year');
   const currentYear = new Date().getFullYear();
   const displayYear = currentYearParam || currentYear.toString();
   const isFilterActive = !!currentYearParam;
 
-  // Fetch pin count when year filter is active
+  // Fetch mention count when year filter is active
   useEffect(() => {
     if (currentYearParam) {
       const fetchCount = async () => {
         try {
-          const count = await PublicMapPinService.getPinCountWithFilters({ 
+          const mentions = await MentionService.getMentions({ 
             year: parseInt(currentYearParam, 10) 
           });
-          setPinCount(count);
+          setMentionCount(mentions.length);
         } catch (error) {
-          console.error('Error fetching pin count:', error);
-          setPinCount(null);
+          console.error('Error fetching mention count:', error);
+          setMentionCount(null);
         }
       };
       fetchCount();
     } else {
-      setPinCount(null);
+      setMentionCount(null);
     }
   }, [currentYearParam]);
 
@@ -46,11 +46,11 @@ export default function HomepageStatsHandle() {
             : 'bg-white hover:bg-gray-50 text-gray-700'
         }`}
         aria-label="View site statistics and year filter"
-        title={isFilterActive ? `Filtered by ${displayYear}${pinCount !== null ? ` (${pinCount.toLocaleString()} pins)` : ''}` : 'View site statistics and year filter'}
+        title={isFilterActive ? `Filtered by ${displayYear}${mentionCount !== null ? ` (${mentionCount.toLocaleString()} mentions)` : ''}` : 'View site statistics and year filter'}
       >
         <span className="text-xs">{displayYear}</span>
-        {isFilterActive && pinCount !== null && (
-          <span className="text-[10px] text-gray-500 font-normal">({pinCount.toLocaleString()})</span>
+        {isFilterActive && mentionCount !== null && (
+          <span className="text-[10px] text-gray-500 font-normal">({mentionCount.toLocaleString()})</span>
         )}
         <ChevronRightIcon className="w-3 h-3 text-gray-400" />
       </button>

@@ -9,13 +9,13 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies();
     const searchParams = request.nextUrl.searchParams;
     const page_url = searchParams.get('page_url');
-    const pin_id = searchParams.get('pin_id');
+    const mention_id = searchParams.get('mention_id');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    if (!page_url && !pin_id) {
+    if (!page_url && !mention_id) {
       return NextResponse.json(
-        { error: 'Either page_url or pin_id is required' },
+        { error: 'Either page_url or mention_id is required' },
         { status: 400 }
       );
     }
@@ -76,14 +76,14 @@ export async function GET(request: NextRequest) {
       isOwner = page_url === profileUrl;
       
       // Could also check other owned pages here (e.g., user-created pages)
-    } else if (pin_id) {
-      // For pins, check if user owns the pin
-      const { data: pin } = await supabase
-        .from('pins')
+    } else if (mention_id) {
+      // For mentions, check if user owns the mention
+      const { data: mention } = await supabase
+        .from('mentions')
         .select('account_id')
-        .eq('id', pin_id)
+        .eq('id', mention_id)
         .single() as { data: { account_id: string } | null; error: any };
-      isOwner = (pin as { account_id: string } | null)?.account_id === account.id;
+      isOwner = (mention as { account_id: string } | null)?.account_id === account.id;
     }
 
     if (!isOwner) {
@@ -105,14 +105,11 @@ export async function GET(request: NextRequest) {
       } as any);
       visitors = result.data as Visitor[] | null;
       error = result.error;
-    } else if (pin_id) {
-      const result = await supabase.rpc('get_pin_viewers', {
-        p_pin_id: pin_id,
-        p_limit: limit,
-        p_offset: offset,
-      } as any);
-      visitors = result.data as Visitor[] | null;
-      error = result.error;
+    } else if (mention_id) {
+      // Note: get_pin_viewers function may need to be updated to get_mention_viewers
+      // For now, returning empty array as mentions don't have view tracking yet
+      visitors = [];
+      error = null;
     }
 
     if (error) {

@@ -7,19 +7,19 @@ import { useSearchParams, usePathname } from 'next/navigation';
  * Centralized hook for managing profile page URL state
  * 
  * Manages:
- * - pinId: Currently selected pin (opens popup)
+ * - mentionId: Currently selected mention (opens popup)
  * - view: View mode ('visitor' for owner preview, undefined for owner view)
  * 
  * Improvements:
  * - Single source of truth (URL is the state)
- * - Debounced rapid pin switching
+ * - Debounced rapid mention switching
  * - Transition state to prevent conflicts
  * - Clean browser navigation handling
  * - Proper cleanup on unmount
  */
 
 interface UrlStateUpdate {
-  pinId?: string | null;
+  mentionId?: string | null;
   view?: 'owner' | 'visitor' | null;
 }
 
@@ -37,10 +37,10 @@ export function useProfileUrlState() {
   const lastUrlRef = useRef<string>('');
   
   // Local state for immediate updates (searchParams doesn't update with replaceState)
-  const [pinId, setPinIdState] = useState<string | null>(() => {
+  const [mentionId, setMentionIdState] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.search);
-    return params.get('pinId');
+    return params.get('mentionId');
   });
   
   const [viewMode, setViewModeState] = useState<'owner' | 'visitor'>(() => {
@@ -51,19 +51,19 @@ export function useProfileUrlState() {
 
   // Sync with searchParams for browser back/forward navigation
   useEffect(() => {
-    const urlPinId = searchParams.get('pinId');
+    const urlMentionId = searchParams.get('mentionId');
     const urlView = searchParams.get('view');
     const urlViewMode = urlView === 'visitor' ? 'visitor' : 'owner';
     
     // Only sync if values differ (prevents unnecessary updates)
-    if (urlPinId !== pinId) {
-      setPinIdState(urlPinId);
+    if (urlMentionId !== mentionId) {
+      setMentionIdState(urlMentionId);
     }
     
     if (urlViewMode !== viewMode) {
       setViewModeState(urlViewMode);
     }
-  }, [searchParams, pinId, viewMode]);
+  }, [searchParams, mentionId, viewMode]);
 
   /**
    * Handle browser back/forward navigation
@@ -94,11 +94,11 @@ export function useProfileUrlState() {
         clearTimeout(debounceTimerRef.current);
       }
       
-      // If there's a pinId in the URL when unmounting, clean it up
+      // If there's a mentionId in the URL when unmounting, clean it up
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
-        if (params.has('pinId')) {
-          params.delete('pinId');
+        if (params.has('mentionId')) {
+          params.delete('mentionId');
           const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : '');
           window.history.replaceState({}, '', newUrl);
         }
@@ -129,14 +129,14 @@ export function useProfileUrlState() {
       
       const url = new URL(window.location.href);
       
-      // Handle pinId
-      if ('pinId' in updates) {
-        if (updates.pinId) {
-          url.searchParams.set('pinId', updates.pinId);
-          setPinIdState(updates.pinId); // Update state immediately
+      // Handle mentionId
+      if ('mentionId' in updates) {
+        if (updates.mentionId) {
+          url.searchParams.set('mentionId', updates.mentionId);
+          setMentionIdState(updates.mentionId); // Update state immediately
         } else {
-          url.searchParams.delete('pinId');
-          setPinIdState(null); // Update state immediately
+          url.searchParams.delete('mentionId');
+          setMentionIdState(null); // Update state immediately
         }
       }
       
@@ -172,31 +172,31 @@ export function useProfileUrlState() {
     };
 
     // For immediate updates (like closing popup), don't debounce
-    if (immediate || updates.pinId === null) {
+    if (immediate || updates.mentionId === null) {
       performUpdate();
     } else {
-      // Debounce rapid pin switches
+      // Debounce rapid mention switches
       setIsTransitioning(true);
       debounceTimerRef.current = setTimeout(performUpdate, 100);
     }
   }, []);
 
   /**
-   * Set pinId in URL (opens popup)
+   * Set mentionId in URL (opens popup)
    */
-  const setPinId = useCallback((newPinId: string | null, immediate: boolean = false) => {
+  const setMentionId = useCallback((newMentionId: string | null, immediate: boolean = false) => {
     if (isTransitioning && !immediate) {
       // Prevent rapid switching unless immediate flag is set
       return;
     }
-    updateUrl({ pinId: newPinId }, { immediate });
+    updateUrl({ mentionId: newMentionId }, { immediate });
   }, [updateUrl, isTransitioning]);
 
   /**
-   * Clear pinId from URL (closes popup) - always immediate
+   * Clear mentionId from URL (closes popup) - always immediate
    */
-  const clearPinId = useCallback(() => {
-    updateUrl({ pinId: null }, { immediate: true });
+  const clearMentionId = useCallback(() => {
+    updateUrl({ mentionId: null }, { immediate: true });
   }, [updateUrl]);
 
   /**
@@ -215,50 +215,57 @@ export function useProfileUrlState() {
   }, [viewMode, updateUrl]);
 
   /**
-   * Clear both pinId and view (reset to default)
+   * Clear both mentionId and view (reset to default)
    */
   const clearAll = useCallback(() => {
-    updateUrl({ pinId: null, view: null }, { immediate: true });
+    updateUrl({ mentionId: null, view: null }, { immediate: true });
   }, [updateUrl]);
 
   /**
-   * Set pinId and view in one operation
+   * Set mentionId and view in one operation
    */
-  const setPinIdAndView = useCallback((
-    newPinId: string | null,
+  const setMentionIdAndView = useCallback((
+    newMentionId: string | null,
     newView: 'owner' | 'visitor' | null,
     immediate: boolean = false
   ) => {
-    if (isTransitioning && !immediate && newPinId !== null) {
+    if (isTransitioning && !immediate && newMentionId !== null) {
       return;
     }
-    updateUrl({ pinId: newPinId, view: newView }, { immediate });
+    updateUrl({ mentionId: newMentionId, view: newView }, { immediate });
   }, [updateUrl, isTransitioning]);
 
   /**
-   * Switch to a different pin (closes current, opens new)
+   * Switch to a different mention (closes current, opens new)
    */
-  const switchPin = useCallback((newPinId: string) => {
+  const switchMention = useCallback((newMentionId: string) => {
     // Force immediate to ensure smooth transition
-    updateUrl({ pinId: newPinId }, { immediate: true });
+    updateUrl({ mentionId: newMentionId }, { immediate: true });
   }, [updateUrl]);
 
   return {
     // State
-    pinId,
+    mentionId,
     viewMode,
     isTransitioning,
     
     // Setters
-    setPinId,
-    clearPinId,
+    setMentionId,
+    clearMentionId,
     setView,
     toggleView,
     clearAll,
-    setPinIdAndView,
-    switchPin,
+    setMentionIdAndView,
+    switchMention,
     
     // Raw update function for complex operations
     updateUrl,
+    
+    // Legacy aliases for backward compatibility (deprecated)
+    pinId: mentionId,
+    setPinId: setMentionId,
+    clearPinId: clearMentionId,
+    setPinIdAndView: setMentionIdAndView,
+    switchPin: switchMention,
   };
 }

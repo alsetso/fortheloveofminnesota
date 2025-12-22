@@ -2,14 +2,14 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { MagnifyingGlassIcon, PencilIcon, CheckIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { MapPin } from '@/types/map-pin';
-import { PublicMapPinService } from '@/features/map-pins/services/publicMapPinService';
+import type { ProfilePin } from '@/types/profile';
+import { MentionService } from '@/features/mentions/services/mentionService';
 import { useToast } from '@/features/ui/hooks/useToast';
 
 interface ProfilePinsListProps {
-  pins: MapPin[];
+  pins: ProfilePin[];
   isOwnProfile: boolean;
-  onPinClick?: (pin: MapPin) => void;
+  onPinClick?: (pin: ProfilePin) => void;
   onPinUpdated?: () => void;
 }
 
@@ -18,7 +18,7 @@ type VisibilityFilter = 'all' | 'public' | 'only_me';
 export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPinClick, onPinUpdated }: ProfilePinsListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all');
-  const [pins, setPins] = useState<MapPin[]>(initialPins);
+  const [pins, setPins] = useState<ProfilePin[]>(initialPins);
   const [editingPinId, setEditingPinId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -56,7 +56,7 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
 
     try {
       const value = editValue.trim() || null;
-      await PublicMapPinService.updatePin(pinId, {
+      await MentionService.updateMention(pinId, {
         description: value,
       });
 
@@ -69,18 +69,18 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
 
       setEditingPinId(null);
       setEditValue('');
-      success('Updated', 'Pin description updated');
+      success('Updated', 'Mention description updated');
       onPinUpdated?.();
     } catch (err) {
       console.error('Error updating pin:', err);
-      showError('Error', 'Failed to update pin description');
+      showError('Error', 'Failed to update mention description');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeletePin = async (pinId: string) => {
-    if (!confirm('Are you sure you want to delete this pin?')) {
+  const handleArchivePin = async (pinId: string) => {
+    if (!confirm('Are you sure you want to archive this mention?')) {
       return;
     }
 
@@ -88,16 +88,17 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
     setDeletingPinId(pinId);
 
     try {
-      await PublicMapPinService.deletePin(pinId);
+      // Archive the mention by updating archived = true
+      await MentionService.updateMention(pinId, { archived: true });
       
       // Remove pin from local state
       setPins(prevPins => prevPins.filter(pin => pin.id !== pinId));
       
-      success('Deleted', 'Pin deleted');
+      success('Archived', 'Mention archived');
       onPinUpdated?.();
     } catch (err) {
-      console.error('Error deleting pin:', err);
-      showError('Error', 'Failed to delete pin');
+      console.error('Error archiving pin:', err);
+      showError('Error', 'Failed to archive mention');
     } finally {
       setDeletingPinId(null);
     }
@@ -148,7 +149,7 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search pins..."
+            placeholder="Search mentions..."
             className="w-full pl-8 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
           />
         </div>
@@ -193,7 +194,7 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
       {/* Pins List */}
       {filteredPins.length === 0 ? (
         <div className="text-xs text-gray-500 py-3">
-          {searchQuery || visibilityFilter !== 'all' ? 'No pins match your filters.' : 'No pins found.'}
+          {searchQuery || visibilityFilter !== 'all' ? 'No mentions match your filters.' : 'No mentions found.'}
         </div>
       ) : (
         <div className="space-y-0">
@@ -276,11 +277,11 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeletePin(pin.id);
+                            handleArchivePin(pin.id);
                           }}
                           disabled={deletingPinId === pin.id}
                           className="p-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
-                          title="Delete pin"
+                          title="Archive mention"
                         >
                           {deletingPinId === pin.id ? (
                             <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />

@@ -7,7 +7,22 @@ import {
   ExclamationCircleIcon,
   ArrowRightIcon,
 } from '@heroicons/react/24/outline';
-import type { BillingClientProps } from '../types';
+import type { Plan, BillingMode } from '@/features/auth';
+
+export interface BillingData {
+  plan: Plan;
+  billing_mode: BillingMode;
+  subscription_status: string | null;
+  stripe_subscription_id: string | null;
+  isTrial: boolean;
+  isActive: boolean;
+  hasCustomer: boolean;
+}
+
+interface BillingClientProps {
+  initialBillingData: BillingData;
+  onChangePlanClick?: () => void;
+}
 
 export default function BillingClient({ initialBillingData, onChangePlanClick }: BillingClientProps) {
   const router = useRouter();
@@ -141,15 +156,12 @@ export default function BillingClient({ initialBillingData, onChangePlanClick }:
                 Change Plan
               </button>
             ) : (
-              <button
-                onClick={() => {
-                  // Open account modal with billing tab to show change plan
-                  window.location.href = '/?modal=account&tab=billing';
-                }}
+              <Link
+                href="/account/change-plan"
                 className="text-xs text-gold-600 hover:text-gold-700 transition-colors"
               >
                 Change Plan
-              </button>
+              </Link>
             )}
           </div>
         </div>

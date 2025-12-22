@@ -6,7 +6,7 @@ import OwnershipToast from '@/features/profiles/components/OwnershipToast';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { Metadata } from 'next';
 import type { ProfileAccount } from '@/types/profile';
-import type { MapPin } from '@/types/map-pin';
+import type { Mention } from '@/types/mention';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,23 +104,23 @@ export default async function ProfilePage({ params }: Props) {
     isOwnProfile = true;
   }
 
-  // Fetch pins for this account
-  // For visitors, only show public pins; for owners, show all non-archived pins
-  let pinsQuery = supabase
-    .from('pins')
+  // Fetch mentions for this account
+  // For visitors, only show public mentions; for owners, show all non-archived mentions
+  let mentionsQuery = supabase
+    .from('mentions')
     .select('id, lat, lng, description, visibility, created_at, updated_at')
     .eq('account_id', accountData.id)
     .eq('archived', false)
     .order('created_at', { ascending: false });
 
-  // If not owner, only show public pins
+  // If not owner, only show public mentions
   if (!isOwnProfile) {
-    pinsQuery = pinsQuery.eq('visibility', 'public');
+    mentionsQuery = mentionsQuery.eq('visibility', 'public');
   }
 
-  const { data: pinsData } = await pinsQuery;
+  const { data: mentionsData } = await mentionsQuery;
 
-  const pins: MapPin[] = (pinsData || []).map((pin: {
+  const mentions: Mention[] = (mentionsData || []).map((mention: {
     id: string;
     lat: number;
     lng: number;
@@ -129,18 +129,14 @@ export default async function ProfilePage({ params }: Props) {
     created_at: string;
     updated_at: string;
   }) => ({
-    id: pin.id,
-    lat: pin.lat,
-    lng: pin.lng,
-    description: pin.description,
-    type: null,
-    media_url: null,
+    id: mention.id,
+    lat: mention.lat,
+    lng: mention.lng,
+    description: mention.description,
     account_id: accountData.id,
-    city_id: null,
-    county_id: null,
-    visibility: pin.visibility || 'public',
-    created_at: pin.created_at,
-    updated_at: pin.updated_at,
+    visibility: mention.visibility || 'public',
+    created_at: mention.created_at,
+    updated_at: mention.updated_at,
   }));
 
   const profileAccountData: ProfileAccount = {
@@ -168,8 +164,8 @@ export default async function ProfilePage({ params }: Props) {
           account={profileAccountData}
           isOwnProfile={isOwnProfile}
         />
-        {pins.length > 0 && (
-          <ProfilePinsList pins={pins} isOwnProfile={isOwnProfile} />
+        {mentions.length > 0 && (
+          <ProfilePinsList pins={mentions} isOwnProfile={isOwnProfile} />
         )}
       </div>
     </SimplePageLayout>

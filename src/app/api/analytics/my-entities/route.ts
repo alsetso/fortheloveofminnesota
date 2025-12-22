@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
 
-type EntityType = 'account' | 'pin';
+type EntityType = 'account' | 'mention';
 
 interface EntityWithViews {
   entity_type: EntityType;
@@ -143,55 +143,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get user's pins with stats (excluding archived)
-    if (!entityType || entityType === 'pin') {
-      const { data: pins } = await supabase
-        .from('pins')
-        .select('id, name, description, created_at')
+    // Get user's mentions (excluding archived)
+    if (!entityType || entityType === 'mention') {
+      const { data: mentions } = await supabase
+        .from('mentions')
+        .select('id, description, created_at')
         .eq('account_id', accountId)
-        .eq('archived', false) // Exclude archived pins
+        .eq('archived', false) // Exclude archived mentions
         .order('created_at', { ascending: false });
 
-      if (pins) {
-        for (const pin of pins) {
-          const pinData = pin as { id: string; name: string | null; description: string | null; created_at: string };
-          
-          // Get stats for this pin
-          const { data: stats } = await supabase.rpc('get_pin_stats', {
-            p_pin_id: pinData.id,
-            p_hours: null, // All time
-          } as any);
-
-          const statsData = (stats as any)?.[0] || {};
-          
-          // Get first and last viewed dates
-          const { data: firstView } = await supabase
-            .from('pin_views')
-            .select('viewed_at')
-            .eq('pin_id', pinData.id)
-            .order('viewed_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-
-          const { data: lastView } = await supabase
-            .from('pin_views')
-            .select('viewed_at')
-            .eq('pin_id', pinData.id)
-            .order('viewed_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+      if (mentions) {
+        for (const mention of mentions) {
+          const mentionData = mention as { id: string; description: string | null; created_at: string };
 
           entities.push({
-            entity_type: 'pin',
-            entity_id: pinData.id,
+            entity_type: 'mention',
+            entity_id: mentionData.id,
             entity_slug: null,
-            title: pinData.name || pinData.description || 'Pin',
-            total_views: statsData.total_views || 0,
-            unique_visitors: statsData.unique_viewers || 0,
-            first_viewed_at: (firstView as any)?.viewed_at || null,
-            last_viewed_at: (lastView as any)?.viewed_at || null,
-            created_at: pinData.created_at,
-            url: '#', // Pins don't have direct URLs
+            title: mentionData.description || 'Mention',
+            total_views: 0, // Mentions don't have view tracking yet
+            unique_visitors: 0,
+            first_viewed_at: null,
+            last_viewed_at: null,
+            created_at: mentionData.created_at,
+            url: '#', // Mentions don't have direct URLs
           });
         }
       }

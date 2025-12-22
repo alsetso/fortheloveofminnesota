@@ -74,6 +74,7 @@ export interface UpdateMapPinData {
   county_id?: string | null;
   tags?: string[]; // User-defined labels for organizing pins
   event_date?: string | null; // ISO date string - can be up to 100 years in the past
+  archived?: boolean; // Set to true to archive the pin (soft delete)
 }
 
 export interface MapPinFilters {

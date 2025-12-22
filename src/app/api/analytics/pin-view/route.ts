@@ -5,7 +5,8 @@ import { Database } from '@/types/supabase';
 
 /**
  * POST /api/analytics/pin-view
- * Records a pin view using the simplified pin_views system
+ * Records a mention view (formerly pin view) using the pin_views system
+ * Note: Parameter name is "pin_id" for backward compatibility, but it's actually a mention ID
  */
 export async function POST(request: NextRequest) {
   try {
@@ -57,7 +58,8 @@ export async function POST(request: NextRequest) {
       accountId = (account as { id: string } | null)?.id || null;
     }
 
-    // Record pin view using the new simplified function
+    // Record mention view using record_pin_view function
+    // Note: pin_id is actually a mention ID (legacy naming)
     const { data, error } = await supabase.rpc('record_pin_view', {
       p_pin_id: pin_id,
       p_account_id: accountId,
@@ -67,9 +69,9 @@ export async function POST(request: NextRequest) {
     } as any) as { data: string | null; error: any };
 
     if (error) {
-      console.error('Error recording pin view:', error);
+      console.error('Error recording mention view:', error);
       return NextResponse.json(
-        { error: 'Failed to record pin view', details: error.message },
+        { error: 'Failed to record mention view', details: error.message },
         { status: 500 }
       );
     }
@@ -86,5 +88,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-

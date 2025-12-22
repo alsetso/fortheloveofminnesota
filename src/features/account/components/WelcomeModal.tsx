@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { XMarkIcon, ArrowRightIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ArrowRightIcon, CheckIcon, ExclamationCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { cleanAuthParams } from '@/lib/urlParams';
 
@@ -50,8 +50,10 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | 'info' | null>(null);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [isEmailValid, setIsEmailValid] = useState(false);
   
   // Stats state
   const [stats, setStats] = useState<HomepageStats | null>(null);
@@ -86,7 +88,9 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setOtp('');
       setOtpSent(false);
       setMessage('');
+      setMessageType(null);
       setEmailError('');
+      setIsEmailValid(false);
     }
   }, [isOpen]);
 
@@ -98,9 +102,12 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   }, [authLoading, user, isOpen, onClose]);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
+    const value = e.target.value;
+    setEmail(value);
     setEmailError('');
     setMessage('');
+    setMessageType(null);
+    setIsEmailValid(value.length > 0 && isValidEmail(value));
   };
 
   const handleEmailBlur = () => {
@@ -130,9 +137,11 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       await signInWithOtp(email.trim().toLowerCase());
       setOtpSent(true);
       setMessage('Check your email for the 6-digit code!');
+      setMessageType('success');
     } catch (error: unknown) {
       console.error('OTP error:', error);
       setMessage(`Error: ${error instanceof Error ? error.message : 'Failed to send code'}`);
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -151,9 +160,11 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     try {
       await verifyOtp(email.trim().toLowerCase(), otp, 'email');
       setMessage('Login successful! Redirecting...');
+      setMessageType('success');
       cleanAuthParams(router);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Invalid code');
+      setMessageType('error');
       setLoading(false);
     }
   };
@@ -178,7 +189,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
       {/* Modal */}
       <div 
-        className="relative w-full max-w-sm rounded-md bg-white border border-gray-200"
+        className="relative w-full max-w-sm rounded-md bg-white border border-gray-200 transition-all duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-[10px]">
@@ -225,11 +236,19 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
               {/* Community Stats */}
               {statsLoading ? (
-                <div className="flex items-center justify-center py-3">
-                  <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                <div className="mb-3 p-2.5 bg-gray-50 rounded-md border border-gray-200">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="space-y-1">
+                        <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                        <div className="h-2.5 bg-gray-200 rounded animate-pulse" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-1.5 h-2.5 bg-gray-200 rounded animate-pulse w-3/4 mx-auto" />
                 </div>
               ) : stats && (
-                <div className="mb-3 p-2.5 bg-gray-50 rounded-md border border-gray-200">
+                <div className="mb-3 p-2.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-md border border-gray-200">
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <div className="text-sm font-semibold text-gray-900">
@@ -271,6 +290,27 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
           {/* Step: Sign In */}
           {step === 'signin' && (
             <>
+              {/* Progress Indicator */}
+              <div className="mb-3 flex items-center justify-center gap-2">
+                <div className={`flex items-center gap-1 ${!otpSent ? 'text-gray-900' : 'text-gray-400'}`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
+                    !otpSent ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {!otpSent ? '1' : <CheckIcon className="w-3 h-3" />}
+                  </div>
+                  <span className="text-[10px] font-medium">Email</span>
+                </div>
+                <div className="w-6 h-0.5 bg-gray-200" />
+                <div className={`flex items-center gap-1 ${otpSent ? 'text-gray-900' : 'text-gray-400'}`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
+                    otpSent ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    2
+                  </div>
+                  <span className="text-[10px] font-medium">Code</span>
+                </div>
+              </div>
+
               <div className="text-center mb-3">
                 <h1 className="text-sm font-semibold text-gray-900 mb-1">
                   {!otpSent ? 'Sign In' : 'Verify Code'}
@@ -283,8 +323,16 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               {!otpSent ? (
                 <form className="space-y-3" onSubmit={handleSendOtp}>
                   {message && (
-                    <div className="px-[10px] py-[10px] rounded-md text-xs bg-gray-50 border border-gray-200 text-gray-700">
-                      {message}
+                    <div className={`px-[10px] py-[10px] rounded-md text-xs border flex items-start gap-2 ${
+                      messageType === 'success' 
+                        ? 'bg-green-50 border-green-200 text-green-800'
+                        : messageType === 'error'
+                        ? 'bg-red-50 border-red-200 text-red-800'
+                        : 'bg-gray-50 border-gray-200 text-gray-700'
+                    }`}>
+                      {messageType === 'success' && <CheckIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
+                      {messageType === 'error' && <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
+                      <span>{message}</span>
                     </div>
                   )}
 
@@ -292,28 +340,45 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                     <label htmlFor="email" className="block text-xs font-medium text-gray-900 mb-1.5">
                       Email Address
                     </label>
-                    <input
-                      id="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      value={email}
-                      onChange={handleEmailChange}
-                      onBlur={handleEmailBlur}
-                      className={`w-full px-[10px] py-[10px] border rounded-md text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 focus:border-gray-500 ${
-                        emailError ? 'border-gray-300' : 'border-gray-200'
-                      }`}
-                      placeholder="your.email@example.com"
-                    />
+                    <div className="relative">
+                      <div className="absolute left-[10px] top-1/2 -translate-y-1/2 text-gray-400">
+                        <EnvelopeIcon className="w-3.5 h-3.5" />
+                      </div>
+                      <input
+                        id="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={email}
+                        onChange={handleEmailChange}
+                        onBlur={handleEmailBlur}
+                        className={`w-full pl-8 pr-[10px] py-[10px] border rounded-md text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 transition-colors ${
+                          emailError 
+                            ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                            : isEmailValid
+                            ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
+                            : 'border-gray-200 focus:ring-gray-500 focus:border-gray-500'
+                        }`}
+                        placeholder="your.email@example.com"
+                      />
+                      {isEmailValid && !emailError && (
+                        <div className="absolute right-[10px] top-1/2 -translate-y-1/2 text-green-600">
+                          <CheckIcon className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </div>
                     {emailError && (
-                      <p className="mt-1.5 text-xs text-gray-600">{emailError}</p>
+                      <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                        <ExclamationCircleIcon className="w-3 h-3" />
+                        {emailError}
+                      </p>
                     )}
                   </div>
 
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={loading || !isEmailValid}
+                    className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                   >
                     {loading ? (
                       <>
@@ -342,8 +407,16 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               ) : (
                 <form className="space-y-3" onSubmit={handleVerifyOtp}>
                   {message && (
-                    <div className="px-[10px] py-[10px] rounded-md text-xs bg-gray-50 border border-gray-200 text-gray-700">
-                      {message}
+                    <div className={`px-[10px] py-[10px] rounded-md text-xs border flex items-start gap-2 ${
+                      messageType === 'success' 
+                        ? 'bg-green-50 border-green-200 text-green-800'
+                        : messageType === 'error'
+                        ? 'bg-red-50 border-red-200 text-red-800'
+                        : 'bg-gray-50 border-gray-200 text-gray-700'
+                    }`}>
+                      {messageType === 'success' && <CheckIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
+                      {messageType === 'error' && <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
+                      <span>{message}</span>
                     </div>
                   )}
 
@@ -356,14 +429,27 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                       type="text"
                       maxLength={6}
                       required
+                      autoFocus
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-500 focus:border-gray-500 text-center text-xs tracking-widest font-mono text-gray-900"
+                      className={`w-full px-[10px] py-[10px] border rounded-md placeholder-gray-400 focus:outline-none focus:ring-1 text-center text-xs tracking-widest font-mono text-gray-900 transition-colors ${
+                        messageType === 'error'
+                          ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                          : otp.length === 6
+                          ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
+                          : 'border-gray-200 focus:ring-gray-500 focus:border-gray-500'
+                      }`}
                       placeholder="000000"
                     />
-                    <p className="mt-1.5 text-xs text-gray-600">
+                    <p className="mt-1.5 text-xs text-gray-600 flex items-center gap-1">
+                      <EnvelopeIcon className="w-3 h-3" />
                       Sent to <span className="font-medium text-gray-900">{email}</span>
                     </p>
+                    {otp.length > 0 && otp.length < 6 && (
+                      <p className="mt-1 text-[10px] text-gray-500">
+                        {6 - otp.length} digit{6 - otp.length !== 1 ? 's' : ''} remaining
+                      </p>
+                    )}
                   </div>
 
                   <button

@@ -553,7 +553,7 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
         onClose={() => setShowUpgradeModal(false)}
         onUpgrade={() => {
           setShowUpgradeModal(false);
-          router.push('/settings?tab=billing');
+          router.push('/?modal=account&tab=settings');
         }}
         feature="Property Intelligence"
         overlay="sidebar"

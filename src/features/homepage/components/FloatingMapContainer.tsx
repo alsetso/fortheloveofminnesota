@@ -3,19 +3,15 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { XMarkIcon, MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, AdjustmentsHorizontalIcon, PlusIcon, MinusIcon, ArrowPathIcon, CubeIcon, MapIcon, PlayIcon, StopIcon, HomeIcon, HeartIcon, CameraIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { PublicMapPinService } from '@/features/map-pins/services/publicMapPinService';
-import { LocationLookupService } from '@/features/map-pins/services/locationLookupService';
-import type { CreateMapPinData } from '@/types/map-pin';
+import { XMarkIcon, MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, AdjustmentsHorizontalIcon, PlusIcon, MinusIcon, ArrowPathIcon, CubeIcon, MapIcon, PlayIcon, StopIcon, HomeIcon, HeartIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import MapScreenshotEditor from './MapScreenshotEditor';
+import { MentionService } from '@/features/mentions/services/mentionService';
+import { LocationLookupService } from '@/features/map/services/locationLookupService';
+import type { CreateMentionData } from '@/types/mention';
 import IntelligenceModal from '@/features/account/components/IntelligenceModal';
 import { MAP_CONFIG } from '@/features/map/config';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import type { MapboxMapInstance, MapboxMouseEvent } from '@/types/mapbox-events';
-import PinStatsCard from '@/features/pins/components/PinStatsCard';
-import PinTrendingBadge from '@/features/pins/components/PinTrendingBadge';
-import PinAnalyticsModal from '@/features/pins/components/PinAnalyticsModal';
-import AtlasEntityModal, { type AtlasEntityData } from '@/features/atlas/components/AtlasEntityModal';
-import type { AtlasEntityType } from '@/features/atlas/services/atlasService';
 import { findCityByName, findCountyByName, updateCityCoordinates, deleteNeighborhood, deleteSchool, deletePark, deleteLake, deleteWatertower, deleteCemetery, deleteGolfCourse, deleteHospital, deleteAirport, deleteChurch, deleteMunicipal, deleteRoad } from '@/features/atlas/services/atlasService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -85,20 +81,6 @@ interface LocationData {
   postalCode?: string;
 }
 
-interface PinData {
-  id: string;
-  name: string;
-  description?: string | null;
-  media_url?: string | null;
-  address?: string | null;
-  coordinates: { lat: number; lng: number };
-  created_at: string;
-  account?: {
-    id: string;
-    username: string | null;
-    image_url: string | null;
-  } | null;
-}
 
 // FeatureMetadata is now imported from map-metadata feature as ExtractedFeature
 
@@ -184,7 +166,6 @@ export default function LocationSidebar({
   // ═══════════════════════════════════════════════════════════════════════════
   
   const [locationData, setLocationData] = useState<LocationData | null>(null);
-  const [selectedPin, setSelectedPin] = useState<PinData | null>(null);
   const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<AtlasEntity | null>(null);
   const [capturedFeature, setCapturedFeature] = useState<ExtractedFeature | null>(null);
   
@@ -201,7 +182,6 @@ export default function LocationSidebar({
 
   const clearSelection = useCallback(() => {
     setLocationData(null);
-    setSelectedPin(null);
     setSelectedAtlasEntity(null);
     setCapturedFeature(null);
   }, []);
@@ -213,15 +193,7 @@ export default function LocationSidebar({
   const [isIntelligenceModalOpen, setIsIntelligenceModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [isComingSoonModalOpen, setIsComingSoonModalOpen] = useState(false);
-  const [isAtlasEntityModalOpen, setIsAtlasEntityModalOpen] = useState(false);
   
-  const [analyticsPinId, setAnalyticsPinId] = useState<string | null>(null);
-  const [analyticsPinName, setAnalyticsPinName] = useState<string | null>(null);
-  const [atlasEntityModalMode, setAtlasEntityModalMode] = useState<'create' | 'edit'>('create');
-  const [atlasEntityType, setAtlasEntityType] = useState<AtlasEntityType>('neighborhood');
-  const [atlasEntityFeatureName, setAtlasEntityFeatureName] = useState<string | undefined>(undefined);
-  const [atlasEntityFeatureProperties, setAtlasEntityFeatureProperties] = useState<Record<string, any> | undefined>(undefined);
-  const [atlasEntityToEdit, setAtlasEntityToEdit] = useState<AtlasEntityData | undefined>(undefined);
   const [comingSoonFeature, setComingSoonFeature] = useState<string>('');
 
   // Modal openers
@@ -229,39 +201,14 @@ export default function LocationSidebar({
     setIsIntelligenceModalOpen(true);
   }, []);
 
-  const openAnalyticsModal = useCallback((pinId: string, pinName?: string) => {
-    setAnalyticsPinName(pinName || null);
-    setAnalyticsPinId(pinId);
-    setIsAnalyticsModalOpen(true);
-  }, []);
-
   const openComingSoonModal = useCallback((feature: string) => {
     setComingSoonFeature(feature);
     setIsComingSoonModalOpen(true);
   }, []);
 
-  const openAtlasEntityModal = useCallback((
-    mode: 'create' | 'edit',
-    entityType: AtlasEntityType,
-    featureName?: string,
-    entityToEdit?: AtlasEntityData,
-    featureProperties?: Record<string, any>
-  ) => {
-    setAtlasEntityType(entityType);
-    setAtlasEntityFeatureName(featureName);
-    setAtlasEntityFeatureProperties(featureProperties);
-    setAtlasEntityToEdit(entityToEdit);
-    setAtlasEntityModalMode(mode);
-    setIsAtlasEntityModalOpen(true);
-  }, []);
-
   const closeModal = useCallback(() => {
     setIsIntelligenceModalOpen(false);
-    setIsAnalyticsModalOpen(false);
     setIsComingSoonModalOpen(false);
-    setIsAtlasEntityModalOpen(false);
-    setAnalyticsPinId(null);
-    setAnalyticsPinName(null);
   }, []);
 
 
@@ -297,11 +244,7 @@ export default function LocationSidebar({
   const [parkCreateMessage, setParkCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isDeletingAtlasEntity, setIsDeletingAtlasEntity] = useState(false);
   const [atlasEntityMessage, setAtlasEntityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [screenshot, setScreenshot] = useState<string | null>(null);
-  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
-  const [isScreenshotPreviewOpen, setIsScreenshotPreviewOpen] = useState(false);
   const [isMetadataOpen, setIsMetadataOpen] = useState(false);
-  const [isPinDetailsExpanded, setIsPinDetailsExpanded] = useState(false);
   const [isAtlasEntityExpanded, setIsAtlasEntityExpanded] = useState(false);
   const [isLocationDetailsExpanded, setIsLocationDetailsExpanded] = useState(false);
   
@@ -310,6 +253,7 @@ export default function LocationSidebar({
   const [pinDescription, setPinDescription] = useState('');
   const [pinSelectedFile, setPinSelectedFile] = useState<File | null>(null);
   const [pinEventYear, setPinEventYear] = useState<string>('');
+  const [showPostDateInput, setShowPostDateInput] = useState(false);
   
   const [pinFilePreview, setPinFilePreview] = useState<string | null>(null);
   const [pinVisibility, setPinVisibility] = useState<'public' | 'only_me'>('public');
@@ -327,6 +271,9 @@ export default function LocationSidebar({
     clickFeature: hookClickFeature,
     clearClickFeature,
   } = useFeatureTracking(map, mapLoaded, { throttleMs: 50 });
+
+  // Track hovered mention for cursor tracker
+  const [hoveredMention, setHoveredMention] = useState<{ id: string; mention: any } | null>(null);
   
   // Sync hook's captured click feature to our state
   // This ensures we use the ref-based capture (always current) rather than stale state
@@ -527,61 +474,6 @@ export default function LocationSidebar({
     }, 300);
   }, [searchLocations]);
 
-  // Screenshot capture function
-  const captureMapScreenshot = useCallback(async (): Promise<string | null> => {
-    if (!map || !mapLoaded) {
-      return null;
-    }
-
-    setIsCapturingScreenshot(true);
-
-    try {
-      // Wait for map to finish rendering
-      await new Promise<void>((resolve) => {
-        if ((map as any).loaded()) {
-          resolve();
-        } else {
-          (map as any).once('idle', () => resolve());
-        }
-      });
-
-      // Small delay to ensure everything is rendered
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
-
-      const canvas = (map as any).getCanvas() as HTMLCanvasElement;
-      if (!canvas) {
-        throw new Error('Canvas not available');
-      }
-
-      // Check if canvas is valid
-      if (canvas.width === 0 || canvas.height === 0) {
-        throw new Error('Canvas has invalid dimensions');
-      }
-
-      const dataUrl = canvas.toDataURL('image/png', 0.9);
-      
-      // Validate data URL
-      if (!dataUrl || dataUrl === 'data:,') {
-        throw new Error('Invalid screenshot data');
-      }
-      
-      setIsCapturingScreenshot(false);
-      return dataUrl;
-    } catch (error) {
-      console.error('Error capturing screenshot:', error);
-      setIsCapturingScreenshot(false);
-      return null;
-    }
-  }, [map, mapLoaded]);
-
-  // Handle screenshot button click
-  const handleScreenshotClick = useCallback(async () => {
-    const screenshotData = await captureMapScreenshot();
-    if (screenshotData) {
-      setScreenshot(screenshotData);
-      setIsScreenshotPreviewOpen(true);
-    }
-  }, [captureMapScreenshot]);
 
   // Handle suggestion select
   const handleSuggestionSelect = useCallback(async (feature: MapboxFeature) => {
@@ -778,8 +670,8 @@ export default function LocationSidebar({
     setPinSelectedFile(null);
     setPinFilePreview(null);
     setPinVisibility('public');
-    setPinHideLocation(false);
     setPinEventYear('');
+    setShowPostDateInput(false);
     setPinError(null);
     if (pinFileInputRef.current) {
       pinFileInputRef.current.value = '';
@@ -843,12 +735,12 @@ export default function LocationSidebar({
 
   const handleSubmitPin = useCallback(async () => {
     if (!locationData?.coordinates) return;
-    if (!pinDescription.trim() && !pinSelectedFile) {
-      setPinError('Please add a caption or photo');
+    if (!pinDescription.trim()) {
+      setPinError('Please add a description');
       return;
     }
 
-    // Require authentication to create pins
+    // Require authentication to create mentions
     // Check ref to get current auth state (avoids stale closure issues)
     if (authLoadingRef.current) {
       setPinError('Checking authentication...');
@@ -856,7 +748,7 @@ export default function LocationSidebar({
     }
 
     if (!userRef.current) {
-      setPinError('Please sign in to create pins');
+      setPinError('Please sign in to create mentions');
       openWelcome();
       return;
     }
@@ -872,155 +764,39 @@ export default function LocationSidebar({
     setPinError(null);
 
     try {
-      let mediaUrl: string | null = null;
-
-      if (pinSelectedFile) {
-        // Require signed-in user to upload media server-side
-        // Check ref to get current auth state (avoids stale closure issues)
-        if (!userRef.current) {
-          throw new Error('Please sign in to upload photos and videos');
-        }
-        
-        setIsPinUploading(true);
-        
-        const fileExt = pinSelectedFile.name.split('.').pop();
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substring(7);
-        // userRef.current is guaranteed to be non-null here (checked earlier)
-        const accountId = userRef.current!.id;
-        const fileName = `${accountId}/map-pins/${timestamp}-${random}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('map-pins-media')
-          .upload(fileName, pinSelectedFile, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload file: ${uploadError.message}`);
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('map-pins-media')
-          .getPublicUrl(fileName);
-
-        if (!urlData?.publicUrl) {
-          throw new Error('Failed to get file URL');
-        }
-
-        mediaUrl = urlData.publicUrl;
-        setIsPinUploading(false);
-      }
-
-      const locationIds = await LocationLookupService.getLocationIds(
-        locationData.coordinates.lat,
-        locationData.coordinates.lng
-      );
-
-      const cityId = locationIds.cityId && locationIds.cityId.length === 36 
-        ? locationIds.cityId 
-        : undefined;
-      const countyId = locationIds.countyId && locationIds.countyId.length === 36 
-        ? locationIds.countyId 
-        : undefined;
-
-      // If hide_location is enabled, fetch city coordinates
-      let finalLat = locationData.coordinates.lat;
-      let finalLng = locationData.coordinates.lng;
-      
-      // Use cityId from location lookup, or try locationData.cityId/parentCityId
-      const effectiveCityId = cityId || locationData.cityId || locationData.parentCityId;
-      
-      if (pinHideLocation && effectiveCityId) {
-        try {
-          const { data: cityData, error: cityError } = await supabase
-            .from('cities')
-            .select('lat, lng')
-            .eq('id', effectiveCityId)
-            .single();
-          
-          if (!cityError && cityData && cityData.lat && cityData.lng) {
-            finalLat = Number(cityData.lat);
-            finalLng = Number(cityData.lng);
-          } else {
-            // If city coordinates not available, show error
-            setPinError('City coordinates not available. Cannot hide location.');
-            setIsPinSubmitting(false);
-            setIsPinUploading(false);
-            return;
-          }
-        } catch (err) {
-          console.error('[LocationSidebar] Error fetching city coordinates:', err);
-          setPinError('Failed to fetch city coordinates. Cannot hide location.');
-          setIsPinSubmitting(false);
-          setIsPinUploading(false);
-          return;
-        }
-      } else if (pinHideLocation && !effectiveCityId) {
-        // No cityId available
-        setPinError('City not found. Cannot hide location without a city.');
-        setIsPinSubmitting(false);
-        setIsPinUploading(false);
-        return;
-      }
-
-      // Capture location metadata from Mapbox feature
-      const locationMetadata = pinFeature ? {
-        layerId: pinFeature.layerId,
-        sourceLayer: pinFeature.sourceLayer,
-        name: pinFeature.name,
-        category: pinFeature.category,
-        class: pinFeature.properties?.class || null,
-        type: pinFeature.properties?.type || null,
-        properties: pinFeature.properties,
-      } : null;
-
-      // Capture atlas metadata if pin is on an atlas entity
-      const atlasMetadata = selectedAtlasEntity ? {
-        entityId: selectedAtlasEntity.id,
-        entityType: selectedAtlasEntity.layerType,
-        name: selectedAtlasEntity.name,
-        emoji: selectedAtlasEntity.emoji,
-      } : null;
-
-      // Convert year to date string (January 1st of that year)
-      const eventDate = pinEventYear 
-        ? `${pinEventYear}-01-01T00:00:00.000Z`
+      // Convert year to date string (January 2nd of that year - avoids timezone issues)
+      const postDate = pinEventYear 
+        ? `${pinEventYear}-01-02T00:00:00.000Z`
         : null;
 
-      const pinData: CreateMapPinData = {
-        lat: finalLat,
-        lng: finalLng,
+      const mentionData: CreateMentionData = {
+        lat: locationData.coordinates.lat,
+        lng: locationData.coordinates.lng,
         description: pinDescription.trim() || null,
-        media_url: mediaUrl,
-        city_id: effectiveCityId,
-        county_id: countyId,
         visibility: pinVisibility,
-        location_metadata: locationMetadata,
-        atlas_metadata: atlasMetadata,
-        event_date: eventDate,
-        hide_location: pinHideLocation && effectiveCityId ? true : false,
+        post_date: postDate,
       };
 
-      await PublicMapPinService.createPin(pinData);
+      const createdMention = await MentionService.createMention(mentionData);
 
       // Reset form and remove temporary marker
       resetPinForm();
       removeTemporaryPin();
 
-      // Trigger pins refresh via custom event
-      window.dispatchEvent(new CustomEvent('pin-created'));
+      // Trigger mentions refresh via custom event with the created mention
+      window.dispatchEvent(new CustomEvent('mention-created', {
+        detail: { mention: createdMention }
+      }));
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create pin';
-      console.error('[LocationSidebar] Error creating pin:', errorMessage, err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create mention';
+      console.error('[LocationSidebar] Error creating mention:', errorMessage, err);
       setPinError(errorMessage);
     } finally {
       setIsPinSubmitting(false);
       setIsPinUploading(false);
     }
-  }, [locationData, pinDescription, pinSelectedFile, pinVisibility, pinHideLocation, user, resetPinForm, removeTemporaryPin, pinFeature, selectedAtlasEntity, openOnboarding, openWelcome]);
+  }, [locationData, pinDescription, pinEventYear, pinVisibility, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome]);
 
   // Map control handlers
   const handleZoomIn = useCallback(() => {
@@ -1373,11 +1149,35 @@ export default function LocationSidebar({
     };
   }, [map, mapLoaded, removeTemporaryPin]);
 
+  // Listen for mention hover updates for cursor tracker
+  useEffect(() => {
+    const handleMentionHoverUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ mentionId: string | null; mention: any }>;
+      const { mentionId, mention } = customEvent.detail || {};
+      if (mentionId && mention) {
+        setHoveredMention({ id: mentionId, mention });
+      } else {
+        setHoveredMention(null);
+      }
+    };
+
+    window.addEventListener('mention-hover-update', handleMentionHoverUpdate);
+
+    return () => {
+      window.removeEventListener('mention-hover-update', handleMentionHoverUpdate);
+    };
+  }, []);
+
   // Listen for double-click on map to show location and expand pin form
   useEffect(() => {
     const handleShowLocationForPin = async (event: Event) => {
       const customEvent = event as CustomEvent;
       const { lat, lng } = customEvent.detail;
+      
+      // Don't open location details if hovering over a mention
+      if (hoveredMention) {
+        return;
+      }
       
       // Reverse geocode and select the location
       const geocodedData = await reverseGeocode(lat, lng);
@@ -1406,15 +1206,33 @@ export default function LocationSidebar({
       }
     };
 
-    window.addEventListener('show-location-for-pin', handleShowLocationForPin);
+    window.addEventListener('show-location-for-mention', handleShowLocationForPin);
 
     return () => {
-      window.removeEventListener('show-location-for-pin', handleShowLocationForPin);
+      window.removeEventListener('show-location-for-mention', handleShowLocationForPin);
     };
-  }, [map, mapLoaded, reverseGeocode, addTemporaryPin]);
+  }, [map, mapLoaded, reverseGeocode, addTemporaryPin, hoveredMention]);
 
   const handleMapClick = useCallback(async (e: MapboxMouseEvent) => {
     if (!map || !mapLoaded) return;
+    
+    // Check if click hit a mention layer - if so, don't open location details
+    // Mention click handlers will handle opening the popup
+    const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
+    const mapboxMap = map as any;
+    const features = mapboxMap.queryRenderedFeatures(e.point, {
+      layers: mentionLayers,
+    });
+
+    // If clicked on a mention, don't open location details (mention click handler will handle it)
+    if (features.length > 0) {
+      return;
+    }
+
+    // Also check if hovering over a mention
+    if (hoveredMention) {
+      return;
+    }
     
     const { lng, lat } = e.lngLat;
     
@@ -1456,10 +1274,13 @@ export default function LocationSidebar({
       return; // In POI mode, don't do normal map click behavior
     }
     
-    // Normal mode: Check if click hit a pin or atlas entity - if so, don't show map click data
+    // Normal mode: Check if click hit a mention, pin or atlas entity - if so, don't show map click data
     try {
       const mapboxMap = map as any;
       const layersToCheck = [
+        // Mentions
+        'map-mentions-point',
+        'map-mentions-point-label',
         // User pins
         'map-pins-point',
         'map-pins-point-label',
@@ -1702,7 +1523,7 @@ export default function LocationSidebar({
         map.off('click', handleMapClick as any);
       }
     };
-  }, [map, mapLoaded, handleMapClick]);
+  }, [map, mapLoaded, handleMapClick, hoveredMention]);
 
   // Cleanup search timeout and temporary marker
   useEffect(() => {
@@ -1747,16 +1568,15 @@ export default function LocationSidebar({
   // Close menu when any data opens
   // Close all dropdowns when location data appears
   useEffect(() => {
-    if (locationData || selectedPin) {
+    if (locationData) {
       setActivePanel('none');
     }
-  }, [locationData, selectedPin]);
+  }, [locationData]);
 
   // Fast panel switching - single state update clears location and switches panel
   const openMenu = useCallback(() => {
     setShowSuggestions(false);
     setLocationData(null);
-    setSelectedPin(null);
     setSelectedAtlasEntity(null);
     setPinFeature(null);
     setActivePanel('menu');
@@ -1765,7 +1585,6 @@ export default function LocationSidebar({
   const openMapControls = useCallback(() => {
     setShowSuggestions(false);
     setLocationData(null);
-    setSelectedPin(null);
     setSelectedAtlasEntity(null);
     setPinFeature(null);
     setActivePanel('controls');
@@ -1803,8 +1622,9 @@ export default function LocationSidebar({
     return undefined;
   }, [showSuggestions, suggestions, selectedIndex, handleSuggestionSelect]);
 
+
   // Sidebar expands if either location data, selected pin, selected atlas entity exists, or search is focused
-  const hasData = locationData !== null || selectedPin !== null || selectedAtlasEntity !== null;
+  const hasData = locationData !== null || selectedAtlasEntity !== null;
   const isExpanded = hasData || isSearchFocused;
   
   // Determine width based on state: panels open = wider, expanded = medium, collapsed = narrow
@@ -1841,7 +1661,12 @@ export default function LocationSidebar({
       >
         <div className="flex flex-col p-4 lg:p-4">
         {/* Cursor Tracker - Above sidebar */}
-        <CursorTracker feature={hoverFeature} className="mb-2 hidden lg:block" />
+        <CursorTracker 
+          feature={hoverFeature} 
+          mentionId={hoveredMention?.id || null}
+          mention={hoveredMention?.mention || null}
+          className="mb-2 hidden lg:block" 
+        />
         
         {/* Sidebar Card Container - Unified container for toolbar and all dropdowns */}
         <div className="relative bg-white border border-gray-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out" style={{ pointerEvents: 'auto', zIndex: 50 }}>
@@ -2076,11 +1901,11 @@ export default function LocationSidebar({
                           const url = new URL(window.location.href);
                           if (year && !isNaN(year)) {
                             url.searchParams.set('year', year.toString());
-                            // Trigger pins reload by dispatching event
-                            window.dispatchEvent(new CustomEvent('pin-created'));
+                            // Trigger mentions reload by dispatching event
+                            window.dispatchEvent(new CustomEvent('mention-created'));
                           } else {
                             url.searchParams.delete('year');
-                            window.dispatchEvent(new CustomEvent('pin-created'));
+                            window.dispatchEvent(new CustomEvent('mention-created'));
                           }
                           router.push(url.pathname + url.search);
                         }}
@@ -2201,27 +2026,8 @@ export default function LocationSidebar({
               </button>
             </div>
 
-            {/* Screenshot Icon */}
-            <div className="border-l border-gray-200">
-              <button
-                className={`flex items-center justify-center w-11 h-11 text-gray-700 hover:bg-gray-50 transition-all duration-150 pointer-events-auto ${
-                  isCapturingScreenshot ? 'bg-gray-100' : ''
-                }`}
-                title="Screenshot"
-                aria-label="Capture Screenshot"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleScreenshotClick();
-                }}
-                disabled={isCapturingScreenshot || !mapLoaded}
-              >
-                {isCapturingScreenshot ? (
-                  <ArrowPathIcon className="w-5 h-5 animate-spin" />
-                ) : (
-                  <CameraIcon className="w-5 h-5" />
-                )}
-              </button>
-            </div>
+              {/* Screenshot Editor */}
+            <MapScreenshotEditor map={map} mapLoaded={mapLoaded} />
 
             {/* Search Input */}
             <div className="relative flex-1 border-l border-gray-200">
@@ -2282,9 +2088,9 @@ export default function LocationSidebar({
               )}
 
               {/* ═══════════════════════════════════════════════════════════════
-                  PRIMARY ACTION: Drop Heart - Inline expandable form
+                  PRIMARY ACTION: Mention Heart - Inline expandable form
                   ═══════════════════════════════════════════════════════════════ */}
-              {locationData && !selectedPin && (
+              {locationData && (
                 <div className="space-y-3">
                   {/* Expanded Form */}
                   {isDropHeartExpanded && (
@@ -2348,158 +2154,73 @@ export default function LocationSidebar({
                         </div>
                       </div>
 
-                      {/* Event Year Selector */}
+                      {/* Event Year Selector - Collapsible */}
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          When did this happen? (optional)
-                        </label>
-                        <input
-                          type="number"
-                          value={pinEventYear}
-                          onChange={(e) => {
-                            const yearValue = e.target.value;
-                            setPinEventYear(yearValue);
-                            
-                            // Only validate when 4 digits are entered
-                            if (yearValue && yearValue.length === 4) {
-                              const year = parseInt(yearValue, 10);
-                              const currentYear = new Date().getFullYear();
-                              const hundredYearsAgo = currentYear - 100;
-                              
-                              if (isNaN(year)) {
-                                setPinError('Please enter a valid year');
-                                return;
-                              }
-                              
-                              if (year > currentYear) {
-                                setPinError('Year cannot be in the future');
-                                return;
-                              }
-                              
-                              if (year < hundredYearsAgo) {
-                                setPinError('Year cannot be more than 100 years in the past');
-                                return;
-                              }
-                              
-                              setPinError(null);
-                            } else if (!yearValue) {
-                              // Clear error when field is empty
-                              setPinError(null);
-                            }
-                            // Don't validate while typing (1-3 digits)
-                          }}
-                          min={new Date().getFullYear() - 100}
-                          max={new Date().getFullYear()}
-                          placeholder="e.g., 2025"
-                          className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                          disabled={isPinSubmitting || isPinUploading}
-                        />
-                        <p className="text-[10px] text-gray-500 mt-0.5">
-                          Enter a year to filter this pin by year on the map (saved as January 1st of that year)
-                        </p>
-                      </div>
-
-                      {/* Hide Location Toggle */}
-                      {locationData && (
-                        <div className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-md">
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-900 mb-0.5">
-                              Hide Location
+                        {!showPostDateInput ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowPostDateInput(true)}
+                            className="text-xs text-gray-600 hover:text-gray-900 underline"
+                            disabled={isPinSubmitting || isPinUploading}
+                          >
+                            Post Date
+                          </button>
+                        ) : (
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              When did this happen? (optional)
                             </label>
-                            <p className="text-[10px] text-gray-500">
-                              {pinHideLocation 
-                                ? 'Using city coordinates (defaults to city center)' 
-                                : 'Use city coordinates instead of exact location'}
+                            <input
+                              type="number"
+                              value={pinEventYear}
+                              onChange={(e) => {
+                                const yearValue = e.target.value;
+                                setPinEventYear(yearValue);
+                                
+                                // Only validate when 4 digits are entered
+                                if (yearValue && yearValue.length === 4) {
+                                  const year = parseInt(yearValue, 10);
+                                  const currentYear = new Date().getFullYear();
+                                  const hundredYearsAgo = currentYear - 100;
+                                  
+                                  if (isNaN(year)) {
+                                    setPinError('Please enter a valid year');
+                                    return;
+                                  }
+                                  
+                                  if (year > currentYear) {
+                                    setPinError('Year cannot be in the future');
+                                    return;
+                                  }
+                                  
+                                  if (year < hundredYearsAgo) {
+                                    setPinError('Year cannot be more than 100 years in the past');
+                                    return;
+                                  }
+                                  
+                                  setPinError(null);
+                                } else if (!yearValue) {
+                                  // Clear error when field is empty
+                                  setPinError(null);
+                                }
+                                // Don't validate while typing (1-3 digits)
+                              }}
+                              min={new Date().getFullYear() - 100}
+                              max={new Date().getFullYear()}
+                              placeholder="e.g., 2025"
+                              className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                              disabled={isPinSubmitting || isPinUploading}
+                              autoFocus
+                            />
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              Enter a year to filter this mention by year on the map
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setPinHideLocation(!pinHideLocation)}
-                            disabled={isPinSubmitting || isPinUploading}
-                            className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
-                              pinHideLocation ? 'bg-gray-700' : 'bg-gray-300'
-                            }`}
-                            role="switch"
-                            aria-checked={pinHideLocation}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-                                pinHideLocation ? 'translate-x-3' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Media Preview */}
-                      {pinFilePreview && (
-                        <div className="relative rounded-md overflow-hidden">
-                          {pinSelectedFile?.type.startsWith('image/') ? (
-                            <img
-                              src={pinFilePreview}
-                              alt="Preview"
-                              className="w-full max-h-32 object-cover"
-                            />
-                          ) : (
-                            <video
-                              src={pinFilePreview}
-                              className="w-full max-h-32 object-cover"
-                              controls
-                            />
-                          )}
-                          <button
-                            type="button"
-                            onClick={handleRemovePinFile}
-                            className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-black/70 rounded-full transition-colors"
-                            disabled={isPinSubmitting || isPinUploading}
-                          >
-                            <XCircleIcon className="w-4 h-4 text-white" />
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Camera Button and Visibility Toggle - Same Row */}
-                      <div className="flex items-center justify-between gap-2">
-                        {/* Camera Button */}
-                        {!pinSelectedFile && (
-                          <div 
-                            className="relative"
-                            onMouseEnter={() => !user && setShowCameraTooltip(true)}
-                            onMouseLeave={() => setShowCameraTooltip(false)}
-                          >
-                            <label 
-                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
-                                user 
-                                  ? 'bg-gray-100 hover:bg-gray-200 cursor-pointer' 
-                                  : 'bg-gray-50 cursor-not-allowed opacity-50'
-                              }`}
-                              onClick={!user ? (e) => {
-                                e.preventDefault();
-                                openWelcome();
-                              } : undefined}
-                            >
-                              <input
-                                ref={pinFileInputRef}
-                                type="file"
-                                accept="image/*,video/*"
-                                capture="environment"
-                                onChange={handlePinFileSelect}
-                                className="hidden"
-                                disabled={isPinSubmitting || isPinUploading || !user}
-                              />
-                              <CameraIcon className={`w-4 h-4 ${user ? 'text-gray-600' : 'text-gray-400'}`} />
-                            </label>
-                            {!user && showCameraTooltip && (
-                              <div className="absolute bottom-full left-0 mb-1 z-50 w-48 bg-white border border-gray-200 rounded-md shadow-lg p-2">
-                                <p className="text-[10px] text-gray-600">
-                                  Sign in to upload photos and videos
-                                </p>
-                              </div>
-                            )}
-                          </div>
                         )}
+                      </div>
 
-                        {/* Visibility Toggle */}
+                      {/* Visibility Toggle */}
+                      <div className="flex items-center justify-between gap-2">
                         <div 
                           className="flex items-center gap-1.5 relative ml-auto"
                           onMouseEnter={() => !user && setShowVisibilityTooltip(true)}
@@ -2511,7 +2232,7 @@ export default function LocationSidebar({
                           <button
                             type="button"
                             onClick={() => setPinVisibility(pinVisibility === 'public' ? 'only_me' : 'public')}
-                            disabled={isPinSubmitting || isPinUploading || !user}
+                            disabled={isPinSubmitting || !user}
                             className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
                               pinVisibility === 'only_me' ? 'bg-gray-700' : 'bg-gray-300'
                             }`}
@@ -2531,7 +2252,7 @@ export default function LocationSidebar({
                           {!user && showVisibilityTooltip && (
                             <div className="absolute bottom-full right-0 mb-1 z-50 w-40 bg-white border border-gray-200 rounded-md shadow-lg p-2">
                               <p className="text-[10px] text-gray-600">
-                                Sign in for private pins
+                                Sign in for private mentions
                               </p>
                             </div>
                           )}
@@ -2549,20 +2270,20 @@ export default function LocationSidebar({
                       <div className="flex items-center gap-2 -mt-3">
                         <button
                           onClick={handleSubmitPin}
-                          disabled={isPinSubmitting || isPinUploading || (!pinDescription.trim() && !pinSelectedFile) || !user}
+                          disabled={isPinSubmitting || !pinDescription.trim() || !user}
                           className="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors disabled:opacity-50"
                         >
-                          {isPinUploading ? 'Uploading...' : isPinSubmitting ? 'Posting...' : 'Post'}
+                          {isPinSubmitting ? 'Posting...' : 'Post'}
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Drop Heart Button */}
+                  {/* Mention Heart Button */}
                   {!isDropHeartExpanded && (
                     <button
                       onClick={() => {
-                        // Require authentication to create pins
+                        // Require authentication to create mentions
                         // Check ref to get current auth state (avoids stale closure issues)
                         if (authLoadingRef.current) {
                           return; // Wait for auth to initialize
@@ -2576,7 +2297,7 @@ export default function LocationSidebar({
                       }}
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors shadow-sm"
                     >
-                      <span>Drop</span>
+                      <span>Mention</span>
                       <HeartIcon className="w-5 h-5" />
                     </button>
                   )}
@@ -2587,119 +2308,6 @@ export default function LocationSidebar({
                   VIEWING SECTION: What the user clicked on (read-only context)
                   ═══════════════════════════════════════════════════════════════ */}
               
-              {/* Pin Details - Accordion */}
-              {selectedPin && (
-                <div className="border-b border-gray-200">
-                  {/* Accordion Header */}
-                  <div
-                    onClick={() => setIsPinDetailsExpanded(!isPinDetailsExpanded)}
-                    className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className="text-xs font-medium text-gray-900 truncate">{selectedPin.name || 'Pin'}</span>
-                      {selectedPin.account?.username && (
-                        <span className="text-xs text-gray-500 truncate">· @{selectedPin.account.username}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedPin(null);
-                        }}
-                        className="p-0.5 text-gray-400 hover:text-gray-900 transition-colors"
-                        title="Close"
-                      >
-                        <XMarkIcon className="w-3 h-3" />
-                      </button>
-                      {isPinDetailsExpanded ? (
-                        <ChevronUpIcon className="w-3 h-3 text-gray-500" />
-                      ) : (
-                        <ChevronDownIcon className="w-3 h-3 text-gray-500" />
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Accordion Content - Packed Data */}
-                  {isPinDetailsExpanded && (
-                    <div className="px-2 pb-2 space-y-2">
-                      {/* Account + Date Row */}
-                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-gray-100">
-                        {selectedPin.account && (
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            {selectedPin.account.image_url ? (
-                              <img 
-                                src={selectedPin.account.image_url} 
-                                alt={selectedPin.account.username || 'User'} 
-                                className="w-5 h-5 rounded-full object-cover flex-shrink-0"
-                              />
-                            ) : (
-                              <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-700 font-medium flex-shrink-0">
-                                {(selectedPin.account.username || 'U')[0].toUpperCase()}
-                              </div>
-                            )}
-                            {selectedPin.account.username ? (
-                              <Link 
-                                href={`/profile/${selectedPin.account.username}`}
-                                className="text-xs font-medium text-gray-900 hover:underline truncate"
-                              >
-                                @{selectedPin.account.username}
-                              </Link>
-                            ) : (
-                              <span className="text-xs text-gray-600">User</span>
-                            )}
-                          </div>
-                        )}
-                        <div className="text-[10px] text-gray-500 flex-shrink-0">
-                          {new Date(selectedPin.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                      
-                      {/* Description + Media */}
-                      {selectedPin.description && (
-                        <p className="text-xs text-gray-600 leading-relaxed">
-                          {selectedPin.description}
-                        </p>
-                      )}
-                      {selectedPin.media_url && (
-                        <div className="rounded-md overflow-hidden">
-                          {selectedPin.media_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                            <img 
-                              src={selectedPin.media_url} 
-                              alt="Pin media" 
-                              className="w-full max-h-32 object-cover"
-                            />
-                          ) : selectedPin.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
-                            <video 
-                              src={selectedPin.media_url} 
-                              controls 
-                              className="w-full max-h-32"
-                            />
-                          ) : null}
-                        </div>
-                      )}
-                      
-                      {/* Analytics Row - Compact */}
-                      {selectedPin.id && (
-                        <div className="pt-1.5 border-t border-gray-100 space-y-1.5">
-                          <PinStatsCard pinId={selectedPin.id} compact={true} />
-                          <button
-                            onClick={() => {
-                              setAnalyticsPinId(selectedPin.id);
-                              setAnalyticsPinName(selectedPin.name || null);
-                              setIsAnalyticsModalOpen(true);
-                            }}
-                            className="w-full text-[10px] text-gray-500 hover:text-gray-900 hover:bg-gray-50 px-2 py-1 rounded transition-colors text-left"
-                          >
-                            View Full Analytics →
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Atlas Entity Details - Accordion */}
               {selectedAtlasEntity && (
                 <div className="border-b border-gray-200">
@@ -2871,67 +2479,6 @@ export default function LocationSidebar({
                           <div className="text-[9px] text-gray-400 font-medium">Admin</div>
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => {
-                          // Map layerType to singular entityType
-                          const typeMap: Record<string, AtlasEntityType> = {
-                            neighborhoods: 'neighborhood',
-                            schools: 'school',
-                            parks: 'park',
-                            lakes: 'lake',
-                            watertowers: 'watertower',
-                            cemeteries: 'cemetery',
-                            golf_courses: 'golf_course',
-                            hospitals: 'hospital',
-                            airports: 'airport',
-                            churches: 'church',
-                            municipals: 'municipal',
-                            roads: 'road',
-                          };
-                          const entityType = typeMap[selectedAtlasEntity.layerType];
-                          if (entityType) {
-                            setAtlasEntityType(entityType);
-                            setAtlasEntityModalMode('edit');
-                            setAtlasEntityToEdit({
-                              id: selectedAtlasEntity.id,
-                              name: selectedAtlasEntity.name,
-                              slug: selectedAtlasEntity.slug,
-                              lat: selectedAtlasEntity.lat,
-                              lng: selectedAtlasEntity.lng,
-                              description: selectedAtlasEntity.description,
-                              website_url: selectedAtlasEntity.website_url,
-                              phone: selectedAtlasEntity.phone,
-                              address: selectedAtlasEntity.address,
-                              city_id: selectedAtlasEntity.city_id,
-                              county_id: selectedAtlasEntity.county_id,
-                              school_type: selectedAtlasEntity.school_type,
-                              is_public: selectedAtlasEntity.is_public,
-                              district: selectedAtlasEntity.district,
-                              park_type: selectedAtlasEntity.park_type,
-                              hospital_type: selectedAtlasEntity.hospital_type,
-                              course_type: selectedAtlasEntity.course_type,
-                              holes: selectedAtlasEntity.holes,
-                              airport_type: selectedAtlasEntity.airport_type,
-                              iata_code: selectedAtlasEntity.iata_code,
-                              icao_code: selectedAtlasEntity.icao_code,
-                              church_type: selectedAtlasEntity.church_type,
-                              denomination: selectedAtlasEntity.denomination,
-                              municipal_type: selectedAtlasEntity.municipal_type,
-                            });
-                            setIsAtlasEntityModalOpen(true);
-                          } else {
-                            // For unknown entity types, show a message that editing is coming soon
-                            setAtlasEntityMessage({ 
-                              type: 'error', 
-                              text: 'Edit functionality coming soon for this entity type'
-                            });
-                          }
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium text-gray-700 bg-transparent border border-gray-200 hover:bg-gray-50 rounded transition-colors"
-                      >
-                        <Cog6ToothIcon className="w-3 h-3 text-gray-500" />
-                        <span>Edit</span>
-                      </button>
-                      <button
                         onClick={async () => {
                           if (!confirm(`Are you sure you want to delete "${selectedAtlasEntity.name}"? This action cannot be undone.`)) {
                             return;
@@ -3102,15 +2649,6 @@ export default function LocationSidebar({
                           <div className="flex items-center gap-1">
                             <span className="px-1 py-0.5 text-[9px] font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded">Nbhd</span>
                             <span className="text-xs text-gray-700 truncate">{locationData.neighborhood}</span>
-                            {isAdmin && (
-                              <button
-                                onClick={() => openAtlasEntityModal('create', 'neighborhood', locationData.neighborhood)}
-                                className="text-[9px] text-purple-500 hover:text-purple-700 ml-auto"
-                                title="Add to Atlas"
-                              >
-                                + Add
-                              </button>
-                            )}
                           </div>
                         )}
                         
@@ -3131,15 +2669,6 @@ export default function LocationSidebar({
                                 className="text-[9px] text-gray-400 hover:text-gray-900 underline ml-auto"
                               >
                                 Explore
-                              </button>
-                            )}
-                            {isAdmin && !locationData.cityId && (
-                              <button
-                                onClick={() => openAtlasEntityModal('create', 'neighborhood', locationData.locality)}
-                                className="text-[9px] text-amber-500 hover:text-amber-700 ml-auto"
-                                title="Add as Neighborhood"
-                              >
-                                + Add
                               </button>
                             )}
                           </div>
@@ -3335,10 +2864,11 @@ export default function LocationSidebar({
                 </div>
               )}
 
+
               {/* ═══════════════════════════════════════════════════════════════
                   SECONDARY ACTIONS: User-facing tools (simplified)
                   ═══════════════════════════════════════════════════════════════ */}
-              {locationData && !selectedPin && !isDropHeartExpanded && (
+              {locationData && !isDropHeartExpanded && (
                 <div className="space-y-2">
                   {/* Intelligence - Only show for houses (building type=house) */}
                   {pinFeature?.showIntelligence && (
@@ -3361,92 +2891,8 @@ export default function LocationSidebar({
               {isAdmin && locationData && (
                 <div className="pt-2 border-t border-gray-200">
                   {(() => {
-                    // Use atlasType from extracted feature (computed in featureService)
-                    // Maps all detected categories to proper atlas entity types
-                    const detectedAtlasType = pinFeature?.atlasType as AtlasEntityType | null;
-                    const featureIcon = pinFeature?.icon || '📍';
-                    const featureLabel = pinFeature?.label || 'Location';
-                    
-                    // All entity types for compact grid (all 13 atlas types)
-                    const allEntities: Array<{ type: AtlasEntityType; icon: string; label: string }> = [
-                      { type: 'neighborhood', icon: '🏘️', label: 'Nbhd' },
-                      { type: 'school', icon: '🏫', label: 'School' },
-                      { type: 'park', icon: '🌳', label: 'Park' },
-                      { type: 'lake', icon: '💧', label: 'Lake' },
-                      { type: 'hospital', icon: '🏥', label: 'Hospital' },
-                      { type: 'church', icon: '⛪', label: 'Church' },
-                      { type: 'cemetery', icon: '🪦', label: 'Cemetery' },
-                      { type: 'airport', icon: '✈️', label: 'Airport' },
-                      { type: 'golf_course', icon: '⛳', label: 'Golf' },
-                      { type: 'watertower', icon: '🗼', label: 'Tower' },
-                      { type: 'municipal', icon: '🏛️', label: 'Municipal' },
-                      { type: 'road', icon: '🛣️', label: 'Road' },
-                      { type: 'radio_and_news', icon: '📻', label: 'News' },
-                    ];
-                    
-                    // Get recommended entity info
-                    const recommendedEntity = detectedAtlasType 
-                      ? allEntities.find(e => e.type === detectedAtlasType)
-                      : null;
-                    
-                    // Open modal for entity creation - pass properties for pre-filling
-                    const handleOpenCreateModal = (entityType: AtlasEntityType) => {
-                      openAtlasEntityModal('create', entityType, pinFeature?.name || undefined, undefined, pinFeature?.properties);
-                    };
-                    
                     return (
                       <>
-                        {/* Contextual Create Button - Show when atlas type detected */}
-                        {detectedAtlasType && recommendedEntity && (
-                          <button
-                            onClick={() => handleOpenCreateModal(detectedAtlasType)}
-                            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-medium text-white bg-gray-800 hover:bg-gray-700 rounded transition-colors"
-                          >
-                            <span>{recommendedEntity.icon}</span>
-                            <span>+ Create {recommendedEntity.label}</span>
-                            {pinFeature?.name && (
-                              <span className="opacity-70 truncate max-w-[80px]">&quot;{pinFeature.name}&quot;</span>
-                            )}
-                          </button>
-                        )}
-                        
-                        {/* Admin Tools Toggle - More options or create entity */}
-                        <button
-                          onClick={() => setIsAdminToolsOpen(!isAdminToolsOpen)}
-                          className={`w-full flex items-center justify-between px-2 py-1 text-[10px] font-medium text-gray-500 hover:text-gray-700 transition-colors ${detectedAtlasType ? 'mt-1' : ''}`}
-                        >
-                          <div className="flex items-center gap-1">
-                            <WrenchScrewdriverIcon className="w-3 h-3" />
-                            <span>{detectedAtlasType ? 'Other types' : 'Create Entity'}</span>
-                          </div>
-                          {isAdminToolsOpen ? (
-                            <ChevronUpIcon className="w-2.5 h-2.5" />
-                          ) : (
-                            <ChevronDownIcon className="w-2.5 h-2.5" />
-                          )}
-                        </button>
-                        
-                        {/* Compact Grid of All Entity Buttons */}
-                        {isAdminToolsOpen && (
-                          <div className="mt-1.5 grid grid-cols-4 gap-1">
-                            {allEntities.map((entity) => (
-                              <button
-                                key={entity.type}
-                                onClick={() => handleOpenCreateModal(entity.type)}
-                                className={`flex flex-col items-center gap-0.5 px-1 py-1.5 text-[9px] rounded transition-colors border ${
-                                  entity.type === detectedAtlasType 
-                                    ? 'text-gray-900 bg-gray-100 border-gray-300' 
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 border-gray-100'
-                                }`}
-                                title={`Create ${entity.label}`}
-                              >
-                                <span className="text-sm">{entity.icon}</span>
-                                <span className="truncate w-full text-center">{entity.label}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        
                         {/* City Edit - Update coordinates for existing city */}
                         {pinFeature?.category === 'city' && pinFeature?.name && (
                           <button
@@ -3501,22 +2947,8 @@ export default function LocationSidebar({
       <IntelligenceModal
         isOpen={isIntelligenceModalOpen}
         onClose={() => setIsIntelligenceModalOpen(false)}
-        locationData={selectedPin ? {
-          coordinates: selectedPin.coordinates,
-          placeName: selectedPin.name,
-          address: selectedPin.address || undefined,
-          type: 'pin-click',
-        } : locationData}
-        pinFeature={selectedPin ? {
-          type: 'pin',
-          name: selectedPin.name,
-          properties: {
-            id: selectedPin.id,
-            description: selectedPin.description || undefined,
-            created_at: selectedPin.created_at,
-            ...(selectedPin.address ? { address: selectedPin.address } : {}),
-          },
-        } : pinFeature ? {
+        locationData={locationData}
+        pinFeature={pinFeature ? {
           // Convert ExtractedFeature to old FeatureMetadata format
           type: pinFeature.layerId,
           name: pinFeature.name || undefined,
@@ -3525,29 +2957,6 @@ export default function LocationSidebar({
         } : null}
       />
 
-      {/* Pin Analytics Modal */}
-      {analyticsPinId && (
-        <PinAnalyticsModal
-          isOpen={isAnalyticsModalOpen}
-          onClose={() => {
-            setIsAnalyticsModalOpen(false);
-            setAnalyticsPinId(null);
-            setAnalyticsPinName(null);
-          }}
-          pinId={analyticsPinId}
-          pinName={analyticsPinName || undefined}
-          isOwner={!!(currentUserAccountId && selectedPin?.account?.id === currentUserAccountId)}
-          isPro={currentUserPlan === 'pro'}
-          onUpgrade={() => {
-            // Close analytics modal and open account modal with billing tab
-            setIsAnalyticsModalOpen(false);
-            setAnalyticsPinId(null);
-            setAnalyticsPinName(null);
-            // Open account modal via context
-            openAccount('billing');
-          }}
-        />
-      )}
 
       {/* POI Drop Pin Button - Shows when POI label is found */}
       {isPOIMode && showDropPinButton && poiFeature && poiClickLocation && (
@@ -3608,87 +3017,6 @@ export default function LocationSidebar({
         </div>
       )}
 
-      {/* Atlas Entity Modal (Admin Only) - Supports Create and Edit modes */}
-      <AtlasEntityModal
-        isOpen={isAtlasEntityModalOpen}
-        onClose={() => {
-          setIsAtlasEntityModalOpen(false);
-          setAtlasEntityToEdit(undefined);
-        }}
-        entityType={atlasEntityType}
-        mode={atlasEntityModalMode}
-        coordinates={atlasEntityModalMode === 'create' ? locationData?.coordinates : undefined}
-        featureName={atlasEntityModalMode === 'create' ? atlasEntityFeatureName : undefined}
-        cityName={atlasEntityModalMode === 'create' ? locationData?.city : undefined}
-        countyName={atlasEntityModalMode === 'create' ? locationData?.county : undefined}
-        address={atlasEntityModalMode === 'create' ? locationData?.address : undefined}
-        featureProperties={atlasEntityModalMode === 'create' ? atlasEntityFeatureProperties : undefined}
-        existingEntity={atlasEntityModalMode === 'edit' ? atlasEntityToEdit : undefined}
-        onSuccess={() => {
-          // Clear the selected atlas entity after successful edit
-          if (atlasEntityModalMode === 'edit') {
-            setSelectedAtlasEntity(null);
-          }
-          console.log(`Successfully ${atlasEntityModalMode === 'edit' ? 'updated' : 'created'} ${atlasEntityType}`);
-        }}
-      />
-
-      {/* Screenshot Preview Modal */}
-      {isScreenshotPreviewOpen && screenshot && (
-        <div className="fixed inset-0 z-[1002] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] w-full mx-4 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-900">Map Screenshot</h3>
-              <button
-                onClick={() => {
-                  setIsScreenshotPreviewOpen(false);
-                  setScreenshot(null);
-                }}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
-                aria-label="Close"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Screenshot Image */}
-            <div className="relative bg-gray-100 overflow-auto max-h-[calc(90vh-120px)]">
-              <img
-                src={screenshot}
-                alt="Map screenshot"
-                className="w-full h-auto"
-              />
-            </div>
-
-            {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-2 p-3 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setIsScreenshotPreviewOpen(false);
-                  setScreenshot(null);
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => {
-                  if (screenshot) {
-                    const link = document.createElement('a');
-                    link.download = `map-screenshot-${new Date().toISOString().split('T')[0]}.png`;
-                    link.href = screenshot;
-                    link.click();
-                  }
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors"
-              >
-                Download
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

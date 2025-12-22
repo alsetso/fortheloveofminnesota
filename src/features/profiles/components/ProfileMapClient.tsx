@@ -5,7 +5,7 @@ import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
-import CreatePinModal from '@/features/map/components/CreatePinModal';
+import CreateMentionModal from '@/features/map/components/CreateMentionModal';
 import SimpleNav from '@/components/layout/SimpleNav';
 import { usePageView } from '@/hooks/usePageView';
 import { XMarkIcon } from '@heroicons/react/24/outline';
@@ -44,7 +44,7 @@ export default function ProfileMapClient({
   usePageView();
   
   // Centralized URL state management
-  const { pinId: urlPinId, viewMode, setPinId, clearPinId, setView, setPinIdAndView } = useProfileUrlState();
+  const { mentionId: urlMentionId, viewMode, setMentionId, clearMentionId, setView, setMentionIdAndView } = useProfileUrlState();
   
   // Use ownership hook for consolidated ownership logic
   const ownership = useProfileOwnership({
@@ -102,7 +102,7 @@ export default function ProfileMapClient({
 
     const shouldClose = 
       localViewMode === 'visitor' || // Switching to visitor view
-      (urlPinId !== null); // User clicked existing pin
+      (urlMentionId !== null); // User clicked existing mention
 
     if (shouldClose) {
       removeTemporaryPin();
@@ -360,34 +360,32 @@ export default function ProfileMapClient({
     }
   }, [mapLoaded]);
 
-  const handlePinCreated = (newPin?: ProfilePin | { id: string; lat: number; lng: number; description: string | null; media_url: string | null; visibility: string; view_count: number | null; created_at: string; updated_at: string }) => {
+  const handleMentionCreated = (newMention?: Mention) => {
     // Remove temporary pin marker
     removeTemporaryPin();
     
-    // If we received the new pin data, add it optimistically
-    if (newPin) {
-      // Convert to ProfilePin format if needed
+    // If we received the new mention data, add it optimistically
+    if (newMention) {
+      // Convert to ProfilePin format
       const profilePin: ProfilePin = {
-        id: newPin.id,
-        lat: newPin.lat,
-        lng: newPin.lng,
-        description: newPin.description,
-        media_url: newPin.media_url,
-        visibility: newPin.visibility as 'public' | 'only_me',
-        view_count: newPin.view_count,
-        created_at: newPin.created_at,
-        updated_at: newPin.updated_at,
+        id: newMention.id,
+        lat: newMention.lat,
+        lng: newMention.lng,
+        description: newMention.description,
+        visibility: newMention.visibility as 'public' | 'only_me',
+        created_at: newMention.created_at,
+        updated_at: newMention.updated_at,
       };
       
       setLocalPins(prev => [profilePin, ...prev]);
       
       // Update URL with new pin ID to show it immediately
-      setPinId(newPin.id);
+      setMentionId(newMention.id);
     }
     
     setPinsRefreshKey(prev => prev + 1);
     setModalState({ type: 'none' });
-    // No page reload needed - pin added to local state
+    // No page reload needed - mention added to local state
   };
 
   const handleCloseCreatePinModal = () => {
@@ -403,7 +401,7 @@ export default function ProfileMapClient({
   };
 
   // Stable callback for ProfilePinsLayer to prevent unnecessary re-renders
-  const handlePinDeleted = useCallback((pinId: string) => {
+  const handlePinArchived = useCallback((pinId: string) => {
     setLocalPins(prev => prev.filter(p => p.id !== pinId));
   }, []);
 
@@ -441,7 +439,7 @@ export default function ProfileMapClient({
           mapLoaded={mapLoaded}
           pins={displayPins}
           isOwnProfile={showOwnerControls}
-          onPinDeleted={handlePinDeleted}
+          onPinArchived={handlePinArchived}
         />
       )}
 
@@ -471,7 +469,7 @@ export default function ProfileMapClient({
           
           // Update URL state (clears pinId when switching to visitor)
           if (newMode === 'visitor') {
-            setPinIdAndView(null, 'visitor'); // Clear pinId, set view=visitor
+            setMentionIdAndView(null, 'visitor'); // Clear mentionId, set view=visitor
           } else {
             setView('owner'); // Just set view (pinId can stay if set)
           }
@@ -480,8 +478,8 @@ export default function ProfileMapClient({
         onTogglePrivatePins={showOwnerControls ? () => {
           setShowPrivatePins(prev => !prev);
           // Clear pinId when toggling private pins (pin visibility changes)
-          if (urlPinId) {
-            clearPinId();
+          if (urlMentionId) {
+            clearMentionId();
           }
         } : undefined}
         onLocationSelect={(coordinates) => {
@@ -541,18 +539,18 @@ export default function ProfileMapClient({
               duration: 1500,
             });
             // Set pinId in URL to show popup
-            setPinId(pin.id);
+            setMentionId(pin.id);
           }
         }}
       />
 
       {/* Create Pin Modal (only for owners, not in visitor view) */}
       {showOwnerControls && ownership.canCreatePin && (
-        <CreatePinModal
+        <CreateMentionModal
           isOpen={isCreatePinModalOpen}
           onClose={handleCloseCreatePinModal}
           coordinates={createPinCoordinates}
-          onPinCreated={handlePinCreated}
+          onMentionCreated={handleMentionCreated}
           onBack={handleCloseCreatePinModal}
           onVisibilityChange={updateTemporaryPinColor}
           map={mapInstanceRef.current}

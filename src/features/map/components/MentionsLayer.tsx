@@ -1,43 +1,47 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { PublicMapPinService } from '@/features/map-pins/services/publicMapPinService';
-import type { MapPin } from '@/types/map-pin';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { MentionService } from '@/features/mentions/services/mentionService';
+import type { Mention } from '@/types/mention';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
-interface PinsLayerProps {
+interface MentionsLayerProps {
   map: MapboxMapInstance;
   mapLoaded: boolean;
 }
 
 /**
- * PinsLayer component manages Mapbox pin visualization
+ * MentionsLayer component manages Mapbox mention visualization
  * Handles fetching, formatting, and real-time updates
  */
-export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
-  const sourceId = 'map-pins';
-  const pointLayerId = 'map-pins-point';
-  const pointLabelLayerId = 'map-pins-point-label';
+export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
+  const sourceId = 'map-mentions';
+  const pointLayerId = 'map-mentions-point';
+  const pointLabelLayerId = 'map-mentions-point-label';
   
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const searchParams = useSearchParams();
-  const pinsRef = useRef<MapPin[]>([]);
+  const router = useRouter();
+  const pathname = usePathname();
+  const mentionsRef = useRef<Mention[]>([]);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const isAddingLayersRef = useRef<boolean>(false);
   const popupRef = useRef<any>(null); // Mapbox Popup instance
   const clickHandlersAddedRef = useRef<boolean>(false);
   const locationSelectedHandlerRef = useRef<(() => void) | null>(null);
-  const selectPinByIdHandlerRef = useRef<((event: CustomEvent<{ pinId: string }>) => void) | null>(null);
+  const selectMentionByIdHandlerRef = useRef<((event: CustomEvent<{ mentionId: string }>) => void) | null>(null);
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHandlingStyleChangeRef = useRef<boolean>(false);
+  const mentionCreatedHandlerRef = useRef<((event: CustomEvent<{ mention: Mention }>) => void) | null>(null);
+  const mentionArchivedHandlerRef = useRef<((event: CustomEvent<{ mentionId: string }>) => void) | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
-  const currentPinRef = useRef<MapPin | null>(null);
+  const currentMentionRef = useRef<Mention | null>(null);
   const accountRef = useRef(account);
   const openWelcomeRef = useRef(openWelcome);
   
@@ -51,13 +55,13 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
     openWelcomeRef.current = openWelcome;
   }, [openWelcome]);
 
-  // Fetch pins and add to map
+  // Fetch mentions and add to map
   useEffect(() => {
     if (!map || !mapLoaded) return;
 
     let mounted = true;
 
-    const loadPins = async () => {
+    const loadMentions = async () => {
       // Prevent concurrent calls
       if (isAddingLayersRef.current) return;
       
@@ -66,15 +70,15 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         const yearParam = searchParams.get('year');
         const year = yearParam ? parseInt(yearParam, 10) : undefined;
         
-        const pins = await PublicMapPinService.getPins(year ? { year } : undefined);
+        const mentions = await MentionService.getMentions(year ? { year } : undefined);
         if (!mounted) return;
 
-        pinsRef.current = pins;
-        const geoJSON = PublicMapPinService.pinsToGeoJSON(pins);
+        mentionsRef.current = mentions;
+        const geoJSON = MentionService.mentionsToGeoJSON(mentions);
         
         // Log for debugging
         if (process.env.NODE_ENV === 'development') {
-          console.log('[PinsLayer] Loaded pins:', pins.length);
+          console.log('[MentionsLayer] Loaded mentions:', mentions.length);
         }
 
         isAddingLayersRef.current = true;
@@ -94,7 +98,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         } catch (e) {
           // Source check failed - map may be in invalid state, continue with adding source
           if (process.env.NODE_ENV === 'development') {
-            console.warn('[PinsLayer] Error checking existing source:', e);
+            console.warn('[MentionsLayer] Error checking existing source:', e);
           }
         }
 
@@ -121,11 +125,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
           data: geoJSON,
         });
 
-        // Load pin icon image
-        const pinImageId = 'map-pin-icon';
+        // Load mention icon image
+        const mentionImageId = 'map-mention-icon';
         
         // Check if image already exists
-        if (!mapboxMap.hasImage(pinImageId)) {
+        if (!mapboxMap.hasImage(mentionImageId)) {
           try {
             // Create an Image element and wait for it to load
             const img = new Image();
@@ -134,13 +138,13 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             await new Promise((resolve, reject) => {
               img.onload = resolve;
               img.onerror = reject;
-              img.src = '/map_pin.svg';
+              img.src = '/heart.png';
             });
             
-            // Create a canvas to resize the image to 8x8
+            // Create a canvas to resize the image to 64x64 for high quality
             const canvas = document.createElement('canvas');
-            canvas.width = 8;
-            canvas.height = 8;
+            canvas.width = 64;
+            canvas.height = 64;
             const ctx = canvas.getContext('2d');
             
             if (ctx) {
@@ -148,33 +152,45 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'high';
               
-              // Draw the image scaled to 8x8 (SVG is already oriented correctly with tip down)
-              ctx.drawImage(img, 0, 0, 8, 8);
+              // Draw the image scaled to 64x64
+              ctx.drawImage(img, 0, 0, 64, 64);
               
-              // Get ImageData and add to map
-              const imageData = ctx.getImageData(0, 0, 8, 8);
-              mapboxMap.addImage(pinImageId, imageData);
+              // Get ImageData and add to map with pixelRatio for retina displays
+              const imageData = ctx.getImageData(0, 0, 64, 64);
+              mapboxMap.addImage(mentionImageId, imageData, { pixelRatio: 2 });
             }
           } catch (error) {
-            console.error('[PinsLayer] Failed to load pin icon:', error);
+            console.error('[MentionsLayer] Failed to load mention icon:', error);
             // Fallback: continue without icon (will show as missing image)
           }
         }
 
-        // Add points as pin icons
+        // Add points as mention icons with zoom-based sizing
         map.addLayer({
           id: pointLayerId,
           type: 'symbol',
           source: sourceId,
           layout: {
-            'icon-image': pinImageId,
-            'icon-size': 1, // Image is already sized to 8px
-            'icon-anchor': 'top', // Use 'top' anchor if SVG tip is at top
+            'icon-image': mentionImageId,
+            'icon-size': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              0, 0.15,   // At zoom 0, size is 0.15 (small for overview)
+              5, 0.25,   // At zoom 5, size is 0.25
+              10, 0.4,   // At zoom 10, size is 0.4
+              12, 0.5,   // At zoom 12, size is 0.5
+              14, 0.65,  // At zoom 14, size is 0.65
+              16, 0.8,   // At zoom 16, size is 0.8
+              18, 1.0,   // At zoom 18, size is 1.0 (full size)
+              20, 1.2,   // At zoom 20, size is 1.2 (larger when zoomed in)
+            ],
+            'icon-anchor': 'center',
             'icon-allow-overlap': true,
           },
         });
 
-        // Add labels for points (positioned above pin icon)
+        // Add labels for points (positioned above mention icon)
         mapboxMap.addLayer({
           id: pointLabelLayerId,
           type: 'symbol',
@@ -201,11 +217,16 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
 
         isAddingLayersRef.current = false;
 
-        // Add click handlers for pin interactions (only once)
+        // Add click handlers for mention interactions (only once)
         if (!clickHandlersAddedRef.current) {
-          const handlePinClick = async (e: any) => {
+          const handleMentionClick = async (e: any) => {
             if (!mounted) return;
             if (!mapboxMap || !e || !e.point || typeof e.point.x !== 'number' || typeof e.point.y !== 'number' || typeof mapboxMap.queryRenderedFeatures !== 'function') return;
+            
+            // Stop event propagation to prevent map click handler from firing
+            if (e.originalEvent) {
+              e.originalEvent.stopPropagation();
+            }
             
             const features = mapboxMap.queryRenderedFeatures(e.point, {
               layers: [pointLayerId, pointLabelLayerId],
@@ -214,26 +235,56 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
             if (features.length === 0) return;
 
             const feature = features[0];
-            const pinId = feature.properties?.id;
+            const mentionId = feature.properties?.id;
             
-            if (!pinId) return;
+            if (!mentionId) return;
 
-            // Find the pin data
-            const pin = pinsRef.current.find(p => p.id === pinId);
-            if (!pin) return;
+            // Find the mention data
+            let mention = mentionsRef.current.find(m => m.id === mentionId);
+            if (!mention) return;
 
-            // Fly to pin location
+            // Fetch full account profile data if account_id exists
+            if (mention.account_id && (!mention.account || !mention.account.username)) {
+              try {
+                const { supabase } = await import('@/lib/supabase');
+                const { data: accountData } = await supabase
+                  .from('accounts')
+                  .select('id, username, first_name, image_url')
+                  .eq('id', mention.account_id)
+                  .single();
+                
+                if (accountData) {
+                  // Update mention with full account data
+                  mention = {
+                    ...mention,
+                    account: {
+                      id: accountData.id,
+                      username: accountData.username,
+                      image_url: accountData.image_url,
+                    }
+                  };
+                  // Update in refs
+                  const index = mentionsRef.current.findIndex(m => m.id === mentionId);
+                  if (index !== -1) {
+                    mentionsRef.current[index] = mention;
+                  }
+                }
+              } catch (error) {
+                console.error('[MentionsLayer] Error fetching account profile:', error);
+                // Continue with existing mention data
+              }
+            }
+
+            // Fly to mention location
             const currentZoom = mapboxMap.getZoom();
             const targetZoom = Math.max(currentZoom, 14); // Ensure we zoom in at least to level 14
             
             mapboxMap.flyTo({
-              center: [pin.lng, pin.lat],
+              center: [mention.lng, mention.lat],
               zoom: targetZoom,
               duration: 800,
               essential: true, // Animation is essential for accessibility
             });
-
-            // Don't automatically open sidebar - only show popup
 
             // Helper functions
             const escapeHtml = (text: string | null): string => {
@@ -260,18 +311,17 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               }
             };
 
-            const createPopupContent = (viewCount: number | null, isLoading: boolean = false, pinToUse: MapPin = pin) => {
-              // Use provided pin or fallback to current pin
-              const currentPin = pinToUse || pin;
+            const createPopupContent = (mentionToUse: Mention = mention) => {
+              const currentMention = mentionToUse || mention;
               // Determine profile URL - use username if available
-              const profileSlug = currentPin.account?.username;
+              const profileSlug = currentMention.account?.username;
               const profileUrl = profileSlug ? `/profile/${encodeURIComponent(profileSlug)}` : null;
               
               // Display name: use username, fallback to 'User'
-              const displayName = currentPin.account?.username || 'User';
+              const displayName = currentMention.account?.username || 'User';
               
-              // Check if current user owns this pin
-              const isOwnPin = accountRef.current && currentPin.account_id === accountRef.current.id;
+              // Check if current user owns this mention
+              const isOwnMention = accountRef.current && currentMention.account_id === accountRef.current.id;
               
               // Check if user is authenticated
               const isAuthenticated = !!accountRef.current;
@@ -279,8 +329,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               // Only show account info if user is authenticated
               const accountInfo = isAuthenticated ? `
                 <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
-                  ${currentPin.account?.image_url ? `
-                    <img src="${escapeHtml(currentPin.account.image_url)}" alt="${escapeHtml(displayName)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e7eb;" />
+                  ${currentMention.account?.image_url ? `
+                    <img src="${escapeHtml(currentMention.account.image_url)}" alt="${escapeHtml(displayName)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e7eb;" />
                   ` : `
                     <div style="width: 20px; height: 20px; border-radius: 50%; background-color: #f3f4f6; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; flex-shrink: 0; font-weight: 500;">
                       ${escapeHtml(displayName[0].toUpperCase())}
@@ -294,61 +344,42 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                 </a>
               ` : '';
               
-              // Manage button (only for own pins)
-              const manageButton = isOwnPin ? `
+              // Manage button (only for own mentions)
+              const manageButton = isOwnMention ? `
                 <div style="position: relative;">
-                  <button class="pin-manage-button" data-pin-id="${currentPin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';" aria-label="Manage pin">
+                  <button class="mention-manage-button" data-mention-id="${currentMention.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';" aria-label="Manage mention">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                       <circle cx="12" cy="5" r="2"></circle>
                       <circle cx="12" cy="12" r="2"></circle>
                       <circle cx="12" cy="19" r="2"></circle>
                     </svg>
                   </button>
-                  <div class="pin-manage-menu" id="pin-manage-menu-${currentPin.id}" style="display: none; position: absolute; top: 28px; right: 0; min-width: 120px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden;">
-                    <button class="pin-edit-button" data-pin-id="${currentPin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
+                  <div class="mention-manage-menu" id="mention-manage-menu-${currentMention.id}" style="display: none; position: absolute; top: 28px; right: 0; min-width: 120px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); z-index: 1000; overflow: hidden;">
+                    <button class="mention-edit-button" data-mention-id="${currentMention.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                       </svg>
                       Edit
                     </button>
-                    <button class="pin-delete-button" data-pin-id="${currentPin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
+                    <button class="mention-delete-button" data-mention-id="${currentMention.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #dc2626; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#fef2f2';" onmouseout="this.style.background='transparent';">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="3 6 5 6 21 6"></polyline>
                         <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                       </svg>
-                      Delete
+                      Archive
                     </button>
                   </div>
                 </div>
               ` : '';
 
-              const viewCountDisplay = isLoading ? `
-                <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;">
-                  <div style="width: 12px; height: 12px; border: 2px solid #e5e7eb; border-top-color: #6b7280; border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0;"></div>
-                  <style>
-                    @keyframes spin {
-                      to { transform: rotate(360deg); }
-                    }
-                  </style>
-                </div>
-              ` : viewCount !== null && viewCount > 0 ? `
-                <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  <span>${viewCount.toLocaleString()}</span>
-                </div>
-              ` : '';
-
               // "See who" link for unauthenticated users
               const seeWhoLink = !isAuthenticated ? `
-                <a id="see-who-link-${currentPin.id}" href="#" style="font-size: 12px; color: #2563eb; text-decoration: none; cursor: pointer; transition: color 0.15s;" onmouseover="this.style.color='#1d4ed8'; text-decoration: underline;" onmouseout="this.style.color='#2563eb'; this.style.textDecoration='none';">See who</a>
+                <a id="see-who-link-${currentMention.id}" href="#" style="font-size: 12px; color: #2563eb; text-decoration: none; cursor: pointer; transition: color 0.15s;" onmouseover="this.style.color='#1d4ed8'; text-decoration: underline;" onmouseout="this.style.color='#2563eb'; this.style.textDecoration='none';">See who</a>
               ` : '';
 
               return `
-                <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                <div class="map-mention-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
                   <!-- Header with account info (if authenticated), manage button, and close button -->
                   ${isAuthenticated || manageButton ? `
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px;">
@@ -370,29 +401,19 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                   
                   <!-- Content -->
                   <div style="margin-bottom: 8px;">
-                    ${currentPin.description ? `
-                      <div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: ${currentPin.media_url ? '8px' : '0'}; word-wrap: break-word;">
-                        ${escapeHtml(currentPin.description)}
-                      </div>
-                    ` : ''}
-                    ${currentPin.media_url ? `
-                      <div style="margin-top: ${currentPin.description ? '8px' : '0'};">
-                        ${currentPin.media_url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `
-                          <img src="${escapeHtml(currentPin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 120px; object-fit: cover; display: block;" />
-                        ` : currentPin.media_url.match(/\.(mp4|webm|ogg)$/i) ? `
-                          <video src="${escapeHtml(currentPin.media_url)}" controls style="width: 100%; border-radius: 4px; max-height: 120px; display: block;" />
-                        ` : ''}
+                    ${currentMention.description ? `
+                      <div style="font-size: 12px; color: #374151; line-height: 1.5; word-wrap: break-word;">
+                        ${escapeHtml(currentMention.description)}
                       </div>
                     ` : ''}
                   </div>
                   
-                  <!-- Footer with date and view count -->
+                  <!-- Footer with date -->
                   <div style="padding-top: 8px;">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                       <div style="font-size: 12px; color: #6b7280;">
-                        ${formatDate(currentPin.created_at)}
+                        ${formatDate(currentMention.created_at)}
                       </div>
-                      ${viewCountDisplay}
                     </div>
                   </div>
                 </div>
@@ -404,28 +425,32 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               popupRef.current.remove();
             }
 
-            // Update URL with pin parameter for shareable links
-            const url = new URL(window.location.href);
-            url.searchParams.set('pin', pin.id);
-            window.history.replaceState({}, '', url.pathname + url.search);
+            // Update URL with mention parameter for shareable links
+            // Use Next.js router for proper state management
+            const params = new URLSearchParams(searchParams.toString());
+            params.set('mention', mention.id);
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
 
             // Dispatch event to notify FloatingMapContainer to close location details
-            window.dispatchEvent(new CustomEvent('pin-popup-opening', {
-              detail: { pinId: pin.id }
+            window.dispatchEvent(new CustomEvent('mention-popup-opening', {
+              detail: { mentionId: mention.id }
             }));
 
-            // Create popup immediately with loading state
+            // Set current mention ref before creating popup
+            currentMentionRef.current = mention;
+            
+            // Create popup immediately
             const mapbox = await import('mapbox-gl');
             popupRef.current = new mapbox.default.Popup({
               offset: 25,
               closeButton: false, // We're handling close button in the header
               closeOnClick: true,
-              className: 'map-pin-popup',
+              className: 'map-mention-popup',
               maxWidth: '280px',
               anchor: 'bottom',
             })
-              .setLngLat([pin.lng, pin.lat])
-              .setHTML(createPopupContent(null, true))
+              .setLngLat([mention.lng, mention.lat])
+              .setHTML(createPopupContent())
               .addTo(mapboxMap);
 
             // Add click handlers after popup is added to DOM
@@ -447,7 +472,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               }
 
               // "See who" link handler
-              const seeWhoLink = popupElement.querySelector(`#see-who-link-${pin.id}`) as HTMLAnchorElement;
+              const seeWhoLink = popupElement.querySelector(`#see-who-link-${mention.id}`) as HTMLAnchorElement;
               if (seeWhoLink) {
                 seeWhoLink.addEventListener('click', (e: MouseEvent) => {
                   e.preventDefault();
@@ -459,8 +484,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               }
 
               // Manage button handler
-              const manageButton = popupElement.querySelector('.pin-manage-button') as HTMLButtonElement;
-              const manageMenu = popupElement.querySelector('.pin-manage-menu') as HTMLDivElement;
+              const manageButton = popupElement.querySelector('.mention-manage-button') as HTMLButtonElement;
+              const manageMenu = popupElement.querySelector('.mention-manage-menu') as HTMLDivElement;
               
               if (manageButton && manageMenu) {
                 // Toggle menu on button click
@@ -480,32 +505,32 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                 document.addEventListener('click', handleClickOutside);
 
                 // Edit button handler
-                const editButton = popupElement.querySelector('.pin-edit-button') as HTMLButtonElement;
+                const editButton = popupElement.querySelector('.mention-edit-button') as HTMLButtonElement;
                 if (editButton) {
                   editButton.addEventListener('click', async (e: MouseEvent) => {
                     e.preventDefault();
                     e.stopPropagation();
                     manageMenu.style.display = 'none';
                     
-                    // Store current pin for editing
-                    currentPinRef.current = pin;
-                    setEditDescription(pin.description || '');
+                    // Store current mention for editing
+                    currentMentionRef.current = mention;
+                    setEditDescription(mention.description || '');
                     setIsEditing(true);
                     
                     // Update popup to show edit form
                     if (popupRef.current) {
                       const editForm = `
-                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                        <div class="map-mention-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
                           <div style="margin-bottom: 10px; padding-bottom: 8px;">
-                            <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Edit Pin</h3>
+                            <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Edit Mention</h3>
                           </div>
                           <div style="margin-bottom: 10px;">
                             <label style="display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 4px;">Description</label>
-                            <textarea id="pin-edit-description" style="width: 100%; min-height: 60px; padding: 6px 8px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; font-family: inherit;" placeholder="Add a description...">${escapeHtml(pin.description || '')}</textarea>
+                            <textarea id="mention-edit-description" style="width: 100%; min-height: 60px; padding: 6px 8px; font-size: 12px; border: 1px solid #d1d5db; border-radius: 4px; resize: vertical; font-family: inherit;" placeholder="Add a description...">${escapeHtml(mention.description || '')}</textarea>
                           </div>
                           <div style="display: flex; gap: 6px;">
-                            <button class="pin-edit-cancel" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">Cancel</button>
-                            <button class="pin-edit-save" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #111827; border: 1px solid #111827; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#374151';" onmouseout="this.style.background='#111827';">Save</button>
+                            <button class="mention-edit-cancel" data-mention-id="${mention.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">Cancel</button>
+                            <button class="mention-edit-save" data-mention-id="${mention.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #111827; border: 1px solid #111827; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#374151';" onmouseout="this.style.background='#111827';">Save</button>
                           </div>
                         </div>
                       `;
@@ -515,8 +540,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                   });
                 }
 
-                // Delete button handler
-                const deleteButton = popupElement.querySelector('.pin-delete-button') as HTMLButtonElement;
+                // Archive button handler
+                const deleteButton = popupElement.querySelector('.mention-delete-button') as HTMLButtonElement;
                 if (deleteButton) {
                   deleteButton.addEventListener('click', (e: MouseEvent) => {
                     e.preventDefault();
@@ -526,24 +551,24 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     // Show inline confirmation
                     if (popupRef.current) {
                       const confirmDeleteForm = `
-                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                        <div class="map-mention-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
                           <div style="margin-bottom: 10px; padding-bottom: 8px;">
-                            <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Delete Pin</h3>
+                            <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Archive Mention</h3>
                           </div>
                           <div style="margin-bottom: 10px;">
                             <p style="font-size: 12px; color: #374151; line-height: 1.5; margin: 0 0 8px 0;">
-                              Are you sure you want to delete this pin? This action cannot be undone.
+                              Are you sure you want to archive this mention? It will be hidden from your profile.
                             </p>
-                            ${pin.description ? `
+                            ${mention.description ? `
                               <div style="padding: 8px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 8px;">
-                                <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Pin description:</div>
-                                <div style="font-size: 12px; color: #111827;">${escapeHtml(pin.description)}</div>
+                                <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">Mention description:</div>
+                                <div style="font-size: 12px; color: #111827;">${escapeHtml(mention.description)}</div>
                               </div>
                             ` : ''}
                           </div>
                           <div style="display: flex; gap: 6px;">
-                            <button class="pin-delete-cancel" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">Cancel</button>
-                            <button class="pin-delete-confirm" data-pin-id="${pin.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #dc2626; border: 1px solid #dc2626; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#b91c1c';" onmouseout="this.style.background='#dc2626';">Delete</button>
+                            <button class="mention-delete-cancel" data-mention-id="${mention.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#e5e7eb';" onmouseout="this.style.background='#f3f4f6';">Cancel</button>
+                            <button class="mention-delete-confirm" data-mention-id="${mention.id}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #dc2626; border: 1px solid #dc2626; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#b91c1c';" onmouseout="this.style.background='#dc2626';">Archive</button>
                           </div>
                         </div>
                       `;
@@ -554,38 +579,38 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                 }
               }
 
-              // Delete confirmation handlers
-              const deleteCancelButton = popupElement.querySelector('.pin-delete-cancel') as HTMLButtonElement;
+              // Archive confirmation handlers
+              const deleteCancelButton = popupElement.querySelector('.mention-delete-cancel') as HTMLButtonElement;
               if (deleteCancelButton) {
                 deleteCancelButton.addEventListener('click', (e: MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
                   
-                  const pinId = deleteCancelButton.getAttribute('data-pin-id');
-                  if (!pinId) return;
+                  const mentionId = deleteCancelButton.getAttribute('data-mention-id');
+                  if (!mentionId) return;
                   
-                  const currentPinForCancel = pinsRef.current.find(p => p.id === pinId) || pin;
-                  if (!currentPinForCancel) return;
+                  const currentMentionForCancel = mentionsRef.current.find(m => m.id === mentionId) || mention;
+                  if (!currentMentionForCancel) return;
                   
                   // Reload popup with original content
                   if (popupRef.current) {
-                    popupRef.current.setHTML(createPopupContent(null, false, currentPinForCancel));
+                    popupRef.current.setHTML(createPopupContent(currentMentionForCancel));
                     setTimeout(() => setupPopupHandlers(), 0);
                   }
                 });
               }
 
-              const deleteConfirmButton = popupElement.querySelector('.pin-delete-confirm') as HTMLButtonElement;
+              const deleteConfirmButton = popupElement.querySelector('.mention-delete-confirm') as HTMLButtonElement;
               if (deleteConfirmButton) {
                 deleteConfirmButton.addEventListener('click', async (e: MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
                   
-                  const pinId = deleteConfirmButton.getAttribute('data-pin-id');
-                  if (!pinId) return;
+                  const mentionId = deleteConfirmButton.getAttribute('data-mention-id');
+                  if (!mentionId) return;
                   
-                  const pinToDelete = pinsRef.current.find(p => p.id === pinId) || pin;
-                  if (!pinToDelete) return;
+                  const mentionToDelete = mentionsRef.current.find(m => m.id === mentionId) || mention;
+                  if (!mentionToDelete) return;
                   
                   setIsDeleting(true);
                   
@@ -594,19 +619,21 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     deleteConfirmButton.disabled = true;
                     deleteConfirmButton.style.opacity = '0.6';
                     deleteConfirmButton.style.cursor = 'not-allowed';
-                    deleteConfirmButton.textContent = 'Deleting...';
+                    deleteConfirmButton.textContent = 'Archiving...';
                   }
                   
                   try {
-                    await PublicMapPinService.deletePin(pinId);
-                    // Remove pin from local refs
-                    pinsRef.current = pinsRef.current.filter(p => p.id !== pinId);
-                    // Reload pins
+                    // Archive the mention by updating archived = true
+                    await MentionService.updateMention(mentionId, { archived: true });
+                    
+                    // Remove mention from local refs
+                    mentionsRef.current = mentionsRef.current.filter(m => m.id !== mentionId);
+                    // Reload mentions
                     const yearParam = searchParams.get('year');
                     const year = yearParam ? parseInt(yearParam, 10) : undefined;
-                    const updatedPins = await PublicMapPinService.getPins(year ? { year } : undefined);
-                    pinsRef.current = updatedPins;
-                    const geoJSON = PublicMapPinService.pinsToGeoJSON(updatedPins);
+                    const updatedMentions = await MentionService.getMentions(year ? { year } : undefined);
+                    mentionsRef.current = updatedMentions;
+                    const geoJSON = MentionService.mentionsToGeoJSON(updatedMentions);
                     const source = mapboxMap.getSource(sourceId) as any;
                     if (source) {
                       source.setData(geoJSON);
@@ -616,42 +643,42 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                       popupRef.current.remove();
                       popupRef.current = null;
                     }
-                    // Dispatch event to refresh pins
-                    window.dispatchEvent(new CustomEvent('pin-deleted', { detail: { pinId } }));
+                    // Dispatch event to refresh mentions
+                    window.dispatchEvent(new CustomEvent('mention-archived', { detail: { mentionId } }));
                   } catch (error) {
-                    console.error('[PinsLayer] Error deleting pin:', error);
+                    console.error('[MentionsLayer] Error archiving mention:', error);
                     // Restore button state
                     if (deleteConfirmButton) {
                       deleteConfirmButton.disabled = false;
                       deleteConfirmButton.style.opacity = '1';
                       deleteConfirmButton.style.cursor = 'pointer';
-                      deleteConfirmButton.textContent = 'Delete';
+                      deleteConfirmButton.textContent = 'Archive';
                     }
                     // Show error in popup
                     if (popupRef.current) {
                       const errorForm = `
-                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                        <div class="map-mention-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
                           <div style="margin-bottom: 10px; padding-bottom: 8px;">
-                            <h3 style="font-size: 13px; font-weight: 600; color: #dc2626; margin: 0;">Delete Failed</h3>
+                            <h3 style="font-size: 13px; font-weight: 600; color: #dc2626; margin: 0;">Archive Failed</h3>
                           </div>
                           <div style="margin-bottom: 10px;">
                             <p style="font-size: 12px; color: #374151; line-height: 1.5; margin: 0;">
-                              Failed to delete pin. Please try again.
+                              Failed to archive mention. Please try again.
                             </p>
                           </div>
                           <div style="display: flex; gap: 6px;">
-                            <button class="pin-delete-error-ok" data-pin-id="${pinId}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #111827; border: 1px solid #111827; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#374151';" onmouseout="this.style.background='#111827';">OK</button>
+                            <button class="mention-delete-error-ok" data-mention-id="${mentionId}" style="flex: 1; padding: 6px 12px; font-size: 12px; font-weight: 500; color: white; background: #111827; border: 1px solid #111827; border-radius: 4px; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#374151';" onmouseout="this.style.background='#111827';">OK</button>
                           </div>
                         </div>
                       `;
                       popupRef.current.setHTML(errorForm);
                       setTimeout(() => {
-                        const okButton = popupRef.current?.getElement()?.querySelector('.pin-delete-error-ok') as HTMLButtonElement;
+                        const okButton = popupRef.current?.getElement()?.querySelector('.mention-delete-error-ok') as HTMLButtonElement;
                         if (okButton) {
                           okButton.addEventListener('click', () => {
                             if (popupRef.current) {
-                              const currentPinForReload = pinsRef.current.find(p => p.id === pinId) || pinToDelete;
-                              popupRef.current.setHTML(createPopupContent(null, false, currentPinForReload));
+                              const currentMentionForReload = mentionsRef.current.find(m => m.id === mentionId) || mentionToDelete;
+                              popupRef.current.setHTML(createPopupContent(currentMentionForReload));
                               setTimeout(() => setupPopupHandlers(), 0);
                             }
                           });
@@ -665,63 +692,62 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               }
 
               // Edit form handlers (when in edit mode)
-              const editCancelButton = popupElement.querySelector('.pin-edit-cancel') as HTMLButtonElement;
+              const editCancelButton = popupElement.querySelector('.mention-edit-cancel') as HTMLButtonElement;
               if (editCancelButton) {
                 editCancelButton.addEventListener('click', (e: MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
                   
-                  const pinId = editCancelButton.getAttribute('data-pin-id');
-                  if (!pinId) return;
+                  const mentionId = editCancelButton.getAttribute('data-mention-id');
+                  if (!mentionId) return;
                   
-                  const currentPinForCancel = pinsRef.current.find(p => p.id === pinId) || pin;
-                  if (!currentPinForCancel) return;
+                  const currentMentionForCancel = mentionsRef.current.find(m => m.id === mentionId) || mention;
+                  if (!currentMentionForCancel) return;
                   
                   setIsEditing(false);
-                  currentPinRef.current = null;
+                  currentMentionRef.current = null;
                   // Reload popup with original content
                   if (popupRef.current) {
-                    popupRef.current.setHTML(createPopupContent(null, false, currentPinForCancel));
+                    popupRef.current.setHTML(createPopupContent(currentMentionForCancel));
                     setTimeout(() => setupPopupHandlers(), 0);
                   }
                 });
               }
 
-              const editSaveButton = popupElement.querySelector('.pin-edit-save') as HTMLButtonElement;
-              const editDescriptionTextarea = popupElement.querySelector('#pin-edit-description') as HTMLTextAreaElement;
+              const editSaveButton = popupElement.querySelector('.mention-edit-save') as HTMLButtonElement;
+              const editDescriptionTextarea = popupElement.querySelector('#mention-edit-description') as HTMLTextAreaElement;
               if (editSaveButton) {
                 editSaveButton.addEventListener('click', async (e: MouseEvent) => {
                   e.preventDefault();
                   e.stopPropagation();
                   
-                  const pinId = editSaveButton.getAttribute('data-pin-id');
-                  if (!pinId) return;
+                  const mentionId = editSaveButton.getAttribute('data-mention-id');
+                  if (!mentionId) return;
                   
-                  const currentPinForEdit = pinsRef.current.find(p => p.id === pinId) || pin;
-                  if (!currentPinForEdit) return;
+                  const currentMentionForEdit = mentionsRef.current.find(m => m.id === mentionId) || mention;
+                  if (!currentMentionForEdit) return;
                   
                   const newDescription = editDescriptionTextarea?.value.trim() || null;
                   
                   try {
-                    await PublicMapPinService.updatePin(pinId, {
-                      description: newDescription,
-                    });
+                    // Update mention description
+                    await MentionService.updateMention(mentionId, { description: newDescription });
                     
-                    // Update pin in local refs
-                    const pinIndex = pinsRef.current.findIndex(p => p.id === pinId);
-                    if (pinIndex !== -1) {
-                      pinsRef.current[pinIndex] = {
-                        ...pinsRef.current[pinIndex],
+                    // Update mention in local refs
+                    const mentionIndex = mentionsRef.current.findIndex(m => m.id === mentionId);
+                    if (mentionIndex !== -1) {
+                      mentionsRef.current[mentionIndex] = {
+                        ...mentionsRef.current[mentionIndex],
                         description: newDescription,
                       };
                     }
                     
-                    // Reload pins to get fresh data
+                    // Reload mentions to get fresh data
                     const yearParam = searchParams.get('year');
                     const year = yearParam ? parseInt(yearParam, 10) : undefined;
-                    const updatedPins = await PublicMapPinService.getPins(year ? { year } : undefined);
-                    pinsRef.current = updatedPins;
-                    const geoJSON = PublicMapPinService.pinsToGeoJSON(updatedPins);
+                    const updatedMentions = await MentionService.getMentions(year ? { year } : undefined);
+                    mentionsRef.current = updatedMentions;
+                    const geoJSON = MentionService.mentionsToGeoJSON(updatedMentions);
                     const source = mapboxMap.getSource(sourceId) as any;
                     if (source) {
                       source.setData(geoJSON);
@@ -729,21 +755,21 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     
                     // Update popup with new content
                     if (popupRef.current) {
-                      const updatedPin = updatedPins.find(p => p.id === pinId);
-                      if (updatedPin) {
-                        popupRef.current.setHTML(createPopupContent(null, false, updatedPin));
+                      const updatedMention = updatedMentions.find(m => m.id === mentionId);
+                      if (updatedMention) {
+                        popupRef.current.setHTML(createPopupContent(updatedMention));
                         setTimeout(() => setupPopupHandlers(), 0);
                       }
                     }
                     
                     setIsEditing(false);
-                    currentPinRef.current = null;
+                    currentMentionRef.current = null;
                     
-                    // Dispatch event to refresh pins
-                    window.dispatchEvent(new CustomEvent('pin-updated', { detail: { pinId } }));
+                    // Dispatch event to refresh mentions
+                    window.dispatchEvent(new CustomEvent('mention-updated', { detail: { mentionId } }));
                   } catch (error) {
-                    console.error('[PinsLayer] Error updating pin:', error);
-                    alert('Failed to update pin. Please try again.');
+                    console.error('[MentionsLayer] Error updating mention:', error);
+                    alert('Failed to update mention. Please try again.');
                   }
                 });
               }
@@ -753,84 +779,59 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
 
             // Cleanup popup ref when it closes
             popupRef.current.on('close', () => {
+              currentMentionRef.current = null;
               popupRef.current = null;
-              // Clear pin parameter from URL when popup closes
-              const url = new URL(window.location.href);
-              if (url.searchParams.has('pin')) {
-                url.searchParams.delete('pin');
-                window.history.replaceState({}, '', url.pathname + url.search || '/');
+              // Clear mention parameter from URL when popup closes
+              const params = new URLSearchParams(searchParams.toString());
+              if (params.has('mention')) {
+                params.delete('mention');
+                const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+                router.replace(newUrl, { scroll: false });
               }
             });
-
-            // Track pin view and fetch updated count asynchronously
-            (async () => {
-              const referrer = typeof document !== 'undefined' ? document.referrer : null;
-              const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
-              let sessionId: string | null = null;
-              if (typeof window !== 'undefined') {
-                sessionId = sessionStorage.getItem('analytics_session_id');
-                if (!sessionId) {
-                  sessionId = crypto.randomUUID();
-                  sessionStorage.setItem('analytics_session_id', sessionId);
-                }
-              }
-
-              let viewCount: number | null = null;
-              try {
-                // Track the view
-                const trackResponse = await fetch('/api/analytics/pin-view', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    pin_id: pin.id,
-                    referrer_url: referrer || null,
-                    user_agent: userAgent || null,
-                    session_id: sessionId,
-                  }),
-                  keepalive: true,
-                });
-
-                if (trackResponse.ok) {
-                  // Dispatch event to notify sidebar to refetch stats
-                  window.dispatchEvent(new CustomEvent('pin-view-tracked', {
-                    detail: { pin_id: pin.id }
-                  }));
-                }
-
-                // Fetch updated view count (includes the view we just tracked)
-                const statsResponse = await fetch(`/api/analytics/pin-stats?pin_id=${pin.id}`);
-                if (statsResponse.ok) {
-                  const statsData = await statsResponse.json();
-                  viewCount = statsData.stats?.total_views || 0;
-                }
-              } catch (error) {
-                // Silently fail - use null as fallback (no view count shown)
-                if (process.env.NODE_ENV === 'development') {
-                  console.error('[PinsLayer] Failed to track/fetch pin view:', error);
-                }
-              }
-
-              // Update popup content with view count (only if popup still exists)
-              if (popupRef.current) {
-                popupRef.current.setHTML(createPopupContent(viewCount, false));
-                // Re-setup handlers after content update
-                setTimeout(setupPopupHandlers, 0);
-              }
-            })();
           };
 
           // Add click handler to point layer
           // Cast to any for layer-specific event handlers (not in interface)
-          (mapboxMap as any).on('click', pointLayerId, handlePinClick);
-          (mapboxMap as any).on('click', pointLabelLayerId, handlePinClick);
+          (mapboxMap as any).on('click', pointLayerId, handleMentionClick);
+          (mapboxMap as any).on('click', pointLabelLayerId, handleMentionClick);
 
-          // Make pins cursor pointer
-          (mapboxMap as any).on('mouseenter', pointLayerId, () => {
-            (mapboxMap as any).getCanvas().style.cursor = 'pointer';
-          });
-          (mapboxMap as any).on('mouseleave', pointLayerId, () => {
+          // Make mentions cursor pointer and prevent mention creation on hover
+          const handleMentionHoverStart = (e: any) => {
+            if (!e || !e.point) return;
+            
+            // Get mention ID from the feature
+            const features = (mapboxMap as any).queryRenderedFeatures(e.point, {
+              layers: [pointLayerId, pointLabelLayerId],
+            });
+            
+            if (features.length > 0) {
+              const mentionId = features[0].properties?.id;
+              if (mentionId) {
+                // Find the full mention object
+                const mention = mentionsRef.current.find(m => m.id === mentionId);
+                if (mention) {
+                  // Dispatch event with mention ID to prevent mention creation when hovering
+                  window.dispatchEvent(new CustomEvent('mention-hover-start', {
+                    detail: { mentionId, mention }
+                  }));
+                  (mapboxMap as any).getCanvas().style.cursor = 'pointer';
+                }
+              }
+            }
+          };
+          
+          const handleMentionHoverEnd = () => {
+            // Dispatch event to allow mention creation when not hovering
+            window.dispatchEvent(new CustomEvent('mention-hover-end'));
             (mapboxMap as any).getCanvas().style.cursor = '';
-          });
+          };
+          
+          // Add hover handlers for both point and label layers
+          (mapboxMap as any).on('mouseenter', pointLayerId, handleMentionHoverStart);
+          (mapboxMap as any).on('mouseleave', pointLayerId, handleMentionHoverEnd);
+          (mapboxMap as any).on('mouseenter', pointLabelLayerId, handleMentionHoverStart);
+          (mapboxMap as any).on('mouseleave', pointLabelLayerId, handleMentionHoverEnd);
 
           // Listen for location-selected-on-map event to close popup
           locationSelectedHandlerRef.current = () => {
@@ -841,30 +842,51 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
           };
           window.addEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
 
-          // Listen for select-pin-by-id event (from URL param watcher)
-          selectPinByIdHandlerRef.current = (event: CustomEvent<{ pinId: string }>) => {
-            const { pinId } = event.detail;
-            const pin = pinsRef.current.find(p => p.id === pinId);
-            if (pin) {
-              // Simulate a click on the pin to open popup
+          // Listen for select-mention-by-id event (from URL param watcher)
+          selectMentionByIdHandlerRef.current = async (event: CustomEvent<{ mentionId: string }>) => {
+            if (!event.detail) return;
+            const { mentionId } = event.detail;
+            
+            // Wait a bit to ensure mentions are loaded
+            let mention = mentionsRef.current.find(m => m.id === mentionId);
+            if (!mention) {
+              // If mention not found, wait a bit and try again
+              await new Promise(resolve => setTimeout(resolve, 100));
+              mention = mentionsRef.current.find(m => m.id === mentionId);
+            }
+            
+            if (mention) {
+              // Check if popup is already open for this mention
+              if (currentMentionRef.current?.id === mentionId && popupRef.current) {
+                return; // Already open
+              }
+              
+              // Close existing popup if different mention
+              if (popupRef.current && currentMentionRef.current?.id !== mentionId) {
+                popupRef.current.remove();
+                popupRef.current = null;
+              }
+              
+              // Open popup for this mention
               const fakeEvent = {
                 point: { x: 0, y: 0 },
-                lngLat: { lng: pin.lng, lat: pin.lat },
+                lngLat: { lng: mention.lng, lat: mention.lat },
+                originalEvent: { stopPropagation: () => {} },
               };
-              // Directly trigger the pin click handler logic
-              handlePinClick(fakeEvent);
+              // Directly trigger the mention click handler logic
+              await handleMentionClick(fakeEvent);
             }
           };
-          window.addEventListener('select-pin-by-id', selectPinByIdHandlerRef.current as EventListener);
+          window.addEventListener('select-mention-by-id', selectMentionByIdHandlerRef.current as EventListener);
 
           clickHandlersAddedRef.current = true;
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load map pins';
-        console.error('[PinsLayer] Error loading map pins:', errorMessage, error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load map mentions';
+        console.error('[MentionsLayer] Error loading map mentions:', errorMessage, error);
         // Log full error details in development
         if (process.env.NODE_ENV === 'development') {
-          console.error('[PinsLayer] Full error details:', {
+          console.error('[MentionsLayer] Full error details:', {
             error,
             message: errorMessage,
             stack: error instanceof Error ? error.stack : undefined,
@@ -874,9 +896,9 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
       }
     };
 
-    loadPins();
+    loadMentions();
 
-    // Re-add pins when map style changes (e.g., switching to satellite)
+    // Re-add mentions when map style changes (e.g., switching to satellite)
     // 'styledata' fires multiple times during style change - debounce to handle only the final one
     const handleStyleData = () => {
       if (!mounted) return;
@@ -904,11 +926,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         if (isHandlingStyleChangeRef.current) return;
         isHandlingStyleChangeRef.current = true;
         
-        // Reset flags and reload pins since style change cleared our layers
+        // Reset flags and reload mentions since style change cleared our layers
         isAddingLayersRef.current = false;
         clickHandlersAddedRef.current = false;
         
-        loadPins().finally(() => {
+        loadMentions().finally(() => {
           isHandlingStyleChangeRef.current = false;
         });
       }, 100);
@@ -919,19 +941,78 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
       map.on('styledata', handleStyleData);
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[PinsLayer] Error subscribing to styledata:', e);
+        console.warn('[MentionsLayer] Error subscribing to styledata:', e);
       }
     }
 
-    // Subscribe to real-time updates
-    const subscription = PublicMapPinService.subscribeToPins((payload) => {
-      if (!mounted) return;
+    // Listen for mention-created event to immediately add new mention
+    mentionCreatedHandlerRef.current = async (event: CustomEvent<{ mention: Mention }>) => {
+      if (!mounted || !map || !mapLoaded) return;
       
-      // Reload pins on any change
-      loadPins();
-    });
+      if (!event.detail) return;
+      const { mention } = event.detail;
+      if (!mention) return;
 
-    subscriptionRef.current = subscription;
+      try {
+        const mapboxMap = map as any;
+        const existingSource = map.getSource(sourceId) as any;
+        
+        if (existingSource && existingSource.type === 'geojson') {
+          // Add the new mention to the current list
+          mentionsRef.current = [mention, ...mentionsRef.current];
+          
+          // Update the GeoJSON source
+          const geoJSON = MentionService.mentionsToGeoJSON(mentionsRef.current);
+          existingSource.setData(geoJSON);
+        } else {
+          // Source doesn't exist yet, reload all mentions
+          loadMentions();
+        }
+      } catch (error) {
+        console.error('[MentionsLayer] Error adding mention:', error);
+        // Fallback to full reload
+        loadMentions();
+      }
+    };
+    window.addEventListener('mention-created', mentionCreatedHandlerRef.current as EventListener);
+
+    // Listen for mention-archived event to immediately remove mention
+    mentionArchivedHandlerRef.current = async (event: CustomEvent<{ mentionId: string }>) => {
+      if (!mounted || !map || !mapLoaded) return;
+      
+      if (!event.detail) return;
+      const { mentionId } = event.detail;
+      if (!mentionId) return;
+
+      try {
+        const mapboxMap = map as any;
+        const existingSource = map.getSource(sourceId) as any;
+        
+        if (existingSource && existingSource.type === 'geojson') {
+          // Remove the archived mention from the current list
+          mentionsRef.current = mentionsRef.current.filter(m => m.id !== mentionId);
+          
+          // Update the GeoJSON source
+          const geoJSON = MentionService.mentionsToGeoJSON(mentionsRef.current);
+          existingSource.setData(geoJSON);
+          
+          // Close popup if it's for this mention
+          if (popupRef.current && currentMentionRef.current?.id === mentionId) {
+            popupRef.current.remove();
+            popupRef.current = null;
+            currentMentionRef.current = null;
+          }
+        } else {
+          // Source doesn't exist yet, reload all mentions
+          loadMentions();
+        }
+      } catch (error) {
+        console.error('[MentionsLayer] Error removing mention:', error);
+        // Fallback to full reload
+        loadMentions();
+      }
+    };
+    window.addEventListener('mention-archived', mentionArchivedHandlerRef.current as EventListener);
 
     return () => {
       mounted = false;
@@ -942,20 +1023,22 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         styleChangeTimeoutRef.current = null;
       }
       
-      // Unsubscribe from real-time updates
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-        subscriptionRef.current = null;
-      }
-
       // Remove window event listeners
       if (locationSelectedHandlerRef.current) {
         window.removeEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
         locationSelectedHandlerRef.current = null;
       }
-      if (selectPinByIdHandlerRef.current) {
-        window.removeEventListener('select-pin-by-id', selectPinByIdHandlerRef.current as EventListener);
-        selectPinByIdHandlerRef.current = null;
+      if (selectMentionByIdHandlerRef.current) {
+        window.removeEventListener('select-mention-by-id', selectMentionByIdHandlerRef.current as EventListener);
+        selectMentionByIdHandlerRef.current = null;
+      }
+      if (mentionCreatedHandlerRef.current) {
+        window.removeEventListener('mention-created', mentionCreatedHandlerRef.current as EventListener);
+        mentionCreatedHandlerRef.current = null;
+      }
+      if (mentionArchivedHandlerRef.current) {
+        window.removeEventListener('mention-archived', mentionArchivedHandlerRef.current as EventListener);
+        mentionArchivedHandlerRef.current = null;
       }
       
       // Remove event listeners safely
@@ -966,7 +1049,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         } catch (e) {
           // Event listener may not exist or map may be removed
           if (process.env.NODE_ENV === 'development') {
-            console.warn('[PinsLayer] Error removing styledata listener:', e);
+            console.warn('[MentionsLayer] Error removing styledata listener:', e);
           }
         }
       }
@@ -1019,7 +1102,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
         } catch (e) {
           // Map may be in an invalid state - ignore cleanup errors
           if (process.env.NODE_ENV === 'development') {
-            console.warn('[PinsLayer] Error during cleanup:', e);
+            console.warn('[MentionsLayer] Error during cleanup:', e);
           }
         }
       }
@@ -1032,6 +1115,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
           mapboxMap.off('click', pointLabelLayerId);
           mapboxMap.off('mouseenter', pointLayerId);
           mapboxMap.off('mouseleave', pointLayerId);
+          mapboxMap.off('mouseenter', pointLabelLayerId);
+          mapboxMap.off('mouseleave', pointLabelLayerId);
         } catch (e) {
           // Handlers may not exist or map may be removed
         }
@@ -1041,3 +1126,4 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
 
   return null; // This component doesn't render anything
 }
+

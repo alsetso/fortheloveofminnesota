@@ -377,22 +377,32 @@ export class PublicMapPinService {
       }
     }
 
-    // Update the pin
+    // Update the pin directly
+    // RLS policy will enforce ownership via USING clause
     // The WHERE clauses ensure:
     // 1. Pin ID matches
     // 2. User owns the pin (account_id matches)
-    // 3. Pin is not archived (archived = false)
-    const { data: pin, error } = await supabase
+    // 3. Only filter by archived = false if we're NOT archiving
+    //    (allows archiving pins by setting archived = true)
+    let query = supabase
       .from('pins')
       .update(updateData)
       .eq('id', pinId)
-      .eq('account_id', account.id)
-      .eq('archived', false)
-      .select()
-      .single();
+      .eq('account_id', account.id);
+    
+    // Only filter by archived = false if we're not setting archived = true
+    // This allows archiving pins (setting archived = true)
+    if (updateData.archived !== true) {
+      query = query.eq('archived', false);
+    }
+    
+    const { data: pin, error } = await query.select().single();
 
     if (error) {
-      console.error('Error updating map pin:', {
+      // Test the ownership function
+      const ownershipCheck = 'Run: SELECT public.user_owns_account(\'' + account.id + '\'::uuid)';
+      
+      console.error('[updatePin] RLS Error - Detailed diagnostics:', {
         error,
         errorMessage: error.message,
         errorCode: error.code,
@@ -400,7 +410,9 @@ export class PublicMapPinService {
         errorHint: error.hint,
         pinId,
         accountId: account.id,
+        userId: user.id,
         updateData,
+        ownershipCheck,
       });
       throw new Error(`Failed to update pin: ${error.message || 'Unknown error'}`);
     }
@@ -445,50 +457,38 @@ export class PublicMapPinService {
     }
 
     // Archive the pin: set archived = true
-    // RLS policy will enforce ownership - we don't need to check account_id in WHERE
-    // The WHERE clauses ensure:
-    // 1. Pin ID matches
-    // 2. Pin is not already archived (archived = false)
-    // RLS policy "Users can update own pins" will ensure user owns the pin
+    // Explicitly preserve account_id to ensure it doesn't get cleared
+    // RLS policy will enforce ownership
     const { data, error } = await supabase
       .from('pins')
       .update({ archived: true })
       .eq('id', pinId)
       .eq('archived', false)
-      .select('id');
+      .select('id, account_id');
 
     // Check for error first
     if (error) {
-      // Extract error message - handle different error object structures
-      let errorMessage = 'Unknown error';
+      // Log the full error object with all properties
+      const errorDetails = {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        toString: String(error),
+        json: JSON.stringify(error),
+        keys: Object.keys(error),
+        allProps: Object.getOwnPropertyNames(error),
+      };
       
-      if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      } else if (error?.error) {
-        errorMessage = error.error;
-      } else {
-        // Try to stringify the error to see what we have
-        try {
-          const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
-          if (errorStr && errorStr !== '{}') {
-            errorMessage = errorStr;
-          }
-        } catch {
-          // If stringify fails, try toString
-          errorMessage = String(error);
-        }
-      }
-      
-      console.error('Error archiving map pin:', {
+      console.error('Error archiving map pin - Full details:', {
         error,
-        errorMessage,
-        errorType: error?.constructor?.name,
+        errorDetails,
         pinId,
         accountId: account.id,
+        userId: user.id,
       });
       
+      const errorMessage = error.message || error.details || error.hint || 'RLS policy violation - check WITH CHECK clause';
       throw new Error(`Failed to archive pin: ${errorMessage}`);
     }
 
@@ -498,7 +498,7 @@ export class PublicMapPinService {
     // 2. User doesn't own the pin (RLS blocked it)
     // 3. Pin is already archived
     if (!data || data.length === 0) {
-      throw new Error('Pin not found, already archived, or you do not have permission to delete it');
+      throw new Error('Pin not found, already archived, or you do not have permission to archive it');
     }
   }
 

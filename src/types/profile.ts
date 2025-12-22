@@ -9,14 +9,13 @@
 // PIN TYPES
 // =============================================================================
 
+// ProfilePin is now an alias for Mention (mentions table)
 export interface ProfilePin {
   id: string;
   lat: number;
   lng: number;
   description: string | null;
-  media_url: string | null;
   visibility: PinVisibility;
-  view_count: number | null;
   created_at: string;
   updated_at: string;
 }

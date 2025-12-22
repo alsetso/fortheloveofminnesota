@@ -12,7 +12,7 @@ interface ProfilePinsLayerProps {
   mapLoaded: boolean;
   pins: ProfilePin[];
   isOwnProfile: boolean;
-  onPinDeleted?: (pinId: string) => void;
+  onPinArchived?: (pinId: string) => void;
 }
 
 const SOURCE_ID = 'profile-pins';
@@ -28,20 +28,20 @@ export default function ProfilePinsLayer({
   mapLoaded, 
   pins, 
   isOwnProfile, 
-  onPinDeleted,
+  onPinArchived,
 }: ProfilePinsLayerProps) {
   // Centralized URL state management
-  const { pinId: urlPinId, setPinId, clearPinId } = useProfileUrlState();
+  const { mentionId: urlMentionId, setMentionId, clearMentionId } = useProfileUrlState();
   
   // Refs for current values (prevents stale closures)
   const pinsRef = useRef<ProfilePin[]>(pins);
   const isOwnProfileRef = useRef(isOwnProfile);
-  const onPinDeletedRef = useRef(onPinDeleted);
+  const onPinArchivedRef = useRef(onPinArchived);
   
   // Update refs on each render
   pinsRef.current = pins;
   isOwnProfileRef.current = isOwnProfile;
-  onPinDeletedRef.current = onPinDeleted;
+  onPinArchivedRef.current = onPinArchived;
 
   // State refs
   const popupRef = useRef<any>(null);
@@ -81,7 +81,7 @@ export default function ProfilePinsLayer({
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
               </svg>
-              Delete
+              Archive
             </button>
             <button id="pin-close-btn-${pin.id}" style="display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: none; background: transparent; cursor: pointer; font-size: 12px; color: #374151; text-align: left; border-top: 1px solid #e5e7eb; transition: background 0.15s;" onmouseover="this.style.background='#f3f4f6';" onmouseout="this.style.background='transparent';">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -116,12 +116,12 @@ export default function ProfilePinsLayer({
 
   // URL state helpers (using centralized hook)
   const clearUrlParams = useCallback(() => {
-    clearPinId();
-  }, [clearPinId]);
+    clearMentionId();
+  }, [clearMentionId]);
 
   const updateUrlParams = useCallback((pinId: string) => {
-    setPinId(pinId);
-  }, [setPinId]);
+    setMentionId(pinId);
+  }, [setMentionId]);
 
   // Helper function to setup popup handlers
   const setupPopupHandlers = useCallback((pinId: string) => {
@@ -140,27 +140,27 @@ export default function ProfilePinsLayer({
     deleteBtn?.addEventListener('click', async (e) => {
       e.stopPropagation();
       
+      if (!confirm('Are you sure you want to archive this pin? It will be hidden from your profile.')) {
+        return;
+      }
+      
       try {
-        const { error } = await supabase
-          .from('pins')
-          .update({ archived: true })
-          .eq('id', pinId)
-          .eq('archived', false);
-        
-        if (error) throw error;
+        const { MentionService } = await import('@/features/mentions/services/mentionService');
+        // Archive the mention by updating archived = true
+        await MentionService.updateMention(pinId, { archived: true });
         
         if (popupRef.current) {
           popupRef.current.remove();
           popupRef.current = null;
         }
         currentOpenPinIdRef.current = null;
-        onPinDeletedRef.current?.(pinId);
+        onPinArchivedRef.current?.(pinId);
         
         // Clear URL
         clearUrlParams();
       } catch (err) {
-        console.error('[ProfilePinsLayer] Delete failed:', err);
-        alert('Failed to delete pin.');
+        console.error('[ProfilePinsLayer] Archive failed:', err);
+        alert(err instanceof Error ? err.message : 'Failed to archive pin.');
       }
     });
 
@@ -315,21 +315,21 @@ export default function ProfilePinsLayer({
   useEffect(() => {
     if (!mapLoaded || !map || pins.length === 0) return;
 
-    const pinId = urlPinId;
+    const mentionId = urlMentionId;
     
-    if (pinId) {
-      // If clicking the same pin that's already open, do nothing (handled by click handler)
-      if (currentOpenPinIdRef.current === pinId && popupRef.current) {
+    if (mentionId) {
+      // If clicking the same mention that's already open, do nothing (handled by click handler)
+      if (currentOpenPinIdRef.current === mentionId && popupRef.current) {
         return;
       }
       
-      // Find pin first
-      const pin = pinsRef.current.find(p => p.id === pinId);
+      // Find mention first
+      const pin = pinsRef.current.find(p => p.id === mentionId);
       if (!pin) return;
       
-      // Close existing popup if different pin (seamless switch)
+      // Close existing popup if different mention (seamless switch)
       // Do this synchronously before opening new popup to prevent flicker
-      if (currentOpenPinIdRef.current && currentOpenPinIdRef.current !== pinId && popupRef.current) {
+      if (currentOpenPinIdRef.current && currentOpenPinIdRef.current !== mentionId && popupRef.current) {
         popupRef.current.remove();
         popupRef.current = null;
         currentOpenPinIdRef.current = null;
@@ -346,7 +346,7 @@ export default function ProfilePinsLayer({
         currentOpenPinIdRef.current = null;
       }
     }
-  }, [mapLoaded, map, urlPinId, openPopupForPin, pins.length]);
+  }, [mapLoaded, map, urlMentionId, openPopupForPin, pins.length]);
 
   // Direct click handler - toggles popup or switches pins
   const handlePinClick = useCallback((e: any) => {

@@ -3,9 +3,8 @@
  */
 
 import type { Account } from '@/features/auth';
-import type { BillingData } from '@/lib/billingServer';
 
-export type AccountTabId = 'analytics' | 'settings' | 'billing';
+export type AccountTabId = 'analytics' | 'settings';
 
 export interface AccountModalProps {
   isOpen: boolean;
@@ -19,11 +18,6 @@ export interface SettingsClientProps {
   userEmail: string;
 }
 
-export interface BillingClientProps {
-  initialBillingData: BillingData;
-  onChangePlanClick?: () => void;
-}
-
 export interface OnboardingClientProps {
   initialAccount: Account | null;
   redirectTo?: string;
@@ -33,7 +27,6 @@ export interface OnboardingClientProps {
 export interface AccountData {
   account: Account | null;
   userEmail: string;
-  billingData: BillingData | null;
   loading: boolean;
   error: string | null;
 }

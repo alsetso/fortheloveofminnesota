@@ -10,7 +10,6 @@ const ROUTE_PROTECTION: Record<string, {
   roles?: AccountRole[];
 }> = {
   '/account/settings': { auth: true },
-  '/account/billing': { auth: true },
   '/map-test': { auth: true },
 };
 
@@ -133,7 +132,7 @@ export async function middleware(req: NextRequest) {
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts stylesheets
     "img-src 'self' data: https:",
     "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts fonts
-    "connect-src 'self' https://*.supabase.co https://*.mapbox.com https://api.mapbox.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com",
     "frame-ancestors 'none'",
   ].join('; ');
   response.headers.set('Content-Security-Policy', csp);
@@ -158,9 +157,7 @@ export async function middleware(req: NextRequest) {
     // Other account pages go to account modal with tab
     const accountRouteMap: Record<string, string> = {
       '/account/settings': 'settings',
-      '/account/billing': 'billing',
       '/account/analytics': 'analytics',
-      '/account/change-plan': 'billing', // change-plan opens billing tab
     };
     
     const tab = accountRouteMap[pathname] || 'settings';

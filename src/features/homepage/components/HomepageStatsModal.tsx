@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useToast } from '@/features/ui/hooks/useToast';
-import { PublicMapPinService } from '@/features/map-pins/services/publicMapPinService';
 
 interface HomepageStatsModalProps {
   isOpen: boolean;
@@ -89,7 +88,7 @@ export default function HomepageStatsModal({ isOpen, onClose }: HomepageStatsMod
     router.push(url.pathname + url.search);
     
     // Trigger pins reload
-    window.dispatchEvent(new CustomEvent('pin-created'));
+    window.dispatchEvent(new CustomEvent('mention-created'));
   };
 
   if (!isOpen) return null;
@@ -190,7 +189,7 @@ export default function HomepageStatsModal({ isOpen, onClose }: HomepageStatsMod
               </p>
             </div>
             <label className="block text-xs font-medium text-gray-700 mb-1.5">
-              Filter Pins by Year
+              Filter Mentions by Year
             </label>
             <select
               value={currentYear?.toString() || ''}
@@ -205,7 +204,7 @@ export default function HomepageStatsModal({ isOpen, onClose }: HomepageStatsMod
               ))}
             </select>
             <p className="text-[10px] text-gray-500 mt-1">
-              Show only pins from selected year (100 year range)
+              Show only mentions from selected year (100 year range)
             </p>
           </div>
         </div>

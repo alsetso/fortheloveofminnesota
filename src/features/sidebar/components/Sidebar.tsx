@@ -14,10 +14,11 @@ import {
   AdjustmentsHorizontalIcon,
   MapPinIcon,
   QuestionMarkCircleIcon,
+  NewspaperIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
-import { Account } from '@/features/auth';
-import AccountDropdown from '@/features/auth/components/AccountDropdown';
+import { Account, AccountService, useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SecondarySidebar from './SecondarySidebar';
 import ExploreSecondaryContent from './ExploreSecondaryContent';
@@ -25,6 +26,7 @@ import MentionsSecondaryContent from './MentionsSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
 import POISecondaryContent from './POISecondaryContent';
 import FAQsSecondaryContent from './FAQsSecondaryContent';
+import NewsSecondaryContent from './NewsSecondaryContent';
 import { useSidebarTabState, type SidebarTab } from '../hooks/useSidebarTabState';
 
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -43,12 +45,65 @@ interface NavItem {
 
 // Map href to tab identifier for URL params
 const hrefToTab: Record<string, SidebarTab> = {
-  '#explore': 'explore',
-  '#mentions': 'mentions',
-  '#controls': 'controls',
-  '#poi': 'poi',
-  '#faqs': 'faqs',
+  '#explore': 'explore' as SidebarTab,
+  '#mentions': 'mentions' as SidebarTab,
+  '#controls': 'controls' as SidebarTab,
+  '#poi': 'poi' as SidebarTab,
+  '#faqs': 'faqs' as SidebarTab,
+  '#news': 'news' as SidebarTab,
 };
+
+// Simple account icon button component (no dropdown)
+function AccountIconButton({
+  onAccountClick,
+  onSignInClick,
+}: {
+  onAccountClick: () => void;
+  onSignInClick: () => void;
+}) {
+  const { account, isLoading, displayAccount } = useAuthStateSafe();
+
+  // When not authenticated and not loading, show sign in button
+  if (!isLoading && !account) {
+    return (
+      <button
+        onClick={onSignInClick}
+        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors"
+        aria-label="Sign in"
+      >
+        Sign In
+      </button>
+    );
+  }
+
+  // When authenticated or loading, show profile photo button
+  return (
+    <button
+      onClick={onAccountClick}
+      className="flex flex-col items-center justify-center gap-1 px-1 py-2 group cursor-pointer w-full"
+      title="Account"
+      type="button"
+      aria-label="Account"
+    >
+      <div className="w-8 h-8 flex items-center justify-center rounded-md transition-colors group-hover:bg-gray-100">
+        {displayAccount ? (
+          <ProfilePhoto 
+            account={displayAccount as Account} 
+            size="sm" 
+            editable={false}
+          />
+        ) : (
+          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+            <UserIcon className="w-3 h-3 text-gray-500" />
+          </div>
+        )}
+      </div>
+      <span className="text-[10px] leading-tight text-center text-gray-600">
+        Account
+      </span>
+    </button>
+  );
+}
 
 const allNavItems: NavItem[] = [
   { 
@@ -80,6 +135,12 @@ const allNavItems: NavItem[] = [
     label: 'FAQs', 
     icon: QuestionMarkCircleIcon,
     secondaryContent: <FAQsSecondaryContent />,
+  },
+  { 
+    href: '#news', 
+    label: 'News', 
+    icon: NewspaperIcon,
+    secondaryContent: <NewsSecondaryContent />,
   },
 ];
 
@@ -122,6 +183,8 @@ export default function Sidebar({ account, map }: SidebarProps) {
         setClickedNavItem('#poi');
       } else if (tab === 'faqs') {
         setClickedNavItem('#faqs');
+      } else if (tab === 'news') {
+        setClickedNavItem('#news');
       }
     },
   });
@@ -251,8 +314,7 @@ export default function Sidebar({ account, map }: SidebarProps) {
 
           {/* Right side - Account and Hamburger */}
           <div className="flex items-center gap-2">
-            <AccountDropdown
-              variant="light"
+            <AccountIconButton
               onAccountClick={() => {
                 setIsMobileMenuOpen(false);
                 openAccount('settings');
@@ -389,12 +451,11 @@ export default function Sidebar({ account, map }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Account dropdown at bottom */}
+        {/* Account icon at bottom */}
         <div className="p-2 border-t border-gray-200">
-          {/* Account dropdown - shows login if not authenticated, account menu if authenticated */}
+          {/* Account icon - opens account modal on click */}
           <div className="flex justify-center">
-            <AccountDropdown
-              variant="light"
+            <AccountIconButton
               onAccountClick={() => openAccount('settings')}
               onSignInClick={() => openWelcome()}
             />

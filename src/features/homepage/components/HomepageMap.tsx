@@ -6,13 +6,14 @@ import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import FloatingMapContainer from './FloatingMapContainer';
-import PinsLayer from '@/features/map/components/PinsLayer';
+import MentionsLayer from '@/features/map/components/MentionsLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
 import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAtlasLayers, AtlasLayersRenderer } from '@/features/atlas/components';
 import { useUrlMapState } from '../hooks/useUrlMapState';
+import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/features/sidebar/components/Sidebar';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 
@@ -42,9 +43,12 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
-  const [pinsRefreshKey, setPinsRefreshKey] = useState(0);
+  const [mentionsRefreshKey, setMentionsRefreshKey] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const initializedRef = useRef(false);
+  const hoveredMentionIdRef = useRef<string | null>(null);
+  const searchParams = useSearchParams();
+  const isHoveringMentionRef = useRef(false);
   
   // Atlas layers
   const { layers, toggleLayer, setLayerCount } = useAtlasLayers();
@@ -102,15 +106,66 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
     initializedRef.current = true;
   }, []);
 
-  // Listen for pin-created event from inline form to refresh pins layer
+  // Listen for mention-created event from inline form to refresh mentions layer
   useEffect(() => {
-    const handlePinCreatedEvent = () => {
-      setPinsRefreshKey(prev => prev + 1);
+    const handleMentionCreatedEvent = () => {
+      setMentionsRefreshKey(prev => prev + 1);
     };
 
-    window.addEventListener('pin-created', handlePinCreatedEvent);
+    window.addEventListener('mention-created', handleMentionCreatedEvent);
     return () => {
-      window.removeEventListener('pin-created', handlePinCreatedEvent);
+      window.removeEventListener('mention-created', handleMentionCreatedEvent);
+    };
+  }, []);
+
+  // Watch for mention URL parameter and select mention
+  useEffect(() => {
+    if (!mapLoaded || !mapInstanceRef.current) return;
+
+    const mentionId = searchParams.get('mention');
+    
+    if (mentionId) {
+      // Small delay to ensure MentionsLayer is ready
+      const timeoutId = setTimeout(() => {
+        // Dispatch event to select mention by ID
+        window.dispatchEvent(new CustomEvent('select-mention-by-id', {
+          detail: { mentionId }
+        }));
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [mapLoaded, searchParams]);
+
+  // Listen for mention hover events to prevent mention creation
+  useEffect(() => {
+    const handleMentionHoverStart = (event: Event) => {
+      const customEvent = event as CustomEvent<{ mentionId: string; mention: any }>;
+      const { mentionId } = customEvent.detail || {};
+      if (mentionId) {
+        isHoveringMentionRef.current = true;
+        hoveredMentionIdRef.current = mentionId;
+        // Dispatch event with mention ID for cursor tracker
+        window.dispatchEvent(new CustomEvent('mention-hover-update', {
+          detail: { mentionId, mention: customEvent.detail?.mention }
+        }));
+      }
+    };
+
+    const handleMentionHoverEnd = () => {
+      isHoveringMentionRef.current = false;
+      hoveredMentionIdRef.current = null;
+      // Dispatch event to clear mention from cursor tracker
+      window.dispatchEvent(new CustomEvent('mention-hover-update', {
+        detail: { mentionId: null, mention: null }
+      }));
+    };
+
+    window.addEventListener('mention-hover-start', handleMentionHoverStart);
+    window.addEventListener('mention-hover-end', handleMentionHoverEnd);
+    return () => {
+      window.removeEventListener('mention-hover-start', handleMentionHoverStart);
+      window.removeEventListener('mention-hover-end', handleMentionHoverEnd);
     };
   }, []);
 
@@ -160,17 +215,37 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           }
         });
 
-        // Handle double-click to select location and expand inline pin form
+        // Handle double-click to select location and expand inline mention form
         mapInstance.on('dblclick', (e: any) => {
           if (!mounted) return;
           
+          // Prevent mention creation if hovering over a mention
+          if (isHoveringMentionRef.current || hoveredMentionIdRef.current) {
+            return;
+          }
+          
+          // Check if click hit a mention layer - if so, don't create new mention
+          // Mention click handlers will handle opening the popup
+          const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
+          const features = (mapInstance as any).queryRenderedFeatures(e.point, {
+            layers: mentionLayers,
+          });
+
+          // If clicked on a mention, don't create new mention (mention click handler will handle it)
+          if (features.length > 0) {
+            return;
+          }
+          
           const lng = e.lngLat.lng;
           const lat = e.lngLat.lat;
-          // Dispatch event to show location in sidebar and expand pin form
-          // Location details can be shown without authentication - auth check happens when creating pin
-          window.dispatchEvent(new CustomEvent('show-location-for-pin', {
-            detail: { lat, lng }
-          }));
+          // Dispatch event to show location in sidebar and expand mention form
+          // Location details can be shown without authentication - auth check happens when creating mention
+          // Only dispatch if not hovering over a mention
+          if (!isHoveringMentionRef.current && !hoveredMentionIdRef.current) {
+            window.dispatchEvent(new CustomEvent('show-location-for-mention', {
+              detail: { lat, lng }
+            }));
+          }
         });
 
         mapInstance.on('error', (e: unknown) => {
@@ -240,9 +315,9 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           style={{ margin: 0, padding: 0, overflow: 'hidden', zIndex: 1 }}
         />
 
-        {/* Pins Layer */}
+        {/* Mentions Layer */}
         {mapLoaded && mapInstanceRef.current && (
-          <PinsLayer key={pinsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+          <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
         )}
 
         {/* Atlas Layers */}

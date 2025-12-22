@@ -1,8 +1,6 @@
 // Atlas feature exports
 
 // Components
-export { default as AtlasEntityModal } from './components/AtlasEntityModal';
-export type { AtlasEntityData } from './components/AtlasEntityModal';
 export { default as AtlasLayersRenderer } from './components/AtlasLayersRenderer';
 export { default as MapLayersPanel, useAtlasLayers } from './components/MapLayersPanel';
 export type { AtlasLayer } from './components/MapLayersPanel';
@@ -21,8 +19,39 @@ export { default as CountyMap } from './components/CountyMap';
 export { default as CountyEditButton } from './components/CountyEditButton';
 export { default as CountyEditModal } from './components/CountyEditModal';
 
-// Services
-export * from './services/atlasService';
+// Services (functions only, types exported separately)
+export {
+  createNeighborhood,
+  createSchool,
+  createPark,
+  createLake,
+  createWatertower,
+  createCemetery,
+  createGolfCourse,
+  createHospital,
+  createAirport,
+  createChurch,
+  createMunicipal,
+  createRoad,
+  createRadioAndNews,
+  updateNeighborhood,
+  updateSchool,
+  updatePark,
+  updateLake,
+  updateWatertower,
+  updateCemetery,
+  updateGolfCourse,
+  updateHospital,
+  updateAirport,
+  updateChurch,
+  updateMunicipal,
+  updateRoad,
+  updateRadioAndNews,
+  getCities,
+  getCounties,
+  generateSlug,
+} from './services/atlasService';
+export type { AtlasEntityType } from './services/atlasService';
 
 // Types
 export type * from './types';

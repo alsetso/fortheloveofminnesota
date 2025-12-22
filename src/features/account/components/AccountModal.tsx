@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChartBarIcon, UserIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChartBarIcon, UserIcon } from '@heroicons/react/24/outline';
 import AnalyticsClient from './AnalyticsClient';
 import SettingsClient from './SettingsClient';
-import BillingClient from './BillingClient';
-import PricingTable from './PricingTable';
 import { useAccountData } from '../hooks/useAccountData';
 import { useAccountTabs } from '../hooks/useAccountTabs';
 import type { AccountModalProps, AccountTabId } from '../types';
@@ -20,25 +18,11 @@ interface Tab {
 const tabs: Tab[] = [
   { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
   { id: 'settings', label: 'Settings', icon: UserIcon },
-  { id: 'billing', label: 'Billing', icon: CreditCardIcon },
 ];
 
 export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpdate }: AccountModalProps) {
   const { activeTab, setActiveTab } = useAccountTabs(initialTab, isOpen);
-  const { account, userEmail, billingData, loading } = useAccountData(isOpen, activeTab);
-  const [showChangePlan, setShowChangePlan] = useState(false);
-
-  // Reset showChangePlan when switching away from billing tab
-  useEffect(() => {
-    if (activeTab !== 'billing') {
-      setShowChangePlan(false);
-    }
-  }, [activeTab]);
-
-  // Handle change plan click from BillingClient
-  const handleChangePlanClick = () => {
-    setShowChangePlan(true);
-  };
+  const { account, userEmail, loading } = useAccountData(isOpen, activeTab);
 
   if (!isOpen) return null;
 
@@ -110,20 +94,6 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
             <>
               {activeTab === 'analytics' && <AnalyticsClient />}
               {activeTab === 'settings' && account && <SettingsClient initialAccount={account} userEmail={userEmail} />}
-              {activeTab === 'billing' && (
-                <>
-                  {showChangePlan ? (
-                    <PricingTable onBack={() => setShowChangePlan(false)} />
-                  ) : (
-                    billingData && (
-                      <BillingClient 
-                        initialBillingData={billingData} 
-                        onChangePlanClick={handleChangePlanClick}
-                      />
-                    )
-                  )}
-                </>
-              )}
             </>
           )}
         </div>

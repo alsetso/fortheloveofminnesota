@@ -16,9 +16,8 @@ export async function GET(request: NextRequest) {
 
     // Use authenticated client if user is authenticated (needed for admin to see all FAQs)
     // Otherwise use anonymous client (RLS will filter to visible FAQs)
-    const cookieStore = await cookies();
     const supabase = auth 
-      ? await createServerClientWithAuth(cookieStore)
+      ? await createServerClientWithAuth(cookies())
       : createServerClient();
 
     // RLS policies handle visibility:
@@ -65,8 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create authenticated Supabase client
-    const cookieStore = await cookies();
-    const supabase = await createServerClientWithAuth(cookieStore);
+    const supabase = await createServerClientWithAuth(cookies());
 
     const body: CreateFAQData = await request.json();
 

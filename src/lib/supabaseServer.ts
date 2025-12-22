@@ -48,9 +48,11 @@ export function createServerClient() {
  * 
  * Uses the same pattern as getServerAuth() to ensure consistency
  * 
- * @param cookieStore Optional cookie store (for API routes, pass request cookies)
+ * @param cookieStore Optional cookie store (for API routes, pass request cookies or Promise)
  */
-export async function createServerClientWithAuth(cookieStore?: ReturnType<typeof cookies>) {
+export async function createServerClientWithAuth(
+  cookieStore?: ReturnType<typeof cookies> | Promise<ReturnType<typeof cookies>>
+) {
   if (!supabaseAnonKey) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
@@ -60,7 +62,9 @@ export async function createServerClientWithAuth(cookieStore?: ReturnType<typeof
   }
 
   // Use provided cookie store or get from next/headers
-  const cookieStoreToUse = cookieStore || await cookies();
+  const cookieStoreToUse = cookieStore 
+    ? await Promise.resolve(cookieStore)
+    : await cookies();
 
   // Use createServerClient from @supabase/ssr for cookie-based auth
   return createSSRClient<Database>(

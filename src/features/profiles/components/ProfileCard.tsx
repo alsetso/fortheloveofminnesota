@@ -1,16 +1,42 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { UserIcon, EnvelopeIcon, PhoneIcon } from '@heroicons/react/24/outline';
+import { UserIcon, EnvelopeIcon, PhoneIcon, PencilIcon, CheckIcon, XMarkIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
-import { getDisplayName, formatJoinDate, TRAIT_OPTIONS } from '@/types/profile';
+import { getDisplayName, formatJoinDate, TRAIT_OPTIONS, type TraitId } from '@/types/profile';
+import { AccountService } from '@/features/auth';
+import { useToast } from '@/features/ui/hooks/useToast';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/features/auth';
 
 interface ProfileCardProps {
   account: ProfileAccount;
   isOwnProfile: boolean;
 }
 
-export default function ProfileCard({ account, isOwnProfile }: ProfileCardProps) {
+export default function ProfileCard({ account: initialAccount, isOwnProfile }: ProfileCardProps) {
+  const { user } = useAuth();
+  const { success, error: showError } = useToast();
+  const [account, setAccount] = useState<ProfileAccount>(initialAccount);
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+  
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const profileInputRef = useRef<HTMLInputElement>(null);
+  const firstNameInputRef = useRef<HTMLInputElement>(null);
+  const lastNameInputRef = useRef<HTMLInputElement>(null);
+  const usernameInputRef = useRef<HTMLInputElement>(null);
+  const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Update local state when prop changes
+  useEffect(() => {
+    setAccount(initialAccount);
+  }, [initialAccount]);
+
   const displayName = getDisplayName(account);
   const joinDate = formatJoinDate(account.created_at);
   
@@ -21,10 +47,144 @@ export default function ProfileCard({ account, isOwnProfile }: ProfileCardProps)
         .filter(Boolean)
     : [];
 
+  const startEditing = (field: string, currentValue: string | null) => {
+    setEditingField(field);
+    setEditValue(currentValue || '');
+    setTimeout(() => {
+      if (field === 'first_name' && firstNameInputRef.current) {
+        firstNameInputRef.current.focus();
+      } else if (field === 'last_name' && lastNameInputRef.current) {
+        lastNameInputRef.current.focus();
+      } else if (field === 'username' && usernameInputRef.current) {
+        usernameInputRef.current.focus();
+      } else if (field === 'bio' && bioTextareaRef.current) {
+        bioTextareaRef.current.focus();
+      }
+    }, 10);
+  };
+
+  const cancelEditing = () => {
+    setEditingField(null);
+    setEditValue('');
+  };
+
+  const saveField = async (field: string) => {
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const value = editValue.trim() || null;
+      const updatedAccount = await AccountService.updateCurrentAccount({
+        [field]: value,
+      });
+
+      setAccount(updatedAccount);
+      setEditingField(null);
+      setEditValue('');
+      success('Updated', `${field.replace('_', ' ')} updated`);
+    } catch (err) {
+      console.error(`Error updating ${field}:`, err);
+      showError('Error', `Failed to update ${field.replace('_', ' ')}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, field: string) => {
+    if (e.key === 'Enter' && field !== 'bio') {
+      e.preventDefault();
+      saveField(field);
+    } else if (e.key === 'Escape') {
+      cancelEditing();
+    }
+  };
+
+  const handleImageUpload = async (
+    file: File,
+    field: 'image_url' | 'cover_image_url',
+    setIsUploading: (value: boolean) => void
+  ) => {
+    if (!user) return;
+
+    setIsUploading(true);
+    try {
+      // Validate file
+      if (!file.type.startsWith('image/')) {
+        showError('Error', 'Please select a valid image file');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        showError('Error', 'Image must be smaller than 5MB');
+        return;
+      }
+
+      // Determine bucket and path
+      const bucket = field === 'cover_image_url' ? 'cover-photos' : 'profile-images';
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/accounts/${field}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      // Upload to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get image URL');
+      }
+
+      // Update account
+      const updatedAccount = await AccountService.updateCurrentAccount({
+        [field]: urlData.publicUrl,
+      });
+
+      setAccount(updatedAccount);
+      success('Updated', `${field === 'cover_image_url' ? 'Cover' : 'Profile'} image updated`);
+    } catch (err) {
+      console.error(`Error uploading ${field}:`, err);
+      showError('Error', `Failed to upload ${field === 'cover_image_url' ? 'cover' : 'profile'} image`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const toggleTrait = async (traitId: TraitId) => {
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const currentTraits = account.traits || [];
+      const newTraits = currentTraits.includes(traitId)
+        ? currentTraits.filter(t => t !== traitId)
+        : [...currentTraits, traitId];
+
+      const updatedAccount = await AccountService.updateCurrentAccount({
+        traits: newTraits.length > 0 ? newTraits : null,
+      });
+
+      setAccount(updatedAccount);
+    } catch (err) {
+      console.error('Error updating traits:', err);
+      showError('Error', 'Failed to update traits');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* Cover Image */}
-      <div className="relative h-32 bg-gradient-to-r from-gray-800 to-gray-900 rounded-md overflow-hidden">
+      <div className="relative h-32 bg-gradient-to-r from-gray-800 to-gray-900 rounded-md overflow-hidden group">
         {account.cover_image_url ? (
           <Image
             src={account.cover_image_url}
@@ -34,11 +194,36 @@ export default function ProfileCard({ account, isOwnProfile }: ProfileCardProps)
             unoptimized={account.cover_image_url.includes('supabase.co')}
           />
         ) : null}
+        {isOwnProfile && (
+          <>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file, 'cover_image_url', setIsUploadingCover);
+              }}
+            />
+            <button
+              onClick={() => coverInputRef.current?.click()}
+              disabled={isUploadingCover}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+            >
+              {isUploadingCover ? (
+                <div className="text-xs text-white">Uploading...</div>
+              ) : (
+                <ArrowUpTrayIcon className="w-4 h-4 text-white" />
+              )}
+            </button>
+          </>
+        )}
       </div>
 
       {/* Profile Photo - Overlapping Cover */}
       <div className="relative -mt-12">
-        <div className="w-14 h-14 rounded-full bg-gray-100 border-2 border-white overflow-hidden">
+        <div className="relative w-14 h-14 rounded-full bg-gray-100 border-2 border-white overflow-hidden group">
           {account.image_url ? (
             <Image
               src={account.image_url}
@@ -53,23 +238,226 @@ export default function ProfileCard({ account, isOwnProfile }: ProfileCardProps)
               <UserIcon className="w-7 h-7 text-gray-400" />
             </div>
           )}
+          {isOwnProfile && (
+            <>
+              <input
+                ref={profileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file, 'image_url', setIsUploadingProfile);
+                }}
+              />
+              <button
+                onClick={() => profileInputRef.current?.click()}
+                disabled={isUploadingProfile}
+                className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors opacity-0 group-hover:opacity-100 rounded-full disabled:opacity-50"
+              >
+                {isUploadingProfile ? (
+                  <div className="text-[10px] text-white">...</div>
+                ) : (
+                  <ArrowUpTrayIcon className="w-3 h-3 text-white" />
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Name and Username */}
-      <div>
-        <h1 className="text-sm font-semibold text-gray-900 leading-tight">
-          {displayName}
-        </h1>
-        {account.username && (
-          <p className="text-xs text-gray-500">@{account.username}</p>
+      <div className="space-y-1">
+        {/* Name - Combined display, separate editing */}
+        {editingField === 'first_name' ? (
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={firstNameInputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, 'first_name')}
+              onBlur={() => saveField('first_name')}
+              placeholder="First name"
+              className="text-sm font-semibold text-gray-900 leading-tight border border-gray-300 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              disabled={isSaving}
+              autoFocus
+            />
+            <button
+              onClick={() => saveField('first_name')}
+              disabled={isSaving}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            >
+              <CheckIcon className="w-3 h-3 text-gray-600" />
+            </button>
+            <button
+              onClick={cancelEditing}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+            >
+              <XMarkIcon className="w-3 h-3 text-gray-600" />
+            </button>
+          </div>
+        ) : editingField === 'last_name' ? (
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={lastNameInputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, 'last_name')}
+              onBlur={() => saveField('last_name')}
+              placeholder="Last name"
+              className="text-sm font-semibold text-gray-900 leading-tight border border-gray-300 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              disabled={isSaving}
+              autoFocus
+            />
+            <button
+              onClick={() => saveField('last_name')}
+              disabled={isSaving}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            >
+              <CheckIcon className="w-3 h-3 text-gray-600" />
+            </button>
+            <button
+              onClick={cancelEditing}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+            >
+              <XMarkIcon className="w-3 h-3 text-gray-600" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 group">
+            <h1 className="text-sm font-semibold text-gray-900 leading-tight">
+              {displayName}
+            </h1>
+            {isOwnProfile && (
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={() => startEditing('first_name', account.first_name)}
+                  className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                  title="Edit first name"
+                >
+                  <PencilIcon className="w-3 h-3 text-gray-400" />
+                </button>
+                {(account.first_name || account.last_name) && (
+                  <button
+                    onClick={() => startEditing('last_name', account.last_name)}
+                    className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+                    title="Edit last name"
+                  >
+                    <PencilIcon className="w-3 h-3 text-gray-400" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Username */}
+        {editingField === 'username' ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">@</span>
+            <input
+              ref={usernameInputRef}
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+              onKeyDown={(e) => handleKeyDown(e, 'username')}
+              onBlur={() => saveField('username')}
+              className="text-xs text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 flex-1 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              disabled={isSaving}
+              autoFocus
+            />
+            <button
+              onClick={() => saveField('username')}
+              disabled={isSaving}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            >
+              <CheckIcon className="w-3 h-3 text-gray-600" />
+            </button>
+            <button
+              onClick={cancelEditing}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+            >
+              <XMarkIcon className="w-3 h-3 text-gray-600" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 group">
+            {account.username ? (
+              <p className="text-xs text-gray-500">@{account.username}</p>
+            ) : isOwnProfile ? (
+              <button
+                onClick={() => startEditing('username', null)}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                Add username
+              </button>
+            ) : null}
+            {isOwnProfile && account.username && (
+              <button
+                onClick={() => startEditing('username', account.username)}
+                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-100 rounded transition-all"
+              >
+                <PencilIcon className="w-3 h-3 text-gray-400" />
+              </button>
+            )}
+          </div>
         )}
       </div>
 
       {/* Bio */}
-      {account.bio && (
-        <div>
-          <p className="text-xs text-gray-600 leading-relaxed">{account.bio}</p>
+      {editingField === 'bio' ? (
+        <div className="space-y-1">
+          <textarea
+            ref={bioTextareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') cancelEditing();
+            }}
+            onBlur={() => saveField('bio')}
+            className="text-xs text-gray-600 leading-relaxed border border-gray-300 rounded px-1.5 py-1 w-full resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
+            rows={3}
+            disabled={isSaving}
+            autoFocus
+          />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => saveField('bio')}
+              disabled={isSaving}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            >
+              <CheckIcon className="w-3 h-3 text-gray-600" />
+            </button>
+            <button
+              onClick={cancelEditing}
+              className="p-0.5 hover:bg-gray-100 rounded transition-colors"
+            >
+              <XMarkIcon className="w-3 h-3 text-gray-600" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="group">
+          {account.bio ? (
+            <p className="text-xs text-gray-600 leading-relaxed">{account.bio}</p>
+          ) : isOwnProfile ? (
+            <button
+              onClick={() => startEditing('bio', null)}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Add bio
+            </button>
+          ) : null}
+          {isOwnProfile && account.bio && (
+            <button
+              onClick={() => startEditing('bio', account.bio)}
+              className="opacity-0 group-hover:opacity-100 ml-1.5 p-0.5 hover:bg-gray-100 rounded transition-all inline-flex items-center"
+            >
+              <PencilIcon className="w-3 h-3 text-gray-400" />
+            </button>
+          )}
         </div>
       )}
 
@@ -96,21 +484,41 @@ export default function ProfileCard({ account, isOwnProfile }: ProfileCardProps)
         </div>
       )}
 
-        {/* Traits */}
-        {traitLabels.length > 0 && (
-          <div className="pt-2">
-            <div className="flex flex-wrap gap-1.5">
-              {traitLabels.map((label, idx) => (
-                <span
-                  key={idx}
-                  className="px-2 py-0.5 bg-black/20 text-xs text-gray-900 rounded"
+      {/* Traits */}
+      <div className="pt-2">
+        <div className="flex flex-wrap gap-1.5">
+          {isOwnProfile ? (
+            // Editable traits - show all options, highlight selected
+            TRAIT_OPTIONS.map((trait) => {
+              const isSelected = account.traits?.includes(trait.id) || false;
+              return (
+                <button
+                  key={trait.id}
+                  onClick={() => toggleTrait(trait.id)}
+                  disabled={isSaving}
+                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                    isSelected
+                      ? 'bg-gray-700 text-white hover:bg-gray-600'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  } disabled:opacity-50`}
                 >
-                  {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+                  {trait.label}
+                </button>
+              );
+            })
+          ) : (
+            // Read-only traits - only show selected
+            traitLabels.map((label, idx) => (
+              <span
+                key={idx}
+                className="px-2 py-0.5 bg-black/20 text-xs text-gray-900 rounded"
+              >
+                {label}
+              </span>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   );
 }

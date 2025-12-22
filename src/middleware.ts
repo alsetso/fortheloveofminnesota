@@ -285,10 +285,12 @@ export async function middleware(req: NextRequest) {
     // Use void to explicitly ignore the promise result
     void (async () => {
       try {
-        await (supabase
+        // Type assertion needed due to incomplete Supabase type definitions
+        const updateQuery = supabase
           .from('accounts')
-          .update({ last_visit: new Date().toISOString() } as any)
-          .eq('user_id', user.id) as any);
+          .update({ last_visit: new Date().toISOString() } as never)
+          .eq('user_id', user.id);
+        await (updateQuery as unknown as Promise<unknown>);
       } catch (error) {
         // Log but don't fail request
         console.error('Failed to update last_visit:', error);

@@ -52,7 +52,7 @@ export const getServerAuth = cache(async (): Promise<ServerAuthUser | null> => {
     }
 
     // Get account role - query by user_id (accounts.id is a separate UUID, user_id references auth.users)
-    const { data: account, error: accountError } = await supabase
+    const { data: accountData, error: accountError } = await supabase
       .from('accounts')
       .select('role, first_name, last_name')
       .eq('user_id', user.id)
@@ -70,7 +70,7 @@ export const getServerAuth = cache(async (): Promise<ServerAuthUser | null> => {
       };
     }
 
-    if (!account) {
+    if (!accountData) {
       // User exists in auth but not in accounts table - return user without role
       return {
         id: user.id,
@@ -79,6 +79,9 @@ export const getServerAuth = cache(async (): Promise<ServerAuthUser | null> => {
         name: user.user_metadata?.name || null,
       };
     }
+
+    // Type assertion to help TypeScript understand the account structure
+    const account: { role: unknown; first_name: string | null; last_name: string | null } = accountData;
 
     // Ensure role is a string (PostgreSQL enums can sometimes be returned differently)
     // Handle both string and enum types from PostgreSQL
@@ -109,7 +112,7 @@ export const getServerAuth = cache(async (): Promise<ServerAuthUser | null> => {
     }
 
     // Construct name from first_name and last_name
-    const name = account?.first_name || account?.last_name
+    const name = account.first_name || account.last_name
       ? `${account.first_name || ''} ${account.last_name || ''}`.trim()
       : null;
 

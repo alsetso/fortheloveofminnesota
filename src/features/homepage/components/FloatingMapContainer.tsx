@@ -1110,6 +1110,7 @@ export default function LocationSidebar({
       // Close location details when a pin popup opens
       clearSelection();
       removeTemporaryPin();
+      setIsLocationDetailsExpanded(false);
     };
 
     window.addEventListener('pin-popup-opening', handlePinPopupOpening as EventListener);
@@ -1118,6 +1119,34 @@ export default function LocationSidebar({
       window.removeEventListener('pin-popup-opening', handlePinPopupOpening as EventListener);
     };
   }, [removeTemporaryPin, clearSelection]);
+
+  // Listen for "mention-popup-opening" event to close location details when a mention popup opens
+  useEffect(() => {
+    const handleMentionPopupOpening = () => {
+      // Close location details when a mention popup opens
+      clearSelection();
+      removeTemporaryPin();
+      setIsLocationDetailsExpanded(false);
+    };
+
+    window.addEventListener('mention-popup-opening', handleMentionPopupOpening as EventListener);
+
+    return () => {
+      window.removeEventListener('mention-popup-opening', handleMentionPopupOpening as EventListener);
+    };
+  }, [removeTemporaryPin, clearSelection]);
+
+  // Watch for mention URL parameter and close location details when present
+  useEffect(() => {
+    const mentionId = searchParams.get('mention');
+    
+    if (mentionId) {
+      // Close location details and remove temporary pin when mention parameter is present
+      clearSelection();
+      removeTemporaryPin();
+      setIsLocationDetailsExpanded(false);
+    }
+  }, [searchParams, removeTemporaryPin, clearSelection]);
 
 
   // Listen for atlas entity clicks

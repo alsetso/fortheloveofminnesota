@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { LocationLookupService } from '@/features/map/services/locationLookupService';
 import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
 
 /**
@@ -37,6 +38,10 @@ export class MentionService {
 
     if (filters?.account_id) {
       query = query.eq('account_id', filters.account_id);
+    }
+
+    if (filters?.city_id) {
+      query = query.eq('city_id', filters.city_id);
     }
 
     // Year filter - filter by post_date year (or created_at if post_date is null)
@@ -112,12 +117,25 @@ export class MentionService {
       normalizedPostDate = this.normalizePostDate(data.post_date);
     }
 
+    // Auto-detect city_id if not provided
+    let cityId = data.city_id || null;
+    if (!cityId) {
+      try {
+        const locationIds = await LocationLookupService.getLocationIds(data.lat, data.lng);
+        cityId = locationIds.cityId || null;
+      } catch (error) {
+        // Non-blocking: if city detection fails, continue without city_id
+        console.warn('[MentionService] Failed to auto-detect city_id:', error);
+      }
+    }
+
     const { data: mention, error } = await supabase
       .from('mentions')
       .insert({
         lat: data.lat,
         lng: data.lng,
         description: data.description || null,
+        city_id: cityId,
         post_date: normalizedPostDate,
         account_id: account.id,
         visibility: data.visibility || 'public',

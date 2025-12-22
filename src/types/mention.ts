@@ -10,6 +10,7 @@ export interface Mention {
   lng: number;
   description: string | null;
   account_id: string | null;
+  city_id: string | null; // City ID for filtering mentions by city
   visibility: MentionVisibility;
   archived?: boolean;
   post_date?: string | null; // Date when the event/memory happened (for year filtering)
@@ -26,12 +27,14 @@ export interface CreateMentionData {
   lat: number;
   lng: number;
   description?: string | null;
+  city_id?: string | null; // Optional city ID - can be set during creation or auto-detected
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
 }
 
 export interface MentionFilters {
   account_id?: string;
+  city_id?: string; // Filter by city ID
   year?: number; // Filter by year of post_date
   bbox?: {
     minLat: number;

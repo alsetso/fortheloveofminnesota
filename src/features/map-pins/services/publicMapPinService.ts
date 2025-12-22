@@ -377,22 +377,41 @@ export class PublicMapPinService {
       }
     }
 
+    // Update the pin
+    // The WHERE clauses ensure:
+    // 1. Pin ID matches
+    // 2. User owns the pin (account_id matches)
+    // 3. Pin is not archived (archived = false)
     const { data: pin, error } = await supabase
       .from('pins')
       .update(updateData)
       .eq('id', pinId)
-      .eq('account_id', account.id) // Ensure user owns the pin
-      .eq('archived', false) // Can't update archived pins
+      .eq('account_id', account.id)
+      .eq('archived', false)
       .select()
       .single();
 
     if (error) {
-      console.error('Error updating map pin:', error);
-      throw new Error(`Failed to update pin: ${error.message}`);
+      console.error('Error updating map pin:', {
+        error,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        pinId,
+        accountId: account.id,
+        updateData,
+      });
+      throw new Error(`Failed to update pin: ${error.message || 'Unknown error'}`);
     }
 
+    // Check if any rows were actually updated
+    // If no pin returned, either:
+    // 1. Pin doesn't exist
+    // 2. User doesn't own the pin
+    // 3. Pin is archived
     if (!pin) {
-      throw new Error('Pin not found or you do not have permission to update it');
+      throw new Error('Pin not found, is archived, or you do not have permission to update it');
     }
 
     return pin as MapPin;
@@ -401,6 +420,11 @@ export class PublicMapPinService {
   /**
    * Delete a map pin (soft delete - marks as archived)
    * User must own the pin
+   * 
+   * Archiving logic:
+   * - Sets the `archived` column (BOOLEAN) to `true`
+   * - Only updates pins where `archived = false` (not already archived)
+   * - Requires ownership via `account_id` match
    */
   static async deletePin(pinId: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -420,17 +444,61 @@ export class PublicMapPinService {
       throw new Error('Account not found');
     }
 
-    // Soft delete: set archived = true instead of deleting
-    const { error } = await supabase
+    // Archive the pin: set archived = true
+    // RLS policy will enforce ownership - we don't need to check account_id in WHERE
+    // The WHERE clauses ensure:
+    // 1. Pin ID matches
+    // 2. Pin is not already archived (archived = false)
+    // RLS policy "Users can update own pins" will ensure user owns the pin
+    const { data, error } = await supabase
       .from('pins')
       .update({ archived: true })
       .eq('id', pinId)
-      .eq('account_id', account.id) // Ensure user owns the pin
-      .eq('archived', false); // Only archive pins that aren't already archived
+      .eq('archived', false)
+      .select('id');
 
+    // Check for error first
     if (error) {
-      console.error('Error archiving map pin:', error);
-      throw new Error(`Failed to archive pin: ${error.message}`);
+      // Extract error message - handle different error object structures
+      let errorMessage = 'Unknown error';
+      
+      if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else {
+        // Try to stringify the error to see what we have
+        try {
+          const errorStr = JSON.stringify(error, Object.getOwnPropertyNames(error));
+          if (errorStr && errorStr !== '{}') {
+            errorMessage = errorStr;
+          }
+        } catch {
+          // If stringify fails, try toString
+          errorMessage = String(error);
+        }
+      }
+      
+      console.error('Error archiving map pin:', {
+        error,
+        errorMessage,
+        errorType: error?.constructor?.name,
+        pinId,
+        accountId: account.id,
+      });
+      
+      throw new Error(`Failed to archive pin: ${errorMessage}`);
+    }
+
+    // Check if any rows were actually updated
+    // If no rows updated, either:
+    // 1. Pin doesn't exist
+    // 2. User doesn't own the pin (RLS blocked it)
+    // 3. Pin is already archived
+    if (!data || data.length === 0) {
+      throw new Error('Pin not found, already archived, or you do not have permission to delete it');
     }
   }
 

@@ -260,18 +260,23 @@ export default function Sidebar({ account, map }: SidebarProps) {
     }
   }, [account?.role, clickedNavItem, isHomepage, updateUrl]);
 
-  // Close sidebar when clicking outside
+  // Close sidebar when clicking outside (desktop only - mobile uses overlay)
   useEffect(() => {
     if (!clickedNavItem) return;
 
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      
+      // On mobile, secondary sidebar is full-screen overlay - don't close on outside click
+      // User must use back button or close button
+      if (window.innerWidth < 1024) return;
+      
       if (
         clickedNavItem &&
         sidebarRef.current &&
-        !sidebarRef.current.contains(event.target as Node)
+        !sidebarRef.current.contains(target)
       ) {
         // Check if click is not on the secondary sidebar
-        const target = event.target as HTMLElement;
         const secondarySidebar = target.closest('[data-secondary-sidebar]');
         
         // Check if click is on the map (mapbox canvas or map container)
@@ -294,6 +299,18 @@ export default function Sidebar({ account, map }: SidebarProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [clickedNavItem, isHomepage, updateUrl]);
+
+  // Prevent body scroll when mobile secondary sidebar is open
+  useEffect(() => {
+    if (clickedNavItem && window.innerWidth < 1024) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [clickedNavItem]);
 
   return (
     <>
@@ -325,11 +342,23 @@ export default function Sidebar({ account, map }: SidebarProps) {
               }}
             />
             <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              onClick={() => {
+                if (clickedNavItem) {
+                  // If secondary sidebar is open, close it
+                  const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
+                  setClickedNavItem(null);
+                  if (isHomepage && tab) {
+                    updateUrl(null);
+                  }
+                } else {
+                  // Toggle mobile menu
+                  setIsMobileMenuOpen(!isMobileMenuOpen);
+                }
+              }}
               className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              aria-label="Toggle menu"
+              aria-label={clickedNavItem ? "Close" : "Toggle menu"}
             >
-              {isMobileMenuOpen ? (
+              {clickedNavItem || isMobileMenuOpen ? (
                 <XMarkIcon className="w-6 h-6" />
               ) : (
                 <Bars3Icon className="w-6 h-6" />
@@ -338,34 +367,39 @@ export default function Sidebar({ account, map }: SidebarProps) {
           </div>
         </div>
 
-        {/* Mobile Menu Dropdown */}
-        {isMobileMenuOpen && (
-          <>
-            {/* Overlay */}
-            <div
-              className="fixed inset-0 bg-black/20 z-[99]"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            {/* Menu */}
-            <div className="absolute top-full left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-[101]">
+        {/* Mobile Menu Dropdown - Only show when no secondary content is open */}
+        {isMobileMenuOpen && !clickedNavItem && (
+          <div className="absolute top-full left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-[101]">
               <div className="py-2">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
                   const tab = hrefToTab[item.href];
+                  const hasSecondaryContent = !!item.secondaryContent;
 
                   return (
                     <div
                       key={item.href}
                       onClick={() => {
-                        setIsMobileMenuOpen(false);
-                        // Toggle tab on mobile
-                        if (clickedNavItem === item.href) {
-                          setClickedNavItem(null);
-                          if (isHomepage && tab) updateUrl(null);
+                        // If item has secondary content, open it (menu will hide automatically)
+                        if (hasSecondaryContent) {
+                          if (clickedNavItem === item.href) {
+                            setClickedNavItem(null);
+                            if (isHomepage && tab) updateUrl(null);
+                          } else {
+                            setClickedNavItem(item.href);
+                            if (isHomepage && tab) updateUrl(tab);
+                          }
                         } else {
-                          setClickedNavItem(item.href);
-                          if (isHomepage && tab) updateUrl(tab);
+                          // No secondary content, close menu
+                          setIsMobileMenuOpen(false);
+                          if (clickedNavItem === item.href) {
+                            setClickedNavItem(null);
+                            if (isHomepage && tab) updateUrl(null);
+                          } else {
+                            setClickedNavItem(item.href);
+                            if (isHomepage && tab) updateUrl(tab);
+                          }
                         }
                       }}
                       className={`
@@ -384,7 +418,6 @@ export default function Sidebar({ account, map }: SidebarProps) {
                 })}
               </div>
             </div>
-          </>
         )}
       </nav>
 
@@ -462,7 +495,7 @@ export default function Sidebar({ account, map }: SidebarProps) {
           </div>
         </div>
 
-        {/* Secondary Sidebar - Shows on click */}
+        {/* Desktop Secondary Sidebar - Shows on click */}
         {clickedNavItem && (() => {
           const navItem = navItems.find(item => item.href === clickedNavItem);
           const content = navItem?.secondaryContent;
@@ -491,6 +524,33 @@ export default function Sidebar({ account, map }: SidebarProps) {
           );
         })()}
       </aside>
+
+      {/* Mobile Secondary Sidebar - Full screen overlay */}
+      {clickedNavItem && (() => {
+        const navItem = navItems.find(item => item.href === clickedNavItem);
+        const content = navItem?.secondaryContent;
+        if (!content) return null;
+        
+        return (
+          <SecondarySidebar
+            isOpen={true}
+            label={navItem?.label || ''}
+            onClose={() => {
+              const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
+              setClickedNavItem(null);
+              // Remove URL param when closing tab on homepage
+              if (isHomepage && tab) {
+                updateUrl(null);
+              }
+            }}
+          >
+            {React.isValidElement(content)
+              ? React.cloneElement(content as React.ReactElement<any>, { map, mapLoaded: !!map })
+              : content
+            }
+          </SecondarySidebar>
+        );
+      })()}
     </>
   );
 }

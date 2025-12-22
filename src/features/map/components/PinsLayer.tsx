@@ -348,10 +348,10 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
               ` : '';
 
               return `
-                <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
                   <!-- Header with account info (if authenticated), manage button, and close button -->
                   ${isAuthenticated || manageButton ? `
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px;">
                     ${accountInfo}
                     <div style="display: flex; align-items: center; gap: 4px;">
                       ${manageButton}
@@ -359,7 +359,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     </div>
                   </div>
                   ` : `
-                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px;">
                     <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;">
                       ${seeWhoLink}
                       <span style="color: #6b7280;">sign in now</span>
@@ -387,7 +387,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                   </div>
                   
                   <!-- Footer with date and view count -->
-                  <div style="padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                  <div style="padding-top: 8px;">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                       <div style="font-size: 12px; color: #6b7280;">
                         ${formatDate(currentPin.created_at)}
@@ -495,8 +495,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     // Update popup to show edit form
                     if (popupRef.current) {
                       const editForm = `
-                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
-                          <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                          <div style="margin-bottom: 10px; padding-bottom: 8px;">
                             <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Edit Pin</h3>
                           </div>
                           <div style="margin-bottom: 10px;">
@@ -526,8 +526,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     // Show inline confirmation
                     if (popupRef.current) {
                       const confirmDeleteForm = `
-                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
-                          <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                          <div style="margin-bottom: 10px; padding-bottom: 8px;">
                             <h3 style="font-size: 13px; font-weight: 600; color: #111827; margin: 0;">Delete Pin</h3>
                           </div>
                           <div style="margin-bottom: 10px;">
@@ -630,8 +630,8 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     // Show error in popup
                     if (popupRef.current) {
                       const errorForm = `
-                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
-                          <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                        <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+                          <div style="margin-bottom: 10px; padding-bottom: 8px;">
                             <h3 style="font-size: 13px; font-weight: 600; color: #dc2626; margin: 0;">Delete Failed</h3>
                           </div>
                           <div style="margin-bottom: 10px;">

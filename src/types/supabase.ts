@@ -67,6 +67,30 @@ export type Database = {
           updated_at?: string
         }
       }
+      cities: {
+        Row: {
+          id: string
+          name: string
+          slug: string | null
+          favorite: boolean | null
+          updated_at: string | null
+          [key: string]: any
+        }
+        Insert: Record<string, any>
+        Update: Record<string, any>
+      }
+      counties: {
+        Row: {
+          id: string
+          name: string
+          slug: string | null
+          favorite: boolean | null
+          updated_at: string | null
+          [key: string]: any
+        }
+        Insert: Record<string, any>
+        Update: Record<string, any>
+      }
     }
     Views: {
       [key: string]: {

@@ -65,7 +65,7 @@ export default function ProfilePinsLayer({
     const isOwner = isOwnProfileRef.current;
 
     return `
-      <div class="map-pin-popup-content" style="min-width: 180px; max-width: 250px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; position: relative;">
+      <div class="map-pin-popup-content" style="min-width: 180px; max-width: 250px; padding: 10px; background: white; border-radius: 6px; position: relative;">
         ${isOwner ? `
         <div style="position: absolute; top: 6px; right: 6px;">
           <button id="pin-menu-btn-${pin.id}" style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: transparent; cursor: pointer; border-radius: 4px; color: #6b7280; transition: all 0.15s;" onmouseover="this.style.background='#f3f4f6'; this.style.color='#111827';" onmouseout="this.style.background='transparent'; this.style.color='#6b7280';">
@@ -106,7 +106,7 @@ export default function ProfilePinsLayer({
         ` : ''}
         ${pin.description ? `<div style="font-size: 12px; color: #374151; line-height: 1.5; margin-bottom: 8px; word-wrap: break-word;${isOwner ? ' margin-right: 30px;' : ''}">${escapeHtml(pin.description)}</div>` : ''}
         ${pin.media_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? `<div style="margin-bottom: 8px;"><img src="${escapeHtml(pin.media_url)}" alt="Pin media" style="width: 100%; border-radius: 4px; max-height: 100px; object-fit: cover; display: block;" /></div>` : ''}
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #6b7280; padding-top: 6px; border-top: 1px solid #e5e7eb;">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #6b7280; padding-top: 6px;">
           <span>${formatDate(pin.created_at)}</span>
           ${viewCount !== null ? `<span style="display: flex; align-items: center; gap: 4px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>${viewCount}</span>` : ''}
         </div>

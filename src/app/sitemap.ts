@@ -67,7 +67,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .order('updated_at', { ascending: false });
 
   // Build city URLs
-  const cityUrls: MetadataRoute.Sitemap = (cities || []).map((city) => ({
+  const cityUrls: MetadataRoute.Sitemap = (cities || []).map((city: { slug: string; favorite: boolean | null; updated_at: string | null }) => ({
     url: `${baseUrl}/explore/city/${city.slug}`,
     lastModified: city.updated_at ? new Date(city.updated_at) : now,
     changeFrequency: (city.favorite ? 'weekly' : 'monthly') as 'weekly' | 'monthly',
@@ -75,7 +75,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Build county URLs
-  const countyUrls: MetadataRoute.Sitemap = (counties || []).map((county) => ({
+  const countyUrls: MetadataRoute.Sitemap = (counties || []).map((county: { slug: string; favorite: boolean | null; updated_at: string | null }) => ({
     url: `${baseUrl}/explore/county/${county.slug}`,
     lastModified: county.updated_at ? new Date(county.updated_at) : now,
     changeFrequency: (county.favorite ? 'weekly' : 'monthly') as 'weekly' | 'monthly',

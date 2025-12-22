@@ -83,13 +83,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get account_id for authenticated user
-    const { data: account } = await supabase
+    const { data: account, error: accountError } = await supabase
       .from('accounts')
       .select('id')
       .eq('user_id', auth.id)
-      .single();
+      .maybeSingle();
     
-    const accountId = account?.id || null;
+    if (accountError) {
+      console.error('Error fetching account:', accountError);
+    }
+    
+    const accountId = account ? (account as { id: string }).id : null;
 
     const { data, error } = await supabase
       .from('faqs')

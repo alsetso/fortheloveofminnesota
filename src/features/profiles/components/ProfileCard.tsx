@@ -24,6 +24,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+  const [isEditingTraits, setIsEditingTraits] = useState(false);
   
   const coverInputRef = useRef<HTMLInputElement>(null);
   const profileInputRef = useRef<HTMLInputElement>(null);
@@ -40,10 +41,10 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
   const displayName = getDisplayName(account);
   const joinDate = formatJoinDate(account.created_at);
   
-  // Get trait labels
-  const traitLabels = account.traits
+  // Get selected trait labels (only show selected traits)
+  const selectedTraits = account.traits
     ? account.traits
-        .map(traitId => TRAIT_OPTIONS.find(opt => opt.id === traitId)?.label)
+        .map(traitId => TRAIT_OPTIONS.find(opt => opt.id === traitId))
         .filter(Boolean)
     : [];
 
@@ -486,38 +487,59 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
 
       {/* Traits */}
       <div className="pt-2">
-        <div className="flex flex-wrap gap-1.5">
-          {isOwnProfile ? (
-            // Editable traits - show all options, highlight selected
-            TRAIT_OPTIONS.map((trait) => {
-              const isSelected = account.traits?.includes(trait.id) || false;
-              return (
-                <button
-                  key={trait.id}
-                  onClick={() => toggleTrait(trait.id)}
-                  disabled={isSaving}
-                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                    isSelected
-                      ? 'bg-gray-700 text-white hover:bg-gray-600'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  } disabled:opacity-50`}
-                >
-                  {trait.label}
-                </button>
-              );
-            })
-          ) : (
-            // Read-only traits - only show selected
-            traitLabels.map((label, idx) => (
+        <div className="flex flex-wrap gap-1.5 items-center">
+          {/* Show selected traits */}
+          {selectedTraits.length > 0 ? (
+            selectedTraits.map((trait) => (
               <span
-                key={idx}
+                key={trait.id}
                 className="px-2 py-0.5 bg-black/20 text-xs text-gray-900 rounded"
               >
-                {label}
+                {trait.label}
               </span>
             ))
+          ) : (
+            !isOwnProfile && (
+              <span className="text-xs text-gray-400">No traits selected</span>
+            )
+          )}
+          
+          {/* Edit button for owners */}
+          {isOwnProfile && (
+            <button
+              onClick={() => setIsEditingTraits(!isEditingTraits)}
+              className="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors flex items-center gap-1"
+            >
+              <PencilIcon className="w-3 h-3" />
+              <span>{isEditingTraits ? 'Done' : 'Edit'}</span>
+            </button>
           )}
         </div>
+        
+        {/* Expanded trait editor for owners */}
+        {isOwnProfile && isEditingTraits && (
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="flex flex-wrap gap-1.5">
+              {TRAIT_OPTIONS.map((trait) => {
+                const isSelected = account.traits?.includes(trait.id) || false;
+                return (
+                  <button
+                    key={trait.id}
+                    onClick={() => toggleTrait(trait.id)}
+                    disabled={isSaving}
+                    className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                      isSelected
+                        ? 'bg-gray-700 text-white hover:bg-gray-600'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    } disabled:opacity-50`}
+                  >
+                    {trait.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

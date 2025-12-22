@@ -8,7 +8,6 @@ import { useAuth } from '@/features/auth';
 interface PinViewStats {
   pin_id: string;
   pin_description: string | null;
-  pin_type: string | null;
   pin_created_at: string;
   total_views: number;
   unique_viewers: number;
@@ -145,9 +144,6 @@ export default function AnalyticsClient() {
                   <span className="text-xs font-medium text-gray-900 truncate block">
                     {pin.pin_description || 'Untitled Pin'}
                   </span>
-                  {pin.pin_type && (
-                    <p className="text-[10px] text-gray-500 truncate mt-0.5">{pin.pin_type}</p>
-                  )}
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <div className="flex items-center gap-1">

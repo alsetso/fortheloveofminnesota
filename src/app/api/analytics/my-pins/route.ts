@@ -6,7 +6,6 @@ import { Database } from '@/types/supabase';
 interface PinViewStats {
   pin_id: string;
   pin_description: string | null;
-  pin_type: string | null;
   pin_created_at: string;
   total_views: number;
   unique_viewers: number;
@@ -85,7 +84,7 @@ export async function GET(request: NextRequest) {
     // Get user's mentions (excluding archived)
     const { data: mentions, error: mentionsError } = await supabase
       .from('mentions')
-      .select('id, description, type, created_at')
+      .select('id, description, created_at')
       .eq('account_id', accountId)
       .eq('archived', false)
       .order('created_at', { ascending: false });
@@ -135,7 +134,9 @@ export async function GET(request: NextRequest) {
       };
 
       // Get last viewed date
-      const { data: lastView } = await supabase
+      // Note: This query is subject to RLS, but the policy "Users can view views of own mentions"
+      // should allow it since mentions.account_id matches the current user's account
+      const { data: lastView, error: lastViewError } = await supabase
         .from('pin_views')
         .select('viewed_at')
         .eq('pin_id', mentionData.id)
@@ -143,12 +144,17 @@ export async function GET(request: NextRequest) {
         .limit(1)
         .maybeSingle();
 
+      // If RLS blocks the query, lastView will be null but no error
+      // If there's an actual error, log it but continue
+      if (lastViewError) {
+        console.error(`Error fetching last view for mention ${mentionData.id}:`, lastViewError);
+      }
+
       const lastViewedAt = (lastView as any)?.viewed_at || null;
 
       pins.push({
         pin_id: mentionData.id,
         pin_description: mentionData.description,
-        pin_type: mentionData.type,
         pin_created_at: mentionData.created_at,
         total_views: stats.total_views || 0,
         unique_viewers: stats.unique_viewers || 0,

@@ -38,7 +38,7 @@ export function ImageUpload({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const currentUrls = multiple 
+  const currentUrls: string[] | string | null = multiple 
     ? (Array.isArray(value) ? value : value ? [value] : [])
     : (typeof value === 'string' ? value : null);
 
@@ -230,7 +230,7 @@ export function ImageUpload({
       )}
 
       {/* Single Image Display */}
-      {!multiple && currentUrls && (
+      {!multiple && currentUrls && typeof currentUrls === 'string' && (
         <div className="mb-4 relative inline-block">
           <div className="relative w-32 h-32 bg-gray-100 rounded-lg overflow-hidden">
             <Image
@@ -261,7 +261,7 @@ export function ImageUpload({
         <button
           type="button"
           onClick={handleClick}
-          disabled={isUploading || authLoading || (multiple && maxImages && Array.isArray(currentUrls) && currentUrls.length >= maxImages)}
+          disabled={Boolean(isUploading || authLoading || (multiple && maxImages !== undefined && Array.isArray(currentUrls) && currentUrls.length >= maxImages))}
           className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-gold-500 hover:bg-gold-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isUploading ? (
@@ -275,7 +275,7 @@ export function ImageUpload({
               <span className="text-sm font-semibold text-gray-700">
                 {multiple 
                   ? `Upload Image${Array.isArray(currentUrls) && currentUrls.length > 0 ? 's' : ''}`
-                  : currentUrls 
+                  : (typeof currentUrls === 'string' && currentUrls)
                     ? 'Replace Image' 
                     : 'Upload Image'
                 }

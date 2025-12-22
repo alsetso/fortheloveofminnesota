@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClient, createServerClientWithAuth } from '@/lib/supabaseServer';
 import { getServerAuth } from '@/lib/authServer';
 import { CreateFAQData } from '@/types/faq';
+import { Database } from '@/types/supabase';
 
 /**
  * GET /api/faqs
@@ -95,14 +96,16 @@ export async function POST(request: NextRequest) {
     
     const accountId = account ? (account as { id: string }).id : null;
 
+    const insertData: Database['public']['Tables']['faqs']['Insert'] = {
+      question: body.question.trim(),
+      answer: null,
+      is_visible: false,
+      account_id: accountId,
+    };
+
     const { data, error } = await supabase
       .from('faqs')
-      .insert({
-        question: body.question.trim(),
-        answer: null,
-        is_visible: false,
-        account_id: accountId,
-      })
+      .insert(insertData as any)
       .select()
       .single();
 

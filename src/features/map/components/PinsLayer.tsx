@@ -6,6 +6,7 @@ import { PublicMapPinService } from '@/features/map-pins/services/publicMapPinSe
 import type { MapPin } from '@/types/map-pin';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface PinsLayerProps {
   map: MapboxMapInstance;
@@ -22,6 +23,7 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
   const pointLabelLayerId = 'map-pins-point-label';
   
   const { account } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const searchParams = useSearchParams();
   const pinsRef = useRef<MapPin[]>([]);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
@@ -37,11 +39,17 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
   const [editDescription, setEditDescription] = useState('');
   const currentPinRef = useRef<MapPin | null>(null);
   const accountRef = useRef(account);
+  const openWelcomeRef = useRef(openWelcome);
   
   // Keep account ref updated
   useEffect(() => {
     accountRef.current = account;
   }, [account]);
+  
+  // Keep openWelcome ref updated
+  useEffect(() => {
+    openWelcomeRef.current = openWelcome;
+  }, [openWelcome]);
 
   // Fetch pins and add to map
   useEffect(() => {
@@ -334,6 +342,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                 </div>
               ` : '';
 
+              // "See who" link for unauthenticated users
+              const seeWhoLink = !isAuthenticated ? `
+                <a id="see-who-link-${currentPin.id}" href="#" style="font-size: 12px; color: #2563eb; text-decoration: none; cursor: pointer; transition: color 0.15s;" onmouseover="this.style.color='#1d4ed8'; text-decoration: underline;" onmouseout="this.style.color='#2563eb'; this.style.textDecoration='none';">See who</a>
+              ` : '';
+
               return `
                 <div class="map-pin-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border: 1px solid #e5e7eb; border-radius: 6px;">
                   <!-- Header with account info (if authenticated), manage button, and close button -->
@@ -346,7 +359,11 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                     </div>
                   </div>
                   ` : `
-                  <div style="display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb;">
+                    <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;">
+                      ${seeWhoLink}
+                      <span style="color: #6b7280;">sign in now</span>
+                    </div>
                     <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px; line-height: 1; flex-shrink: 0; transition: color 0.15s;" onmouseover="this.style.color='#111827'" onmouseout="this.style.color='#6b7280'" aria-label="Close popup">×</button>
                   </div>
                   `}
@@ -425,6 +442,18 @@ export default function PinsLayer({ map, mapLoaded }: PinsLayerProps) {
                   if (popupRef.current) {
                     popupRef.current.remove();
                     popupRef.current = null;
+                  }
+                });
+              }
+
+              // "See who" link handler
+              const seeWhoLink = popupElement.querySelector(`#see-who-link-${pin.id}`) as HTMLAnchorElement;
+              if (seeWhoLink) {
+                seeWhoLink.addEventListener('click', (e: MouseEvent) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (openWelcomeRef.current) {
+                    openWelcomeRef.current();
                   }
                 });
               }

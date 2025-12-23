@@ -58,6 +58,9 @@ export default function ProfileMentionsLayer({
       try {
         const geoJSON = pinsToGeoJSON(pinsRef.current);
 
+        // Cast to any to access Mapbox methods
+        const mapboxMap = map as any;
+
         // Check if source already exists
         try {
           const existingSource = map.getSource(SOURCE_ID);
@@ -72,7 +75,7 @@ export default function ProfileMentionsLayer({
         }
 
         // Add pin images
-        if (!map.hasImage(PIN_IMAGE_ID)) {
+        if (!mapboxMap.hasImage(PIN_IMAGE_ID)) {
           const imageSize = 32;
           const canvas = document.createElement('canvas');
           canvas.width = imageSize;
@@ -93,11 +96,11 @@ export default function ProfileMentionsLayer({
           }
           const imageData = ctx?.getImageData(0, 0, imageSize, imageSize);
           if (imageData) {
-            map.addImage(PIN_IMAGE_ID, imageData, { pixelRatio: 2 });
+            mapboxMap.addImage(PIN_IMAGE_ID, imageData, { pixelRatio: 2 });
           }
         }
 
-        if (!map.hasImage(PIN_PRIVATE_IMAGE_ID)) {
+        if (!mapboxMap.hasImage(PIN_PRIVATE_IMAGE_ID)) {
           const imageSize = 32;
           const canvas = document.createElement('canvas');
           canvas.width = imageSize;
@@ -118,18 +121,18 @@ export default function ProfileMentionsLayer({
           }
           const imageData = ctx?.getImageData(0, 0, imageSize, imageSize);
           if (imageData) {
-            map.addImage(PIN_PRIVATE_IMAGE_ID, imageData, { pixelRatio: 2 });
+            mapboxMap.addImage(PIN_PRIVATE_IMAGE_ID, imageData, { pixelRatio: 2 });
           }
         }
 
         // Add source
-        map.addSource(SOURCE_ID, {
+        mapboxMap.addSource(SOURCE_ID, {
           type: 'geojson',
           data: geoJSON,
         });
 
         // Add point layer
-        map.addLayer({
+        mapboxMap.addLayer({
           id: LAYER_IDS.points,
           type: 'symbol',
           source: SOURCE_ID,
@@ -147,7 +150,7 @@ export default function ProfileMentionsLayer({
         });
 
         // Add label layer
-        map.addLayer({
+        mapboxMap.addLayer({
           id: LAYER_IDS.labels,
           type: 'symbol',
           source: SOURCE_ID,

@@ -163,17 +163,17 @@ export default async function ProfilePage({ params }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           {/* Left Column - Profile */}
           <div className="lg:col-span-3">
-            <ProfileCard 
-              account={profileAccountData}
-              isOwnProfile={isOwnProfile}
-            />
+        <ProfileCard 
+          account={profileAccountData}
+          isOwnProfile={isOwnProfile}
+        />
           </div>
 
           {/* Middle Column - Search Filters and Mentions */}
           <div className="lg:col-span-6">
-            {mentions.length > 0 && (
+        {mentions.length > 0 && (
               <ProfileMentionsSection pins={mentions} isOwnProfile={isOwnProfile} />
-            )}
+        )}
           </div>
 
           {/* Right Column - Empty for now */}

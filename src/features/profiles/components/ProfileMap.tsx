@@ -152,7 +152,9 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
 
-    mapInstanceRef.current.fitBounds(
+    // Cast to any to access fitBounds method
+    const mapboxMap = mapInstanceRef.current as any;
+    mapboxMap.fitBounds(
       [
         [minLng, minLat],
         [maxLng, maxLat],

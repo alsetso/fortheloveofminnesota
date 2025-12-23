@@ -31,13 +31,13 @@ export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {
     const referrer = typeof document !== 'undefined' ? document.referrer : null;
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
     
-    // Generate or get session ID from sessionStorage
-    let sessionId: string | null = null;
+    // Generate or get device ID from localStorage (shared across tabs on same device)
+    let deviceId: string | null = null;
     if (typeof window !== 'undefined') {
-      sessionId = sessionStorage.getItem('analytics_session_id');
-      if (!sessionId) {
-        sessionId = crypto.randomUUID();
-        sessionStorage.setItem('analytics_session_id', sessionId);
+      deviceId = localStorage.getItem('analytics_device_id');
+      if (!deviceId) {
+        deviceId = crypto.randomUUID();
+        localStorage.setItem('analytics_device_id', deviceId);
       }
     }
 
@@ -45,7 +45,7 @@ export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {
       page_url: url,
       referrer_url: referrer || null,
       user_agent: userAgent || null,
-      session_id: sessionId,
+      session_id: deviceId, // Using session_id column to store device_id
     };
     
     // Use requestIdleCallback if available, otherwise setTimeout

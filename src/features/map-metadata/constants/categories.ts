@@ -34,6 +34,8 @@ export type FeatureCategory =
   | 'radio_and_news'
   // Non-atlas POIs (no admin create)
   | 'restaurant'
+  | 'grocery'
+  | 'store'
   | 'hotel'
   | 'gas_station'
   | 'entertainment'
@@ -231,7 +233,8 @@ export const POI_CATEGORIES: Record<string, FeatureCategory> = {
   lodging: 'hotel',
   food_and_drink: 'restaurant',
   fuel: 'gas_station',
-  shop: 'poi',
+  store_like: 'store',
+  shop: 'store',
   sport: 'poi',
   leisure: 'poi',
 };
@@ -346,6 +349,10 @@ export const POI_TYPE_CATEGORIES: Record<string, FeatureCategory> = {
   Cafe: 'restaurant',
   'Coffee Shop': 'restaurant',
   Bar: 'restaurant',
+  'Grocery Store': 'grocery',
+  Grocery: 'grocery',
+  Supermarket: 'grocery',
+  'Food Store': 'grocery',
   'Gas Station': 'gas_station',
   'Fuel Station': 'gas_station',
   'Service Station': 'gas_station',
@@ -409,6 +416,10 @@ export const MAKI_CATEGORIES: Record<string, FeatureCategory> = {
   restaurant: 'restaurant',
   cafe: 'restaurant',
   bar: 'restaurant',
+  grocery: 'grocery',
+  shop: 'grocery', // Generic shop icon often used for grocery stores
+  supermarket: 'grocery',
+  'grocery-store': 'grocery',
   lodging: 'hotel',
   hotel: 'hotel',
   fuel: 'gas_station',
@@ -461,6 +472,8 @@ export const CATEGORY_CONFIG: Record<FeatureCategory, {
   
   // Non-atlas POIs
   restaurant: { icon: '🍽️', label: 'Restaurant', color: '#F97316' },
+  grocery: { icon: '🛒', label: 'Grocery Store', color: '#10B981' },
+  store: { icon: '🏪', label: 'Store', color: '#06B6D4' },
   hotel: { icon: '🏨', label: 'Hotel', color: '#8B5CF6' },
   gas_station: { icon: '⛽', label: 'Gas Station', color: '#EF4444' },
   entertainment: { icon: '🎭', label: 'Entertainment', color: '#EC4899' },

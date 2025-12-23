@@ -104,26 +104,59 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
 
         // Source doesn't exist - need to add source and layers
         // First, clean up any existing layers (shouldn't exist if source doesn't, but be safe)
+        // IMPORTANT: Remove layers BEFORE removing source to avoid "source not found" errors
         try {
+          // Remove layers first (they depend on the source)
           if (mapboxMap.getLayer(pointLabelLayerId)) {
-            mapboxMap.removeLayer(pointLabelLayerId);
+            try {
+              mapboxMap.removeLayer(pointLabelLayerId);
+            } catch (e) {
+              // Layer may already be removed or source missing - ignore
+            }
           }
           if (mapboxMap.getLayer(pointLayerId)) {
-            mapboxMap.removeLayer(pointLayerId);
+            try {
+              mapboxMap.removeLayer(pointLayerId);
+            } catch (e) {
+              // Layer may already be removed or source missing - ignore
+            }
           }
+          // Then remove source (only if it exists)
           if (mapboxMap.getSource(sourceId)) {
-            mapboxMap.removeSource(sourceId);
+            try {
+              mapboxMap.removeSource(sourceId);
+            } catch (e) {
+              // Source may already be removed - ignore
+            }
           }
         } catch (e) {
           // Source or layers may already be removed (e.g., during style change)
           // This is expected and safe to ignore
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[MentionsLayer] Error during cleanup:', e);
+          }
         }
 
         // Add source (no clustering)
-        mapboxMap.addSource(sourceId, {
-          type: 'geojson',
-          data: geoJSON,
-        });
+        // Ensure source doesn't already exist before adding
+        try {
+          if (!mapboxMap.getSource(sourceId)) {
+            mapboxMap.addSource(sourceId, {
+              type: 'geojson',
+              data: geoJSON,
+            });
+          } else {
+            // Source exists, just update data
+            const existingSource = mapboxMap.getSource(sourceId) as any;
+            if (existingSource && existingSource.setData) {
+              existingSource.setData(geoJSON);
+            }
+          }
+        } catch (e) {
+          console.error('[MentionsLayer] Error adding/updating source:', e);
+          isAddingLayersRef.current = false;
+          return;
+        }
 
         // Load mention icon image
         const mentionImageId = 'map-mention-icon';
@@ -165,11 +198,19 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           }
         }
 
+        // Verify source exists before adding layers
+        if (!mapboxMap.getSource(sourceId)) {
+          console.error('[MentionsLayer] Source does not exist before adding layer');
+          isAddingLayersRef.current = false;
+          return;
+        }
+
         // Add points as mention icons with zoom-based sizing
-        map.addLayer({
-          id: pointLayerId,
-          type: 'symbol',
-          source: sourceId,
+        try {
+          map.addLayer({
+            id: pointLayerId,
+            type: 'symbol',
+            source: sourceId,
           layout: {
             'icon-image': mentionImageId,
             'icon-size': [
@@ -188,13 +229,19 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             'icon-anchor': 'center',
             'icon-allow-overlap': true,
           },
-        });
+          });
+        } catch (e) {
+          console.error('[MentionsLayer] Error adding point layer:', e);
+          isAddingLayersRef.current = false;
+          return;
+        }
 
         // Add labels for points (positioned above mention icon)
-        mapboxMap.addLayer({
-          id: pointLabelLayerId,
-          type: 'symbol',
-          source: sourceId,
+        try {
+          mapboxMap.addLayer({
+            id: pointLabelLayerId,
+            type: 'symbol',
+            source: sourceId,
           layout: {
             'text-field': [
               'case',
@@ -213,7 +260,20 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             'text-halo-width': 2,
             'text-halo-blur': 1,
           },
-        });
+          });
+        } catch (e) {
+          console.error('[MentionsLayer] Error adding label layer:', e);
+          // Try to remove the point layer if label layer failed
+          try {
+            if (mapboxMap.getLayer(pointLayerId)) {
+              mapboxMap.removeLayer(pointLayerId);
+            }
+          } catch (removeError) {
+            // Ignore removal errors
+          }
+          isAddingLayersRef.current = false;
+          return;
+        }
 
         isAddingLayersRef.current = false;
 

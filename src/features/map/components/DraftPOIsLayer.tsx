@@ -3,46 +3,41 @@
 import { useEffect, useRef } from 'react';
 import { useSearchParams, usePathname } from 'next/navigation';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import { POIService, type PointOfInterest } from '@/features/poi/services/poiService';
+import { useDraftPOIs } from '@/features/poi/contexts/DraftPOIsContext';
 import { getPOIEmoji } from '@/features/poi/utils/getPOIEmoji';
 
-interface POIsLayerProps {
+interface DraftPOIsLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
 }
 
-const sourceId = 'pois-active';
-const emojiLayerId = 'pois-active-emoji';
-const nameLayerId = 'pois-active-name';
+const sourceId = 'pois-draft';
+const emojiLayerId = 'pois-draft-emoji';
+const nameLayerId = 'pois-draft-name';
 
 /**
- * POIsLayer - Self-contained layer that fetches and displays POIs
- * Shows all active POIs when POI tab is active (?tab=poi)
+ * DraftPOIsLayer - Displays draft POIs on the map in real-time
+ * Shows draft POIs when POI tab is active (?tab=poi)
  */
-export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
+export default function DraftPOIsLayer({ map, mapLoaded }: DraftPOIsLayerProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const isHomepage = pathname === '/';
   const isPOITabActive = isHomepage && searchParams.get('tab') === 'poi';
   
-  const poisRef = useRef<PointOfInterest[]>([]);
+  const { draftPOIs } = useDraftPOIs();
   const isAddingLayersRef = useRef(false);
 
-  // Fetch POIs when tab is active
+  // Update map when draft POIs change
   useEffect(() => {
     if (!map || !mapLoaded || !isPOITabActive) return;
 
     let mounted = true;
 
-    const loadPOIs = async () => {
+    const updateDraftPOIs = async () => {
       if (isAddingLayersRef.current) return;
 
       try {
-        const pois = await POIService.getPOIs();
-        if (!mounted) return;
-
-        poisRef.current = pois;
-
         const mapboxMap = map as any;
 
         // Wait for style to load
@@ -61,41 +56,31 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
 
         if (!mounted) return;
 
-        // Convert to GeoJSON using lat/lng directly
+        // Convert draft POIs to GeoJSON
         const geoJSON = {
           type: 'FeatureCollection' as const,
-          features: pois
-            .map(poi => {
-              // Use lat/lng directly if available, otherwise skip
-              if (poi.lat === null || poi.lng === null || poi.lat === undefined || poi.lng === undefined) {
+          features: draftPOIs
+            .map(draft => {
+              if (draft.lat === null || draft.lng === null || draft.lat === undefined || draft.lng === undefined) {
                 return null;
               }
 
-              // Get emoji - use stored emoji if available, otherwise calculate from category/type
-              const emoji = poi.emoji || getPOIEmoji(poi.category, poi.type);
-
-              if (process.env.NODE_ENV === 'development') {
-                console.log(`[POIsLayer] POI ${poi.id}: emoji="${emoji}", category="${poi.category}", type="${poi.type}"`);
-              }
+              // Get emoji - use stored emoji if available, otherwise calculate from category
+              const emoji = draft.emoji || getPOIEmoji(draft.category || null, null);
 
               return {
                 type: 'Feature' as const,
-                geometry: { type: 'Point' as const, coordinates: [poi.lng, poi.lat] },
+                geometry: { type: 'Point' as const, coordinates: [draft.lng, draft.lat] },
                 properties: {
-                  id: poi.id,
-                  name: poi.name || 'Unnamed POI',
+                  id: draft.id,
+                  name: draft.name || 'Unnamed POI',
                   emoji,
-                  category: poi.category,
+                  category: draft.category,
                 },
               };
             })
             .filter(Boolean),
         };
-
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`[POIsLayer] Total POIs: ${pois.length}, Features: ${geoJSON.features.length}`);
-          console.log('[POIsLayer] Sample feature:', geoJSON.features[0]);
-        }
 
         isAddingLayersRef.current = true;
 
@@ -110,7 +95,7 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
         // Generate canvas images for each emoji
         const emojiImageMap = new Map<string, string>();
         uniqueEmojis.forEach(emoji => {
-          const imageId = `poi-emoji-${emoji}`;
+          const imageId = `draft-poi-emoji-${emoji}`;
           if (!mapboxMap.hasImage(imageId)) {
             const imageSize = 32;
             const canvas = document.createElement('canvas');
@@ -120,9 +105,7 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
             if (ctx) {
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'high';
-              // Clear canvas with transparent background
               ctx.clearRect(0, 0, imageSize, imageSize);
-              // Draw emoji - use larger font size for better emoji rendering
               ctx.font = `${imageSize}px Arial, sans-serif`;
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
@@ -136,14 +119,14 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
           emojiImageMap.set(emoji, imageId);
         });
 
-        // Update GeoJSON properties to include emoji image ID (ensure all features have it)
+        // Update GeoJSON properties to include emoji image ID
         geoJSON.features.forEach((feature: any) => {
           if (feature.properties?.emoji && emojiImageMap.has(feature.properties.emoji)) {
             feature.properties.emojiImageId = emojiImageMap.get(feature.properties.emoji);
           } else {
             // Fallback to default emoji if missing
             const defaultEmoji = '📍';
-            const defaultImageId = `poi-emoji-${defaultEmoji}`;
+            const defaultImageId = `draft-poi-emoji-${defaultEmoji}`;
             if (!mapboxMap.hasImage(defaultImageId)) {
               const imageSize = 32;
               const canvas = document.createElement('canvas');
@@ -154,7 +137,7 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
                 ctx.imageSmoothingEnabled = true;
                 ctx.imageSmoothingQuality = 'high';
                 ctx.clearRect(0, 0, imageSize, imageSize);
-                ctx.font = `${imageSize * 0.8}px Arial`;
+                ctx.font = `${imageSize}px Arial, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(defaultEmoji, imageSize / 2, imageSize / 2);
@@ -189,6 +172,9 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
               'icon-allow-overlap': true,
               'icon-ignore-placement': true,
             },
+            paint: {
+              'icon-opacity': 0.7, // Slightly transparent to distinguish from active POIs
+            },
           });
         }
 
@@ -208,27 +194,28 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
               'text-ignore-placement': true,
             },
             paint: {
-              'text-color': '#111827',
+              'text-color': '#6b7280', // Gray to distinguish from active POIs
               'text-halo-color': '#FFFFFF',
               'text-halo-width': 2,
               'text-halo-blur': 1,
+              'text-opacity': 0.7,
             },
           }, emojiLayerId); // Add after emoji layer
         }
 
         isAddingLayersRef.current = false;
       } catch (error) {
-        console.error('[POIsLayer] Error loading POIs:', error);
+        console.error('[DraftPOIsLayer] Error updating draft POIs:', error);
         isAddingLayersRef.current = false;
       }
     };
 
-    loadPOIs();
+    updateDraftPOIs();
 
     return () => {
       mounted = false;
     };
-  }, [map, mapLoaded, isPOITabActive]);
+  }, [map, mapLoaded, isPOITabActive, draftPOIs]);
 
   // Cleanup when tab is inactive or component unmounts
   useEffect(() => {
@@ -264,3 +251,4 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
 
   return null;
 }
+

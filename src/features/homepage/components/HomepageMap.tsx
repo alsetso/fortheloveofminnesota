@@ -16,6 +16,8 @@ import { useUrlMapState } from '../hooks/useUrlMapState';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/features/sidebar/components/Sidebar';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
+import POIsLayer from '@/features/map/components/POIsLayer';
+import DraftPOIsLayer from '@/features/map/components/DraftPOIsLayer';
 
 interface HomepageMapProps {
   cities: Array<{
@@ -340,6 +342,14 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
             mapLoaded={mapLoaded}
             visibleTables={selectedAtlasTables}
           />
+        )}
+
+        {/* POIs Layer - Shows all POIs when ?tab=poi */}
+        {mapLoaded && mapInstanceRef.current && (
+          <>
+            <POIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+            <DraftPOIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+          </>
         )}
 
 

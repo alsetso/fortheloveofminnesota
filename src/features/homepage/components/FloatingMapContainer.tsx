@@ -1288,14 +1288,20 @@ export default function LocationSidebar({
       removeTemporaryPin();
       
       // Set locationData so intelligence button section can show
-      setLocationData({
+      const entityLocationData: LocationData = {
         coordinates: {
           lat: entity.lat,
           lng: entity.lng,
         },
         address: entity.name,
         placeName: entity.name,
-      });
+      };
+      setLocationData(entityLocationData);
+      
+      // Dispatch location data for atlas creation
+      window.dispatchEvent(new CustomEvent('atlas-location-updated', {
+        detail: entityLocationData
+      }));
       
       // Set the selected atlas entity (clears other selections automatically)
       setSelectedAtlasEntity(entity);
@@ -1350,12 +1356,18 @@ export default function LocationSidebar({
       
       // Reverse geocode and select the location
       const geocodedData = await reverseGeocode(lat, lng);
-      setLocationData({
+      const locationDataForPin: LocationData = {
         coordinates: { lat, lng },
         placeName: geocodedData.city || geocodedData.locality || undefined,
         address: geocodedData.address || undefined,
         type: 'map-click',
-      });
+      };
+      setLocationData(locationDataForPin);
+      
+      // Dispatch location data for atlas creation
+      window.dispatchEvent(new CustomEvent('atlas-location-updated', {
+        detail: locationDataForPin
+      }));
       
       // Expand the inline pin form if user is authenticated
       // Username check happens on submit, not here

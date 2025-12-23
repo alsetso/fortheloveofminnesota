@@ -22,6 +22,7 @@ import SecondarySidebar from './SecondarySidebar';
 import ExploreSecondaryContent from './ExploreSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
 import POISecondaryContent from './POISecondaryContent';
+import AtlasSecondaryContent from './AtlasSecondaryContent';
 import FAQsSecondaryContent from './FAQsSecondaryContent';
 import NewsSecondaryContent from './NewsSecondaryContent';
 import { useSidebarTabState, type SidebarTab } from '../hooks/useSidebarTabState';
@@ -45,6 +46,7 @@ const hrefToTab: Record<string, SidebarTab> = {
   '#explore': 'explore' as SidebarTab,
   '#controls': 'controls' as SidebarTab,
   '#poi': 'poi' as SidebarTab,
+  '#atlas': 'atlas' as SidebarTab,
   '#faqs': 'faqs' as SidebarTab,
   '#news': 'news' as SidebarTab,
 };
@@ -63,6 +65,12 @@ const allNavItems: NavItem[] = [
     secondaryContent: <POISecondaryContent />,
   },
   { 
+    href: '#atlas', 
+    label: 'Atlas', 
+    icon: BuildingLibraryIcon,
+    secondaryContent: <AtlasSecondaryContent map={null} />,
+  },
+  { 
     href: '#news', 
     label: 'News', 
     icon: NewspaperIcon,
@@ -77,9 +85,9 @@ const allNavItems: NavItem[] = [
 ];
 
 export default function Sidebar({ account, map }: SidebarProps) {
-  // Filter nav items based on admin role - POI is admin-only
+  // Filter nav items based on admin role - POI and Atlas are admin-only
   const navItems = allNavItems.filter((item) => {
-    if (item.href === '#poi') {
+    if (item.href === '#poi' || item.href === '#atlas') {
       return account?.role === 'admin';
     }
     return true;
@@ -98,9 +106,9 @@ export default function Sidebar({ account, map }: SidebarProps) {
     syncToUrl: isHomepage,
     onTabChange: (tab) => {
       // Open tab when URL param is present
-      // Prevent POI tab from opening if user is not admin
-      if (tab === 'poi' && account?.role !== 'admin') {
-        // Remove POI tab from URL if not admin
+      // Prevent POI and Atlas tabs from opening if user is not admin
+      if ((tab === 'poi' || tab === 'atlas') && account?.role !== 'admin') {
+        // Remove tab from URL if not admin
         updateUrl(null);
         return;
       }
@@ -111,6 +119,8 @@ export default function Sidebar({ account, map }: SidebarProps) {
         setClickedNavItem('#controls');
       } else if (tab === 'poi') {
         setClickedNavItem('#poi');
+      } else if (tab === 'atlas') {
+        setClickedNavItem('#atlas');
       } else if (tab === 'faqs') {
         setClickedNavItem('#faqs');
       } else if (tab === 'news') {
@@ -134,8 +144,8 @@ export default function Sidebar({ account, map }: SidebarProps) {
   const handleNavItemClick = (href: string) => {
     const tab = hrefToTab[href];
     
-    // Prevent POI from opening if user is not admin
-    if (href === '#poi' && account?.role !== 'admin') {
+    // Prevent POI and Atlas from opening if user is not admin
+    if ((href === '#poi' || href === '#atlas') && account?.role !== 'admin') {
       return;
     }
     
@@ -161,10 +171,10 @@ export default function Sidebar({ account, map }: SidebarProps) {
     
     const tabFromUrl = urlTab;
     
-    // Prevent POI tab from opening if user is not admin
-    if (tabFromUrl === 'poi' && account?.role !== 'admin') {
+    // Prevent POI and Atlas tabs from opening if user is not admin
+    if ((tabFromUrl === 'poi' || tabFromUrl === 'atlas') && account?.role !== 'admin') {
       updateUrl(null);
-      if (clickedNavItem === '#poi') {
+      if (clickedNavItem === '#poi' || clickedNavItem === '#atlas') {
         setClickedNavItem(null);
       }
       return;
@@ -180,9 +190,9 @@ export default function Sidebar({ account, map }: SidebarProps) {
     }
   }, [urlTab, isHomepage, clickedNavItem, account?.role, updateUrl]);
   
-  // Close POI tab if it's open and user is not admin (e.g., role changed)
+  // Close POI and Atlas tabs if they're open and user is not admin (e.g., role changed)
   useEffect(() => {
-    if (clickedNavItem === '#poi' && account?.role !== 'admin') {
+    if ((clickedNavItem === '#poi' || clickedNavItem === '#atlas') && account?.role !== 'admin') {
       setClickedNavItem(null);
       if (isHomepage) {
         updateUrl(null);

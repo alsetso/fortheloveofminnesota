@@ -134,7 +134,7 @@ export default function AppHeader({
                 <div className="relative">
                   <Image
                     src="/logo.png"
-                    alt="MNUDA Emblem"
+                    alt="For the Love of Minnesota Emblem"
                     width={40}
                     height={40}
                     className="h-auto w-auto"

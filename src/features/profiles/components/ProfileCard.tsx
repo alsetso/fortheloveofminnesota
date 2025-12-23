@@ -493,7 +493,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
             selectedTraits.filter(Boolean).map((trait) => (
               <span
                 key={trait!.id}
-                className="px-2 py-0.5 bg-black/20 text-xs text-gray-900 rounded"
+                className="px-2 py-0.5 bg-white border border-gray-200 text-xs text-gray-900 rounded"
               >
                 {trait!.label}
               </span>

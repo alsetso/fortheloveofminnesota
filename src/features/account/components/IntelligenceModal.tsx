@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { XMarkIcon, PaperAirplaneIcon, ArrowLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
-import UpgradeToProModal from '@/components/modals/UpgradeToProModal';
+import BillingModal from '@/components/modals/BillingModal';
 
 interface Message {
   id: string;
@@ -547,14 +547,10 @@ export default function IntelligenceModal({ isOpen, onClose, locationData, pinFe
         </div>
       </div>
 
-      {/* Upgrade to Pro Modal - overlays the intelligence sidebar */}
-      <UpgradeToProModal
+      {/* Billing & Upgrade Modal - overlays the intelligence sidebar */}
+      <BillingModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        onUpgrade={() => {
-          setShowUpgradeModal(false);
-          router.push('/?modal=account&tab=settings');
-        }}
         feature="Property Intelligence"
         overlay="sidebar"
       />

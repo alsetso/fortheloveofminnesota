@@ -12,15 +12,15 @@ interface OwnershipToastProps {
  * Only shows once per page load to avoid spam.
  */
 export default function OwnershipToast({ isOwnProfile }: OwnershipToastProps) {
-  const { info } = useToast();
+  const { success } = useToast();
   const hasShownRef = useRef(false);
 
   useEffect(() => {
     if (isOwnProfile && !hasShownRef.current) {
       hasShownRef.current = true;
-      info('Your Profile', 'You are viewing your own profile');
+      success('Your Profile', 'This is your profile');
     }
-  }, [isOwnProfile, info]);
+  }, [isOwnProfile, success]);
 
   return null;
 }

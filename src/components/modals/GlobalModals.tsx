@@ -4,7 +4,7 @@ import { useAppModalContext } from '@/contexts/AppModalContext';
 import WelcomeModal from '@/features/account/components/WelcomeModal';
 import OnboardingModal from '@/features/account/components/OnboardingModal';
 import AccountModal from '@/features/account/components/AccountModal';
-import UpgradeToProModal from '@/components/modals/UpgradeToProModal';
+import BillingModal from '@/components/modals/BillingModal';
 
 /**
  * GlobalModals - Renders all URL-controlled modals at the app level
@@ -39,14 +39,10 @@ export default function GlobalModals() {
         }}
       />
 
-      {/* Upgrade Modal */}
-      <UpgradeToProModal
+      {/* Billing & Upgrade Modal */}
+      <BillingModal
         isOpen={modal.type === 'upgrade'}
         onClose={closeModal}
-        onUpgrade={() => {
-          closeModal();
-          // Upgrade action - can be customized as needed
-        }}
         feature={modal.feature}
       />
 

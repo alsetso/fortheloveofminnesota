@@ -4,20 +4,20 @@ services:
   # Stripe CLI for local webhook testing
   stripe-cli:
     image: stripe/stripe-cli:latest
-    container_name: mnuda-stripe-cli
+    container_name: minnesota-stripe-cli
     command: listen --forward-to http://host.docker.internal:4000/webhooks/stripe --skip-verify
     environment:
       - STRIPE_API_KEY=${STRIPE_SECRET_KEY}
     volumes:
       - stripe-config:/root/.config/stripe
     networks:
-      - mnuda-dev
+      - minnesota-dev
     restart: unless-stopped
     # Note: You'll need to login to Stripe CLI first:
-    # docker exec -it mnuda-stripe-cli stripe login
+    # docker exec -it minnesota-stripe-cli stripe login
 
 networks:
-  mnuda-dev:
+  minnesota-dev:
     driver: bridge
 
 volumes:

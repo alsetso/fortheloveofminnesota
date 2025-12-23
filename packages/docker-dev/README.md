@@ -16,7 +16,7 @@ The Stripe CLI service forwards webhooks from Stripe to your local API server fo
 
 2. **Login to Stripe CLI:**
    ```bash
-   docker exec -it mnuda-stripe-cli stripe login
+   docker exec -it minnesota-stripe-cli stripe login
    ```
    This will open a browser for authentication.
 
@@ -33,7 +33,7 @@ To test webhooks locally:
 1. Trigger events in your Stripe dashboard (test mode)
 2. Or use the Stripe CLI to trigger test events:
    ```bash
-   docker exec -it mnuda-stripe-cli stripe trigger checkout.session.completed
+   docker exec -it minnesota-stripe-cli stripe trigger checkout.session.completed
    ```
 
 ### Environment Variables

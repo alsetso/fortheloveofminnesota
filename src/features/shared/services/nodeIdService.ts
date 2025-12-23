@@ -1,7 +1,7 @@
-// MNuda ID Service for generating unique identifiers and managing relationships
+// Node ID Service for generating unique identifiers and managing relationships
 // This service provides a foundation for tracking nodes and parsed data with unique IDs
 
-export class MnudaIdService {
+export class NodeIdService {
   private static counter = 0;
   private static entityIdCache = new Map<string, string>(); // Cache for deterministic entity IDs
 
@@ -67,40 +67,40 @@ export class MnudaIdService {
     return entityId;
   }
 
-  // Extract type from MNuda ID
-  static getTypeFromId(mnudaId: string): string | null {
-    if (mnudaId.startsWith('MNSESSION')) return 'session';
-    if (mnudaId.startsWith('MNENTITY')) return 'entity';
-    if (mnudaId.startsWith('MN')) return 'node';
+  // Extract type from Node ID
+  static getTypeFromId(nodeId: string): string | null {
+    if (nodeId.startsWith('MNSESSION')) return 'session';
+    if (nodeId.startsWith('MNENTITY')) return 'entity';
+    if (nodeId.startsWith('MN')) return 'node';
     return null;
   }
 
-  // Check if an ID is a MNuda ID
-  static isMnudaId(id: string): boolean {
+  // Check if an ID is a Node ID
+  static isNodeId(id: string): boolean {
     return id.startsWith('MN');
   }
 
   // Create parent-child relationship
   static createRelationship(parentId: string, childId: string): {
-    parentMnudaId: string;
-    childMnudaId: string;
+    parentNodeId: string;
+    childNodeId: string;
   } {
     return {
-      parentMnudaId: parentId,
-      childMnudaId: childId,
+      parentNodeId: parentId,
+      childNodeId: childId,
     };
   }
 
   // Build relationship chain from entities
-  static buildRelationshipChain(entities: Array<{ mnudaId: string; parentMnudaId?: string }>): Map<string, string[]> {
+  static buildRelationshipChain(entities: Array<{ nodeId: string; parentNodeId?: string }>): Map<string, string[]> {
     const relationships = new Map<string, string[]>();
     
     entities.forEach(entity => {
-      if (entity.parentMnudaId) {
-        if (!relationships.has(entity.parentMnudaId)) {
-          relationships.set(entity.parentMnudaId, []);
+      if (entity.parentNodeId) {
+        if (!relationships.has(entity.parentNodeId)) {
+          relationships.set(entity.parentNodeId, []);
         }
-        relationships.get(entity.parentMnudaId)!.push(entity.mnudaId);
+        relationships.get(entity.parentNodeId)!.push(entity.nodeId);
       }
     });
     
@@ -108,37 +108,37 @@ export class MnudaIdService {
   }
 
   // Find all children of a parent
-  static findChildren(parentId: string, entities: Array<{ mnudaId: string; parentMnudaId?: string }>): string[] {
+  static findChildren(parentId: string, entities: Array<{ nodeId: string; parentNodeId?: string }>): string[] {
     return entities
-      .filter(entity => entity.parentMnudaId === parentId)
-      .map(entity => entity.mnudaId);
+      .filter(entity => entity.parentNodeId === parentId)
+      .map(entity => entity.nodeId);
   }
 
   // Find all parents of a child (traces up the hierarchy)
-  static findParents(childId: string, entities: Array<{ mnudaId: string; parentMnudaId?: string }>): string[] {
-    const child = entities.find(entity => entity.mnudaId === childId);
-    if (!child || !child.parentMnudaId) return [];
+  static findParents(childId: string, entities: Array<{ nodeId: string; parentNodeId?: string }>): string[] {
+    const child = entities.find(entity => entity.nodeId === childId);
+    if (!child || !child.parentNodeId) return [];
     
-    return [child.parentMnudaId, ...this.findParents(child.parentMnudaId, entities)];
+    return [child.parentNodeId, ...this.findParents(child.parentNodeId, entities)];
   }
 
   // Get relationship depth (how many levels deep)
-  static getDepth(mnudaId: string, entities: Array<{ mnudaId: string; parentMnudaId?: string }>): number {
-    const parents = this.findParents(mnudaId, entities);
+  static getDepth(nodeId: string, entities: Array<{ nodeId: string; parentNodeId?: string }>): number {
+    const parents = this.findParents(nodeId, entities);
     return parents.length;
   }
 
   // Validate relationship chain (check for circular references, missing parents, etc.)
-  static validateRelationships(entities: Array<{ mnudaId: string; parentMnudaId?: string }>): {
+  static validateRelationships(entities: Array<{ nodeId: string; parentNodeId?: string }>): {
     valid: boolean;
     errors: string[];
   } {
     const errors: string[] = [];
-    const ids = new Set(entities.map(e => e.mnudaId));
+    const ids = new Set(entities.map(e => e.nodeId));
 
     entities.forEach(entity => {
-      if (entity.parentMnudaId && !ids.has(entity.parentMnudaId)) {
-        errors.push(`Entity ${entity.mnudaId} references non-existent parent ${entity.parentMnudaId}`);
+      if (entity.parentNodeId && !ids.has(entity.parentNodeId)) {
+        errors.push(`Entity ${entity.nodeId} references non-existent parent ${entity.parentNodeId}`);
       }
     });
 
@@ -153,29 +153,29 @@ export class MnudaIdService {
     return Array.from({ length: count }, () => this.generateTypedId(type));
   }
 
-  // Parse MNuda ID to get components
-  static parseId(mnudaId: string): {
+  // Parse Node ID to get components
+  static parseId(nodeId: string): {
     prefix: string;
     id: string;
     type: string;
   } | null {
-    if (!this.isMnudaId(mnudaId)) return null;
+    if (!this.isNodeId(nodeId)) return null;
     
     let prefix = '';
     let type = '';
     
-    if (mnudaId.startsWith('MNSESSION')) {
+    if (nodeId.startsWith('MNSESSION')) {
       prefix = 'MNSESSION';
       type = 'session';
-    } else if (mnudaId.startsWith('MNENTITY')) {
+    } else if (nodeId.startsWith('MNENTITY')) {
       prefix = 'MNENTITY';
       type = 'entity';
-    } else if (mnudaId.startsWith('MN')) {
+    } else if (nodeId.startsWith('MN')) {
       prefix = 'MN';
       type = 'node';
     }
     
-    const id = mnudaId.substring(prefix.length);
+    const id = nodeId.substring(prefix.length);
     
     return {
       prefix,

@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!city) {
     return {
-      title: 'City Not Found | MNUDA',
+      title: 'City Not Found',
       robots: {
         index: false,
         follow: false,
@@ -85,7 +85,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title,
       description,
       url,
-      siteName: 'MNUDA',
+      siteName: 'For the Love of Minnesota',
       locale: 'en_US',
       type: 'website',
     },

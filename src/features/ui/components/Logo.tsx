@@ -22,7 +22,7 @@ export default function Logo({ size = 'md', className = '', variant = 'default' 
     <div className={`relative ${heightClass} ${className}`} style={{ width: 'auto' }}>
       <Image
         src="/word_logo.png"
-        alt="MNUDA Logo"
+        alt="For the Love of Minnesota Logo"
         width={250}
         height={50}
         className={`h-full w-auto object-contain ${variant === 'light' ? 'opacity-90' : ''}`}

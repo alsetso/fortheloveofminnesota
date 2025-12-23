@@ -131,7 +131,7 @@ export default function SimpleNav() {
 
   // Logo based on auth state
   const logo = user && account ? '/logo.png' : '/word_logo.png';
-  const logoAlt = user && account ? 'MNUDA Emblem' : 'MNUDA';
+  const logoAlt = user && account ? 'For the Love of Minnesota Emblem' : 'For the Love of Minnesota';
 
   // Compact search for logged-in users
   const searchSection = user && account && !isMapPage ? (

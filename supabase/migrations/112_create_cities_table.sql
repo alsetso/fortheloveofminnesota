@@ -1,5 +1,5 @@
 -- Create cities table - standalone reference table for Minnesota cities
--- Data sourced from MNUDA CACHE - cities.csv
+-- Data sourced from cities.csv
 
 -- ============================================================================
 -- STEP 1: Create cities table

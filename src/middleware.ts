@@ -126,13 +126,15 @@ export async function middleware(req: NextRequest) {
   // Note: This is a basic CSP. You may need to adjust based on your specific needs
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-inline' needed for Next.js
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com", // Stripe.js CDN
+    "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com", // Stripe.js script elements
     "worker-src 'self' blob:", // Mapbox uses blob URLs for Web Workers
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts + Tailwind
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts stylesheets
     "img-src 'self' data: https:",
     "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts fonts
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com https://api.stripe.com", // Stripe API
+    "frame-src 'self' https://js.stripe.com https://hooks.stripe.com", // Stripe Checkout and webhooks
     "frame-ancestors 'none'",
   ].join('; ');
   response.headers.set('Content-Security-Policy', csp);

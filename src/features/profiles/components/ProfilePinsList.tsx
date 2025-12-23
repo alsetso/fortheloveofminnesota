@@ -6,18 +6,38 @@ import type { ProfilePin } from '@/types/profile';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useToast } from '@/features/ui/hooks/useToast';
 
+type VisibilityFilter = 'all' | 'public' | 'only_me';
+
 interface ProfilePinsListProps {
   pins: ProfilePin[];
   isOwnProfile: boolean;
   onPinClick?: (pin: ProfilePin) => void;
   onPinUpdated?: () => void;
+  searchQuery?: string;
+  visibilityFilter?: VisibilityFilter;
+  onSearchQueryChange?: (query: string) => void;
+  onVisibilityFilterChange?: (filter: VisibilityFilter) => void;
 }
 
-type VisibilityFilter = 'all' | 'public' | 'only_me';
+export default function ProfilePinsList({
+  pins: initialPins,
+  isOwnProfile,
+  onPinClick,
+  onPinUpdated,
+  searchQuery: externalSearchQuery,
+  visibilityFilter: externalVisibilityFilter,
+  onSearchQueryChange,
+  onVisibilityFilterChange,
+}: ProfilePinsListProps) {
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const [internalVisibilityFilter, setInternalVisibilityFilter] = useState<VisibilityFilter>('all');
 
-export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPinClick, onPinUpdated }: ProfilePinsListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all');
+  // Use external state if provided, otherwise use internal state
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const visibilityFilter = externalVisibilityFilter !== undefined ? externalVisibilityFilter : internalVisibilityFilter;
+  
+  const setSearchQuery = onSearchQueryChange || setInternalSearchQuery;
+  const setVisibilityFilter = onVisibilityFilterChange || setInternalVisibilityFilter;
   const [pins, setPins] = useState<ProfilePin[]>(initialPins);
   const [editingPinId, setEditingPinId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -140,57 +160,6 @@ export default function ProfilePinsList({ pins: initialPins, isOwnProfile, onPin
 
   return (
     <div className="space-y-3">
-      {/* Search and Filters */}
-      <div className="space-y-2">
-        {/* Search Input */}
-        <div className="relative">
-          <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search mentions..."
-            className="w-full pl-8 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-          />
-        </div>
-
-        {/* Visibility Filter - Only for owners */}
-        {isOwnProfile && (
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => setVisibilityFilter('all')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                visibilityFilter === 'all'
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setVisibilityFilter('public')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                visibilityFilter === 'public'
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Public
-            </button>
-            <button
-              onClick={() => setVisibilityFilter('only_me')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                visibilityFilter === 'only_me'
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Private
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Pins List */}
       {filteredPins.length === 0 ? (
         <div className="text-xs text-gray-500 py-3">

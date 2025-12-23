@@ -1,11 +1,11 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import ProfileCard from '@/features/profiles/components/ProfileCard';
-import ProfilePinsList from '@/features/profiles/components/ProfilePinsList';
+import ProfileMentionsSection from '@/features/profiles/components/ProfileMentionsSection';
 import OwnershipToast from '@/features/profiles/components/OwnershipToast';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { Metadata } from 'next';
-import type { ProfileAccount } from '@/types/profile';
+import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Mention } from '@/types/mention';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!account) {
     return {
-      title: 'Profile Not Found | MNUDA',
+      title: 'Profile Not Found',
     };
   }
 
@@ -42,8 +42,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : accountMeta.username || 'User';
 
   return {
-    title: `${displayName} | MNUDA`,
-    description: `View ${displayName}'s profile on MNUDA - For the Love of Minnesota`,
+    title: `${displayName}`,
+    description: `View ${displayName}'s profile - For the Love of Minnesota`,
   };
 }
 
@@ -120,7 +120,7 @@ export default async function ProfilePage({ params }: Props) {
 
   const { data: mentionsData } = await mentionsQuery;
 
-  const mentions: Mention[] = (mentionsData || []).map((mention: {
+  const mentions: ProfilePin[] = (mentionsData || []).map((mention: {
     id: string;
     lat: number;
     lng: number;
@@ -134,8 +134,6 @@ export default async function ProfilePage({ params }: Props) {
     lat: mention.lat,
     lng: mention.lng,
     description: mention.description,
-    account_id: accountData.id,
-    city_id: mention.city_id || null,
     visibility: mention.visibility || 'public',
     created_at: mention.created_at,
     updated_at: mention.updated_at,
@@ -161,14 +159,28 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
       <OwnershipToast isOwnProfile={isOwnProfile} />
-      <div className="max-w-2xl mx-auto space-y-3">
-        <ProfileCard 
-          account={profileAccountData}
-          isOwnProfile={isOwnProfile}
-        />
-        {mentions.length > 0 && (
-          <ProfilePinsList pins={mentions} isOwnProfile={isOwnProfile} />
-        )}
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          {/* Left Column - Profile */}
+          <div className="lg:col-span-3">
+            <ProfileCard 
+              account={profileAccountData}
+              isOwnProfile={isOwnProfile}
+            />
+          </div>
+
+          {/* Middle Column - Search Filters and Mentions */}
+          <div className="lg:col-span-6">
+            {mentions.length > 0 && (
+              <ProfileMentionsSection pins={mentions} isOwnProfile={isOwnProfile} />
+            )}
+          </div>
+
+          {/* Right Column - Empty for now */}
+          <div className="lg:col-span-3">
+            {/* Reserved for future content */}
+          </div>
+        </div>
       </div>
     </SimplePageLayout>
   );

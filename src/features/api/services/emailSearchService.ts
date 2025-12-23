@@ -2,7 +2,7 @@
 
 import { apiService } from './apiService';
 import { NodeData } from '@/features/session/services/sessionStorage';
-import { MnudaIdService } from '@/features/shared/services/mnudaIdService';
+import { NodeIdService } from '@/features/shared/services/nodeIdService';
 
 export interface EmailSearchResult {
   success: boolean;
@@ -28,7 +28,7 @@ export class EmailSearchService {
         apiName: 'Skip Trace',
         response,
         timestamp: new Date().toISOString(),
-        mnNodeId: MnudaIdService.generateTypedId('node'),
+        mnNodeId: NodeIdService.generateTypedId('node'),
       };
 
       return {

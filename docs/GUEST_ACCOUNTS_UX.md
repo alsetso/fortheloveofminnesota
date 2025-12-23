@@ -12,13 +12,13 @@ The platform supports both **Guest** and **Authenticated User** accounts. A user
 
 #### First Visit (No Auth)
 1. User visits site → No authentication
-2. System checks `localStorage` for `mnuda_guest_id`
+2. System checks `localStorage` for `guest_id`
 3. If not found → Generate new `guest_id` (e.g., `guest_550e8400-e29b-41d4-a716-446655440000`)
-4. Store `guest_id` in `localStorage.mnuda_guest_id`
+4. Store `guest_id` in `localStorage.guest_id`
 5. User can:
    - View public pins and accounts
    - Post pins (creates/uses guest account automatically)
-   - Set guest name (stored in `localStorage.mnuda_guest_name`)
+   - Set guest name (stored in `localStorage.guest_name`)
 
 #### Guest Account Creation
 - **Lazy Creation**: Guest account is created in database only when user posts their first pin
@@ -53,7 +53,7 @@ The platform supports both **Guest** and **Authenticated User** accounts. A user
 When user signs in and has guest data:
 
 **Detection:**
-- `GuestAccountService.hasGuestData()` checks `localStorage.mnuda_guest_id`
+- `GuestAccountService.hasGuestData()` checks `localStorage.guest_id`
 - If exists → Fetch guest account from database
 - Check if guest account has pins
 
@@ -84,8 +84,8 @@ When user signs in and has guest data:
 #### State 1: Pure Guest
 ```
 localStorage:
-  - mnuda_guest_id: "guest_xxx"
-  - mnuda_guest_name: "John"
+  - guest_id: "guest_xxx"
+  - guest_name: "John"
 
 Database:
   - accounts: { id: uuid, guest_id: "guest_xxx", user_id: NULL }
@@ -105,8 +105,8 @@ Database:
 #### State 3: Both (During Transition)
 ```
 localStorage:
-  - mnuda_guest_id: "guest_xxx" (still exists)
-  - mnuda_guest_name: "John"
+  - guest_id: "guest_xxx" (still exists)
+  - guest_name: "John"
 
 Database:
   - accounts: [
@@ -132,8 +132,8 @@ Database:
 ## Technical Details
 
 ### Local Storage Keys
-- `mnuda_guest_id`: Unique guest identifier (persists across sessions)
-- `mnuda_guest_name`: Guest's display name (optional)
+- `guest_id`: Unique guest identifier (persists across sessions)
+- `guest_name`: Guest's display name (optional)
 
 ### Database Schema
 ```sql

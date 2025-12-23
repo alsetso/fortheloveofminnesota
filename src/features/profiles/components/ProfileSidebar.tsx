@@ -135,8 +135,8 @@ export default function ProfileSidebar({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${displayName}'s Profile on MNUDA`,
-          text: `Check out ${displayName}'s pins on MNUDA - For the Love of Minnesota`,
+          title: `${displayName}'s Profile`,
+          text: `Check out ${displayName}'s pins - For the Love of Minnesota`,
           url,
         });
       } catch (err) {
@@ -293,7 +293,7 @@ export default function ProfileSidebar({
           >
             <Image
               src="/logo.png"
-              alt="MNUDA"
+              alt="For the Love of Minnesota"
               width={24}
               height={24}
               className="object-contain transition-opacity duration-150 group-hover:opacity-0"

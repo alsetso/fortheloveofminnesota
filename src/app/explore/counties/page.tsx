@@ -18,14 +18,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
-    title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN | MNUDA`,
+    title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
     description: `Complete directory of all ${countyCount} Minnesota counties. Browse all counties by name, population, and area. Find detailed information about Hennepin County, Ramsey County, Dakota County, and all other Minnesota counties. Updated directory with population data and county profiles.`,
     keywords: ['Minnesota counties', 'MN counties', 'county directory', 'Hennepin County', 'Ramsey County', 'Dakota County', 'Minnesota demographics', 'county population', 'Minnesota geography'],
     openGraph: {
-      title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN | MNUDA`,
+      title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
       description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area. Find detailed information about every county in Minnesota.`,
       url: `${baseUrl}/explore/counties`,
-      siteName: 'MNUDA',
+      siteName: 'For the Love of Minnesota',
       images: [
         {
           url: '/logo.png',

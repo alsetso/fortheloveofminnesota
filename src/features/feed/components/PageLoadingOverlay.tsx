@@ -85,7 +85,7 @@ export default function PageLoadingOverlay({
 
   const overlayContent = (
     <div className="fixed inset-0 z-[99999] bg-white flex flex-col items-center justify-start pt-12">
-      {/* MNUDA Emblem */}
+      {/* Emblem */}
       <div className="mb-6">
         <Image
           src="/word_logo.png"

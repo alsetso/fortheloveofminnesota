@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
               </div>
             </div>
             <div class="footer">
-              <p>This lead was submitted through the MNUDA website contact form.</p>
+              <p>This lead was submitted through the website contact form.</p>
             </div>
           </div>
         </body>
@@ -116,7 +116,7 @@ Account Type: ${accountTypeLabels[accountType] || accountType || 'Not specified'
 
 Submitted: ${new Date().toLocaleString()}
 
-This lead was submitted through the MNUDA website contact form.
+This lead was submitted through the website contact form.
     `.trim();
 
     // Send email directly via Resend API

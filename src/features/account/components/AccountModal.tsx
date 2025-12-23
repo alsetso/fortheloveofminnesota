@@ -41,7 +41,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
             <div className="relative w-6 h-6 flex-shrink-0">
               <Image
                 src="/logo.png"
-                alt="MNUDA"
+                alt="For the Love of Minnesota"
                 width={24}
                 height={24}
                 className="object-contain"

@@ -8,8 +8,8 @@
 INSERT INTO public.notifications (account_id, title, message, read, created_at)
 SELECT 
   id as account_id,
-  'Welcome to MNUDA' as title,
-  'Thank you for joining MNUDA! We''re excited to have you here. Explore the platform and discover what we have to offer.' as message,
+  'Welcome!' as title,
+  'Thank you for joining! We''re excited to have you here. Explore the platform and discover what we have to offer.' as message,
   false as read,
   NOW() as created_at
 FROM public.accounts
@@ -17,7 +17,7 @@ WHERE id NOT IN (
   -- Skip accounts that already have a welcome notification
   SELECT DISTINCT account_id 
   FROM public.notifications 
-  WHERE title = 'Welcome to MNUDA'
+  WHERE title = 'Welcome!'
 );
 
 -- ============================================================================
@@ -30,8 +30,8 @@ BEGIN
   INSERT INTO public.notifications (account_id, title, message, read, created_at)
   VALUES (
     NEW.id,
-    'Welcome to MNUDA',
-    'Thank you for joining MNUDA! We''re excited to have you here. Explore the platform and discover what we have to offer.',
+    'Welcome!',
+    'Thank you for joining! We''re excited to have you here. Explore the platform and discover what we have to offer.',
     false,
     NOW()
   );

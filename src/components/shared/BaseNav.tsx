@@ -56,7 +56,7 @@ interface BaseNavProps {
 export default function BaseNav({
   navLinks,
   logo = '/word_logo.png',
-  logoAlt = 'MNUDA',
+  logoAlt = 'For the Love of Minnesota',
   bgColor = 'bg-white',
   borderColor = 'border-gray-200',
   textColor = 'text-gray-600',

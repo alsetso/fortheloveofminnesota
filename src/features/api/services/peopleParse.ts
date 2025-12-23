@@ -1,5 +1,5 @@
 // People parsing service for converting Skip Trace API responses into formatted person data
-import { MnudaIdService } from '@/features/shared/services/mnudaIdService';
+import { NodeIdService } from '@/features/shared/services/nodeIdService';
 
 export interface PersonRecord {
   name: string;
@@ -54,7 +54,7 @@ export const peopleParseService = {
       person_link: person.Link || undefined,
       apiPersonId: person["Person ID"] || undefined,    // External API ID
       source: apiResponse.Source || 'Unknown',
-      mnEntityId: MnudaIdService.generateEntityId({
+      mnEntityId: NodeIdService.generateEntityId({
         type: 'person',
         name: person.Name || '',
         apiPersonId: person["Person ID"] || undefined,

@@ -230,7 +230,7 @@ CREATE INDEX IF NOT EXISTS accounts_traits_idx
 
 -- Update comments
 COMMENT ON TYPE public.account_trait IS
-  'Enum type for account traits that define user perspectives and activities on MNUDA. Users can select multiple traits from 119 available options organized into 15 categories.';
+  'Enum type for account traits that define user perspectives and activities. Users can select multiple traits from 119 available options organized into 15 categories.';
 
 COMMENT ON COLUMN public.accounts.traits IS
-  'Array of account traits that help define the account''s perspectives and activities on MNUDA. Users can select multiple traits from 119 available options covering emotional meaning, care & stewardship, exploration, belonging, social energy, expression, observation, memory & legacy, environment orientation, practical awareness, engagement style, energy & pace, economic participation, value creation, and economic awareness.';
+  'Array of account traits that help define the account''s perspectives and activities. Users can select multiple traits from 119 available options covering emotional meaning, care & stewardship, exploration, belonging, social energy, expression, observation, memory & legacy, environment orientation, practical awareness, engagement style, energy & pace, economic participation, value creation, and economic awareness.';

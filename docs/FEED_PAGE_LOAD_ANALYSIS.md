@@ -81,11 +81,11 @@ Complete breakdown of everything that loads when `/feed` page is accessed.
 
 #### NavigationCard
 - **Static Component**: No data fetching
-- **Modal**: AboutMnUDAModal (lazy loaded on click)
+- **Modal**: AboutModal (lazy loaded on click)
 
 ### 6. Main Feed Content
 
-#### MnudaHeroCard
+#### HeroCard
 - **Static Component**: No data fetching
 - **State**: Dismissible (local state only)
 

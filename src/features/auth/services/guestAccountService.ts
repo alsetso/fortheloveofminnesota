@@ -1,8 +1,8 @@
 import { supabase } from '@/lib/supabase';
 
-const GUEST_ID_KEY = 'mnuda_guest_id';
-const GUEST_NAME_KEY = 'mnuda_guest_name';
-const ALL_GUEST_IDS_KEY = 'mnuda_all_guest_ids';
+const GUEST_ID_KEY = 'guest_id';
+const GUEST_NAME_KEY = 'guest_name';
+const ALL_GUEST_IDS_KEY = 'all_guest_ids';
 
 export interface GuestAccount {
   id: string;

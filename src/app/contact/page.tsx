@@ -114,7 +114,7 @@ export default function ContactPage() {
             <div className="space-y-0.5">
               <p className="text-xs font-medium text-gray-900">Business Partnerships</p>
               <p className="text-xs text-gray-600">
-                Opportunities for collaboration, partnerships, or integrating with the MNUDA platform.
+                Opportunities for collaboration, partnerships, or integrating with the platform.
               </p>
             </div>
             <div className="space-y-0.5">

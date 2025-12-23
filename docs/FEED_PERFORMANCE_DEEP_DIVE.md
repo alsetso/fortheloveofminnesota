@@ -441,7 +441,7 @@ export default async function FeedPage() {
 import { useState, useEffect, useCallback, useRef } from 'react';
 import FeedPost, { FeedPostData } from './FeedPost';
 import { PostCreationCard } from '@/features/posts';
-import MnudaHeroCard from './MnudaHeroCard';
+import HeroCard from './HeroCard';
 import CitiesAndCountiesSidebar from '@/components/locations/CitiesAndCountiesSidebar';
 import AccountViewsCard from './AccountViewsCard';
 import PagesCard from './PagesCard';
@@ -589,7 +589,7 @@ export default function FeedListClient({ initialAccount = null }: FeedListClient
 
         {/* Main Content */}
         <div className="lg:col-span-6">
-          <MnudaHeroCard />
+          <HeroCard />
           <PostCreationCard onPostCreated={handlePostCreated} />
 
           <div className="space-y-3 mt-3">

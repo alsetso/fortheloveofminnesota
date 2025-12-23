@@ -202,7 +202,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
             <XMarkIcon className="w-3 h-3" />
           </button>
 
-          {/* MNUDA Branding */}
+          {/* Branding */}
           <div className="flex flex-col items-center justify-center mb-3 space-y-2">
             <div className="relative w-8 h-8">
               <Image

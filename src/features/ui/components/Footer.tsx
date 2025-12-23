@@ -113,7 +113,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
         <div className={`pt-3 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-2">
             <p className={`text-xs text-center md:text-left ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              © {currentYear} MNUDA. All rights reserved.
+              © {currentYear} For the Love of Minnesota. All rights reserved.
             </p>
             <div className={`flex items-center gap-4 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
               <span>Minnesota, United States</span>

@@ -18,14 +18,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
-    title: `Minnesota Cities Directory | Complete List of All Cities in MN | MNUDA`,
+    title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
     description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location. Find detailed information about Minneapolis, St. Paul, Duluth, Rochester, and all other Minnesota cities. Updated directory with population data and city profiles.`,
     keywords: ['Minnesota cities', 'MN cities', 'city directory', 'Minneapolis', 'St. Paul', 'Duluth', 'Rochester', 'Minnesota demographics', 'city population', 'Minnesota locations'],
     openGraph: {
-      title: `Minnesota Cities Directory | Complete List of All Cities in MN | MNUDA`,
+      title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
       description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location. Find detailed information about every city in Minnesota.`,
       url: `${baseUrl}/explore/cities`,
-      siteName: 'MNUDA',
+      siteName: 'For the Love of Minnesota',
       images: [
         {
           url: '/logo.png',

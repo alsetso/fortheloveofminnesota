@@ -1,7 +1,7 @@
 // Session storage system - localStorage removed, will be replaced with Supabase
 // This is a temporary stub implementation
 
-import { MnudaIdService } from '@/features/shared/services/mnudaIdService';
+import { NodeIdService } from '@/features/shared/services/nodeIdService';
 
 export interface SessionData {
   id: string;
@@ -10,7 +10,7 @@ export interface SessionData {
   createdAt: number;
   lastAccessed: number;
   nodes: NodeData[];
-  mnudaId?: string; // MNSESSION ID
+  sessionId?: string; // MNSESSION ID
   activeUserFoundNodeId?: string; // Track which UserFoundNode is currently active
   locationTrackingActive: boolean; // Prevent multiple GPS tracking sessions
   metadata?: Record<string, unknown>;
@@ -85,13 +85,13 @@ export interface NodeData {
   };
   
   // Simplified 3-ID structure
-  mnNodeId: string;                    // Internal node ID (replaces mnudaId)
-  parentNodeId?: string;               // Parent node ID (replaces parentMnudaId)
+  mnNodeId: string;                    // Internal node ID
+  parentNodeId?: string;               // Parent node ID
   clickedEntityId?: string;            // Which entity triggered this node
   clickedEntityData?: unknown;         // The actual entity data that triggered this node
   
   // Legacy fields for compatibility
-  childMnudaIds?: string[];            // Child node IDs
+  childNodeIds?: string[];            // Child node IDs
   entityCount?: number;                // Number of entities
   relationshipType?: string;           // Type of relationship (e.g., 'parent', 'child')
 }
@@ -148,7 +148,7 @@ class SessionStorageService {
       createdAt: Date.now(),
       lastAccessed: Date.now(),
       nodes: [],
-      mnudaId: MnudaIdService.generateTypedId('session'),
+      sessionId: NodeIdService.generateTypedId('session'),
       locationTrackingActive: false,
       isActive: true,
     };

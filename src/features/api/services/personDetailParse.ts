@@ -1,6 +1,6 @@
 // Person detail parsing service for extracting structured entities from person detail API responses
 
-import { MnudaIdService } from '@/features/shared/services/mnudaIdService';
+import { NodeIdService } from '@/features/shared/services/nodeIdService';
 
 export interface PersonDetailEntity {
   type: 'property' | 'address' | 'phone' | 'email' | 'person' | 'image';
@@ -204,7 +204,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: false,  // Properties don't have action buttons
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'property',
           address: apiResponse.address?.full,
           city: apiResponse.address?.city,
@@ -230,7 +230,7 @@ export const personDetailParseService = {
           source: apiResponse.Source || 'Unknown',
           parentNodeId: parentNodeId,
           isTraceable: true,  // Addresses have Intel button
-          mnEntityId: MnudaIdService.generateEntityId({
+          mnEntityId: NodeIdService.generateEntityId({
             type: 'address',
             street: addr.street_address,
             city: addr.address_locality,
@@ -257,7 +257,7 @@ export const personDetailParseService = {
           source: apiResponse.Source || 'Unknown',
           parentNodeId: parentNodeId,
           isTraceable: true,  // Addresses have Intel button
-          mnEntityId: MnudaIdService.generateEntityId({
+          mnEntityId: NodeIdService.generateEntityId({
             type: 'address',
             street: addr.streetAddress,
             city: addr.addressLocality,
@@ -281,7 +281,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: false,  // Phones don't have action buttons
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'phone',
           number: ph.phone_number,
           phone_type: ph.phone_type
@@ -299,7 +299,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: false,  // Emails don't have action buttons
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'email',
           email: e
         }, parentNodeId)
@@ -321,7 +321,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: true,  // Persons have Trace button
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'person',
           name: p.Person_name,
           category: 'resident'
@@ -343,7 +343,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: true,  // Persons have Trace button
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'person',
           name: r.Name,
           apiPersonId: r["Person ID"],
@@ -366,7 +366,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: true,  // Persons have Trace button
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'person',
           name: a.Name,
           apiPersonId: a["Person ID"],
@@ -388,7 +388,7 @@ export const personDetailParseService = {
         source: apiResponse.Source || 'Unknown',
         parentNodeId: parentNodeId,
         isTraceable: false,  // Images don't have action buttons
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'image',
           url: photo.url,
           category: 'property_photo',
@@ -408,7 +408,7 @@ export const personDetailParseService = {
         source: "Google Street View",
         parentNodeId: parentNodeId,
         isTraceable: false,  // Images don't have action buttons
-        mnEntityId: MnudaIdService.generateEntityId({
+        mnEntityId: NodeIdService.generateEntityId({
           type: 'image',
           category: 'street_view',
           address: apiResponse.address.full

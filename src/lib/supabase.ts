@@ -7,7 +7,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-const GUEST_ID_KEY = 'mnuda_guest_id';
+const GUEST_ID_KEY = 'guest_id';
 
 /**
  * Get guest ID from localStorage (browser only)

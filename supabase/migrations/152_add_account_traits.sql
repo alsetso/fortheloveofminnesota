@@ -1,5 +1,5 @@
 -- Add account_trait enum and traits array column to accounts table
--- Allows users to select multiple traits that define their activities on MNUDA
+-- Allows users to select multiple traits that define their activities
 
 -- ============================================================================
 -- STEP 1: Create account_trait enum type
@@ -47,9 +47,9 @@ CREATE INDEX IF NOT EXISTS accounts_traits_idx
 -- ============================================================================
 
 COMMENT ON TYPE public.account_trait IS
-  'Enum type for account traits that define user activities on MNUDA. Users can have multiple traits.';
+  'Enum type for account traits that define user activities. Users can have multiple traits.';
 
 COMMENT ON COLUMN public.accounts.traits IS
-  'Array of account traits that help define the account''s activities on MNUDA. Users can select multiple traits from: resident, homeowner, buyer, wholesaler, investor, realtor, broker, contractor, services, business, lender, landlord, manager, developer.';
+  'Array of account traits that help define the account''s activities. Users can select multiple traits from: resident, homeowner, buyer, wholesaler, investor, realtor, broker, contractor, services, business, lender, landlord, manager, developer.';
 
 

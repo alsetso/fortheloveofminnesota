@@ -86,7 +86,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'shop.mnuda.com',
+        hostname: 'shop.fortheloveofminnesota.com',
         port: '',
         pathname: '/**',
       },

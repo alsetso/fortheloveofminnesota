@@ -95,10 +95,10 @@ CREATE INDEX IF NOT EXISTS accounts_traits_idx
 
 -- Update comments
 COMMENT ON TYPE public.account_trait IS
-  'Enum type for account traits that define user activities on MNUDA. Users can have multiple traits.';
+  'Enum type for account traits that define user activities. Users can have multiple traits.';
 
 COMMENT ON COLUMN public.accounts.traits IS
-  'Array of account traits that help define the account''s activities on MNUDA. Users can select multiple traits from: homeowner, buyer, investor, realtor, wholesaler, lender, title, renter, businessowner.';
+  'Array of account traits that help define the account''s activities. Users can select multiple traits from: homeowner, buyer, investor, realtor, wholesaler, lender, title, renter, businessowner.';
 
 
 

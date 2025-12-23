@@ -14,11 +14,10 @@ import {
   MapPinIcon,
   QuestionMarkCircleIcon,
   NewspaperIcon,
-  UserIcon,
 } from '@heroicons/react/24/outline';
-import ProfilePhoto from '@/components/shared/ProfilePhoto';
-import { Account, AccountService, useAuthStateSafe } from '@/features/auth';
+import { Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import SecondarySidebar from './SecondarySidebar';
 import ExploreSecondaryContent from './ExploreSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
@@ -50,70 +49,12 @@ const hrefToTab: Record<string, SidebarTab> = {
   '#news': 'news' as SidebarTab,
 };
 
-// Simple account icon button component (no dropdown)
-function AccountIconButton({
-  onAccountClick,
-  onSignInClick,
-}: {
-  onAccountClick: () => void;
-  onSignInClick: () => void;
-}) {
-  const { account, isLoading, displayAccount } = useAuthStateSafe();
-
-  // When not authenticated and not loading, show sign in button
-  if (!isLoading && !account) {
-    return (
-      <button
-        onClick={onSignInClick}
-        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors"
-        aria-label="Sign in"
-      >
-        Sign In
-      </button>
-    );
-  }
-
-  // When authenticated or loading, show profile photo button
-  return (
-    <button
-      onClick={onAccountClick}
-      className="flex flex-col items-center justify-center gap-1 px-1 py-2 group cursor-pointer w-full"
-      title="Account"
-      type="button"
-      aria-label="Account"
-    >
-      <div className="w-8 h-8 flex items-center justify-center rounded-md transition-colors group-hover:bg-gray-100">
-        {displayAccount ? (
-          <ProfilePhoto 
-            account={displayAccount as Account} 
-            size="sm" 
-            editable={false}
-          />
-        ) : (
-          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-            <UserIcon className="w-3 h-3 text-gray-500" />
-          </div>
-        )}
-      </div>
-      <span className="text-[10px] leading-tight text-center text-gray-600">
-        Account
-      </span>
-    </button>
-  );
-}
-
 const allNavItems: NavItem[] = [
   { 
     href: '#explore', 
     label: 'Explore', 
     icon: GlobeAltIcon,
     secondaryContent: <ExploreSecondaryContent />,
-  },
-  { 
-    href: '#controls', 
-    label: 'Controls', 
-    icon: AdjustmentsHorizontalIcon,
-    secondaryContent: <Map3DControlsSecondaryContent />,
   },
   { 
     href: '#poi', 
@@ -146,11 +87,11 @@ export default function Sidebar({ account, map }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { openAccount, openWelcome } = useAppModalContextSafe();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [clickedNavItem, setClickedNavItem] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const isHomepage = pathname === '/';
-  const { openAccount, openWelcome } = useAppModalContextSafe();
   
   // URL-based tab state (for all tabs on homepage)
   const { urlTab, updateUrl } = useSidebarTabState({
@@ -305,31 +246,9 @@ export default function Sidebar({ account, map }: SidebarProps) {
     <>
       {/* Mobile Top Nav */}
       <nav className="lg:hidden fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-200 h-14">
-        <div className="relative flex items-center justify-end h-full px-3">
-          {/* Logo - Centered */}
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2">
-            <Image
-              src="/logo.png"
-              alt="Logo"
-              width={24}
-              height={24}
-              className="w-6 h-6"
-              unoptimized
-            />
-          </Link>
-
-          {/* Right side - Account and Hamburger */}
+        <div className="relative flex items-center justify-between h-full px-3">
+          {/* Left side - Hamburger */}
           <div className="flex items-center gap-2">
-            <AccountIconButton
-              onAccountClick={() => {
-                setIsMobileMenuOpen(false);
-                openAccount('settings');
-              }}
-              onSignInClick={() => {
-                setIsMobileMenuOpen(false);
-                openWelcome();
-              }}
-            />
             <button
               onClick={() => {
                 if (clickedNavItem) {
@@ -353,6 +272,27 @@ export default function Sidebar({ account, map }: SidebarProps) {
                 <Bars3Icon className="w-6 h-6" />
               )}
             </button>
+          </div>
+
+          {/* Logo - Centered */}
+          <Link href="/" className="absolute left-1/2 -translate-x-1/2">
+            <Image
+              src="/logo.png"
+              alt="Logo"
+              width={24}
+              height={24}
+              className="w-6 h-6"
+              unoptimized
+            />
+          </Link>
+
+          {/* Right side - Account Dropdown */}
+          <div className="flex items-center gap-2">
+            <AccountDropdown
+              variant="light"
+              onAccountClick={() => openAccount('settings')}
+              onSignInClick={() => openWelcome()}
+            />
           </div>
         </div>
 
@@ -411,30 +351,30 @@ export default function Sidebar({ account, map }: SidebarProps) {
       </nav>
 
       {/* Desktop Sidebar */}
-      <aside ref={sidebarRef} className="hidden lg:flex relative w-16 flex-shrink-0 flex-col h-full bg-white border-r border-gray-200">
-        {/* Navigation items - large vertical container */}
-        <nav className="flex-1 flex flex-col overflow-y-auto p-2 border-b border-gray-200">
-          <ul className="flex-1 space-y-2">
-            {/* Logo - centered, vertically inline with nav icons, matches secondary sidebar header height */}
-            <li className="h-11 flex items-center"> {/* h-11 = 2.75rem = 44px, matches secondary sidebar header */}
-              <Link
-                href="/"
-                className="flex flex-col items-center justify-center w-full px-1 group"
-                title="Home"
-              >
-                <div className="w-10 h-10 flex items-center justify-center rounded-md transition-colors group-hover:bg-gray-100">
-                  <Image
-                    src="/logo.png"
-                    alt="Logo"
-                    width={28}
-                    height={28}
-                    className="w-7 h-7"
-                    unoptimized
-                  />
-                </div>
-              </Link>
-            </li>
+      <aside ref={sidebarRef} className="hidden lg:flex relative w-16 flex-shrink-0 flex-col h-screen bg-white border-r border-gray-200">
+        {/* Container 1: Logo */}
+        <div className="flex-shrink-0 p-2 border-b border-gray-200">
+          <Link
+            href="/"
+            className="flex flex-col items-center justify-center w-full px-1 group"
+            title="Home"
+          >
+            <div className="w-10 h-10 flex items-center justify-center rounded-md transition-colors group-hover:bg-gray-100">
+              <Image
+                src="/logo.png"
+                alt="Logo"
+                width={28}
+                height={28}
+                className="w-7 h-7"
+                unoptimized
+              />
+            </div>
+          </Link>
+        </div>
 
+        {/* Container 2: Navigation items */}
+        <nav className="flex-1 flex flex-col overflow-y-auto p-2">
+          <ul className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
@@ -473,19 +413,59 @@ export default function Sidebar({ account, map }: SidebarProps) {
           </ul>
         </nav>
 
-        {/* Account icon at bottom */}
-        <div className="p-2 border-t border-gray-200">
-          {/* Account icon - opens account modal on click */}
-          <div className="flex justify-center">
-            <AccountIconButton
-              onAccountClick={() => openAccount('settings')}
-              onSignInClick={() => openWelcome()}
-            />
-          </div>
+        {/* Container 3: Controls button at bottom */}
+        <div className="flex-shrink-0 p-2 border-t border-gray-200">
+          <button
+            onClick={() => handleNavItemClick('#controls')}
+            className="flex flex-col items-center justify-center gap-1 px-1 py-2 group cursor-pointer w-full"
+            title="Controls"
+            type="button"
+          >
+            <div className={`
+              w-8 h-8 flex items-center justify-center rounded-md transition-colors
+              ${
+                clickedNavItem === '#controls'
+                  ? 'bg-gray-200'
+                  : 'group-hover:bg-gray-100'
+              }
+            `}>
+              <AdjustmentsHorizontalIcon className={`w-5 h-5 ${
+                clickedNavItem === '#controls' ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'
+              }`} />
+            </div>
+            <span className={`text-[10px] leading-tight text-center ${
+              clickedNavItem === '#controls' ? 'text-gray-900' : 'text-gray-600'
+            }`}>
+              Controls
+            </span>
+          </button>
         </div>
 
         {/* Desktop Secondary Sidebar - Shows on click */}
         {clickedNavItem && (() => {
+          // Handle controls separately
+          if (clickedNavItem === '#controls') {
+            return (
+              <SecondarySidebar
+                isOpen={true}
+                label="Controls"
+                onMouseEnter={() => {}} // Keep open when hovering over secondary sidebar
+                onMouseLeave={() => {}} // Don't close on mouse leave
+                onClose={() => {
+                  const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
+                  setClickedNavItem(null);
+                  // Remove URL param when closing tab on homepage
+                  if (isHomepage && tab) {
+                    updateUrl(null);
+                  }
+                }}
+              >
+                <Map3DControlsSecondaryContent map={map} />
+              </SecondarySidebar>
+            );
+          }
+
+          // Handle other nav items
           const navItem = navItems.find(item => item.href === clickedNavItem);
           const content = navItem?.secondaryContent;
           if (!content) return null;
@@ -516,6 +496,27 @@ export default function Sidebar({ account, map }: SidebarProps) {
 
       {/* Mobile Secondary Sidebar - Full screen overlay */}
       {clickedNavItem && (() => {
+        // Handle controls separately
+        if (clickedNavItem === '#controls') {
+          return (
+            <SecondarySidebar
+              isOpen={true}
+              label="Controls"
+              onClose={() => {
+                const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
+                setClickedNavItem(null);
+                // Remove URL param when closing tab on homepage
+                if (isHomepage && tab) {
+                  updateUrl(null);
+                }
+              }}
+            >
+              <Map3DControlsSecondaryContent map={map} />
+            </SecondarySidebar>
+          );
+        }
+
+        // Handle other nav items
         const navItem = navItems.find(item => item.href === clickedNavItem);
         const content = navItem?.secondaryContent;
         if (!content) return null;

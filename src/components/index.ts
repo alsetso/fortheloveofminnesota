@@ -20,7 +20,7 @@ export { SuspenseBoundary, PageSuspense, AuthSuspense } from './errors/SuspenseB
 
 // Modal Components
 export { default as GlobalModals } from './modals/GlobalModals';
-export { default as UpgradeToProModal } from './modals/UpgradeToProModal';
+export { default as BillingModal } from './modals/BillingModal';
 
 // Utility Components
 export { default as LoadingSkeleton, PageLoadingSkeleton, AuthLoadingSkeleton } from './utils/LoadingSkeleton';

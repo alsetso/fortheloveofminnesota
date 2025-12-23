@@ -54,7 +54,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const { layers, toggleLayer, setLayerCount } = useAtlasLayers();
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { isModalOpen, openWelcome, openAccount } = useAppModalContextSafe();
+  const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
   
   // URL-based state (only year filter)
   useUrlMapState();
@@ -336,7 +336,15 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         <HomepageStatsHandle />
 
         {/* Floating Account Dropdown - Top Right (desktop only, mobile has it in nav) */}
-        <div className="hidden lg:block absolute top-4 right-4 z-20 pointer-events-auto">
+        <div className="hidden lg:flex absolute top-4 right-4 z-20 pointer-events-auto items-center gap-2">
+          {account?.plan === 'hobby' && (
+            <button
+              onClick={() => openUpgrade()}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+            >
+              Upgrade
+            </button>
+          )}
           <AccountDropdown
             variant="light"
             onAccountClick={() => openAccount('settings')}

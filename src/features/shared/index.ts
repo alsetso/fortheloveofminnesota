@@ -1,2 +1,2 @@
 // Shared feature exports
-export * from './services/mnudaIdService';
+export * from './services/nodeIdService';

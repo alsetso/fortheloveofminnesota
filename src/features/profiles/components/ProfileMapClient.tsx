@@ -373,6 +373,7 @@ export default function ProfileMapClient({
         lat: newMention.lat,
         lng: newMention.lng,
         description: newMention.description,
+        collection_id: newMention.collection_id || null,
         visibility: newMention.visibility as 'public' | 'only_me',
         created_at: newMention.created_at,
         updated_at: newMention.updated_at,

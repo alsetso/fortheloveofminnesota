@@ -90,6 +90,7 @@ export function useAtlasLayers() {
     { id: 'churches', name: 'Churches', icon: '⛪', visible: false },
     { id: 'municipals', name: 'Municipals', icon: '🏛️', visible: false },
     { id: 'roads', name: 'Roads', icon: '🛣️', visible: false },
+    { id: 'radio_and_news', name: 'Radio & News', icon: '📻', visible: false },
   ]);
 
   const toggleLayer = (layerId: string) => {

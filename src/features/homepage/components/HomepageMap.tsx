@@ -11,7 +11,7 @@ import HomepageStatsHandle from './HomepageStatsHandle';
 import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useAtlasLayers } from '@/features/atlas/components';
+import { useAtlasLayers, AtlasEntitiesLayer, AtlasTableSelector } from '@/features/atlas/components';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/features/sidebar/components/Sidebar';
@@ -52,6 +52,17 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   
   // Atlas layers
   const { layers, toggleLayer, setLayerCount } = useAtlasLayers();
+  
+  // Atlas table selection state (for unified view)
+  const [selectedAtlasTables, setSelectedAtlasTables] = useState<string[]>([]);
+  
+  const handleToggleAtlasTable = (tableId: string) => {
+    setSelectedAtlasTables(prev => 
+      prev.includes(tableId)
+        ? prev.filter(id => id !== tableId)
+        : [...prev, tableId]
+    );
+  };
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -322,6 +333,15 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
         )}
 
+        {/* Atlas Entities Layer */}
+        {mapLoaded && mapInstanceRef.current && (
+          <AtlasEntitiesLayer 
+            map={mapInstanceRef.current} 
+            mapLoaded={mapLoaded}
+            visibleTables={selectedAtlasTables}
+          />
+        )}
+
 
         {/* Left Sidebar */}
         <FloatingMapContainer
@@ -334,6 +354,14 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
 
         {/* Homepage Stats Handle */}
         <HomepageStatsHandle />
+
+        {/* Atlas Table Selector - Top Left */}
+        <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+          <AtlasTableSelector
+            selectedTables={selectedAtlasTables}
+            onToggleTable={handleToggleAtlasTable}
+          />
+        </div>
 
         {/* Floating Account Dropdown - Top Right (desktop only, mobile has it in nav) */}
         <div className="hidden lg:flex absolute top-4 right-4 z-20 pointer-events-auto items-center gap-2">

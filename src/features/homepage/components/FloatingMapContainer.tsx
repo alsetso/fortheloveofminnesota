@@ -87,7 +87,7 @@ interface AtlasEntity {
   id: string;
   name: string;
   slug?: string;
-  layerType: 'cities' | 'counties' | 'neighborhoods' | 'schools' | 'parks' | 'lakes' | 'watertowers' | 'cemeteries' | 'golf_courses' | 'hospitals' | 'airports' | 'churches' | 'municipals' | 'roads';
+  layerType: 'cities' | 'counties' | 'neighborhoods' | 'schools' | 'parks' | 'lakes' | 'watertowers' | 'cemeteries' | 'golf_courses' | 'hospitals' | 'airports' | 'churches' | 'municipals' | 'roads' | 'radio_and_news';
   emoji: string;
   lat: number;
   lng: number;
@@ -1269,11 +1269,33 @@ export default function LocationSidebar({
 
   // Listen for atlas entity clicks
   useEffect(() => {
-    const handleAtlasEntityClick = (event: CustomEvent<AtlasEntity>) => {
-      const entity = event.detail;
+    const handleAtlasEntityClick = (event: CustomEvent<any>) => {
+      const entityData = event.detail;
+      
+      // Map table_name to layerType and ensure all required fields
+      const entity: AtlasEntity = {
+        id: entityData.id,
+        name: entityData.name,
+        slug: entityData.slug,
+        layerType: entityData.table_name as AtlasEntity['layerType'],
+        emoji: entityData.emoji || '📍',
+        lat: entityData.lat,
+        lng: entityData.lng,
+        city_id: entityData.city_id,
+      };
       
       // Clear temporary pin
       removeTemporaryPin();
+      
+      // Set locationData so intelligence button section can show
+      setLocationData({
+        coordinates: {
+          lat: entity.lat,
+          lng: entity.lng,
+        },
+        address: entity.name,
+        placeName: entity.name,
+      });
       
       // Set the selected atlas entity (clears other selections automatically)
       setSelectedAtlasEntity(entity);
@@ -2114,8 +2136,6 @@ export default function LocationSidebar({
                   VIEWING SECTION: What the user clicked on (read-only context)
                   ═══════════════════════════════════════════════════════════════ */}
               
-              {/* TEMPORARY: Hidden container for meta details - not rendered in UI */}
-              <div style={{ display: 'none' }}>
               {/* Atlas Entity Details - Accordion */}
               {selectedAtlasEntity && (
                 <div className="border-b border-gray-200">
@@ -2135,7 +2155,7 @@ export default function LocationSidebar({
                          selectedAtlasEntity.layerType === 'churches' && selectedAtlasEntity.church_type ? `· ${selectedAtlasEntity.church_type.replace('_', ' ')}` :
                          selectedAtlasEntity.layerType === 'municipals' && selectedAtlasEntity.municipal_type ? `· ${selectedAtlasEntity.municipal_type.replace('_', ' ')}` :
                          selectedAtlasEntity.layerType === 'golf_courses' && selectedAtlasEntity.course_type ? `· ${selectedAtlasEntity.course_type.replace('_', ' ')}` :
-                         `· ${selectedAtlasEntity.layerType.replace('_', ' ')}`}
+                         selectedAtlasEntity.layerType ? `· ${selectedAtlasEntity.layerType.replace('_', ' ')}` : ''}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -2207,6 +2227,8 @@ export default function LocationSidebar({
                             {selectedAtlasEntity.layerType === 'counties' && <span>County</span>}
                             {selectedAtlasEntity.layerType === 'neighborhoods' && <span>Neighborhood</span>}
                             {selectedAtlasEntity.layerType === 'lakes' && <span>Lake</span>}
+                            {selectedAtlasEntity.layerType === 'roads' && <span>Road</span>}
+                            {selectedAtlasEntity.layerType === 'radio_and_news' && <span>Radio & News</span>}
                           </div>
                           {selectedAtlasEntity.layerType === 'churches' && selectedAtlasEntity.denomination && (
                             <div className="text-[10px] text-gray-500 mt-0.5">
@@ -2375,10 +2397,10 @@ export default function LocationSidebar({
                         </div>
                       )}
                     </div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
-                )}
                 </div>
               )}
 
@@ -2678,8 +2700,8 @@ export default function LocationSidebar({
                   ═══════════════════════════════════════════════════════════════ */}
               {locationData && !isDropHeartExpanded && (
                 <div className="space-y-2">
-                  {/* Intelligence - Only show for houses (building type=house) */}
-                  {pinFeature?.showIntelligence && (
+                  {/* Intelligence - Show for houses (building type=house) or when locationData exists */}
+                  {(pinFeature?.showIntelligence || (selectedAtlasEntity && locationData)) && (
                     <button
                       onClick={() => {
                         setIsIntelligenceModalOpen(true);
@@ -2687,7 +2709,7 @@ export default function LocationSidebar({
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
                     >
                       <SparklesIcon className="w-4 h-4" />
-                      <span>Property Intelligence</span>
+                      <span>{pinFeature?.showIntelligence ? 'Property Intelligence' : 'Location Intelligence'}</span>
                     </button>
                   )}
                 </div>
@@ -2743,10 +2765,6 @@ export default function LocationSidebar({
                   })()}
                 </div>
               )}
-
-              </div>
-              {/* END TEMPORARY: Hidden container for meta details */}
-
               </div>
             </div>
           )}

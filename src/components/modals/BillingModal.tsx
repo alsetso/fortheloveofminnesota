@@ -16,10 +16,8 @@ interface BillingData {
   plan: 'hobby' | 'pro' | 'plus';
   billing_mode: 'standard' | 'trial';
   subscription_status: string | null;
-  stripe_subscription_id: string | null;
   isTrial: boolean;
   isActive: boolean;
-  hasCustomer: boolean;
 }
 
 const PRO_FEATURES = [
@@ -41,7 +39,6 @@ export default function BillingModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -101,23 +98,16 @@ export default function BillingModal({
           plan: data.plan,
           billing_mode: data.billing_mode,
           subscription_status: data.subscription_status,
-          stripe_subscription_id: data.stripe_subscription_id,
-          stripe_customer_id: data.customerId,
-          hasCustomer: data.hasCustomer,
           isTrial: data.isTrial,
           isActive: data.isActive,
-          paymentMethods: data.paymentMethods,
-          paymentMethodsCount: data.paymentMethods?.length || 0,
         });
         
         setBillingData({
           plan: data.plan || 'hobby',
           billing_mode: data.billing_mode || 'standard',
           subscription_status: data.subscription_status,
-          stripe_subscription_id: data.stripe_subscription_id,
           isTrial: data.isTrial || false,
           isActive: data.isActive || false,
-          hasCustomer: data.hasCustomer || false,
         });
       } catch (err) {
         console.error('Error fetching billing data:', err);
@@ -154,10 +144,8 @@ export default function BillingModal({
               plan: data.plan || 'hobby',
               billing_mode: data.billing_mode || 'standard',
               subscription_status: data.subscription_status,
-              stripe_subscription_id: data.stripe_subscription_id,
               isTrial: data.isTrial || false,
               isActive: data.isActive || false,
-              hasCustomer: data.hasCustomer || false,
             });
           }
         } catch (err) {
@@ -191,15 +179,10 @@ export default function BillingModal({
 
       if (!response.ok) {
         const data = await response.json();
-        console.error('[BillingModal] Checkout session creation failed:', data);
         throw new Error(data.error || 'Failed to create checkout session');
       }
 
       const data = await response.json();
-      console.log('[BillingModal] Checkout session created:', {
-        url: data.url,
-        session_id: data.session_id,
-      });
       
       if (data.url) {
         // Redirect to Stripe Checkout
@@ -214,47 +197,6 @@ export default function BillingModal({
     }
   };
 
-  const openCustomerPortal = async () => {
-    try {
-      setPortalLoading(true);
-      setError(null);
-      
-      const returnUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-      console.log('[BillingModal] Opening customer portal with return URL:', returnUrl);
-      console.log('[BillingModal] Current billing data:', billingData);
-      
-      const response = await fetch('/api/billing/portal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          return_url: returnUrl,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        console.error('[BillingModal] Portal session creation failed:', data);
-        throw new Error(data.error || 'Failed to open customer portal');
-      }
-
-      const data = await response.json();
-      console.log('[BillingModal] Portal session created:', {
-        url: data.url,
-      });
-      
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error('No portal URL received');
-      }
-    } catch (err) {
-      console.error('Error opening customer portal:', err);
-      setError(err instanceof Error ? err.message : 'Failed to open customer portal');
-      setPortalLoading(false);
-    }
-  };
 
   if (!mounted || !isOpen) return null;
 
@@ -415,36 +357,6 @@ export default function BillingModal({
               )}
 
               {/* Billing Management Section */}
-              {isProUser && billingData.hasCustomer && (
-                <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1.5">Subscriptions & Billing</h3>
-                      <p className="text-xs text-gray-600">
-                        Access the Stripe Customer Portal to manage your subscription, update payment methods, view billing history and invoices, 
-                        update your billing address, and cancel or modify your subscription.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={openCustomerPortal}
-                    disabled={portalLoading}
-                    className="w-full mt-3 flex items-center justify-center gap-1.5 px-[10px] py-[10px] bg-gray-900 text-white rounded-md text-xs font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {portalLoading ? (
-                      <>
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Opening...
-                      </>
-                    ) : (
-                      <>
-                        Manage Subscriptions
-                        <ArrowRightIcon className="w-3 h-3" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
             </>
           ) : null}
         </div>
@@ -622,36 +534,6 @@ export default function BillingModal({
               )}
 
               {/* Billing Management Section */}
-              {isProUser && billingData.hasCustomer && (
-                <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-1.5">Subscriptions & Billing</h3>
-                      <p className="text-xs text-gray-600">
-                        Access the Stripe Customer Portal to manage your subscription, update payment methods, view billing history and invoices, 
-                        update your billing address, and cancel or modify your subscription.
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={openCustomerPortal}
-                    disabled={portalLoading}
-                    className="w-full mt-3 flex items-center justify-center gap-1.5 px-[10px] py-[10px] bg-gray-900 text-white rounded-md text-xs font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {portalLoading ? (
-                      <>
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Opening...
-                      </>
-                    ) : (
-                      <>
-                        Manage Subscriptions
-                        <ArrowRightIcon className="w-3 h-3" />
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
             </>
           ) : null}
           </div>

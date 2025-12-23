@@ -8,8 +8,7 @@ import { stripe } from '@/lib/stripe';
  * 
  * POST /api/billing/checkout
  * 
- * Loads the currently authenticated user → finds their account → uses stripe_customer_id
- * → creates checkout session → returns URL
+ * Creates a Stripe checkout session and returns the payment URL
  */
 export async function POST(request: NextRequest) {
   try {
@@ -107,11 +106,10 @@ export async function POST(request: NextRequest) {
 
     // Get base URL for success/cancel redirects
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const successUrl = `${baseUrl}/?modal=upgrade&session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${baseUrl}/?modal=upgrade&canceled=true`;
+    const successUrl = `${baseUrl}/?upgrade=success`;
+    const cancelUrl = `${baseUrl}/?upgrade=canceled`;
 
     // Create checkout session
-    // Payment methods are automatically saved to the customer when checkout completes
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -125,7 +123,6 @@ export async function POST(request: NextRequest) {
       cancel_url: cancelUrl,
       allow_promotion_codes: true,
       billing_address_collection: 'auto',
-      payment_method_collection: 'always', // Always collect payment method
       metadata: {
         accountId: account.id,
         userId: user.id,
@@ -141,7 +138,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       url: session.url,
-      session_id: session.id,
     });
   } catch (error) {
     console.error('Error creating checkout session:', error);

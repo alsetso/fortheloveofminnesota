@@ -8,7 +8,6 @@ interface ProfileMentionsLayerProps {
   map: MapboxMapInstance;
   mapLoaded: boolean;
   pins: ProfilePin[];
-  isOwnProfile: boolean;
 }
 
 const SOURCE_ID = 'profile-mentions';
@@ -23,7 +22,6 @@ export default function ProfileMentionsLayer({
   map,
   mapLoaded,
   pins,
-  isOwnProfile,
 }: ProfileMentionsLayerProps) {
   const pinsRef = useRef<ProfilePin[]>(pins);
   const initializedRef = useRef(false);
@@ -56,14 +54,9 @@ export default function ProfileMentionsLayer({
   useEffect(() => {
     if (!map || !mapLoaded) return;
 
-    let mounted = true;
-
-    const addPinsToMap = async () => {
+    const addPinsToMap = () => {
       try {
         const geoJSON = pinsToGeoJSON(pinsRef.current);
-
-        // Cast to actual Mapbox Map type
-        const mapboxMap = map as any;
 
         // Check if source already exists
         try {
@@ -71,6 +64,7 @@ export default function ProfileMentionsLayer({
           if (existingSource && existingSource.type === 'geojson') {
             // Update existing source data
             existingSource.setData(geoJSON);
+            initializedRef.current = true;
             return;
           }
         } catch (e) {
@@ -79,12 +73,14 @@ export default function ProfileMentionsLayer({
 
         // Add pin images
         if (!map.hasImage(PIN_IMAGE_ID)) {
-          const imageSize = 24;
+          const imageSize = 32;
           const canvas = document.createElement('canvas');
           canvas.width = imageSize;
           canvas.height = imageSize;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             // Red circle for public mentions
             ctx.fillStyle = '#ef4444';
             ctx.beginPath();
@@ -95,16 +91,21 @@ export default function ProfileMentionsLayer({
             ctx.lineWidth = 2;
             ctx.stroke();
           }
-          map.addImage(PIN_IMAGE_ID, canvas);
+          const imageData = ctx?.getImageData(0, 0, imageSize, imageSize);
+          if (imageData) {
+            map.addImage(PIN_IMAGE_ID, imageData, { pixelRatio: 2 });
+          }
         }
 
         if (!map.hasImage(PIN_PRIVATE_IMAGE_ID)) {
-          const imageSize = 24;
+          const imageSize = 32;
           const canvas = document.createElement('canvas');
           canvas.width = imageSize;
           canvas.height = imageSize;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             // Gray circle for private mentions
             ctx.fillStyle = '#9ca3af';
             ctx.beginPath();
@@ -115,7 +116,10 @@ export default function ProfileMentionsLayer({
             ctx.lineWidth = 2;
             ctx.stroke();
           }
-          map.addImage(PIN_PRIVATE_IMAGE_ID, canvas);
+          const imageData = ctx?.getImageData(0, 0, imageSize, imageSize);
+          if (imageData) {
+            map.addImage(PIN_PRIVATE_IMAGE_ID, imageData, { pixelRatio: 2 });
+          }
         }
 
         // Add source
@@ -170,11 +174,6 @@ export default function ProfileMentionsLayer({
     };
 
     addPinsToMap();
-
-    return () => {
-      mounted = false;
-      // Cleanup handled by map removal
-    };
   }, [map, mapLoaded]);
 
   // Update pins when they change
@@ -182,9 +181,7 @@ export default function ProfileMentionsLayer({
     if (!map || !mapLoaded || !initializedRef.current) return;
 
     try {
-      const mentions = pinsToMentions(pinsRef.current);
-      const geoJSON = MentionService.mentionsToGeoJSON(mentions);
-
+      const geoJSON = pinsToGeoJSON(pinsRef.current);
       const source = map.getSource(SOURCE_ID);
       if (source && source.type === 'geojson') {
         source.setData(geoJSON);

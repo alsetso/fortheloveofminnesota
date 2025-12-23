@@ -96,18 +96,26 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
 
         // Fit bounds to pins if available
         if (filteredPins.length > 0) {
-          const bounds = new mapbox.LngLatBounds();
-          filteredPins.forEach((pin) => {
-            bounds.extend([pin.lng, pin.lat]);
-          });
-          
           mapInstance.once('load', () => {
-            if (mounted && bounds.isValid()) {
-              mapInstance.fitBounds(bounds, {
+            if (!mounted) return;
+            
+            const lngs = filteredPins.map((p) => p.lng);
+            const lats = filteredPins.map((p) => p.lat);
+            const minLng = Math.min(...lngs);
+            const maxLng = Math.max(...lngs);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+
+            mapInstance.fitBounds(
+              [
+                [minLng, minLat],
+                [maxLng, maxLat],
+              ],
+              {
                 padding: 50,
                 maxZoom: 14,
-              });
-            }
+              }
+            );
           });
         }
       } catch (error) {
@@ -172,7 +180,6 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
           map={mapInstanceRef.current}
           mapLoaded={mapLoaded}
           pins={filteredPins}
-          isOwnProfile={isOwnProfile}
         />
       )}
     </div>

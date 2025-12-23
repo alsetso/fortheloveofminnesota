@@ -511,11 +511,6 @@ export function getFeatureActions(feature: ExtractedFeature): Array<{
 }> {
   const actions: Array<{ id: string; label: string; icon: string }> = [];
 
-  // Add intelligence action for houses
-  if (feature.showIntelligence) {
-    actions.push({ id: 'intelligence', label: 'Property Intelligence', icon: '🧠' });
-  }
-
   switch (feature.category) {
     case 'city':
       actions.push({ id: 'explore-city', label: 'Explore City', icon: '🔍' });

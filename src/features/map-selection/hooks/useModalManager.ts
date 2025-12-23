@@ -14,18 +14,15 @@ import type { ActiveModal, LocationData, UseModalManagerReturn } from '../types'
  * 
  * URL patterns:
  * - /feed?modal=analytics&pinId=abc123
- * - /feed?modal=intelligence
  * - /feed?modal=atlas&mode=create&entityType=park
  */
 
 // Store modal context that can't be serialized to URL
 const modalContextStore: {
-  intelligenceContext: LocationData | null;
   atlasEntityData: unknown;
   comingSoonFeature: string;
   analyticsPinName?: string;
 } = {
-  intelligenceContext: null,
   atlasEntityData: undefined,
   comingSoonFeature: '',
   analyticsPinName: undefined,
@@ -45,13 +42,6 @@ export function useModalManager(): UseModalManagerReturn {
     }
 
     switch (modal) {
-      case 'intelligence': {
-        return {
-          type: 'intelligence',
-          context: modalContextStore.intelligenceContext,
-        };
-      }
-      
       case 'analytics': {
         const pinId = searchParams.get('pinId');
         if (pinId) {
@@ -115,11 +105,6 @@ export function useModalManager(): UseModalManagerReturn {
   }, [searchParams, pathname, router]);
 
   // Modal actions
-  const openIntelligence = useCallback((context: LocationData | null) => {
-    modalContextStore.intelligenceContext = context;
-    updateModalUrl({ modal: 'intelligence' });
-  }, [updateModalUrl]);
-
   const openAnalytics = useCallback((pinId: string, pinName?: string) => {
     modalContextStore.analyticsPinName = pinName;
     updateModalUrl({
@@ -148,7 +133,6 @@ export function useModalManager(): UseModalManagerReturn {
 
   const closeModal = useCallback(() => {
     // Clear context
-    modalContextStore.intelligenceContext = null;
     modalContextStore.atlasEntityData = undefined;
     modalContextStore.comingSoonFeature = '';
     modalContextStore.analyticsPinName = undefined;
@@ -160,7 +144,6 @@ export function useModalManager(): UseModalManagerReturn {
 
   return {
     activeModal,
-    openIntelligence,
     openAnalytics,
     openComingSoon,
     openAtlasEntity,

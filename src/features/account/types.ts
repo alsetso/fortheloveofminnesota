@@ -4,7 +4,7 @@
 
 import type { Account } from '@/features/auth';
 
-export type AccountTabId = 'analytics' | 'settings';
+export type AccountTabId = 'analytics' | 'settings' | 'profiles';
 
 export interface AccountModalProps {
   isOpen: boolean;

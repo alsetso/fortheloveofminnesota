@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useSearchParams, usePathname } from 'next/navigation';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { POIService, type PointOfInterest } from '@/features/poi/services/poiService';
 import { getPOIEmoji } from '@/features/poi/utils/getPOIEmoji';
@@ -9,6 +8,7 @@ import { getPOIEmoji } from '@/features/poi/utils/getPOIEmoji';
 interface POIsLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
+  visible?: boolean;
 }
 
 const sourceId = 'pois-active';
@@ -19,18 +19,13 @@ const nameLayerId = 'pois-active-name';
  * POIsLayer - Self-contained layer that fetches and displays POIs
  * Shows all active POIs when POI tab is active (?tab=poi)
  */
-export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const isHomepage = pathname === '/';
-  const isPOITabActive = isHomepage && searchParams.get('tab') === 'poi';
-  
+export default function POIsLayer({ map, mapLoaded, visible = false }: POIsLayerProps) {
   const poisRef = useRef<PointOfInterest[]>([]);
   const isAddingLayersRef = useRef(false);
 
-  // Fetch POIs when tab is active
+  // Fetch POIs when visible
   useEffect(() => {
-    if (!map || !mapLoaded || !isPOITabActive) return;
+    if (!map || !mapLoaded || !visible) return;
 
     let mounted = true;
 
@@ -228,12 +223,12 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
     return () => {
       mounted = false;
     };
-  }, [map, mapLoaded, isPOITabActive]);
+  }, [map, mapLoaded, visible]);
 
-  // Cleanup when tab is inactive or component unmounts
+  // Cleanup when not visible or component unmounts
   useEffect(() => {
     if (!map || map.removed) return;
-    if (isPOITabActive) return; // Don't cleanup if tab is active
+    if (visible) return; // Don't cleanup if visible
 
     const mapboxMap = map as any;
 
@@ -244,7 +239,7 @@ export default function POIsLayer({ map, mapLoaded }: POIsLayerProps) {
     } catch (error) {
       // Ignore cleanup errors
     }
-  }, [map, isPOITabActive]);
+  }, [map, visible]);
 
   // Cleanup on unmount
   useEffect(() => {

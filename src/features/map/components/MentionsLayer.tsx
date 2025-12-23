@@ -55,6 +55,10 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
     openWelcomeRef.current = openWelcome;
   }, [openWelcome]);
 
+  // Extract year from searchParams to avoid re-running effect when other params change
+  const yearParam = searchParams.get('year');
+  const year = yearParam ? parseInt(yearParam, 10) : undefined;
+
   // Fetch mentions and add to map
   useEffect(() => {
     if (!map || !mapLoaded) return;
@@ -66,9 +70,6 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       if (isAddingLayersRef.current) return;
       
       try {
-        // Get year filter from URL
-        const yearParam = searchParams.get('year');
-        const year = yearParam ? parseInt(yearParam, 10) : undefined;
         
         const mentions = await MentionService.getMentions(year ? { year } : undefined);
         if (!mounted) return;
@@ -1182,7 +1183,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         }
       }
     };
-  }, [map, mapLoaded, searchParams]);
+  }, [map, mapLoaded, year]);
 
   return null; // This component doesn't render anything
 }

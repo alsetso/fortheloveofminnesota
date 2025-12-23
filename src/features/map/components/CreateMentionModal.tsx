@@ -5,6 +5,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
 import { useAuth } from '@/features/auth';
+import { useActiveAccount } from '@/features/account/contexts/ActiveAccountContext';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface CreateMentionModalProps {
@@ -26,6 +27,7 @@ export default function CreateMentionModal({
   onVisibilityChange,
 }: CreateMentionModalProps) {
   const { user } = useAuth();
+  const { activeAccountId } = useActiveAccount();
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function CreateMentionModal({
         visibility,
       };
 
-      const createdMention = await MentionService.createMention(mentionData);
+      const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
       onMentionCreated(createdMention);
       onClose();
     } catch (err) {

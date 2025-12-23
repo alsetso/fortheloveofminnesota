@@ -70,22 +70,40 @@ export class MentionService {
    * Create a new mention
    * Requires authenticated user
    */
-  static async createMention(data: CreateMentionData): Promise<Mention> {
+  static async createMention(data: CreateMentionData, accountId?: string): Promise<Mention> {
     // Require authentication
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('You must be signed in to create mentions');
     }
 
-    // Get account_id from authenticated user
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
+    // Use provided accountId or get from authenticated user
+    let account_id: string;
+    if (accountId) {
+      // Verify user owns this account
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('id', accountId)
+        .eq('user_id', user.id)
+        .single();
 
-    if (accountError || !account) {
-      throw new Error('Account not found. Please complete your profile setup.');
+      if (accountError || !account) {
+        throw new Error('Account not found or you do not have access to it.');
+      }
+      account_id = account.id;
+    } else {
+      // Fallback to first account (for backward compatibility)
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (accountError || !account) {
+        throw new Error('Account not found. Please complete your profile setup.');
+      }
+      account_id = account.id;
     }
 
     // Validate post_date if provided (max 100 years in the past)
@@ -127,7 +145,7 @@ export class MentionService {
         description: data.description || null,
         city_id: cityId,
         post_date: normalizedPostDate,
-        account_id: account.id,
+        account_id: account_id,
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
         map_meta: data.map_meta || null,

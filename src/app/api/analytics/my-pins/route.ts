@@ -58,28 +58,52 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('id, username')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get account_id from query params or fallback to first account
+    const searchParams = request.nextUrl.searchParams;
+    const requestedAccountId = searchParams.get('account_id');
+    
+    let accountId: string;
+    if (requestedAccountId) {
+      // Verify user owns this account
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('id, username')
+        .eq('id', requestedAccountId)
+        .eq('user_id', user.id)
+        .single();
 
-    if (accountError) {
-      console.error('Error fetching account:', accountError);
-      return NextResponse.json(
-        { error: 'Failed to fetch account' },
-        { status: 500 }
-      );
+      if (accountError || !account) {
+        return NextResponse.json(
+          { error: 'Account not found or you do not have access to it.' },
+          { status: 403 }
+        );
+      }
+      accountId = account.id;
+    } else {
+      // Fallback to first account
+      const { data: account, error: accountError } = await supabase
+        .from('accounts')
+        .select('id, username')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (accountError) {
+        console.error('Error fetching account:', accountError);
+        return NextResponse.json(
+          { error: 'Failed to fetch account' },
+          { status: 500 }
+        );
+      }
+
+      if (!account) {
+        return NextResponse.json(
+          { error: 'Account not found. Please complete your profile setup.' },
+          { status: 404 }
+        );
+      }
+
+      accountId = account.id;
     }
-
-    if (!account) {
-      return NextResponse.json(
-        { error: 'Account not found. Please complete your profile setup.' },
-        { status: 404 }
-      );
-    }
-
-    const accountId = (account as { id: string; username: string | null }).id;
 
     // Get user's mentions (excluding archived)
     const { data: mentions, error: mentionsError } = await supabase

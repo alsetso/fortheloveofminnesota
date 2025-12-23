@@ -8,6 +8,7 @@ import { WindowManagerProvider } from '@/components/ui/WindowManager';
 import { AppModalProvider } from '@/contexts/AppModalContext';
 import { StripeProvider } from './StripeProvider';
 import { DraftPOIsProvider } from '@/features/poi/contexts/DraftPOIsContext';
+import { ActiveAccountProvider } from '@/features/account/contexts/ActiveAccountContext';
 import PageLoadingOverlay from '@/features/feed/components/PageLoadingOverlay';
 import MobileOverlay from '@/components/modals/MobileOverlay';
 
@@ -20,21 +21,23 @@ export function Providers({ children }: ProvidersProps) {
     <StripeProvider>
       <AuthProvider>
         <AuthStateProvider>
-          <ProfileProvider>
-            <DraftPOIsProvider>
-              <ToastProvider>
-                <WindowManagerProvider>
-                  <Suspense fallback={null}>
-                    <AppModalProvider>
-                      <MobileOverlay />
-                      <PageLoadingOverlay />
-                      {children}
-                    </AppModalProvider>
-                  </Suspense>
-                </WindowManagerProvider>
-              </ToastProvider>
-            </DraftPOIsProvider>
-          </ProfileProvider>
+          <ActiveAccountProvider>
+            <ProfileProvider>
+              <DraftPOIsProvider>
+                <ToastProvider>
+                  <WindowManagerProvider>
+                    <Suspense fallback={null}>
+                      <AppModalProvider>
+                        <MobileOverlay />
+                        <PageLoadingOverlay />
+                        {children}
+                      </AppModalProvider>
+                    </Suspense>
+                  </WindowManagerProvider>
+                </ToastProvider>
+              </DraftPOIsProvider>
+            </ProfileProvider>
+          </ActiveAccountProvider>
         </AuthStateProvider>
       </AuthProvider>
     </StripeProvider>

@@ -8,13 +8,13 @@ import MapScreenshotEditor from './MapScreenshotEditor';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { LocationLookupService } from '@/features/map/services/locationLookupService';
 import type { CreateMentionData } from '@/types/mention';
-import IntelligenceModal from '@/features/account/components/IntelligenceModal';
 import { MAP_CONFIG } from '@/features/map/config';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import type { MapboxMapInstance, MapboxMouseEvent } from '@/types/mapbox-events';
-import { findCityByName, findCountyByName, updateCityCoordinates, deleteNeighborhood, deleteSchool, deletePark, deleteLake, deleteWatertower, deleteCemetery, deleteGolfCourse, deleteHospital, deleteAirport, deleteChurch, deleteMunicipal, deleteRoad } from '@/features/atlas/services/atlasService';
+import { findCityByName, findCountyByName, updateCityCoordinates } from '@/features/atlas/services/atlasService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useActiveAccount } from '@/features/account/contexts/ActiveAccountContext';
 import { supabase } from '@/lib/supabase';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useWindowManager } from '@/components/ui/WindowManager';
@@ -83,36 +83,6 @@ interface LocationData {
 
 // FeatureMetadata is now imported from map-metadata feature as ExtractedFeature
 
-interface AtlasEntity {
-  id: string;
-  name: string;
-  slug?: string;
-  layerType: 'cities' | 'counties' | 'neighborhoods' | 'schools' | 'parks' | 'lakes' | 'watertowers' | 'cemeteries' | 'golf_courses' | 'hospitals' | 'airports' | 'churches' | 'municipals' | 'roads' | 'radio_and_news';
-  emoji: string;
-  lat: number;
-  lng: number;
-  school_type?: string;
-  park_type?: string;
-  hospital_type?: string;
-  church_type?: string;
-  denomination?: string;
-  course_type?: string;
-  holes?: number;
-  airport_type?: string;
-  iata_code?: string;
-  icao_code?: string;
-  municipal_type?: string;
-  description?: string;
-  address?: string;
-  phone?: string;
-  website_url?: string;
-  city_id?: string;
-  county_id?: string;
-  is_public?: boolean;
-  district?: string;
-  [key: string]: any;
-}
-
 interface LocationSidebarProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
@@ -160,7 +130,6 @@ export default function LocationSidebar({
   // ═══════════════════════════════════════════════════════════════════════════
   
   const [locationData, setLocationData] = useState<LocationData | null>(null);
-  const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<AtlasEntity | null>(null);
   const [capturedFeature, setCapturedFeature] = useState<ExtractedFeature | null>(null);
   
   const pinFeature = useMemo(() => {
@@ -176,7 +145,6 @@ export default function LocationSidebar({
 
   const clearSelection = useCallback(() => {
     setLocationData(null);
-    setSelectedAtlasEntity(null);
     setCapturedFeature(null);
   }, []);
 
@@ -184,24 +152,18 @@ export default function LocationSidebar({
   // Local Modal State (not in URL)
   // ═══════════════════════════════════════════════════════════════════════════
   
-  const [isIntelligenceModalOpen, setIsIntelligenceModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [isComingSoonModalOpen, setIsComingSoonModalOpen] = useState(false);
   
   const [comingSoonFeature, setComingSoonFeature] = useState<string>('');
 
   // Modal openers
-  const openIntelligenceModal = useCallback(() => {
-    setIsIntelligenceModalOpen(true);
-  }, []);
-
   const openComingSoonModal = useCallback((feature: string) => {
     setComingSoonFeature(feature);
     setIsComingSoonModalOpen(true);
   }, []);
 
   const closeModal = useCallback(() => {
-    setIsIntelligenceModalOpen(false);
     setIsComingSoonModalOpen(false);
   }, []);
 
@@ -230,10 +192,7 @@ export default function LocationSidebar({
   const [lakeCreateMessage, setLakeCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isCreatingPark, setIsCreatingPark] = useState(false);
   const [parkCreateMessage, setParkCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isDeletingAtlasEntity, setIsDeletingAtlasEntity] = useState(false);
-  const [atlasEntityMessage, setAtlasEntityMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isMetadataOpen, setIsMetadataOpen] = useState(false);
-  const [isAtlasEntityExpanded, setIsAtlasEntityExpanded] = useState(false);
   const [isLocationDetailsExpanded, setIsLocationDetailsExpanded] = useState(false);
   
   // Inline pin creation form state
@@ -296,40 +255,21 @@ export default function LocationSidebar({
   const autofillCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isInitializingFromUrlRef = useRef(false);
 
-  // Fetch current user's account info (ID, plan, and role)
+  // Use active account from context
+  const { activeAccount, activeAccountId } = useActiveAccount();
+
+  // Update account info when active account changes
   useEffect(() => {
-    const fetchAccountInfo = async () => {
-      if (!user) {
-        setCurrentUserAccountId(null);
-        setCurrentUserPlan('hobby');
-        setIsAdmin(false);
-        return;
-      }
-
-      try {
-        const { data: account, error } = await supabase
-          .from('accounts')
-          .select('id, plan, role')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching account info:', error);
-          return;
-        }
-
-        if (account) {
-          setCurrentUserAccountId(account.id);
-          setCurrentUserPlan((account.plan as 'hobby' | 'pro' | 'plus') || 'hobby');
-          setIsAdmin(account.role === 'admin');
-        }
-      } catch (err) {
-        console.error('Error fetching account info:', err);
-      }
-    };
-
-    fetchAccountInfo();
-  }, [user]);
+    if (activeAccount) {
+      setCurrentUserAccountId(activeAccount.id);
+      setCurrentUserPlan((activeAccount.plan as 'hobby' | 'pro' | 'plus') || 'hobby');
+      setIsAdmin(activeAccount.role === 'admin');
+    } else if (!user) {
+      setCurrentUserAccountId(null);
+      setCurrentUserPlan('hobby');
+      setIsAdmin(false);
+    }
+  }, [activeAccount, user, setCurrentUserAccountId, setCurrentUserPlan, setIsAdmin]);
 
   // Add/remove temporary pin marker
   const addTemporaryPin = useCallback(async (coordinates: { lat: number; lng: number }) => {
@@ -876,7 +816,7 @@ export default function LocationSidebar({
         map_meta: mapMeta,
       };
 
-      const createdMention = await MentionService.createMention(mentionData);
+      const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
 
       // Reset form and remove temporary marker
       resetPinForm();
@@ -1267,62 +1207,6 @@ export default function LocationSidebar({
   }, [searchQuery, searchParams, router]);
 
 
-  // Listen for atlas entity clicks
-  useEffect(() => {
-    const handleAtlasEntityClick = (event: CustomEvent<any>) => {
-      const entityData = event.detail;
-      
-      // Map table_name to layerType and ensure all required fields
-      const entity: AtlasEntity = {
-        id: entityData.id,
-        name: entityData.name,
-        slug: entityData.slug,
-        layerType: entityData.table_name as AtlasEntity['layerType'],
-        emoji: entityData.emoji || '📍',
-        lat: entityData.lat,
-        lng: entityData.lng,
-        city_id: entityData.city_id,
-      };
-      
-      // Clear temporary pin
-      removeTemporaryPin();
-      
-      // Set locationData so intelligence button section can show
-      const entityLocationData: LocationData = {
-        coordinates: {
-          lat: entity.lat,
-          lng: entity.lng,
-        },
-        address: entity.name,
-        placeName: entity.name,
-      };
-      setLocationData(entityLocationData);
-      
-      // Dispatch location data for atlas creation
-      window.dispatchEvent(new CustomEvent('atlas-location-updated', {
-        detail: entityLocationData
-      }));
-      
-      // Set the selected atlas entity (clears other selections automatically)
-      setSelectedAtlasEntity(entity);
-      setAtlasEntityMessage(null);
-      
-      // Fly to the entity location
-      if (map && mapLoaded && entity.lat && entity.lng) {
-        (map as any).flyTo({
-          center: [entity.lng, entity.lat],
-          zoom: 14,
-          duration: 1000,
-        });
-      }
-    };
-
-    window.addEventListener('atlas-entity-click', handleAtlasEntityClick as EventListener);
-
-    return () => {
-      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick as EventListener);
-    };
-  }, [map, mapLoaded, removeTemporaryPin]);
 
   // Listen for mention hover updates for cursor tracker
   useEffect(() => {
@@ -1364,8 +1248,8 @@ export default function LocationSidebar({
       };
       setLocationData(locationDataForPin);
       
-      // Dispatch location data for atlas creation
-      window.dispatchEvent(new CustomEvent('atlas-location-updated', {
+      // Dispatch location data for POI creation
+      window.dispatchEvent(new CustomEvent('poi-location-updated', {
         detail: locationDataForPin
       }));
       
@@ -1415,6 +1299,14 @@ export default function LocationSidebar({
       return;
     }
     
+    // Clear mention parameter from URL if present (user is clicking elsewhere on map)
+    const mentionId = searchParams.get('mention');
+    if (mentionId) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('mention');
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+    
     const { lng, lat } = e.lngLat;
     
     // POI Mode: Check for POI label in map metadata
@@ -1456,7 +1348,7 @@ export default function LocationSidebar({
       return; // In POI mode, don't do normal map click behavior
     }
     
-    // Normal mode: Check if click hit a mention, pin or atlas entity - if so, don't show map click data
+    // Normal mode: Check if click hit a mention or pin - if so, don't show map click data
     try {
       const mapboxMap = map as any;
       const layersToCheck = [
@@ -1466,20 +1358,6 @@ export default function LocationSidebar({
         // User pins
         'map-pins-point',
         'map-pins-point-label',
-        // Atlas layers
-        'atlas-cities-points',
-        'atlas-counties-points',
-        'atlas-neighborhoods-points',
-        'atlas-schools-points',
-        'atlas-parks-points',
-        'atlas-lakes-points',
-        'atlas-watertowers-points',
-        'atlas-cemeteries-points',
-        'atlas-golf_courses-points',
-        'atlas-hospitals-points',
-        'atlas-airports-points',
-        'atlas-churches-points',
-        'atlas-municipals-points',
       ];
       
       const existingLayers = layersToCheck.filter(layerId => {
@@ -1495,7 +1373,7 @@ export default function LocationSidebar({
           layers: existingLayers,
         });
 
-        // If a pin or atlas entity was clicked, don't show map click data (their click handlers will handle it)
+        // If a pin was clicked, don't show map click data (their click handlers will handle it)
         if (features.length > 0) {
           return;
         }
@@ -1636,7 +1514,7 @@ export default function LocationSidebar({
     };
     setLocationData(newLocationData);
 
-  }, [map, mapLoaded, addTemporaryPin, reverseGeocode, isPOIMode, user, account]);
+  }, [map, mapLoaded, addTemporaryPin, reverseGeocode, isPOIMode, user, account, searchParams, router]);
   
   // Handle POI creation
   const handleCreatePOI = useCallback(async () => {
@@ -1760,8 +1638,8 @@ export default function LocationSidebar({
   }, [showSuggestions, suggestions, selectedIndex, handleSuggestionSelect]);
 
 
-  // Sidebar expands if either location data, selected pin, selected atlas entity exists, or search is focused
-  const hasData = locationData !== null || selectedAtlasEntity !== null;
+  // Sidebar expands if either location data or selected pin exists, or search is focused
+  const hasData = locationData !== null;
   const isExpanded = hasData || isSearchFocused;
   
   // Determine width based on state: panels open = wider, expanded = medium, collapsed = narrow
@@ -2148,274 +2026,6 @@ export default function LocationSidebar({
                   VIEWING SECTION: What the user clicked on (read-only context)
                   ═══════════════════════════════════════════════════════════════ */}
               
-              {/* Atlas Entity Details - Accordion */}
-              {selectedAtlasEntity && (
-                <div className="border-b border-gray-200">
-                  {/* Accordion Header */}
-                  <div
-                    onClick={() => setIsAtlasEntityExpanded(!isAtlasEntityExpanded)}
-                    className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className="text-xs">{selectedAtlasEntity.emoji}</span>
-                      <span className="text-xs font-medium text-gray-900 truncate">{selectedAtlasEntity.name}</span>
-                      <span className="text-[10px] text-gray-500 truncate">
-                        {selectedAtlasEntity.layerType === 'schools' && selectedAtlasEntity.school_type ? `· ${selectedAtlasEntity.school_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType === 'parks' && selectedAtlasEntity.park_type ? `· ${selectedAtlasEntity.park_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType === 'hospitals' && selectedAtlasEntity.hospital_type ? `· ${selectedAtlasEntity.hospital_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType === 'airports' && selectedAtlasEntity.airport_type ? `· ${selectedAtlasEntity.airport_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType === 'churches' && selectedAtlasEntity.church_type ? `· ${selectedAtlasEntity.church_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType === 'municipals' && selectedAtlasEntity.municipal_type ? `· ${selectedAtlasEntity.municipal_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType === 'golf_courses' && selectedAtlasEntity.course_type ? `· ${selectedAtlasEntity.course_type.replace('_', ' ')}` :
-                         selectedAtlasEntity.layerType ? `· ${selectedAtlasEntity.layerType.replace('_', ' ')}` : ''}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAtlasEntity(null);
-                          setAtlasEntityMessage(null);
-                        }}
-                        className="p-0.5 text-gray-400 hover:text-gray-900 transition-colors"
-                        title="Close"
-                      >
-                        <XMarkIcon className="w-3 h-3" />
-                      </button>
-                      {isAtlasEntityExpanded ? (
-                        <ChevronUpIcon className="w-3 h-3 text-gray-500" />
-                      ) : (
-                        <ChevronDownIcon className="w-3 h-3 text-gray-500" />
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Accordion Content - Packed Data */}
-                  {isAtlasEntityExpanded && (
-                    <div className="px-2 pb-2 space-y-2">
-                      {/* Type + Details Row */}
-                      <div className="flex items-start justify-between gap-2 pb-1.5 border-b border-gray-100">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-gray-500">
-                            {selectedAtlasEntity.layerType === 'schools' && selectedAtlasEntity.school_type && (
-                              <span className="capitalize">{selectedAtlasEntity.school_type.replace('_', ' ')} School</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'parks' && selectedAtlasEntity.park_type && (
-                              <span className="capitalize">{selectedAtlasEntity.park_type.replace('_', ' ')} Park</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'watertowers' && <span>Watertower</span>}
-                            {selectedAtlasEntity.layerType === 'cemeteries' && <span>Cemetery</span>}
-                            {selectedAtlasEntity.layerType === 'golf_courses' && selectedAtlasEntity.course_type && (
-                              <span className="capitalize">{selectedAtlasEntity.course_type.replace('_', ' ')} Golf Course</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'golf_courses' && !selectedAtlasEntity.course_type && (
-                              <span>Golf Course</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'hospitals' && selectedAtlasEntity.hospital_type && (
-                              <span className="capitalize">{selectedAtlasEntity.hospital_type.replace('_', ' ')} Hospital</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'hospitals' && !selectedAtlasEntity.hospital_type && (
-                              <span>Hospital</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'airports' && selectedAtlasEntity.airport_type && (
-                              <span className="capitalize">{selectedAtlasEntity.airport_type.replace('_', ' ')} Airport</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'airports' && !selectedAtlasEntity.airport_type && (
-                              <span>Airport</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'churches' && selectedAtlasEntity.church_type && (
-                              <span className="capitalize">{selectedAtlasEntity.church_type.replace('_', ' ')} Church</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'churches' && !selectedAtlasEntity.church_type && (
-                              <span>Church</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'municipals' && selectedAtlasEntity.municipal_type && (
-                              <span className="capitalize">{selectedAtlasEntity.municipal_type.replace('_', ' ')}</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'municipals' && !selectedAtlasEntity.municipal_type && (
-                              <span>Municipal Building</span>
-                            )}
-                            {selectedAtlasEntity.layerType === 'cities' && <span>City</span>}
-                            {selectedAtlasEntity.layerType === 'counties' && <span>County</span>}
-                            {selectedAtlasEntity.layerType === 'neighborhoods' && <span>Neighborhood</span>}
-                            {selectedAtlasEntity.layerType === 'lakes' && <span>Lake</span>}
-                            {selectedAtlasEntity.layerType === 'roads' && <span>Road</span>}
-                            {selectedAtlasEntity.layerType === 'radio_and_news' && <span>Radio & News</span>}
-                          </div>
-                          {selectedAtlasEntity.layerType === 'churches' && selectedAtlasEntity.denomination && (
-                            <div className="text-[10px] text-gray-500 mt-0.5">
-                              {selectedAtlasEntity.denomination}
-                            </div>
-                          )}
-                          {selectedAtlasEntity.layerType === 'golf_courses' && selectedAtlasEntity.holes && (
-                            <div className="text-[10px] text-gray-500 mt-0.5">
-                              {selectedAtlasEntity.holes} holes
-                            </div>
-                          )}
-                          {selectedAtlasEntity.layerType === 'airports' && (selectedAtlasEntity.iata_code || selectedAtlasEntity.icao_code) && (
-                            <div className="text-[10px] text-gray-500 mt-0.5">
-                              {selectedAtlasEntity.iata_code && <span>IATA: {selectedAtlasEntity.iata_code}</span>}
-                              {selectedAtlasEntity.iata_code && selectedAtlasEntity.icao_code && <span> · </span>}
-                              {selectedAtlasEntity.icao_code && <span>ICAO: {selectedAtlasEntity.icao_code}</span>}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-[10px] text-gray-400 font-mono flex-shrink-0 text-right">
-                          <div>{selectedAtlasEntity.lat.toFixed(6)}</div>
-                          <div>{selectedAtlasEntity.lng.toFixed(6)}</div>
-                        </div>
-                      </div>
-                      
-                      {/* Address + Contact Info - Compact Grid */}
-                      {(selectedAtlasEntity.address || selectedAtlasEntity.phone || selectedAtlasEntity.website_url) && (
-                        <div className="space-y-1 pb-1.5 border-b border-gray-100">
-                          {selectedAtlasEntity.address && (
-                            <div className="text-xs text-gray-600">{selectedAtlasEntity.address}</div>
-                          )}
-                          {selectedAtlasEntity.phone && (
-                            <div className="text-[10px] text-gray-500">Phone: {selectedAtlasEntity.phone}</div>
-                          )}
-                          {selectedAtlasEntity.website_url && (
-                            <a 
-                              href={selectedAtlasEntity.website_url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-[10px] text-gray-500 hover:text-gray-900 underline block"
-                            >
-                              Website →
-                            </a>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Description */}
-                      {selectedAtlasEntity.description && (
-                        <p className="text-xs text-gray-600 leading-relaxed">
-                          {selectedAtlasEntity.description}
-                        </p>
-                      )}
-                      
-                      {/* Explore Links - Inline */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {selectedAtlasEntity.layerType === 'cities' && selectedAtlasEntity.slug && (
-                          <Link 
-                            href={`/explore/city/${selectedAtlasEntity.slug}`}
-                            className="text-[10px] text-gray-500 hover:text-gray-900 underline"
-                          >
-                            Explore City →
-                          </Link>
-                        )}
-                        {selectedAtlasEntity.layerType === 'counties' && selectedAtlasEntity.slug && (
-                          <Link 
-                            href={`/explore/county/${selectedAtlasEntity.slug}`}
-                            className="text-[10px] text-gray-500 hover:text-gray-900 underline"
-                          >
-                            Explore County →
-                          </Link>
-                        )}
-                      </div>
-
-                      {/* Admin Actions - Compact */}
-                      {isAdmin && selectedAtlasEntity.layerType !== 'cities' && selectedAtlasEntity.layerType !== 'counties' && (
-                        <div className="pt-1.5 border-t border-gray-100 space-y-1">
-                          <div className="text-[9px] text-gray-400 font-medium">Admin</div>
-                          <div className="flex items-center gap-1">
-                            <button
-                        onClick={async () => {
-                          if (!confirm(`Are you sure you want to delete "${selectedAtlasEntity.name}"? This action cannot be undone.`)) {
-                            return;
-                          }
-                          
-                          setIsDeletingAtlasEntity(true);
-                          setAtlasEntityMessage(null);
-                          
-                          try {
-                            // Call appropriate delete function based on type
-                            switch (selectedAtlasEntity.layerType) {
-                              case 'neighborhoods':
-                                await deleteNeighborhood(selectedAtlasEntity.id);
-                                break;
-                              case 'schools':
-                                await deleteSchool(selectedAtlasEntity.id);
-                                break;
-                              case 'parks':
-                                await deletePark(selectedAtlasEntity.id);
-                                break;
-                              case 'lakes':
-                                await deleteLake(selectedAtlasEntity.id);
-                                break;
-                              case 'watertowers':
-                                await deleteWatertower(selectedAtlasEntity.id);
-                                break;
-                              case 'cemeteries':
-                                await deleteCemetery(selectedAtlasEntity.id);
-                                break;
-                              case 'golf_courses':
-                                await deleteGolfCourse(selectedAtlasEntity.id);
-                                break;
-                              case 'hospitals':
-                                await deleteHospital(selectedAtlasEntity.id);
-                                break;
-                              case 'airports':
-                                await deleteAirport(selectedAtlasEntity.id);
-                                break;
-                              case 'churches':
-                                await deleteChurch(selectedAtlasEntity.id);
-                                break;
-                              case 'municipals':
-                                await deleteMunicipal(selectedAtlasEntity.id);
-                                break;
-                              case 'roads':
-                                await deleteRoad(selectedAtlasEntity.id);
-                                break;
-                            }
-                            
-                            // Refresh the layer
-                            window.dispatchEvent(new CustomEvent('atlas-layer-refresh', {
-                              detail: { layerId: selectedAtlasEntity.layerType }
-                            }));
-                            
-                            setAtlasEntityMessage({ type: 'success', text: `Deleted "${selectedAtlasEntity.name}"` });
-                            
-                            // Clear selection after short delay
-                            setTimeout(() => {
-                              setSelectedAtlasEntity(null);
-                              setAtlasEntityMessage(null);
-                            }, 1500);
-                          } catch (error) {
-                            console.error('Error deleting entity:', error);
-                            setAtlasEntityMessage({ 
-                              type: 'error', 
-                              text: error instanceof Error ? error.message : 'Failed to delete'
-                            });
-                          } finally {
-                            setIsDeletingAtlasEntity(false);
-                          }
-                        }}
-                        disabled={isDeletingAtlasEntity}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium text-red-600 bg-transparent border border-red-300 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                      >
-                        <XMarkIcon className="w-3 h-3" />
-                        <span>{isDeletingAtlasEntity ? '...' : 'Delete'}</span>
-                      </button>
-                      
-                      {atlasEntityMessage && (
-                        <div className={`px-2 py-1 text-[10px] rounded ${
-                          atlasEntityMessage.type === 'success' 
-                            ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                            : 'bg-red-500/20 text-red-300 border border-red-500/30'
-                        }`}>
-                          {atlasEntityMessage.text}
-                        </div>
-                      )}
-                    </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* Location Details - Accordion */}
               {locationData && !isDropHeartExpanded && (
                 <div className="border-b border-gray-200">
@@ -2710,22 +2320,6 @@ export default function LocationSidebar({
               {/* ═══════════════════════════════════════════════════════════════
                   SECONDARY ACTIONS: User-facing tools (simplified)
                   ═══════════════════════════════════════════════════════════════ */}
-              {locationData && !isDropHeartExpanded && (
-                <div className="space-y-2">
-                  {/* Intelligence - Show for houses (building type=house) or when locationData exists */}
-                  {(pinFeature?.showIntelligence || (selectedAtlasEntity && locationData)) && (
-                    <button
-                      onClick={() => {
-                        setIsIntelligenceModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
-                    >
-                      <SparklesIcon className="w-4 h-4" />
-                      <span>{pinFeature?.showIntelligence ? 'Property Intelligence' : 'Location Intelligence'}</span>
-                    </button>
-                  )}
-                </div>
-              )}
 
               {/* ═══════════════════════════════════════════════════════════════
                   ADMIN PANEL: Compact admin tools - All open modal for review
@@ -2755,7 +2349,7 @@ export default function LocationSidebar({
                                 
                                 await updateCityCoordinates(city.id, locationData.coordinates.lat, locationData.coordinates.lng);
                                 
-                                window.dispatchEvent(new CustomEvent('atlas-layer-refresh', { detail: { layerId: 'cities' } }));
+                                // City coordinates updated - no layer refresh needed
                                 setCityUpdateMessage({ type: 'success', text: `Updated ${pinFeature.name}` });
                                 setTimeout(() => setCityUpdateMessage(null), 3000);
                               } catch (error) {
@@ -2785,19 +2379,6 @@ export default function LocationSidebar({
         </div>
       </div>
 
-      {/* Intelligence Modal */}
-      <IntelligenceModal
-        isOpen={isIntelligenceModalOpen}
-        onClose={() => setIsIntelligenceModalOpen(false)}
-        locationData={locationData}
-        pinFeature={pinFeature ? {
-          // Convert ExtractedFeature to old FeatureMetadata format
-          type: pinFeature.layerId,
-          name: pinFeature.name || undefined,
-          properties: pinFeature.properties,
-          showIntelligence: pinFeature.showIntelligence,
-        } : null}
-      />
 
 
       {/* POI Drop Pin Button - Shows when POI label is found */}

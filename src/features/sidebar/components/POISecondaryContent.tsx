@@ -13,6 +13,7 @@ import { getFeatureCenter } from '@/features/poi/utils/featureGeometry';
 import { isFeatureBlocked } from '@/features/poi/config/poiFilters';
 import { getPOIEmoji } from '@/features/poi/utils/getPOIEmoji';
 import { useDraftPOIs } from '@/features/poi/contexts/DraftPOIsContext';
+import { useToast } from '@/features/ui/hooks/useToast';
 
 interface POISecondaryContentProps {
   map?: MapboxMapInstance | null;
@@ -84,6 +85,7 @@ export default function POISecondaryContent({ map, mapLoaded = false }: POISecon
   const { user, account } = useAuthStateSafe();
   
   const { hoverFeature } = useFeatureTracking(map, mapLoaded, { throttleMs: 50 });
+  const { success: showSuccessToast, error: showErrorToast } = useToast();
   
   const { setDraftPOIs: setContextDraftPOIs } = useDraftPOIs();
   const [draftPOIs, setDraftPOIs] = useState<DraftPOI[]>([]);
@@ -225,17 +227,22 @@ export default function POISecondaryContent({ map, mapLoaded = false }: POISecon
     setIsCreatingPOI(true);
     try {
       const createdPOI = await createPOIFromDraft(draft);
+      // Optimistic update: remove from drafts and add to active immediately
       setDraftPOIs(prev => prev.filter(d => d.id !== draft.id));
       setPois(prev => [createdPOI, ...prev]);
-      POIService.getPOIs().then(setPois).catch(console.error);
+      showSuccessToast('POI Created', `${draft.name} has been saved`);
       window.dispatchEvent(new CustomEvent('poi-created'));
+      // Refresh in background to ensure consistency
+      POIService.getPOIs().then(setPois).catch(console.error);
     } catch (error) {
       console.error('[POISecondaryContent] Error confirming draft:', error);
+      showErrorToast('Failed to Create POI', 'Please try again');
+      // Refresh on error to restore correct state
       POIService.getPOIs().then(setPois).catch(console.error);
     } finally {
       setIsCreatingPOI(false);
     }
-  }, [user, account, isCreatingPOI, createPOIFromDraft]);
+  }, [user, account, isCreatingPOI, createPOIFromDraft, showSuccessToast, showErrorToast]);
   
   // Bulk approve selected drafts
   const handleBulkApprove = useCallback(async () => {
@@ -245,18 +252,35 @@ export default function POISecondaryContent({ map, mapLoaded = false }: POISecon
       const selectedDrafts = draftPOIs.filter(d => bulkSelected.has(d.id));
       const results = await Promise.allSettled(selectedDrafts.map(createPOIFromDraft));
       const successful = results.filter(r => r.status === 'fulfilled').map(r => (r as PromiseFulfilledResult<PointOfInterest>).value);
+      const failed = results.filter(r => r.status === 'rejected').length;
+      
+      // Optimistic update: remove from drafts and add to active immediately
       setDraftPOIs(prev => prev.filter(d => !bulkSelected.has(d.id)));
       setPois(prev => [...successful, ...prev]);
       setBulkSelected(new Set());
-      POIService.getPOIs().then(setPois).catch(console.error);
+      
+      // Show toast with results
+      if (successful.length > 0) {
+        showSuccessToast(
+          `${successful.length} POI${successful.length > 1 ? 's' : ''} Created`,
+          failed > 0 ? `${failed} failed` : undefined
+        );
+      }
+      if (failed > 0 && successful.length === 0) {
+        showErrorToast('Failed to Create POIs', 'Please try again');
+      }
+      
       window.dispatchEvent(new CustomEvent('poi-created'));
+      // Refresh in background to ensure consistency
+      POIService.getPOIs().then(setPois).catch(console.error);
     } catch (error) {
       console.error('[POISecondaryContent] Error bulk approving:', error);
+      showErrorToast('Failed to Create POIs', 'Please try again');
       POIService.getPOIs().then(setPois).catch(console.error);
     } finally {
       setIsCreatingPOI(false);
     }
-  }, [user, account, isCreatingPOI, bulkSelected, draftPOIs, createPOIFromDraft]);
+  }, [user, account, isCreatingPOI, bulkSelected, draftPOIs, createPOIFromDraft, showSuccessToast, showErrorToast]);
   
   // Remove draft(s)
   const handleRemoveDraft = useCallback((draftId: string) => {

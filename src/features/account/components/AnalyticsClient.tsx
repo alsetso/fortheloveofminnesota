@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { MapPinIcon, EyeIcon, UserGroupIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '@/features/auth';
+import { useActiveAccount } from '../contexts/ActiveAccountContext';
 
 interface PinViewStats {
   pin_id: string;
@@ -25,12 +26,13 @@ interface AnalyticsData {
 
 export default function AnalyticsClient() {
   const { user } = useAuth();
+  const { activeAccountId } = useActiveAccount();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !activeAccountId) {
       setLoading(false);
       setError('Sign in to view analytics');
       return;
@@ -41,7 +43,7 @@ export default function AnalyticsClient() {
       setError(null);
 
       try {
-        const response = await fetch('/api/analytics/my-pins', { credentials: 'include' });
+        const response = await fetch(`/api/analytics/my-pins?account_id=${activeAccountId}`, { credentials: 'include' });
         
         if (!response.ok) {
           const contentType = response.headers.get('content-type');
@@ -68,7 +70,7 @@ export default function AnalyticsClient() {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, activeAccountId]);
 
   if (loading) {
     return (

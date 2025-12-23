@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChartBarIcon, UserIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChartBarIcon, UserIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import AnalyticsClient from './AnalyticsClient';
 import SettingsClient from './SettingsClient';
+import ProfilesClient from './ProfilesClient';
 import { useAccountData } from '../hooks/useAccountData';
 import { useAccountTabs } from '../hooks/useAccountTabs';
 import type { AccountModalProps, AccountTabId } from '../types';
@@ -15,14 +16,16 @@ interface Tab {
   icon: typeof ChartBarIcon;
 }
 
-const tabs: Tab[] = [
-  { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
-  { id: 'settings', label: 'Settings', icon: UserIcon },
-];
-
 export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpdate }: AccountModalProps) {
   const { activeTab, setActiveTab } = useAccountTabs(initialTab, isOpen);
   const { account, userEmail, loading } = useAccountData(isOpen, activeTab);
+
+  // Build tabs array - profiles is available to all authenticated users
+  const tabs: Tab[] = [
+    { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
+    { id: 'settings', label: 'Settings', icon: UserIcon },
+    { id: 'profiles', label: 'Profiles', icon: UserGroupIcon },
+  ];
 
   if (!isOpen) return null;
 
@@ -94,6 +97,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
             <>
               {activeTab === 'analytics' && <AnalyticsClient />}
               {activeTab === 'settings' && account && <SettingsClient initialAccount={account} userEmail={userEmail} />}
+              {activeTab === 'profiles' && <ProfilesClient />}
             </>
           )}
         </div>

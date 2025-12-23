@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { ArrowTopRightOnSquareIcon, ClockIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon, ClockIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { hasRemainingCredits, getRemainingCredits, useCredit } from '@/lib/newsRateLimit';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -61,6 +61,14 @@ export default function NewsSecondaryContent() {
   const [error, setError] = useState<string | null>(null);
   const [remainingCredits, setRemainingCredits] = useState<number>(1);
   const [customSearchQuery, setCustomSearchQuery] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter parameters
+  const [limit, setLimit] = useState<string>('50');
+  const [timePublished, setTimePublished] = useState<string>('1y');
+  const [source, setSource] = useState<string>('');
+  const [country, setCountry] = useState<string>('US');
+  const [lang, setLang] = useState<string>('en');
 
   // Update remaining credits on mount and when credits change
   useEffect(() => {
@@ -101,7 +109,16 @@ export default function NewsSecondaryContent() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/news?query=${encodeURIComponent(query)}`);
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('query', query);
+      if (limit) params.append('limit', limit);
+      if (timePublished) params.append('time_published', timePublished);
+      if (source.trim()) params.append('source', source.trim());
+      if (country) params.append('country', country);
+      if (lang) params.append('lang', lang);
+
+      const response = await fetch(`/api/news?${params.toString()}`);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -188,6 +205,98 @@ export default function NewsSecondaryContent() {
               <MagnifyingGlassIcon className="w-3 h-3" />
             </button>
           </div>
+          
+          {/* Filters Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <span>Filters</span>
+            {showFilters ? (
+              <ChevronUpIcon className="w-3 h-3" />
+            ) : (
+              <ChevronDownIcon className="w-3 h-3" />
+            )}
+          </button>
+          
+          {/* Filters Panel */}
+          {showFilters && (
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px] space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {/* Limit */}
+                <div className="space-y-0.5">
+                  <label className="text-xs text-gray-600">Limit</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={limit}
+                    onChange={(e) => setLimit(e.target.value)}
+                    disabled={loading || !hasCredits}
+                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                
+                {/* Time Published */}
+                <div className="space-y-0.5">
+                  <label className="text-xs text-gray-600">Time Published</label>
+                  <select
+                    value={timePublished}
+                    onChange={(e) => setTimePublished(e.target.value)}
+                    disabled={loading || !hasCredits}
+                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="anytime">Anytime</option>
+                    <option value="1h">Last Hour</option>
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
+                    <option value="30d">Last 30 Days</option>
+                    <option value="1y">Last Year</option>
+                  </select>
+                </div>
+                
+                {/* Country */}
+                <div className="space-y-0.5">
+                  <label className="text-xs text-gray-600">Country</label>
+                  <input
+                    type="text"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    placeholder="US"
+                    disabled={loading || !hasCredits}
+                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                
+                {/* Language */}
+                <div className="space-y-0.5">
+                  <label className="text-xs text-gray-600">Language</label>
+                  <input
+                    type="text"
+                    value={lang}
+                    onChange={(e) => setLang(e.target.value)}
+                    placeholder="en"
+                    disabled={loading || !hasCredits}
+                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+              </div>
+              
+              {/* Source */}
+              <div className="space-y-0.5">
+                <label className="text-xs text-gray-600">Source Domain (optional)</label>
+                <input
+                  type="text"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="e.g., cnn.com"
+                  disabled={loading || !hasCredits}
+                  className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+            </div>
+          )}
         </form>
 
         <div className="flex flex-wrap gap-1.5">

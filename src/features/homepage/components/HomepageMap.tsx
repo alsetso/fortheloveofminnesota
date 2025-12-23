@@ -9,9 +9,9 @@ import FloatingMapContainer from './FloatingMapContainer';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
 import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
+import { useActiveAccount } from '@/features/account/contexts/ActiveAccountContext';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useAtlasLayers, AtlasEntitiesLayer, AtlasTableSelector } from '@/features/atlas/components';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/features/sidebar/components/Sidebar';
@@ -52,19 +52,8 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const searchParams = useSearchParams();
   const isHoveringMentionRef = useRef(false);
   
-  // Atlas layers
-  const { layers, toggleLayer, setLayerCount } = useAtlasLayers();
-  
-  // Atlas table selection state (for unified view)
-  const [selectedAtlasTables, setSelectedAtlasTables] = useState<string[]>([]);
-  
-  const handleToggleAtlasTable = (tableId: string) => {
-    setSelectedAtlasTables(prev => 
-      prev.includes(tableId)
-        ? prev.filter(id => id !== tableId)
-        : [...prev, tableId]
-    );
-  };
+  // POI layer visibility state
+  const [isPOILayerVisible, setIsPOILayerVisible] = useState(false);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -78,28 +67,8 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
     isLoading: authLoading,
   } = useAuthStateSafe();
 
-  // Account state for sidebar
-  const [account, setAccount] = useState<Account | null>(null);
-
-  // Load account data
-  useEffect(() => {
-    const loadAccount = async () => {
-      if (!user) {
-        setAccount(null);
-        return;
-      }
-
-      try {
-        const accountData = await AccountService.getCurrentAccount();
-        setAccount(accountData);
-      } catch (error) {
-        console.error('[FeedMapClient] Error loading account:', error);
-        setAccount(null);
-      }
-    };
-
-    loadAccount();
-  }, [user]);
+  // Use active account from context
+  const { activeAccount: account } = useActiveAccount();
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -335,19 +304,10 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
         )}
 
-        {/* Atlas Entities Layer */}
-        {mapLoaded && mapInstanceRef.current && (
-          <AtlasEntitiesLayer 
-            map={mapInstanceRef.current} 
-            mapLoaded={mapLoaded}
-            visibleTables={selectedAtlasTables}
-          />
-        )}
-
-        {/* POIs Layer - Shows all POIs when ?tab=poi */}
+        {/* POIs Layer - Toggleable via button */}
         {mapLoaded && mapInstanceRef.current && (
           <>
-            <POIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+            <POIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} visible={isPOILayerVisible} />
             <DraftPOIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} />
           </>
         )}
@@ -365,12 +325,17 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         {/* Homepage Stats Handle */}
         <HomepageStatsHandle />
 
-        {/* Atlas Table Selector - Top Left */}
+        {/* POI Layer Toggle - Top Left */}
         <div className="absolute top-4 left-4 z-20 pointer-events-auto">
-          <AtlasTableSelector
-            selectedTables={selectedAtlasTables}
-            onToggleTable={handleToggleAtlasTable}
-          />
+          <button
+            onClick={() => setIsPOILayerVisible(!isPOILayerVisible)}
+            className="bg-white border border-gray-200 rounded-md px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-sm"
+          >
+            <span className="text-xs">POIs</span>
+            {isPOILayerVisible && (
+              <span className="w-2 h-2 bg-green-500 rounded-full" />
+            )}
+          </button>
         </div>
 
         {/* Floating Account Dropdown - Top Right (desktop only, mobile has it in nav) */}

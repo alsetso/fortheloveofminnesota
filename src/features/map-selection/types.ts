@@ -129,12 +129,11 @@ export interface SelectionUrlParams {
 
 export type ActiveModal =
   | { type: 'none' }
-  | { type: 'intelligence'; context: LocationData | null }
   | { type: 'analytics'; pinId: string; pinName?: string }
   | { type: 'coming_soon'; feature: string }
   | { type: 'atlas_entity'; mode: 'create' | 'edit'; entityType: string; data?: unknown };
 
-export type ModalUrlType = 'intelligence' | 'analytics' | 'atlas';
+export type ModalUrlType = 'analytics' | 'atlas';
 
 export interface ModalUrlParams {
   modal?: ModalUrlType;
@@ -158,7 +157,6 @@ export interface UseMapSelectionReturn {
 
 export interface UseModalManagerReturn {
   activeModal: ActiveModal;
-  openIntelligence: (context: LocationData | null) => void;
   openAnalytics: (pinId: string, pinName?: string) => void;
   openComingSoon: (feature: string) => void;
   openAtlasEntity: (mode: 'create' | 'edit', entityType: string, data?: unknown) => void;

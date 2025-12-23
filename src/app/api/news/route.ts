@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('query');
+    const limit = searchParams.get('limit');
+    const timePublished = searchParams.get('time_published');
+    const source = searchParams.get('source');
+    const country = searchParams.get('country');
+    const lang = searchParams.get('lang');
 
     if (!query) {
       return NextResponse.json(
@@ -45,9 +50,43 @@ export async function GET(request: NextRequest) {
 
     const encodedQuery = encodeURIComponent(query);
     
-    // Build URL - try with all parameters first, fallback to simpler version if needed
+    // Build URL with optional parameters
     const baseUrl = 'https://real-time-news-data.p.rapidapi.com/search';
-    const url = `${baseUrl}?query=${encodedQuery}&limit=50&time_published=1y&country=US&lang=en`;
+    const urlParams = new URLSearchParams();
+    urlParams.append('query', query);
+    
+    if (limit) {
+      const limitNum = parseInt(limit, 10);
+      if (limitNum >= 1 && limitNum <= 500) {
+        urlParams.append('limit', limit);
+      }
+    } else {
+      urlParams.append('limit', '50'); // Default limit
+    }
+    
+    if (timePublished) {
+      urlParams.append('time_published', timePublished);
+    } else {
+      urlParams.append('time_published', '1y'); // Default: 1 year
+    }
+    
+    if (source) {
+      urlParams.append('source', source);
+    }
+    
+    if (country) {
+      urlParams.append('country', country);
+    } else {
+      urlParams.append('country', 'US'); // Default: US
+    }
+    
+    if (lang) {
+      urlParams.append('lang', lang);
+    } else {
+      urlParams.append('lang', 'en'); // Default: English
+    }
+    
+    const url = `${baseUrl}?${urlParams.toString()}`;
 
     let response: Response;
     try {

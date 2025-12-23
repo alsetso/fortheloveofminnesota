@@ -40,14 +40,12 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openOnboarding: () => {},
       openAccount: () => {},
       openUpgrade: () => {},
-      openIntelligence: () => {},
       openAnalytics: () => {},
       openAtlas: () => {},
       openComingSoon: () => {},
       openSuccessPin: () => {},
       updateSuccessPin: () => {},
       closeModal: () => {},
-      getIntelligenceContext: () => null,
       getAtlasContext: () => undefined,
     };
   }

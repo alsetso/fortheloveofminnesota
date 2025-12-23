@@ -97,3 +97,4 @@ UPDATE civic.leaders SET notes = 'U.S. Representative since 2019. Former Duluth 
 WHERE slug = 'pete-stauber';
 
 
+

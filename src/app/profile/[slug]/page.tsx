@@ -2,11 +2,13 @@ import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import ProfileCard from '@/features/profiles/components/ProfileCard';
 import ProfileMentionsSection from '@/features/profiles/components/ProfileMentionsSection';
+import ProfileCollectionsList from '@/features/profiles/components/ProfileCollectionsList';
 import OwnershipToast from '@/features/profiles/components/OwnershipToast';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { Metadata } from 'next';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Mention } from '@/types/mention';
+import type { Collection } from '@/types/collection';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,11 +106,20 @@ export default async function ProfilePage({ params }: Props) {
     isOwnProfile = true;
   }
 
+  // Fetch collections for this account
+  const { data: collectionsData } = await supabase
+    .from('collections')
+    .select('*')
+    .eq('account_id', accountData.id)
+    .order('created_at', { ascending: false });
+
+  const collections: Collection[] = (collectionsData || []) as Collection[];
+
   // Fetch mentions for this account
   // For visitors, only show public mentions; for owners, show all non-archived mentions
   let mentionsQuery = supabase
     .from('mentions')
-    .select('id, lat, lng, description, visibility, city_id, created_at, updated_at')
+    .select('id, lat, lng, description, visibility, city_id, collection_id, created_at, updated_at')
     .eq('account_id', accountData.id)
     .eq('archived', false)
     .order('created_at', { ascending: false });
@@ -127,6 +138,7 @@ export default async function ProfilePage({ params }: Props) {
     description: string | null;
     visibility: 'public' | 'only_me';
     city_id: string | null;
+    collection_id: string | null;
     created_at: string;
     updated_at: string;
   }) => ({
@@ -134,6 +146,7 @@ export default async function ProfilePage({ params }: Props) {
     lat: mention.lat,
     lng: mention.lng,
     description: mention.description,
+    collection_id: mention.collection_id,
     visibility: mention.visibility || 'public',
     created_at: mention.created_at,
     updated_at: mention.updated_at,
@@ -172,13 +185,20 @@ export default async function ProfilePage({ params }: Props) {
           {/* Middle Column - Search Filters and Mentions */}
           <div className="lg:col-span-6">
         {mentions.length > 0 && (
-              <ProfileMentionsSection pins={mentions} isOwnProfile={isOwnProfile} />
+              <ProfileMentionsSection 
+                pins={mentions} 
+                collections={collections}
+                isOwnProfile={isOwnProfile} 
+              />
         )}
           </div>
 
-          {/* Right Column - Empty for now */}
+          {/* Right Column - Collections */}
           <div className="lg:col-span-3">
-            {/* Reserved for future content */}
+            <ProfileCollectionsList 
+              accountId={accountData.id}
+              isOwnProfile={isOwnProfile}
+            />
           </div>
         </div>
       </div>

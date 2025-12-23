@@ -124,3 +124,4 @@ COMMENT ON COLUMN public.collections.display_order IS 'Order in which collection
 COMMENT ON COLUMN public.pins.collection_id IS 'Optional reference to a collection for grouping pins';
 
 
+

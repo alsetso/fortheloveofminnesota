@@ -43,3 +43,4 @@ CREATE POLICY "Read own or public collections"
 COMMENT ON COLUMN public.pin_collections.visibility IS 
   'Collection visibility: public (visible on profile) or private (only owner can see)';
 
+

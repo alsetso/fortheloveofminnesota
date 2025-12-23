@@ -275,3 +275,4 @@ COMMENT ON FUNCTION public.get_page_viewers IS
 
 COMMENT ON FUNCTION public.get_pin_viewers IS
   'Public wrapper for analytics.get_pin_viewers. Returns list of accounts that viewed a pin.';
+

@@ -171,3 +171,4 @@ GRANT ALL ON ALL TABLES IN SCHEMA civic TO service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA civic TO service_role;
 
 
+

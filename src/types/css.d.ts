@@ -8,3 +8,4 @@ declare module 'mapbox-gl/dist/mapbox-gl.css' {
   export default content;
 }
 
+

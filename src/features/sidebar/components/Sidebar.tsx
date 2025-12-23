@@ -63,16 +63,16 @@ const allNavItems: NavItem[] = [
     secondaryContent: <POISecondaryContent />,
   },
   { 
-    href: '#faqs', 
-    label: 'FAQs', 
-    icon: QuestionMarkCircleIcon,
-    secondaryContent: <FAQsSecondaryContent />,
-  },
-  { 
     href: '#news', 
     label: 'News', 
     icon: NewspaperIcon,
     secondaryContent: <NewsSecondaryContent />,
+  },
+  { 
+    href: '#faqs', 
+    label: 'FAQs', 
+    icon: QuestionMarkCircleIcon,
+    secondaryContent: <FAQsSecondaryContent />,
   },
 ];
 

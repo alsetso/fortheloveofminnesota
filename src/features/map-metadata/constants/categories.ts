@@ -484,3 +484,4 @@ export function shouldShowIntelligence(category: FeatureCategory): boolean {
   return CATEGORY_CONFIG[category]?.showIntelligence === true;
 }
 
+

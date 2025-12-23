@@ -38,3 +38,4 @@ Run Supabase CLI to regenerate types:
 supabase gen types typescript --project-id <project-id> > src/types/supabase.ts
 ```
 Or use your existing type generation command.
+

@@ -155,7 +155,7 @@ export class MentionService {
    * Update an existing mention
    * User must own the mention
    */
-  static async updateMention(mentionId: string, data: { description?: string | null; archived?: boolean }): Promise<Mention> {
+  static async updateMention(mentionId: string, data: { description?: string | null; archived?: boolean; collection_id?: string | null }): Promise<Mention> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('You must be signed in to update mentions');

@@ -215,3 +215,4 @@ See `/mapbox/hoverentities.md` for complete mapping of:
 - Water feature types
 - Land use categories
 
+

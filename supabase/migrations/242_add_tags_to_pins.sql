@@ -20,3 +20,4 @@ CREATE INDEX IF NOT EXISTS idx_pins_tags ON public.pins USING GIN (tags);
 
 COMMENT ON COLUMN public.pins.tags IS 'Array of text labels for organizing pins (e.g., ["favorite", "work", "family"])';
 
+

@@ -239,3 +239,4 @@ import { PostCreationCard } from '@/features/posts'; // ❌
 - ✅ Yes → `features/[feature-name]/components/`
 - ❌ No → `components/[domain]/` (temporary, migrate later)
 
+

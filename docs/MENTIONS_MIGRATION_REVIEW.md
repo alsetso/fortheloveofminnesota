@@ -200,3 +200,4 @@ Several places still reference "pins" in comments:
 The URL parameter and popup state management are **clean and working correctly**. The main gap is **missing API routes** for view tracking and stats. Once those are created, the system will be complete.
 
 The codebase correctly uses `mentionId` for profile pages and `mention` for homepage, with proper state management and event handling. The database migration is complete and all functions reference the `mentions` table correctly.
+

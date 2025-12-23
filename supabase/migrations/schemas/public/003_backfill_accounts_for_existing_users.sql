@@ -52,3 +52,4 @@ BEGIN
     RAISE WARNING 'Some users still do not have accounts. This may indicate users created after this migration ran.';
   END IF;
 END $$;
+

@@ -20,3 +20,4 @@ CREATE INDEX IF NOT EXISTS idx_mentions_map_meta ON public.mentions USING GIN (m
 -- ============================================================================
 
 COMMENT ON COLUMN public.mentions.map_meta IS 'JSON metadata containing all location details from the map (placeName, address, city, county, state, postalCode, etc.) passed to the mention form at creation time.';
+

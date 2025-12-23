@@ -137,3 +137,4 @@ WHERE l.slug = 'julie-blaha'
   AND j.slug = 'mn-executive';
 
 
+

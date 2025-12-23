@@ -127,3 +127,4 @@ COMMENT ON FUNCTION public.get_page_stats IS
 
 COMMENT ON FUNCTION public.get_pin_stats IS
   'Public wrapper for analytics.get_pin_stats. Returns pin statistics counted by device_id.';
+

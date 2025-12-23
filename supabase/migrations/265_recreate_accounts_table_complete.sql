@@ -281,3 +281,4 @@ COMMENT ON COLUMN public.accounts.created_at IS 'Account creation timestamp';
 COMMENT ON COLUMN public.accounts.updated_at IS 'Last update timestamp (auto-updated)';
 COMMENT ON COLUMN public.accounts.last_visit IS 'Last visit timestamp';
 
+

@@ -110,3 +110,4 @@ DROP FUNCTION IF EXISTS public.get_request_guest_id();
 -- All RLS policies now require authentication - anonymous users can only
 -- view public pins and public account information.
 
+

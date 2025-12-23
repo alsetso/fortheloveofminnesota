@@ -54,3 +54,4 @@ CREATE POLICY "pins_update"
 
 COMMENT ON POLICY "pins_update" ON public.pins IS
   'Authenticated users can update pins they own. WITH CHECK is minimal since ownership verified in USING.';
+

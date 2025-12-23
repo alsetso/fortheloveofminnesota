@@ -13,3 +13,4 @@ CREATE POLICY "Authenticated users can submit questions"
 
 -- Revoke INSERT permission from anonymous users
 REVOKE INSERT ON public.faqs FROM anon;
+

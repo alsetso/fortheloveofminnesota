@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { MagnifyingGlassIcon, PencilIcon, CheckIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import type { ProfilePin } from '@/types/profile';
+import type { Collection } from '@/types/collection';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useToast } from '@/features/ui/hooks/useToast';
 
@@ -10,6 +11,7 @@ type VisibilityFilter = 'all' | 'public' | 'only_me';
 
 interface ProfilePinsListProps {
   pins: ProfilePin[];
+  collections?: Collection[];
   isOwnProfile: boolean;
   onPinClick?: (pin: ProfilePin) => void;
   onPinUpdated?: () => void;
@@ -21,6 +23,7 @@ interface ProfilePinsListProps {
 
 export default function ProfilePinsList({
   pins: initialPins,
+  collections = [],
   isOwnProfile,
   onPinClick,
   onPinUpdated,
@@ -43,6 +46,8 @@ export default function ProfilePinsList({
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [deletingPinId, setDeletingPinId] = useState<string | null>(null);
+  const [updatingCollectionId, setUpdatingCollectionId] = useState<string | null>(null);
+  const [editingCollectionPinId, setEditingCollectionPinId] = useState<string | null>(null);
   const { success, error: showError } = useToast();
   const descriptionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -121,6 +126,28 @@ export default function ProfilePinsList({
       showError('Error', 'Failed to archive mention');
     } finally {
       setDeletingPinId(null);
+    }
+  };
+
+  const handleCollectionChange = async (pinId: string, collectionId: string | null) => {
+    if (updatingCollectionId) return;
+    setUpdatingCollectionId(pinId);
+
+    try {
+      await MentionService.updateMention(pinId, { collection_id: collectionId });
+      setPins(prevPins =>
+        prevPins.map(pin =>
+          pin.id === pinId ? { ...pin, collection_id: collectionId, updated_at: new Date().toISOString() } : pin
+        )
+      );
+      setEditingCollectionPinId(null); // Close edit mode after successful update
+      success('Updated', 'Collection updated');
+      onPinUpdated?.();
+    } catch (err) {
+      console.error('Error updating collection:', err);
+      showError('Error', 'Failed to update collection');
+    } finally {
+      setUpdatingCollectionId(null);
     }
   };
 
@@ -263,6 +290,96 @@ export default function ProfilePinsList({
                   </div>
                 )}
                 
+                {/* Collection Assignment - Only for owners */}
+                {isOwnProfile && (
+                  <div className="mt-1.5">
+                    {editingCollectionPinId === pin.id ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <div className="text-[10px] text-gray-500">Collections:</div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCollectionPinId(null);
+                            }}
+                            className="text-[10px] text-gray-500 hover:text-gray-700"
+                          >
+                            Done
+                          </button>
+                        </div>
+                        {collections.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {collections.map((collection) => {
+                              const isSelected = pin.collection_id === collection.id;
+                              return (
+                                <button
+                                  key={collection.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCollectionChange(
+                                      pin.id,
+                                      isSelected ? null : collection.id
+                                    );
+                                  }}
+                                  disabled={updatingCollectionId === pin.id}
+                                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded transition-colors ${
+                                    isSelected
+                                      ? 'bg-gray-200 text-gray-900 border border-gray-300 font-medium'
+                                      : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                                  } disabled:opacity-50`}
+                                  title={isSelected ? 'Click to remove from collection' : 'Click to add to collection'}
+                                >
+                                  <span>{collection.emoji}</span>
+                                  <span>{collection.title}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400">
+                            No collections yet. Create one in the right column.
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        {pin.collection_id ? (
+                          <>
+                            {(() => {
+                              const currentCollection = collections.find(c => c.id === pin.collection_id);
+                              return currentCollection ? (
+                                <div className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded">
+                                  <span>{currentCollection.emoji}</span>
+                                  <span>{currentCollection.title}</span>
+                                </div>
+                              ) : null;
+                            })()}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCollectionPinId(pin.id);
+                              }}
+                              className="text-[10px] text-gray-400 hover:text-gray-600"
+                            >
+                              Edit
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCollectionPinId(pin.id);
+                            }}
+                            className="text-[10px] text-gray-400 hover:text-gray-600"
+                          >
+                            Add to collection
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Coordinates */}
                 {pin.lat && pin.lng && (
                   <div className="text-[10px] text-gray-500 font-mono">

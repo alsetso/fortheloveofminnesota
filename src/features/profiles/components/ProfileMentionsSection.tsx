@@ -6,8 +6,11 @@ import type { ProfilePin } from '@/types/profile';
 import ProfileMap from './ProfileMap';
 import ProfilePinsList from './ProfilePinsList';
 
+import type { Collection } from '@/types/collection';
+
 interface ProfileMentionsSectionProps {
   pins: ProfilePin[];
+  collections?: Collection[];
   isOwnProfile: boolean;
   onPinClick?: (pin: ProfilePin) => void;
   onPinUpdated?: () => void;
@@ -17,6 +20,7 @@ type VisibilityFilter = 'all' | 'public' | 'only_me';
 
 export default function ProfileMentionsSection({
   pins,
+  collections = [],
   isOwnProfile,
   onPinClick,
   onPinUpdated,
@@ -118,6 +122,7 @@ export default function ProfileMentionsSection({
       {/* Mentions List */}
       <ProfilePinsList
         pins={pins}
+        collections={collections}
         isOwnProfile={isOwnProfile}
         onPinClick={onPinClick}
         onPinUpdated={onPinUpdated}

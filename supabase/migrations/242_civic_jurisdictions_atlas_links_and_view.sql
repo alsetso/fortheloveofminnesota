@@ -262,3 +262,4 @@ SELECT id, name, slug, type, depth FROM hierarchy ORDER BY depth DESC;
 $$ LANGUAGE sql STABLE;
 
 
+

@@ -232,3 +232,4 @@ export type AtlasEntity =
   | AtlasMunicipal
   | AtlasRoad
   | AtlasRadioAndNews;
+

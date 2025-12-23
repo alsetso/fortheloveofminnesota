@@ -27,3 +27,4 @@ CREATE INDEX IF NOT EXISTS idx_mentions_city_id_account_id ON public.mentions(ci
 -- ============================================================================
 
 COMMENT ON COLUMN public.mentions.city_id IS 'City ID reference for filtering mentions by city. Nullable - mentions may not always have an associated city.';
+

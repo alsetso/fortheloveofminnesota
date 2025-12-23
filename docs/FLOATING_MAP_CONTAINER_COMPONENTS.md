@@ -157,3 +157,4 @@ FloatingMapContainer (LocationSidebar)
 - `useAuthStateSafe` - Authentication state
 - `useAppModalContextSafe` - Modal management
 - `useWindowManager` - Window management
+

@@ -94,3 +94,4 @@ GRANT INSERT, UPDATE, DELETE ON public.map_pins TO authenticated;
 
 
 
+

@@ -15,6 +15,7 @@ export interface ProfilePin {
   lat: number;
   lng: number;
   description: string | null;
+  collection_id: string | null;
   visibility: PinVisibility;
   created_at: string;
   updated_at: string;

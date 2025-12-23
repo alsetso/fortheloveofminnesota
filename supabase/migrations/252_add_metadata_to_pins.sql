@@ -28,3 +28,4 @@ WHERE atlas_metadata IS NOT NULL;
 COMMENT ON COLUMN public.pins.location_metadata IS 'Mapbox feature metadata captured at pin creation (layerId, sourceLayer, name, category, class, type, properties)';
 COMMENT ON COLUMN public.pins.atlas_metadata IS 'Atlas entity metadata captured at pin creation (entityId, entityType, name, emoji)';
 
+

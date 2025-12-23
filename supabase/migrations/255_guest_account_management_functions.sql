@@ -193,3 +193,4 @@ GRANT EXECUTE ON FUNCTION public.reset_guest_account(TEXT, TEXT) TO anon;
 COMMENT ON FUNCTION public.reset_guest_account IS
   'Resets a guest account by deleting all pins but keeping the account. Optionally updates the display name. Same guest_id is preserved.';
 
+

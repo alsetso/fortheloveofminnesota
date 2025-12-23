@@ -11,6 +11,7 @@ export interface Mention {
   description: string | null;
   account_id: string | null;
   city_id: string | null; // City ID for filtering mentions by city
+  collection_id: string | null; // Collection ID for categorizing mentions
   visibility: MentionVisibility;
   archived?: boolean;
   post_date?: string | null; // Date when the event/memory happened (for year filtering)
@@ -29,6 +30,7 @@ export interface CreateMentionData {
   lng: number;
   description?: string | null;
   city_id?: string | null; // Optional city ID - can be set during creation or auto-detected
+  collection_id?: string | null; // Optional collection ID for categorizing mentions
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
@@ -37,6 +39,7 @@ export interface CreateMentionData {
 export interface MentionFilters {
   account_id?: string;
   city_id?: string; // Filter by city ID
+  collection_id?: string; // Filter by collection ID
   year?: number; // Filter by year of post_date
   bbox?: {
     minLat: number;

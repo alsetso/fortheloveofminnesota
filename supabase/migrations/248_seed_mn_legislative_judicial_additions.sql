@@ -269,3 +269,4 @@ WHERE l.slug = 'jennifer-frisch'
   AND j.slug = 'mn-court-of-appeals';
 
 
+

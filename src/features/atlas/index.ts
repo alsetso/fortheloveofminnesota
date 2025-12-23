@@ -54,3 +54,4 @@ export type { AtlasEntityType } from './services/atlasService';
 
 // Types
 export type * from './types';
+

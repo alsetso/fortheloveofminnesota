@@ -55,3 +55,4 @@ COMMENT ON COLUMN public.map_pins.visibility IS 'Pin visibility: ''public'' (vis
 
 
 
+

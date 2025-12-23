@@ -154,3 +154,4 @@ COMMENT ON FUNCTION public.generate_guest_username IS
   'Generates a unique username for guest accounts in format guest-XXXXXXXX using first 8 chars of UUID.';
 
 
+

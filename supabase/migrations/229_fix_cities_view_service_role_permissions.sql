@@ -16,3 +16,4 @@ COMMENT ON VIEW public.cities IS 'Public-facing view of atlas.cities with INSTEA
 COMMENT ON VIEW public.counties IS 'Public-facing view of atlas.counties with INSTEAD OF triggers for CRUD operations. Service role has full access.';
 
 
+

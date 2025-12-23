@@ -163,3 +163,4 @@ function LocationSidebar() {
 6. **Testable**: Hooks can be unit tested in isolation
 7. **Debuggable**: Current state visible in URL bar
 
+

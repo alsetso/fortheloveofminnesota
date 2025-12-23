@@ -20,13 +20,6 @@ interface BillingData {
   isActive: boolean;
 }
 
-const PRO_FEATURES = [
-  'Unlimited property intelligence queries',
-  'Advanced skip trace lookups',
-  'Private pins',
-  'Priority support',
-];
-
 export default function BillingModal({
   isOpen,
   onClose,
@@ -313,18 +306,6 @@ export default function BillingModal({
               {/* Upgrade Section */}
               {showUpgrade && (
                 <>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-700">Pro includes:</p>
-                    <ul className="space-y-1.5">
-                      {PRO_FEATURES.map((benefit, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <CheckIcon className="w-3.5 h-3.5 text-gray-900 mt-0.5 flex-shrink-0" />
-                          <span className="text-xs text-gray-600">{benefit}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
                   <div className="pt-2 space-y-2">
                     <button
                       onClick={handleUpgrade}
@@ -490,18 +471,6 @@ export default function BillingModal({
               {/* Upgrade Section */}
               {showUpgrade && (
                 <>
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-gray-700">Pro includes:</p>
-                    <ul className="space-y-1.5">
-                      {PRO_FEATURES.map((benefit, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <CheckIcon className="w-3.5 h-3.5 text-gray-900 mt-0.5 flex-shrink-0" />
-                          <span className="text-xs text-gray-600">{benefit}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
                   <div className="pt-2 space-y-2">
                     <button
                       onClick={handleUpgrade}

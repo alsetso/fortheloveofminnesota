@@ -293,6 +293,8 @@ export default function LocationSidebar({
   const spinAnimationRef = useRef<number | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const temporaryMarkerRef = useRef<any>(null);
+  const autofillCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitializingFromUrlRef = useRef(false);
 
   // Fetch current user's account info (ID, plan, and role)
   useEffect(() => {
@@ -460,6 +462,51 @@ export default function LocationSidebar({
     }, 300);
   }, [searchLocations]);
 
+  // Detect browser autofill and clear input
+  useEffect(() => {
+    const input = searchInputRef.current;
+    if (!input) return;
+
+    let lastKnownValue = searchQuery;
+    let isUserInput = false;
+
+    const checkAndClearAutofill = () => {
+      // If input has a value that doesn't match our state and user didn't type it, clear it
+      if (input.value && input.value !== lastKnownValue && !isUserInput) {
+        setSearchQuery('');
+        input.value = '';
+        lastKnownValue = '';
+      }
+      isUserInput = false;
+    };
+
+    const handleFocus = () => {
+      isUserInput = false;
+      lastKnownValue = input.value || '';
+      // Check after a short delay to allow autofill to complete
+      setTimeout(checkAndClearAutofill, 200);
+    };
+
+    const handleInput = () => {
+      isUserInput = true;
+      lastKnownValue = input.value;
+    };
+
+    const handleKeyDown = () => {
+      isUserInput = true;
+    };
+
+    input.addEventListener('focus', handleFocus);
+    input.addEventListener('input', handleInput);
+    input.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      input.removeEventListener('focus', handleFocus);
+      input.removeEventListener('input', handleInput);
+      input.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [searchQuery]);
+
 
   // Handle suggestion select
   const handleSuggestionSelect = useCallback(async (feature: MapboxFeature) => {
@@ -468,7 +515,8 @@ export default function LocationSidebar({
       lng: feature.center[0],
     };
 
-    setSearchQuery(feature.place_name);
+    // Clear search input immediately
+    setSearchQuery('');
     setShowSuggestions(false);
     setSelectedIndex(-1);
 
@@ -615,6 +663,12 @@ export default function LocationSidebar({
     };
     setLocationData(newLocationData);
 
+    // Clear search input after selection
+    setSearchQuery('');
+
+    // Close location details when location is chosen
+    setIsLocationDetailsExpanded(false);
+
     // Add temporary pin
     addTemporaryPin(coordinates);
 
@@ -665,6 +719,15 @@ export default function LocationSidebar({
       pinFileInputRef.current.value = '';
     }
   }, []);
+
+  // Unified location cleanup - clears all location-related state
+  const clearLocation = useCallback(() => {
+    clearSelection();
+    removeTemporaryPin();
+    setIsLocationDetailsExpanded(false);
+    setIsMetadataOpen(false);
+    resetPinForm();
+  }, [clearSelection, removeTemporaryPin, resetPinForm]);
 
   const handlePinFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     // Require signed-in user to upload media
@@ -788,13 +851,29 @@ export default function LocationSidebar({
         postDate = date.toISOString();
       }
 
+      // Combine location data and cursor tracking metadata
+      const mapMeta = {
+        location: locationData,
+        feature: pinFeature ? {
+          layerId: pinFeature.layerId,
+          sourceLayer: pinFeature.sourceLayer,
+          category: pinFeature.category,
+          name: pinFeature.name,
+          label: pinFeature.label,
+          icon: pinFeature.icon,
+          properties: pinFeature.properties,
+          atlasType: pinFeature.atlasType,
+          showIntelligence: pinFeature.showIntelligence,
+        } : null,
+      };
+
       const mentionData: CreateMentionData = {
         lat: locationData.coordinates.lat,
         lng: locationData.coordinates.lng,
         description: pinDescription.trim() || null,
         visibility: pinVisibility,
         post_date: postDate,
-        map_meta: locationData || null,
+        map_meta: mapMeta,
       };
 
       const createdMention = await MentionService.createMention(mentionData);
@@ -816,7 +895,7 @@ export default function LocationSidebar({
       setIsPinSubmitting(false);
       setIsPinUploading(false);
     }
-  }, [locationData, pinDescription, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome]);
+  }, [locationData, pinFeature, pinDescription, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome]);
 
   // Map control handlers
   const handleZoomIn = useCallback(() => {
@@ -1148,6 +1227,44 @@ export default function LocationSidebar({
       setIsLocationDetailsExpanded(false);
     }
   }, [searchParams, removeTemporaryPin, clearSelection]);
+
+  // Initialize search query from URL parameter on mount
+  useEffect(() => {
+    const searchParam = searchParams.get('search');
+    if (searchParam && searchParam !== searchQuery) {
+      isInitializingFromUrlRef.current = true;
+      setSearchQuery(searchParam);
+      // Trigger search if there's a value
+      if (searchParam.trim().length >= 2) {
+        searchLocations(searchParam);
+      }
+      // Reset flag after state update
+      setTimeout(() => {
+        isInitializingFromUrlRef.current = false;
+      }, 0);
+    }
+  }, [searchParams, searchLocations]); // Run when searchParams change or component mounts
+
+  // Sync search query with URL parameter (skip during initialization from URL)
+  useEffect(() => {
+    // Skip URL update if we're initializing from URL
+    if (isInitializingFromUrlRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    const currentSearchParam = params.get('search');
+    
+    // Only update URL if search query differs from URL param
+    if (searchQuery !== currentSearchParam) {
+      if (searchQuery.trim()) {
+        params.set('search', searchQuery);
+      } else {
+        params.delete('search');
+      }
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [searchQuery, searchParams, router]);
 
 
   // Listen for atlas entity clicks
@@ -1710,13 +1827,35 @@ export default function LocationSidebar({
                   }
                 }}
                 placeholder="Search locations..."
-                className="w-full pl-11 pr-10 py-3 text-sm bg-transparent border-0 text-gray-900 placeholder-gray-400 focus:outline-none focus:placeholder-gray-300 transition-all"
+                className={`w-full pl-11 py-3 text-sm bg-transparent border-0 text-gray-900 placeholder-gray-400 focus:outline-none focus:placeholder-gray-300 transition-all ${
+                  searchQuery || isSearching ? 'pr-10' : 'pr-3'
+                }`}
                 style={{ pointerEvents: 'auto', position: 'relative', zIndex: 50 }}
               />
               {isSearching && (
-                <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2">
+                <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2 pointer-events-none">
                   <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
                 </div>
+              )}
+              {!isSearching && searchQuery && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchQuery('');
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                    setSelectedIndex(-1);
+                    // Clear location state when search is cleared
+                    clearLocation();
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute right-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 hover:text-gray-900 transition-colors flex items-center justify-center"
+                  style={{ pointerEvents: 'auto', position: 'absolute', zIndex: 60 }}
+                  title="Clear search"
+                  type="button"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
               )}
             </div>
           </div>
@@ -1975,6 +2114,8 @@ export default function LocationSidebar({
                   VIEWING SECTION: What the user clicked on (read-only context)
                   ═══════════════════════════════════════════════════════════════ */}
               
+              {/* TEMPORARY: Hidden container for meta details - not rendered in UI */}
+              <div style={{ display: 'none' }}>
               {/* Atlas Entity Details - Accordion */}
               {selectedAtlasEntity && (
                 <div className="border-b border-gray-200">
@@ -2604,10 +2745,14 @@ export default function LocationSidebar({
               )}
 
               </div>
+              {/* END TEMPORARY: Hidden container for meta details */}
+
+              </div>
             </div>
           )}
+
         </div>
-      </div>
+        </div>
       </div>
 
       {/* Intelligence Modal */}

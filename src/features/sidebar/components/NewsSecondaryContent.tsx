@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ArrowTopRightOnSquareIcon, ClockIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { hasRemainingCredits, getRemainingCredits, useCredit } from '@/lib/newsRateLimit';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface NewsArticle {
   id: string;
@@ -28,7 +30,6 @@ interface NewsResponse {
   requestId: string;
   articles: NewsArticle[];
   count: number;
-  curl?: string;
 }
 
 interface QueryOption {
@@ -50,11 +51,14 @@ const MINNESOTA_QUERIES: QueryOption[] = [
 ];
 
 export default function NewsSecondaryContent() {
+  const { account } = useAuthStateSafe();
+  const { openUpgrade } = useAppModalContextSafe();
+  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+  
   const [selectedQuery, setSelectedQuery] = useState<string | null>(null);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [curlCommand, setCurlCommand] = useState<string | null>(null);
   const [remainingCredits, setRemainingCredits] = useState<number>(1);
   const [customSearchQuery, setCustomSearchQuery] = useState<string>('');
 
@@ -73,7 +77,6 @@ export default function NewsSecondaryContent() {
       // If clicking the same query, clear results
       setSelectedQuery(null);
       setArticles([]);
-      setCurlCommand(null);
       return;
     }
 
@@ -107,11 +110,9 @@ export default function NewsSecondaryContent() {
 
       const data: NewsResponse = await response.json();
       setArticles(data.articles || []);
-      setCurlCommand(data.curl || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load news');
       setArticles([]);
-      setCurlCommand(null);
     } finally {
       setLoading(false);
     }
@@ -189,7 +190,7 @@ export default function NewsSecondaryContent() {
           </div>
         </form>
 
-        <div className="space-y-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {MINNESOTA_QUERIES.map((option) => {
             const isActive = selectedQuery === option.query;
             const isLoading = loading && selectedQuery === option.query;
@@ -200,11 +201,11 @@ export default function NewsSecondaryContent() {
                 onClick={() => handleQueryClick(option.query)}
                 disabled={loading || !hasCredits}
                 className={`
-                  w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors
+                  px-2 py-1 rounded-md text-xs transition-colors
                   ${
                     isActive
                       ? 'bg-gray-200 text-gray-900 font-medium'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
                   }
                   ${(loading && !isLoading) || !hasCredits ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
@@ -230,18 +231,27 @@ export default function NewsSecondaryContent() {
         </div>
       )}
 
+      {/* Upgrade CTA when credits are used */}
+      {!isPro && remainingCredits === 0 && (
+        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          <div className="space-y-2">
+            <div>
+              <p className="text-xs font-medium text-gray-900">Daily search limit reached</p>
+              <p className="text-xs text-gray-600 mt-0.5">You've used your 1 free search credit for today.</p>
+            </div>
+            <button
+              onClick={() => openUpgrade('news-search')}
+              className="w-full px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
+            >
+              Upgrade to Pro for Unlimited Searches
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Articles */}
       {!loading && articles.length > 0 && (
         <div className="space-y-2">
-          {/* Curl Command */}
-          {curlCommand && (
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
-              <h4 className="text-xs font-semibold text-gray-900 mb-1.5">Curl Command</h4>
-              <pre className="text-xs text-gray-600 whitespace-pre-wrap break-all font-mono">
-                {curlCommand}
-              </pre>
-            </div>
-          )}
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-semibold text-gray-900">
               Results ({articles.length})

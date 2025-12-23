@@ -1,56 +1,55 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { FAQ } from '@/types/faq';
 import FAQItem from '@/features/faqs/components/FAQItem';
 import QuestionSubmissionForm from '@/features/faqs/components/QuestionSubmissionForm';
-import { supabase } from '@/lib/supabase';
+import { useAuthStateSafe } from '@/features/auth';
 
 export default function FAQsSecondaryContent() {
+  const { user, account } = useAuthStateSafe();
+  const isAdmin = account?.role === 'admin';
+  
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasFetchedRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
-  useEffect(() => {
-    async function fetchFAQs() {
-      try {
-        setLoading(true);
-        setError(null);
+  const fetchFAQs = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    if (isFetchingRef.current) return;
+    
+    try {
+      isFetchingRef.current = true;
+      setLoading(true);
+      setError(null);
 
-        // Check if user is admin
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          const { data: account } = await supabase
-            .from('accounts')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-          
-          if (account?.role === 'admin') {
-            setIsAdmin(true);
-          }
-        }
-
-        // Fetch FAQs (admin sees all, public sees only visible)
-        const response = await fetch('/api/faqs');
-        if (!response.ok) {
-          throw new Error('Failed to fetch FAQs');
-        }
-
-        const data = await response.json();
-        // Ensure data is always an array
-        setFaqs(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load FAQs');
-      } finally {
-        setLoading(false);
+      // Fetch FAQs (admin sees all, public sees only visible)
+      const response = await fetch('/api/faqs');
+      if (!response.ok) {
+        throw new Error('Failed to fetch FAQs');
       }
-    }
 
-    fetchFAQs();
+      const data = await response.json();
+      // Ensure data is always an array
+      setFaqs(Array.isArray(data) ? data : []);
+      hasFetchedRef.current = true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load FAQs');
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
   }, []);
+
+  // Only fetch once on mount
+  useEffect(() => {
+    if (!hasFetchedRef.current && !isFetchingRef.current) {
+      fetchFAQs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   const handleUpdate = (updatedFAQ: FAQ) => {
     setFaqs((prev) => prev.map((faq) => (faq.id === updatedFAQ.id ? updatedFAQ : faq)));
@@ -60,20 +59,16 @@ export default function FAQsSecondaryContent() {
     setFaqs((prev) => prev.filter((faq) => faq.id !== id));
   };
 
-  const handleQuestionSubmitted = async () => {
-    // Refresh FAQs list
-    try {
-      const response = await fetch('/api/faqs');
-      if (!response.ok) {
-        throw new Error('Failed to fetch FAQs');
-      }
-      const data = await response.json();
-      // Ensure data is always an array
-      setFaqs(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error refreshing FAQs:', err);
-    }
-  };
+  const handleQuestionSubmitted = useCallback(async () => {
+    // Refresh FAQs list after question submission
+    await fetchFAQs();
+  }, [fetchFAQs]);
+
+  const handleManualRefresh = useCallback(async () => {
+    // Manual refresh - reset the fetched flag to allow refetch
+    hasFetchedRef.current = false;
+    await fetchFAQs();
+  }, [fetchFAQs]);
 
   if (loading) {
     return (

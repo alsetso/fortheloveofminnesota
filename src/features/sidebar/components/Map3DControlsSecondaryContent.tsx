@@ -15,10 +15,13 @@ import {
   TagIcon,
   BeakerIcon,
   Squares2X2Icon,
+  LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import { MAP_CONFIG } from '@/features/map/config';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface Map3DControlsSecondaryContentProps {
   map?: MapboxMapInstance | null;
@@ -27,6 +30,12 @@ interface Map3DControlsSecondaryContentProps {
 type MapStyle = 'streets' | 'satellite' | 'light' | 'dark' | 'outdoors';
 
 export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSecondaryContentProps = {}) {
+  const { account } = useAuthStateSafe();
+  const { openUpgrade } = useAppModalContextSafe();
+  
+  // Check if user has pro plan
+  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+  
   // Building controls
   const [buildingsEnabled, setBuildingsEnabled] = useState(false);
   const [opacity, setOpacity] = useState(0.6);
@@ -272,7 +281,25 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
   return (
     <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-120px)]">
       {/* Map Style */}
-      <div>
+      <div className="relative">
+        {!isPro && (
+          <div 
+            className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm rounded flex flex-col items-center justify-center gap-2 p-4"
+            onClick={() => openUpgrade('map-style')}
+          >
+            <LockClosedIcon className="w-5 h-5 text-gray-400" />
+            <p className="text-xs font-medium text-gray-700">Pro Feature</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openUpgrade('map-style');
+              }}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
+            >
+              Upgrade to Pro
+            </button>
+          </div>
+        )}
         <div className="text-xs text-gray-600 font-medium mb-2">Map Style</div>
         <div className="space-y-1">
           {styleOptions.map((option) => {
@@ -281,13 +308,15 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
             return (
               <button
                 key={option.value}
-                onClick={() => changeMapStyle(option.value)}
+                onClick={() => isPro && changeMapStyle(option.value)}
+                disabled={!isPro}
                 className={`
                   w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors
                   ${isActive
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }
+                  ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
               >
                 <Icon className="w-4 h-4" />
@@ -420,18 +449,39 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
       </div>
 
       {/* Layer Visibility */}
-      <div>
+      <div className="relative">
+        {!isPro && (
+          <div 
+            className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm rounded flex flex-col items-center justify-center gap-2 p-4"
+            onClick={() => openUpgrade('map-layers')}
+          >
+            <LockClosedIcon className="w-5 h-5 text-gray-400" />
+            <p className="text-xs font-medium text-gray-700">Layers</p>
+            <p className="text-[10px] text-gray-500 text-center">Unlock layer controls (Roads, Labels, Water, Landcover) with Pro</p>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openUpgrade('map-layers');
+              }}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
+            >
+              Upgrade to Pro
+            </button>
+          </div>
+        )}
         <div className="text-xs text-gray-600 font-medium mb-2">Layers</div>
         <div className="space-y-1">
           {/* Roads */}
           <button
-            onClick={() => toggleLayerVisibility('road', !roadsVisible)}
+            onClick={() => isPro && toggleLayerVisibility('road', !roadsVisible)}
+            disabled={!isPro}
             className={`
               w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
               ${roadsVisible
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
+              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
             <div className="flex items-center gap-2">
@@ -447,13 +497,15 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
 
           {/* Labels */}
           <button
-            onClick={() => toggleLayerVisibility('label', !labelsVisible)}
+            onClick={() => isPro && toggleLayerVisibility('label', !labelsVisible)}
+            disabled={!isPro}
             className={`
               w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
               ${labelsVisible
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
+              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
             <div className="flex items-center gap-2">
@@ -469,13 +521,15 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
 
           {/* Water */}
           <button
-            onClick={() => toggleLayerVisibility('water', !waterVisible)}
+            onClick={() => isPro && toggleLayerVisibility('water', !waterVisible)}
+            disabled={!isPro}
             className={`
               w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
               ${waterVisible
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
+              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
             <div className="flex items-center gap-2">
@@ -491,13 +545,15 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
 
           {/* Landcover */}
           <button
-            onClick={() => toggleLayerVisibility('landcover', !landcoverVisible)}
+            onClick={() => isPro && toggleLayerVisibility('landcover', !landcoverVisible)}
+            disabled={!isPro}
             className={`
               w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
               ${landcoverVisible
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
+              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
             `}
           >
             <div className="flex items-center gap-2">

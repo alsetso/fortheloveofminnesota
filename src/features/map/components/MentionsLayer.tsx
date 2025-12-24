@@ -257,8 +257,8 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             'text-anchor': 'top',
           },
           paint: {
-            'text-color': '#ffffff',
-            'text-halo-color': '#000000',
+            'text-color': '#000000',
+            'text-halo-color': '#ffffff',
             'text-halo-width': 2,
             'text-halo-blur': 1,
           },

@@ -26,6 +26,8 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface Map3DControlsSecondaryContentProps {
   map?: MapboxMapInstance | null;
+  pointsOfInterestVisible?: boolean;
+  onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
 }
 
 type MapStyle = 'streets' | 'satellite' | 'light' | 'dark' | 'outdoors';

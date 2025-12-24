@@ -4,8 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ChartBarIcon, UserIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
-import { ChartBarIcon as ChartBarIconSolid, EllipsisHorizontalIcon as EllipsisHorizontalIconSolid } from '@heroicons/react/24/solid';
+import { UserIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { EllipsisHorizontalIcon as EllipsisHorizontalIconSolid } from '@heroicons/react/24/solid';
 import { useAuthStateSafe } from '@/features/auth';
 import { getMobileNavItems, type MobileNavItemId } from '@/features/sidebar/config/mobileNavConfig';
 import { useResponsiveNavItems } from './useResponsiveNavItems';
@@ -37,17 +37,8 @@ export default function MobileNav({
   
   const secondaryNavItems = getMobileNavItems(account);
 
-  // Build all nav items (Analytics, Secondary items, Create, Profile)
+  // Build all nav items (Secondary items, Create, Profile)
   const allNavItems = [
-    {
-      id: 'analytics',
-      type: 'link' as const,
-      href: '/account/analytics',
-      label: 'Analytics',
-      icon: ChartBarIcon,
-      iconSolid: ChartBarIconSolid,
-      isActive: pathname === '/account/analytics' || pathname?.startsWith('/account/analytics'),
-    },
     ...secondaryNavItems.map(item => ({
       id: item.id,
       type: 'button' as const,

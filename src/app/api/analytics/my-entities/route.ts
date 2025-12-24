@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
           { status: 403 }
         );
       }
-      accountId = account.id;
+      accountId = (account as { id: string; username: string | null }).id;
     } else {
       // Fallback to first account
       const { data: account, error: accountError } = await supabase
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      accountId = account.id;
+      accountId = (account as { id: string; username: string | null }).id;
     }
     const entities: EntityWithViews[] = [];
 

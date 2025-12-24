@@ -163,7 +163,7 @@ export default function PointsOfInterestLayer({ map, mapLoaded, visible = false 
           return;
         }
 
-        // Add emoji layer (symbol layer with emoji text) - positioned above label
+        // Add emoji layer (symbol layer with emoji text) - similar to mention icon
         try {
           map.addLayer({
             id: emojiLayerId,
@@ -194,7 +194,7 @@ export default function PointsOfInterestLayer({ map, mapLoaded, visible = false 
           return;
         }
 
-        // Add labels for points (positioned below emoji)
+        // Add labels for points (positioned above emoji)
         try {
           mapboxMap.addLayer({
             id: nameLayerId,
@@ -214,8 +214,8 @@ export default function PointsOfInterestLayer({ map, mapLoaded, visible = false 
               ],
               'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
               'text-size': 12,
-              'text-offset': [0, -1.2],
-              'text-anchor': 'bottom',
+              'text-offset': [0, 1.2],
+              'text-anchor': 'top',
             },
             paint: {
               'text-color': '#6b7280',

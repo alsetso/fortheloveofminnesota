@@ -5,6 +5,7 @@ import WelcomeModal from '@/features/account/components/WelcomeModal';
 import OnboardingModal from '@/features/account/components/OnboardingModal';
 import AccountModal from '@/features/account/components/AccountModal';
 import BillingModal from '@/components/modals/BillingModal';
+import AtlasEntityModal from '@/components/modals/AtlasEntityModal';
 
 /**
  * GlobalModals - Renders all URL-controlled modals at the app level
@@ -44,6 +45,14 @@ export default function GlobalModals() {
         isOpen={modal.type === 'upgrade'}
         onClose={closeModal}
         feature={modal.feature}
+      />
+
+      {/* Atlas Entity Modal */}
+      <AtlasEntityModal
+        isOpen={modal.type === 'atlasEntity'}
+        onClose={closeModal}
+        entityId={modal.atlasEntityId || ''}
+        tableName={modal.atlasEntityTableName || ''}
       />
 
     </>

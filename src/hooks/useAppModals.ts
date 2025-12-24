@@ -17,6 +17,7 @@ export type AppModalType =
   // Map/Feature modals
   | 'analytics'
   | 'atlas'
+  | 'atlasEntity'
   | 'coming-soon'
   | 'successPin';
 
@@ -33,6 +34,9 @@ export interface AppModalState {
   // Atlas modal
   mode?: 'create' | 'edit';
   entityType?: string;
+  // Atlas Entity modal
+  atlasEntityId?: string;
+  atlasEntityTableName?: string;
   // Coming soon
   comingSoonFeature?: string;
   // Success pin modal
@@ -70,6 +74,7 @@ export interface UseAppModalsReturn {
   // Feature modals
   openAnalytics: (pinId: string, pinName?: string) => void;
   openAtlas: (mode: 'create' | 'edit', entityType: string, data?: unknown) => void;
+  openAtlasEntity: (entityId: string, tableName: string) => void;
   openComingSoon: (feature: string) => void;
   openSuccessPin: (pinData: { id?: string; lat: number; lng: number; description: string | null; media_url: string | null; status?: 'loading' | 'success' | 'error'; error?: string }) => void;
   updateSuccessPin: (updates: { id?: string; status?: 'loading' | 'success' | 'error'; error?: string; media_url?: string | null }) => void;
@@ -128,6 +133,14 @@ export function useAppModals(): UseAppModalsReturn {
     });
   }, []);
 
+  const openAtlasEntity = useCallback((entityId: string, tableName: string) => {
+    setModal({
+      type: 'atlasEntity',
+      atlasEntityId: entityId,
+      atlasEntityTableName: tableName,
+    });
+  }, []);
+
   const openComingSoon = useCallback((feature: string) => {
     setModal({
       type: 'coming-soon',
@@ -181,6 +194,7 @@ export function useAppModals(): UseAppModalsReturn {
     openUpgrade,
     openAnalytics,
     openAtlas,
+    openAtlasEntity,
     openComingSoon,
     openSuccessPin,
     updateSuccessPin,

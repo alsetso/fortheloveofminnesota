@@ -60,7 +60,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(true);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
+  const { isModalOpen, openWelcome, openAccount, openUpgrade, openAtlasEntity } = useAppModalContextSafe();
   
   // URL-based state (only year filter)
   useUrlMapState();
@@ -103,6 +103,29 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
       window.removeEventListener('mention-created', handleMentionCreatedEvent);
     };
   }, []);
+
+  // Listen for atlas-entity-click event to open entity modal
+  useEffect(() => {
+    const handleAtlasEntityClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        id: string;
+        name: string;
+        table_name: string;
+        emoji: string;
+        lat: number;
+        lng: number;
+      }>;
+      
+      if (customEvent.detail?.id && customEvent.detail?.table_name) {
+        openAtlasEntity(customEvent.detail.id, customEvent.detail.table_name);
+      }
+    };
+
+    window.addEventListener('atlas-entity-click', handleAtlasEntityClick);
+    return () => {
+      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick);
+    };
+  }, [openAtlasEntity]);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {

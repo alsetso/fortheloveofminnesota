@@ -13,11 +13,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [key: string]: {
-        Row: Record<string, any>
-        Insert: Record<string, any>
-        Update: Record<string, any>
-      }
       jurisdictions: {
         Row: {
           id: string
@@ -88,6 +83,91 @@ export type Database = {
           updated_at: string | null
           [key: string]: any
         }
+        Insert: Record<string, any>
+        Update: Record<string, any>
+      }
+      accounts: {
+        Row: {
+          id: string
+          user_id: string | null
+          username: string | null
+          first_name: string | null
+          last_name: string | null
+          email: string | null
+          phone: string | null
+          image_url: string | null
+          cover_image_url: string | null
+          bio: string | null
+          city_id: string | null
+          role: 'general' | 'admin'
+          traits: string[]
+          view_count: number
+          onboarded: boolean
+          stripe_customer_id: string | null
+          plan: 'hobby' | 'pro' | 'plus' | null
+          billing_mode: 'standard' | 'trial' | null
+          subscription_status: string | null
+          stripe_subscription_id: string | null
+          guest_id: string | null
+          created_at: string
+          updated_at: string
+          last_visit: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          username?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          phone?: string | null
+          image_url?: string | null
+          cover_image_url?: string | null
+          bio?: string | null
+          city_id?: string | null
+          role?: 'general' | 'admin'
+          traits?: string[]
+          view_count?: number
+          onboarded?: boolean
+          stripe_customer_id?: string | null
+          plan?: 'hobby' | 'pro' | 'plus' | null
+          billing_mode?: 'standard' | 'trial' | null
+          subscription_status?: string | null
+          stripe_subscription_id?: string | null
+          guest_id?: string | null
+          created_at?: string
+          updated_at?: string
+          last_visit?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          username?: string | null
+          first_name?: string | null
+          last_name?: string | null
+          email?: string | null
+          phone?: string | null
+          image_url?: string | null
+          cover_image_url?: string | null
+          bio?: string | null
+          city_id?: string | null
+          role?: 'general' | 'admin'
+          traits?: string[]
+          view_count?: number
+          onboarded?: boolean
+          stripe_customer_id?: string | null
+          plan?: 'hobby' | 'pro' | 'plus' | null
+          billing_mode?: 'standard' | 'trial' | null
+          subscription_status?: string | null
+          stripe_subscription_id?: string | null
+          guest_id?: string | null
+          created_at?: string
+          updated_at?: string
+          last_visit?: string | null
+        }
+      }
+      [key: string]: {
+        Row: Record<string, any>
         Insert: Record<string, any>
         Update: Record<string, any>
       }

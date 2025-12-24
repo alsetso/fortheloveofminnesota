@@ -99,6 +99,8 @@ export default function ProfilesClient() {
         throw new Error(json.error || 'Failed to create account');
       }
 
+      const newAccount = await response.json();
+
       // Reset form and refresh list
       setFormData({
         username: '',
@@ -111,7 +113,6 @@ export default function ProfilesClient() {
       
       // If this is the first account, set it as active
       if (accounts.length === 0) {
-        const newAccount = await response.json();
         await setActiveAccountId(newAccount.id);
       } else {
         await refreshAccount();

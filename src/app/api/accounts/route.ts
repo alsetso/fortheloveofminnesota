@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
+import type { Database } from '@/types/supabase';
 
 /**
  * GET /api/accounts
@@ -106,16 +107,20 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Create account for current user (user_id is set from auth context)
+    type AccountsInsert = Database['public']['Tables']['accounts']['Insert'];
+    const insertData: AccountsInsert = {
+      user_id: user.id,
+      username: username || null,
+      first_name: first_name || null,
+      last_name: last_name || null,
+      phone: phone || null,
+      role: 'general', // Users can only create general accounts
+    };
+    
+    // Type assertion needed due to generic index signature in Database type
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .insert({
-        user_id: user.id,
-        username: username || null,
-        first_name: first_name || null,
-        last_name: last_name || null,
-        phone: phone || null,
-        role: 'general', // Users can only create general accounts
-      })
+      .insert(insertData as any)
       .select()
       .single();
 

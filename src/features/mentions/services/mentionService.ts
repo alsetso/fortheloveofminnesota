@@ -12,24 +12,37 @@ export class MentionService {
    * Includes account information (username, image_url) when available
    */
   static async getMentions(filters?: MentionFilters): Promise<Mention[]> {
-    const selectQuery = `*,
-      accounts(
-        id,
-        username,
-        first_name,
-        image_url
-      ),
-      collections(
-        id,
-        emoji,
-        title
-      )`;
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    const isAuthenticated = !!user;
     
+    // Build query - for anonymous users, skip accounts and collections joins to avoid RLS issues
     let query = supabase
       .from('mentions')
-      .select(selectQuery)
-      .eq('archived', false) // Exclude archived mentions
-      .order('created_at', { ascending: false });
+      .select(isAuthenticated 
+        ? `*,
+          accounts(
+            id,
+            username,
+            first_name,
+            image_url
+          ),
+          collections(
+            id,
+            emoji,
+            title
+          )`
+        : `*`
+      )
+      .eq('archived', false); // Exclude archived mentions
+    
+    // For anonymous users, explicitly filter to public mentions only
+    // (RLS should handle this, but explicit filter ensures it works)
+    if (!isAuthenticated) {
+      query = query.eq('visibility', 'public');
+    }
+    
+    query = query.order('created_at', { ascending: false });
 
     if (filters?.account_id) {
       query = query.eq('account_id', filters.account_id);
@@ -68,7 +81,8 @@ export class MentionService {
       throw new Error(`Failed to fetch mentions: ${error.message}`);
     }
 
-    return (data || []) as Mention[];
+    // Type assertion needed because Supabase types don't handle conditional selects well
+    return (data || []) as unknown as Mention[];
   }
 
   /**

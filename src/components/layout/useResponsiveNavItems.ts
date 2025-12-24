@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-interface UseResponsiveNavItemsOptions<T> {
-  items: T[];
+interface UseResponsiveNavItemsOptions {
   minItemWidth?: number; // Minimum width per item in pixels
   containerPadding?: number; // Container padding
   gap?: number; // Gap between items
@@ -11,7 +10,7 @@ interface UseResponsiveNavItemsOptions<T> {
 interface UseResponsiveNavItemsResult<T> {
   visibleItems: T[];
   overflowItems: T[];
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /**
@@ -20,7 +19,7 @@ interface UseResponsiveNavItemsResult<T> {
  */
 export function useResponsiveNavItems<T>(
   items: T[],
-  options: UseResponsiveNavItemsOptions<T> = {}
+  options: UseResponsiveNavItemsOptions = {}
 ): UseResponsiveNavItemsResult<T> {
   const {
     minItemWidth = 60, // Each nav item is roughly 60px (flex-1 but with min constraint)

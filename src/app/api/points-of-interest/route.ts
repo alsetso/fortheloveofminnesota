@@ -5,7 +5,9 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = createServerClient();
     
-    const { data, error } = await supabase
+    // Type assertion needed because TypeScript only allows 'public' schema,
+    // but we need to query from 'map' schema
+    const { data, error } = await (supabase as any)
       .schema('map')
       .from('points_of_interest')
       .select('id, name, category, emoji, lat, lng, description, created_at, updated_at')

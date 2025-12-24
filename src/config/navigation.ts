@@ -4,7 +4,6 @@ import {
   Cog6ToothIcon,
   DocumentTextIcon,
   GlobeAltIcon,
-  ChartBarIcon,
   UserIcon,
   BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
@@ -23,7 +22,6 @@ export const appNavItems: NavItem[] = [
   { href: '/', label: 'Home', icon: HomeIcon },
   { href: '/map', label: 'Map', icon: MapIcon },
   { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
-  { href: '/account/analytics', label: 'Analytics', icon: ChartBarIcon },
   { href: '/account/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];
 

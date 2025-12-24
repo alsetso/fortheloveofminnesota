@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
-import { useAuth } from '@/features/auth';
-import { useActiveAccount } from '@/features/account/contexts/ActiveAccountContext';
+import { useAuthStateSafe } from '@/features/auth';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface CreateMentionModalProps {
@@ -26,8 +25,7 @@ export default function CreateMentionModal({
   onBack,
   onVisibilityChange,
 }: CreateMentionModalProps) {
-  const { user } = useAuth();
-  const { activeAccountId } = useActiveAccount();
+  const { user, activeAccountId } = useAuthStateSafe();
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,8 +82,19 @@ export default function CreateMentionModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <div 
+      className="fixed inset-0 z-50 flex items-end bg-black/50 transition-opacity duration-300"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-t-xl shadow-xl w-full max-h-[90vh] overflow-hidden flex flex-col animate-slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag Handle */}
+        <div className="flex justify-center pt-2 pb-1">
+          <div className="w-12 h-1 bg-gray-300 rounded-full" />
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           {onBack && (
@@ -97,18 +106,20 @@ export default function CreateMentionModal({
               <XMarkIcon className="w-4 h-4 text-gray-600" />
             </button>
           )}
-          <h2 className="text-sm font-semibold text-gray-900">Create Mention</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-            disabled={isSubmitting}
-          >
-            <XMarkIcon className="w-4 h-4 text-gray-600" />
-          </button>
+          <h2 className="text-sm font-semibold text-gray-900 flex-1 text-center">Create Mention</h2>
+          <div className="w-8">
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded transition-colors ml-auto"
+              disabled={isSubmitting}
+            >
+              <XMarkIcon className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 pb-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 pb-6">
           <div className="space-y-3 py-4">
             {/* Description */}
             <div>

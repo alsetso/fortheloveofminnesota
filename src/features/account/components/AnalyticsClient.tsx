@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { MapPinIcon, EyeIcon, UserGroupIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
-import { useAuth } from '@/features/auth';
-import { useActiveAccount } from '../contexts/ActiveAccountContext';
+import { useAuthStateSafe } from '@/features/auth';
 
 interface PinViewStats {
   pin_id: string;
@@ -25,8 +24,7 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsClient() {
-  const { user } = useAuth();
-  const { activeAccountId } = useActiveAccount();
+  const { user, activeAccountId } = useAuthStateSafe();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

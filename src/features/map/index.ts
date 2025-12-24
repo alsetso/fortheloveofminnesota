@@ -1,7 +1,6 @@
 // Components
 export { default as MentionsLayer } from './components/MentionsLayer';
 export { default as CreateMentionModal } from './components/CreateMentionModal';
-export { default as POIsLayer } from './components/POIsLayer';
 
 // Services & Utils
 export { MAP_CONFIG } from './config';

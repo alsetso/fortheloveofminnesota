@@ -4,16 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname, useSearchParams, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { 
   GlobeAltIcon,
-  Bars3Icon,
-  XMarkIcon,
   AdjustmentsHorizontalIcon,
-  MapPinIcon,
   QuestionMarkCircleIcon,
   NewspaperIcon,
-  UserIcon,
 } from '@heroicons/react/24/outline';
 import { Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -21,10 +17,8 @@ import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import SecondarySidebar from './SecondarySidebar';
 import ExploreSecondaryContent from './ExploreSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
-import POISecondaryContent from './POISecondaryContent';
 import FAQsSecondaryContent from './FAQsSecondaryContent';
 import NewsSecondaryContent from './NewsSecondaryContent';
-import ProfilesSecondaryContent from './ProfilesSecondaryContent';
 import { useSidebarTabState, type SidebarTab } from '../hooks/useSidebarTabState';
 
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -32,6 +26,8 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 interface SidebarProps {
   account: Account | null;
   map: MapboxMapInstance | null;
+  pointsOfInterestVisible?: boolean;
+  onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
 }
 
 interface NavItem {
@@ -45,10 +41,8 @@ interface NavItem {
 const hrefToTab: Record<string, SidebarTab> = {
   '#explore': 'explore' as SidebarTab,
   '#controls': 'controls' as SidebarTab,
-  '#poi': 'poi' as SidebarTab,
   '#faqs': 'faqs' as SidebarTab,
   '#news': 'news' as SidebarTab,
-  '#profiles': 'profiles' as SidebarTab,
 };
 
 const allNavItems: NavItem[] = [
@@ -57,12 +51,6 @@ const allNavItems: NavItem[] = [
     label: 'Explore', 
     icon: GlobeAltIcon,
     secondaryContent: <ExploreSecondaryContent />,
-  },
-  { 
-    href: '#poi', 
-    label: 'POI', 
-    icon: MapPinIcon,
-    secondaryContent: <POISecondaryContent />,
   },
   { 
     href: '#news', 
@@ -76,27 +64,12 @@ const allNavItems: NavItem[] = [
     icon: QuestionMarkCircleIcon,
     secondaryContent: <FAQsSecondaryContent />,
   },
-  { 
-    href: '#profiles', 
-    label: 'Profiles', 
-    icon: UserIcon,
-    secondaryContent: <ProfilesSecondaryContent />,
-  },
 ];
 
-export default function Sidebar({ account, map }: SidebarProps) {
-  // Filter nav items based on admin role - POI and Profiles are admin-only
-  const navItems = allNavItems.filter((item) => {
-    if (item.href === '#poi' || item.href === '#profiles') {
-      return account?.role === 'admin';
-    }
-    return true;
-  });
+export default function Sidebar({ account, map, pointsOfInterestVisible, onPointsOfInterestVisibilityChange }: SidebarProps) {
+  const navItems = allNavItems;
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const { openAccount, openWelcome } = useAppModalContextSafe();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [clickedNavItem, setClickedNavItem] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const isHomepage = pathname === '/';
@@ -106,25 +79,14 @@ export default function Sidebar({ account, map }: SidebarProps) {
     syncToUrl: isHomepage,
     onTabChange: (tab) => {
       // Open tab when URL param is present
-      // Prevent POI and Profiles tabs from opening if user is not admin
-      if ((tab === 'poi' || tab === 'profiles') && account?.role !== 'admin') {
-        // Remove tab from URL if not admin
-        updateUrl(null);
-        return;
-      }
-      
       if (tab === 'explore') {
         setClickedNavItem('#explore');
       } else if (tab === 'controls') {
         setClickedNavItem('#controls');
-      } else if (tab === 'poi') {
-        setClickedNavItem('#poi');
       } else if (tab === 'faqs') {
         setClickedNavItem('#faqs');
       } else if (tab === 'news') {
         setClickedNavItem('#news');
-      } else if (tab === 'profiles') {
-        setClickedNavItem('#profiles');
       }
     },
   });
@@ -143,11 +105,6 @@ export default function Sidebar({ account, map }: SidebarProps) {
 
   const handleNavItemClick = (href: string) => {
     const tab = hrefToTab[href];
-    
-    // Prevent POI and Profiles from opening if user is not admin
-    if ((href === '#poi' || href === '#profiles') && account?.role !== 'admin') {
-      return;
-    }
     
     // Toggle: if clicking the same item, close it; otherwise open the clicked item
     if (clickedNavItem === href) {
@@ -170,16 +127,6 @@ export default function Sidebar({ account, map }: SidebarProps) {
     if (!isHomepage) return;
     
     const tabFromUrl = urlTab;
-    
-    // Prevent POI and Profiles tabs from opening if user is not admin
-    if ((tabFromUrl === 'poi' || tabFromUrl === 'profiles') && account?.role !== 'admin') {
-      updateUrl(null);
-      if (clickedNavItem === '#poi' || clickedNavItem === '#profiles') {
-        setClickedNavItem(null);
-      }
-      return;
-    }
-    
     const expectedHref = tabFromUrl ? `#${tabFromUrl}` : null;
     
     if (tabFromUrl && clickedNavItem !== expectedHref) {
@@ -188,17 +135,7 @@ export default function Sidebar({ account, map }: SidebarProps) {
       // URL param was removed, close tab
       setClickedNavItem(null);
     }
-  }, [urlTab, isHomepage, clickedNavItem, account?.role, updateUrl]);
-  
-  // Close POI and Profiles tabs if they're open and user is not admin (e.g., role changed)
-  useEffect(() => {
-    if ((clickedNavItem === '#poi' || clickedNavItem === '#profiles') && account?.role !== 'admin') {
-      setClickedNavItem(null);
-      if (isHomepage) {
-        updateUrl(null);
-      }
-    }
-  }, [account?.role, clickedNavItem, isHomepage, updateUrl]);
+  }, [urlTab, isHomepage, clickedNavItem, updateUrl]);
 
   // Close sidebar when clicking outside (desktop only - mobile uses overlay)
   useEffect(() => {
@@ -255,37 +192,10 @@ export default function Sidebar({ account, map }: SidebarProps) {
   return (
     <>
       {/* Mobile Top Nav */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[100] bg-white border-b border-gray-200 h-14">
+      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[100] h-14">
         <div className="relative flex items-center justify-between h-full px-3">
-          {/* Left side - Hamburger */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (clickedNavItem) {
-                  // If secondary sidebar is open, close it
-                  const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
-                  setClickedNavItem(null);
-                  if (isHomepage && tab) {
-                    updateUrl(null);
-                  }
-                } else {
-                  // Toggle mobile menu
-                  setIsMobileMenuOpen(!isMobileMenuOpen);
-                }
-              }}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              aria-label={clickedNavItem ? "Close" : "Toggle menu"}
-            >
-              {clickedNavItem || isMobileMenuOpen ? (
-                <XMarkIcon className="w-6 h-6" />
-              ) : (
-                <Bars3Icon className="w-6 h-6" />
-              )}
-            </button>
-          </div>
-
-          {/* Logo - Centered */}
-          <Link href="/" className="absolute left-1/2 -translate-x-1/2">
+          {/* Logo - Left */}
+          <Link href="/">
             <Image
               src="/logo.png"
               alt="Logo"
@@ -305,59 +215,6 @@ export default function Sidebar({ account, map }: SidebarProps) {
             />
           </div>
         </div>
-
-        {/* Mobile Menu Dropdown - Only show when no secondary content is open */}
-        {isMobileMenuOpen && !clickedNavItem && (
-          <div className="absolute top-full left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-[101]">
-              <div className="py-2">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = isActive(item.href);
-                  const tab = hrefToTab[item.href];
-                  const hasSecondaryContent = !!item.secondaryContent;
-
-                  return (
-                    <div
-                      key={item.href}
-                      onClick={() => {
-                        // If item has secondary content, open it (menu will hide automatically)
-                        if (hasSecondaryContent) {
-                          if (clickedNavItem === item.href) {
-                            setClickedNavItem(null);
-                            if (isHomepage && tab) updateUrl(null);
-                          } else {
-                            setClickedNavItem(item.href);
-                            if (isHomepage && tab) updateUrl(tab);
-                          }
-                        } else {
-                          // No secondary content, close menu
-                          setIsMobileMenuOpen(false);
-                          if (clickedNavItem === item.href) {
-                            setClickedNavItem(null);
-                            if (isHomepage && tab) updateUrl(null);
-                          } else {
-                            setClickedNavItem(item.href);
-                            if (isHomepage && tab) updateUrl(tab);
-                          }
-                        }
-                      }}
-                      className={`
-                        flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors cursor-pointer
-                        ${
-                          active || clickedNavItem === item.href
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        }
-                      `}
-                    >
-                      <Icon className="w-6 h-6" />
-                      <span>{item.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-        )}
       </nav>
 
       {/* Desktop Sidebar */}
@@ -470,7 +327,11 @@ export default function Sidebar({ account, map }: SidebarProps) {
                   }
                 }}
               >
-                <Map3DControlsSecondaryContent map={map} />
+                <Map3DControlsSecondaryContent 
+                  map={map} 
+                  pointsOfInterestVisible={pointsOfInterestVisible}
+                  onPointsOfInterestVisibilityChange={onPointsOfInterestVisibilityChange}
+                />
               </SecondarySidebar>
             );
           }
@@ -521,7 +382,11 @@ export default function Sidebar({ account, map }: SidebarProps) {
                 }
               }}
             >
-              <Map3DControlsSecondaryContent map={map} />
+              <Map3DControlsSecondaryContent 
+                map={map} 
+                pointsOfInterestVisible={pointsOfInterestVisible}
+                onPointsOfInterestVisibilityChange={onPointsOfInterestVisibilityChange}
+              />
             </SecondarySidebar>
           );
         }

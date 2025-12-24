@@ -1,9 +1,5 @@
 // Components
 export { default as ProfileCard } from './components/ProfileCard';
-export { default as ProfileMapClient } from './components/ProfileMapClient';
-export { default as ProfileMapControls } from './components/ProfileMapControls';
-export { default as ProfileMapToolbar } from './components/ProfileMapToolbar';
-export { default as ProfilePinsLayer } from './components/ProfilePinsLayer';
 export { default as ProfilePinsList } from './components/ProfilePinsList';
 export { default as ProfilePinsSidebar } from './components/ProfilePinsSidebar';
 export { default as ProfileSidebar } from './components/ProfileSidebar';

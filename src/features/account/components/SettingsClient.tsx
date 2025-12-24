@@ -6,8 +6,6 @@ import Link from 'next/link';
 import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import { useAuth, AccountService, Account } from '@/features/auth';
 import type { SettingsClientProps } from '../types';
-import ProfileCard from '@/features/profiles/components/ProfileCard';
-import type { ProfileAccount } from '@/types/profile';
 
 export default function SettingsClient({ initialAccount, userEmail }: SettingsClientProps) {
   const router = useRouter();
@@ -21,24 +19,6 @@ export default function SettingsClient({ initialAccount, userEmail }: SettingsCl
   useEffect(() => {
     setAccount(initialAccount);
   }, [initialAccount]);
-
-  // Convert Account to ProfileAccount format
-  const profileAccount: ProfileAccount = {
-    id: account.id,
-    username: account.username,
-    first_name: account.first_name,
-    last_name: account.last_name,
-    email: userEmail,
-    phone: account.phone,
-    image_url: account.image_url,
-    cover_image_url: account.cover_image_url,
-    bio: account.bio,
-    city_id: account.city_id,
-    view_count: account.view_count || 0,
-    traits: account.traits,
-    user_id: account.user_id,
-    created_at: account.created_at,
-  };
 
 
   const handleSignOutClick = () => {
@@ -70,12 +50,6 @@ export default function SettingsClient({ initialAccount, userEmail }: SettingsCl
 
   return (
     <div className="space-y-3">
-      {/* Editable Profile Card */}
-      <ProfileCard 
-        account={profileAccount} 
-        isOwnProfile={true}
-      />
-
       {/* Profile Link Section */}
       {account.username && (
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-md p-[10px]">

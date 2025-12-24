@@ -37,22 +37,21 @@ export default function HomepageStatsHandle() {
 
   return (
     <>
-      {/* Small handle at top center */}
+      {/* Small year toggle at top center of map */}
       <button
         onClick={() => setIsModalOpen(true)}
-        className={`absolute top-0 left-1/2 transform -translate-x-1/2 z-30 border-b border-l border-r border-gray-200 rounded-b-md px-2 py-0.5 transition-all flex items-center gap-1 ${
+        className={`absolute top-4 left-1/2 -translate-x-1/2 z-[110] px-2 py-1 text-xs font-medium rounded-md border border-gray-200 transition-all flex items-center gap-1.5 ${
           isFilterActive
-            ? 'bg-white text-gray-900 font-semibold'
-            : 'bg-white hover:bg-gray-50 text-gray-700'
+            ? 'bg-white text-gray-900 shadow-sm'
+            : 'bg-white/90 backdrop-blur-sm text-gray-700 hover:bg-white'
         }`}
-        aria-label="View site statistics and year filter"
-        title={isFilterActive ? `Filtered by ${displayYear}${mentionCount !== null ? ` (${mentionCount.toLocaleString()} mentions)` : ''}` : 'View site statistics and year filter'}
+        aria-label="Filter by year"
+        title={isFilterActive ? `Filtered by ${displayYear}${mentionCount !== null ? ` (${mentionCount.toLocaleString()} mentions)` : ''}` : 'Filter by year'}
       >
         <span className="text-xs">{displayYear}</span>
         {isFilterActive && mentionCount !== null && (
           <span className="text-[10px] text-gray-500 font-normal">({mentionCount.toLocaleString()})</span>
         )}
-        <ChevronRightIcon className="w-3 h-3 text-gray-400" />
       </button>
 
       <HomepageStatsModal

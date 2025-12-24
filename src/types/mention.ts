@@ -23,6 +23,11 @@ export interface Mention {
     username: string | null;
     image_url: string | null;
   } | null;
+  collection?: {
+    id: string;
+    emoji: string;
+    title: string;
+  } | null;
 }
 
 export interface CreateMentionData {
@@ -62,6 +67,7 @@ export interface MentionGeoJSONFeature {
     id: string;
     description: string | null;
     account_id: string | null;
+    collection_emoji: string | null;
   };
 }
 

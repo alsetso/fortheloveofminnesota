@@ -8,16 +8,17 @@ import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusion
 import FloatingMapContainer from './FloatingMapContainer';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
-import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
-import { useActiveAccount } from '@/features/account/contexts/ActiveAccountContext';
+import { useAuthStateSafe } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useUrlMapState } from '../hooks/useUrlMapState';
-import { useSearchParams } from 'next/navigation';
 import Sidebar from '@/features/sidebar/components/Sidebar';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
-import POIsLayer from '@/features/map/components/POIsLayer';
-import DraftPOIsLayer from '@/features/map/components/DraftPOIsLayer';
+import MobileNav from '@/components/layout/MobileNav';
+import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
+import MobileSecondarySheet from '@/components/layout/MobileSecondarySheet';
+import { getMobileNavItems, type MobileNavItemId } from '@/features/sidebar/config/mobileNavConfig';
+import { PlusIcon } from '@heroicons/react/24/outline';
 
 interface HomepageMapProps {
   cities: Array<{
@@ -46,14 +47,14 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [mentionsRefreshKey, setMentionsRefreshKey] = useState(0);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeSecondaryContent, setActiveSecondaryContent] = useState<MobileNavItemId | null>(null);
   const initializedRef = useRef(false);
   const hoveredMentionIdRef = useRef<string | null>(null);
-  const searchParams = useSearchParams();
   const isHoveringMentionRef = useRef(false);
   
-  // POI layer visibility state
-  const [isPOILayerVisible, setIsPOILayerVisible] = useState(false);
+  // Points of Interest layer visibility state
+  const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -68,7 +69,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   } = useAuthStateSafe();
 
   // Use active account from context
-  const { activeAccount: account } = useActiveAccount();
+  const { account } = useAuthStateSafe();
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -99,27 +100,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
       window.removeEventListener('mention-created', handleMentionCreatedEvent);
     };
   }, []);
-
-  // Watch for mention URL parameter and select mention
-  useEffect(() => {
-    if (!mapLoaded || !mapInstanceRef.current) return undefined;
-
-    const mentionId = searchParams.get('mention');
-    
-    if (mentionId) {
-      // Small delay to ensure MentionsLayer is ready
-      const timeoutId = setTimeout(() => {
-        // Dispatch event to select mention by ID
-        window.dispatchEvent(new CustomEvent('select-mention-by-id', {
-          detail: { mentionId }
-        }));
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    }
-    
-    return undefined;
-  }, [mapLoaded, searchParams]);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -180,7 +160,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           style: MAP_CONFIG.MAPBOX_STYLE,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
-          pitch: 60, // Start in 3D mode
+          pitch: 0, // Start at 0% angle
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
@@ -211,7 +191,13 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           // Check if click hit a mention layer - if so, don't create new mention
           // Mention click handlers will handle opening the popup
           const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
-          const features = (mapInstance as any).queryRenderedFeatures(e.point, {
+          // Query a box around the click point (20px radius) for larger clickable area
+          const hitRadius = 20;
+          const box: [[number, number], [number, number]] = [
+            [e.point.x - hitRadius, e.point.y - hitRadius],
+            [e.point.x + hitRadius, e.point.y + hitRadius]
+          ];
+          const features = (mapInstance as any).queryRenderedFeatures(box, {
             layers: mentionLayers,
           });
 
@@ -288,14 +274,19 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         style={{ height: '100vh' }}
       >
         {/* Sidebar - shows on all screens, mobile nav is built into Sidebar */}
-        <Sidebar account={account} map={mapInstanceRef.current} />
+        <Sidebar 
+          account={account} 
+          map={mapInstanceRef.current}
+          pointsOfInterestVisible={isPointsOfInterestVisible}
+          onPointsOfInterestVisibilityChange={setIsPointsOfInterestVisible}
+        />
 
         {/* Map and other components */}
-        <div className="flex-1 relative overflow-hidden mt-14 lg:mt-0">
+        <div className="flex-1 flex relative overflow-hidden lg:mt-0">
         {/* Mapbox Container */}
         <div 
           ref={mapContainer} 
-          className="absolute inset-0 w-full h-full"
+          className="flex-1 w-full h-full"
           style={{ margin: 0, padding: 0, overflow: 'hidden', zIndex: 1 }}
         />
 
@@ -304,14 +295,14 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
         )}
 
-        {/* POIs Layer - Toggleable via button */}
+        {/* Points of Interest Layer */}
         {mapLoaded && mapInstanceRef.current && (
-          <>
-            <POIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} visible={isPOILayerVisible} />
-            <DraftPOIsLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} />
-          </>
+          <PointsOfInterestLayer 
+            map={mapInstanceRef.current} 
+            mapLoaded={mapLoaded} 
+            visible={isPointsOfInterestVisible} 
+          />
         )}
-
 
         {/* Left Sidebar */}
         <FloatingMapContainer
@@ -325,16 +316,16 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         {/* Homepage Stats Handle */}
         <HomepageStatsHandle />
 
-        {/* POI Layer Toggle - Top Left */}
-        <div className="absolute top-4 left-4 z-20 pointer-events-auto">
+        {/* Create Button - Toggles FloatingMapContainer */}
+        <div className="absolute bottom-4 right-4 z-20 pointer-events-auto">
           <button
-            onClick={() => setIsPOILayerVisible(!isPOILayerVisible)}
-            className="bg-white border border-gray-200 rounded-md px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-1.5 shadow-sm"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className={`bg-white border border-gray-200 rounded-md p-2.5 text-gray-900 hover:bg-gray-50 transition-colors shadow-sm ${
+              isSidebarOpen ? 'bg-gray-100' : ''
+            }`}
+            aria-label={isSidebarOpen ? 'Close create panel' : 'Open create panel'}
           >
-            <span className="text-xs">POIs</span>
-            {isPOILayerVisible && (
-              <span className="w-2 h-2 bg-green-500 rounded-full" />
-            )}
+            <PlusIcon className={`w-5 h-5 transition-transform ${isSidebarOpen ? 'rotate-45' : ''}`} />
           </button>
         </div>
 
@@ -354,6 +345,41 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
             onSignInClick={() => openWelcome()}
           />
         </div>
+
+        {/* Mobile Navigation - Bottom overlay */}
+        <div className="lg:hidden">
+          <MobileNav 
+            onCreateClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            isCreateActive={isSidebarOpen}
+            onSecondaryContentClick={(itemId) => {
+              setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
+            }}
+            activeSecondaryContent={activeSecondaryContent}
+            map={mapInstanceRef.current}
+          />
+        </div>
+
+        {/* iOS-style Secondary Content Slide-up Sheets */}
+        {activeSecondaryContent && (() => {
+          const navItems = getMobileNavItems(account);
+          const item = navItems.find(i => i.id === activeSecondaryContent);
+          if (!item) return null;
+
+          return (
+            <MobileSecondarySheet
+              isOpen={!!activeSecondaryContent}
+              onClose={() => setActiveSecondaryContent(null)}
+              title={item.label}
+            >
+              {item.getContent({ 
+                map: mapInstanceRef.current, 
+                account,
+                pointsOfInterestVisible: isPointsOfInterestVisible,
+                onPointsOfInterestVisibilityChange: setIsPointsOfInterestVisible,
+              })}
+            </MobileSecondarySheet>
+          );
+        })()}
 
         {/* Loading/Error Overlay */}
         {!mapLoaded && (

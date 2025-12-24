@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { AccountService, Account } from '../services/memberService';
@@ -18,8 +18,9 @@ export interface AuthState {
   // Supabase user
   user: User | null;
   
-  // Account data (authenticated user's account)
+  // Account data (active account)
   account: Account | null;
+  activeAccountId: string | null;
   
   // Loading states
   isLoading: boolean;
@@ -48,6 +49,7 @@ interface AuthStateContextType extends AuthState {
   
   // Account methods
   refreshAccount: () => Promise<void>;
+  setActiveAccountId: (accountId: string | null) => Promise<void>;
   
   // Modal methods
   openModal: (modal: AuthModalType, tab?: string) => void;
@@ -59,10 +61,13 @@ interface AuthStateContextType extends AuthState {
 
 const AuthStateContext = createContext<AuthStateContextType | undefined>(undefined);
 
+const ACTIVE_ACCOUNT_STORAGE_KEY = 'mnuda_active_account_id';
+
 export function AuthStateProvider({ children }: { children: ReactNode }) {
   // Core auth state
   const [user, setUser] = useState<User | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
+  const [activeAccountId, setActiveAccountIdState] = useState<string | null>(null);
   
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
@@ -74,6 +79,19 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
   
   // Use AppModalContext for onboarding (separate from account modal)
   const { openOnboarding } = useAppModalContextSafe();
+  
+  // Track previous account ID to detect changes
+  const previousAccountIdRef = useRef<string | null>(null);
+
+  // Load active account ID from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+      if (stored) {
+        setActiveAccountIdState(stored);
+      }
+    }
+  }, []);
   
   // Computed states
   const isAuthenticated = !!user;
@@ -143,28 +161,82 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Load authenticated account when user changes
+  // Load active account when user or activeAccountId changes
   useEffect(() => {
     if (!user) {
       setAccount(null);
+      setActiveAccountIdState(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+      }
       return;
     }
 
     const loadAccount = async () => {
       setIsAccountLoading(true);
       try {
-        // Use centralized onboarding check (ensures account exists)
-        const { needsOnboarding, account } = await checkOnboardingStatus();
-        setAccount(account);
-        
-        // Open onboarding if needed
-        if (needsOnboarding) {
-          openOnboarding();
+        let accountId = activeAccountId;
+
+        // If no active account ID, check localStorage first before defaulting to first account
+        if (!accountId && typeof window !== 'undefined') {
+          const stored = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+          if (stored) {
+            accountId = stored;
+            setActiveAccountIdState(stored);
+          }
+        }
+
+        // If still no account ID, get first account
+        if (!accountId) {
+          const { needsOnboarding, account: firstAccount } = await checkOnboardingStatus();
+          if (firstAccount) {
+            accountId = firstAccount.id;
+            setActiveAccountIdState(accountId);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, accountId);
+            }
+          }
+          if (needsOnboarding) {
+            openOnboarding();
+          }
+        }
+
+        // Load the active account
+        if (accountId) {
+          const { data: accountData, error } = await supabase
+            .from('accounts')
+            .select('*')
+            .eq('id', accountId)
+            .eq('user_id', user.id)
+            .single();
+
+          if (error || !accountData) {
+            // Account not found, reset to first account
+            const { account: firstAccount } = await checkOnboardingStatus();
+            if (firstAccount) {
+              const newAccountId = firstAccount.id;
+              setActiveAccountIdState(newAccountId);
+              setAccount(firstAccount);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, newAccountId);
+              }
+            } else {
+              setAccount(null);
+            }
+          } else {
+            setAccount(accountData as Account);
+            // Dispatch event when account loads/changes
+            if (typeof window !== 'undefined' && accountId !== previousAccountIdRef.current) {
+              previousAccountIdRef.current = accountId;
+              window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId, account: accountData } }));
+            }
+          }
+        } else {
+          setAccount(null);
         }
       } catch (error) {
         console.error('[AuthStateContext] Error loading account:', error);
         setAccount(null);
-        // On error, assume onboarding is needed
         openOnboarding();
       } finally {
         setIsAccountLoading(false);
@@ -172,7 +244,7 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     };
 
     loadAccount();
-  }, [user]);
+  }, [user, activeAccountId]);
 
   // Auth methods
   const signIn = async (email: string, password: string) => {
@@ -249,18 +321,67 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
 
   // Account methods
   const refreshAccount = async () => {
-    if (!user) return;
+    if (!user || !activeAccountId) return;
     
     setIsAccountLoading(true);
     try {
-      const accountData = await AccountService.getCurrentAccount();
-      setAccount(accountData);
+      const { data: accountData, error } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', activeAccountId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!error && accountData) {
+        setAccount(accountData as Account);
+      }
     } catch (error) {
       console.error('[AuthStateContext] Error refreshing account:', error);
     } finally {
       setIsAccountLoading(false);
     }
   };
+
+  const setActiveAccountId = useCallback(async (accountId: string | null) => {
+    if (!user) return;
+
+    if (!accountId) {
+      const firstAccount = await AccountService.getCurrentAccount();
+      if (firstAccount) {
+        accountId = firstAccount.id;
+      } else {
+        setActiveAccountIdState(null);
+        setAccount(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+          window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId: null, account: null } }));
+        }
+        return;
+      }
+    }
+
+    // Only update if actually changing
+    if (accountId === activeAccountId) return;
+
+    // Verify user owns this account before switching
+    const { data: accountData, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('id', accountId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !accountData) {
+      throw new Error('Account not found or you do not have access to it');
+    }
+
+    // Only update activeAccountIdState - useEffect will load the account
+    setActiveAccountIdState(accountId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, accountId);
+    }
+    // useEffect automatically loads account when activeAccountId changes
+  }, [user, activeAccountId]);
 
   // Modal methods
   const openModal = (modal: AuthModalType, tab?: string) => {
@@ -288,6 +409,7 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     // State
     user,
     account,
+    activeAccountId,
     isLoading,
     isAccountLoading,
     isAuthenticated,
@@ -304,6 +426,7 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     verifyOtp,
     signOut,
     refreshAccount,
+    setActiveAccountId,
     openModal,
     closeModal,
     getProfileUrl,
@@ -335,6 +458,7 @@ export function useAuthStateSafe(): AuthStateContextType {
     return {
       user: null,
       account: null,
+      activeAccountId: null,
       isLoading: true,
       isAccountLoading: false,
       isAuthenticated: false,
@@ -349,6 +473,7 @@ export function useAuthStateSafe(): AuthStateContextType {
       verifyOtp: async () => { throw new Error('AuthStateProvider not available'); },
       signOut: async () => { throw new Error('AuthStateProvider not available'); },
       refreshAccount: async () => {},
+      setActiveAccountId: async () => {},
       openModal: () => {},
       closeModal: () => {},
       getProfileUrl: () => null,

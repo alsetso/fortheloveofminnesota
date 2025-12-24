@@ -16,6 +16,7 @@ import {
   BeakerIcon,
   Squares2X2Icon,
   LockClosedIcon,
+  MapPinIcon,
 } from '@heroicons/react/24/outline';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
@@ -29,7 +30,11 @@ interface Map3DControlsSecondaryContentProps {
 
 type MapStyle = 'streets' | 'satellite' | 'light' | 'dark' | 'outdoors';
 
-export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSecondaryContentProps = {}) {
+export default function Map3DControlsSecondaryContent({ 
+  map, 
+  onPointsOfInterestVisibilityChange,
+  pointsOfInterestVisible = false,
+}: Map3DControlsSecondaryContentProps = {}) {
   const { account } = useAuthStateSafe();
   const { openUpgrade } = useAppModalContextSafe();
   
@@ -561,6 +566,38 @@ export default function Map3DControlsSecondaryContent({ map }: Map3DControlsSeco
               <span>Landcover</span>
             </div>
             {landcoverVisible ? (
+              <EyeIcon className="w-4 h-4" />
+            ) : (
+              <EyeSlashIcon className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Points of Interest */}
+      <div>
+        <div className="text-xs text-gray-600 font-medium mb-2">Points of Interest</div>
+        <div className="space-y-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPointsOfInterestVisibilityChange?.(!pointsOfInterestVisible);
+            }}
+            className={`
+              w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
+              ${pointsOfInterestVisible
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <MapPinIcon className="w-4 h-4" />
+              <span>Show POIs</span>
+            </div>
+            {pointsOfInterestVisible ? (
               <EyeIcon className="w-4 h-4" />
             ) : (
               <EyeSlashIcon className="w-4 h-4" />

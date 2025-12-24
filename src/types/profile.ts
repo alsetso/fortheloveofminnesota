@@ -72,16 +72,6 @@ export interface ProfileOwnership {
 }
 
 // =============================================================================
-// COMPONENT PROP TYPES
-// =============================================================================
-
-export interface ProfileMapProps {
-  account: ProfileAccount;
-  pins: ProfilePin[];
-  isOwnProfile: boolean;
-}
-
-// =============================================================================
 // CONSTANTS
 // =============================================================================
 
@@ -234,7 +224,7 @@ export function getDisplayName(account: ProfileAccount): string {
       ? `${account.first_name} ${account.last_name}`
       : account.first_name;
   }
-  return account.username || 'User';
+  return 'User';
 }
 
 /** Format date for display */

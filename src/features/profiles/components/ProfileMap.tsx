@@ -4,46 +4,42 @@ import { useEffect, useRef, useState } from 'react';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import ProfileMentionsLayer from './ProfileMentionsLayer';
 import type { ProfilePin } from '@/types/profile';
 
 interface ProfileMapProps {
   pins: ProfilePin[];
-  isOwnProfile: boolean;
-  searchQuery: string;
-  visibilityFilter: 'all' | 'public' | 'only_me';
 }
 
-export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibilityFilter }: ProfileMapProps) {
+const SOURCE_ID = 'profile-mentions';
+const LAYER_IDS = {
+  points: 'profile-mentions-point',
+  labels: 'profile-mentions-point-label',
+} as const;
+
+export default function ProfileMap({ pins = [] }: ProfileMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
 
-  // Filter pins based on search and visibility
-  const filteredPins = pins.filter((pin) => {
-    // Apply visibility filter (only for owners)
-    if (isOwnProfile && visibilityFilter !== 'all') {
-      if (pin.visibility !== visibilityFilter) return false;
-    } else if (!isOwnProfile) {
-      // For visitors, only show public mentions
-      if (pin.visibility !== 'public') return false;
-    }
+  // Convert pins to GeoJSON
+  const pinsToGeoJSON = (pins: ProfilePin[]) => {
+    const features = pins.map((pin) => ({
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Point' as const,
+        coordinates: [pin.lng, pin.lat] as [number, number],
+      },
+      properties: {
+        id: pin.id,
+        description: pin.description || '',
+      },
+    }));
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim();
-      const formatCoordinates = (lat: number, lng: number): string => {
-        return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      };
-      const matchesSearch = 
-        pin.description?.toLowerCase().includes(query) ||
-        formatCoordinates(pin.lat, pin.lng).includes(query);
-      if (!matchesSearch) return false;
-    }
-
-    return true;
-  });
+    return {
+      type: 'FeatureCollection' as const,
+      features,
+    };
+  };
 
   // Initialize map
   useEffect(() => {
@@ -52,7 +48,6 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
     let mounted = true;
 
     if (!MAP_CONFIG.MAPBOX_TOKEN) {
-      setMapError('missing-token');
       return;
     }
 
@@ -60,7 +55,6 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
       if (!mounted || !mapContainer.current) return;
 
       try {
-        // @ts-ignore - CSS import
         await import('mapbox-gl/dist/mapbox-gl.css');
         const mapbox = await loadMapboxGL();
         mapbox.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
@@ -87,20 +81,13 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
           }
         });
 
-        mapInstance.on('error', (e) => {
-          console.error('[ProfileMap] Map error:', e);
-          if (mounted) {
-            setMapError('load-error');
-          }
-        });
-
         // Fit bounds to pins if available
-        if (filteredPins.length > 0) {
+        if (pins.length > 0) {
           mapInstance.once('load', () => {
             if (!mounted) return;
             
-            const lngs = filteredPins.map((p) => p.lng);
-            const lats = filteredPins.map((p) => p.lat);
+            const lngs = pins.map((p) => p.lng);
+            const lats = pins.map((p) => p.lat);
             const minLng = Math.min(...lngs);
             const maxLng = Math.max(...lngs);
             const minLat = Math.min(...lats);
@@ -120,9 +107,6 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
         }
       } catch (error) {
         console.error('[ProfileMap] Error initializing map:', error);
-        if (mounted) {
-          setMapError('init-error');
-        }
       }
     };
 
@@ -141,49 +125,112 @@ export default function ProfileMap({ pins, isOwnProfile, searchQuery, visibility
     };
   }, []);
 
-  // Update map bounds when filtered pins change
+  // Add pins to map
   useEffect(() => {
-    if (!mapLoaded || !mapInstanceRef.current || filteredPins.length === 0) return;
+    if (!mapLoaded || !mapInstanceRef.current) return;
 
-    const lngs = filteredPins.map((p) => p.lng);
-    const lats = filteredPins.map((p) => p.lat);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-
-    // Cast to any to access fitBounds method
     const mapboxMap = mapInstanceRef.current as any;
-    mapboxMap.fitBounds(
-      [
-        [minLng, minLat],
-        [maxLng, maxLat],
-      ],
-      {
-        padding: 50,
-        maxZoom: 14,
-      }
-    );
-  }, [mapLoaded, filteredPins]);
+    const geoJSON = pinsToGeoJSON(pins);
 
-  if (mapError) {
-    return (
-      <div className="h-[300px] bg-gray-100 border border-gray-200 rounded-md flex items-center justify-center">
-        <p className="text-xs text-gray-500">Map unavailable</p>
-      </div>
-    );
-  }
+    try {
+      // Add or update source
+      let sourceExists = false;
+      try {
+        const existingSource = mapboxMap.getSource(SOURCE_ID);
+        if (existingSource && existingSource.type === 'geojson') {
+          existingSource.setData(geoJSON);
+          sourceExists = true;
+        }
+      } catch (e) {
+        // Source doesn't exist, will add it
+      }
+
+      if (!sourceExists) {
+        try {
+          mapboxMap.addSource(SOURCE_ID, {
+            type: 'geojson',
+            data: geoJSON,
+          });
+        } catch (e) {
+          console.error('[ProfileMap] Error adding source:', e);
+          return;
+        }
+      }
+
+      // Add circle layer for points (native Mapbox circle marker)
+      let pointsLayerExists = false;
+      try {
+        mapboxMap.getLayer(LAYER_IDS.points);
+        pointsLayerExists = true;
+      } catch (e) {
+        // Layer doesn't exist
+      }
+
+      if (!pointsLayerExists) {
+        try {
+          mapboxMap.addLayer({
+            id: LAYER_IDS.points,
+            type: 'circle',
+            source: SOURCE_ID,
+            paint: {
+              'circle-radius': 8,
+              'circle-color': '#ef4444',
+              'circle-stroke-width': 2,
+              'circle-stroke-color': '#ffffff',
+            },
+          });
+        } catch (e) {
+          console.error('[ProfileMap] Error adding points layer:', e);
+        }
+      }
+
+      // Add label layer if it doesn't exist
+      let labelsLayerExists = false;
+      try {
+        mapboxMap.getLayer(LAYER_IDS.labels);
+        labelsLayerExists = true;
+      } catch (e) {
+        // Layer doesn't exist
+      }
+
+      if (!labelsLayerExists) {
+        try {
+          mapboxMap.addLayer({
+            id: LAYER_IDS.labels,
+            type: 'symbol',
+            source: SOURCE_ID,
+            layout: {
+              'text-field': [
+                'case',
+                ['!=', ['get', 'description'], ''],
+                ['get', 'description'],
+                ''
+              ],
+              'text-font': ['Open Sans Regular', 'Arial Unicode MS Regular'],
+              'text-size': 11,
+              'text-offset': [0, 2],
+              'text-anchor': 'top',
+              'text-optional': true,
+            },
+            paint: {
+              'text-color': '#374151',
+              'text-halo-color': '#ffffff',
+              'text-halo-width': 2,
+            },
+          });
+        } catch (e) {
+          console.error('[ProfileMap] Error adding labels layer:', e);
+        }
+      }
+    } catch (error) {
+      console.error('[ProfileMap] Error setting up layers:', error);
+    }
+  }, [mapLoaded, pins]);
 
   return (
-    <div className="relative w-full h-[300px] bg-gray-100 border border-gray-200 rounded-md overflow-hidden">
+    <div className="relative w-full aspect-square bg-gray-100 border border-gray-200 rounded-md overflow-hidden">
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
-      {mapLoaded && mapInstanceRef.current && (
-        <ProfileMentionsLayer
-          map={mapInstanceRef.current}
-          mapLoaded={mapLoaded}
-          pins={filteredPins}
-        />
-      )}
     </div>
   );
 }
+

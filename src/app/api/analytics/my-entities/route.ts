@@ -68,7 +68,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Get account_id from query params or fallback to first account
-    const searchParams = request.nextUrl.searchParams;
     const requestedAccountId = searchParams.get('account_id');
     
     let accountId: string;

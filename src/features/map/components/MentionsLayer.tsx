@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -25,15 +25,12 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
   const mentionsRef = useRef<Mention[]>([]);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const isAddingLayersRef = useRef<boolean>(false);
   const popupRef = useRef<any>(null); // Mapbox Popup instance
   const clickHandlersAddedRef = useRef<boolean>(false);
   const locationSelectedHandlerRef = useRef<(() => void) | null>(null);
-  const selectMentionByIdHandlerRef = useRef<((event: CustomEvent<{ mentionId: string }>) => void) | null>(null);
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHandlingStyleChangeRef = useRef<boolean>(false);
   const mentionCreatedHandlerRef = useRef<((event: CustomEvent<{ mention: Mention }>) => void) | null>(null);
@@ -55,10 +52,6 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
     openWelcomeRef.current = openWelcome;
   }, [openWelcome]);
 
-  // Extract year from searchParams to avoid re-running effect when other params change
-  const yearParam = searchParams.get('year');
-  const year = yearParam ? parseInt(yearParam, 10) : undefined;
-
   // Fetch mentions and add to map
   useEffect(() => {
     if (!map || !mapLoaded) return;
@@ -70,6 +63,9 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       if (isAddingLayersRef.current) return;
       
       try {
+        // Get year filter from URL
+        const yearParam = searchParams.get('year');
+        const year = yearParam ? parseInt(yearParam, 10) : undefined;
         
         const mentions = await MentionService.getMentions(year ? { year } : undefined);
         if (!mounted) return;
@@ -246,14 +242,19 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           layout: {
             'text-field': [
               'case',
-              ['get', 'description'],
-              ['get', 'description'],
+              ['has', 'description'],
+              [
+                'case',
+                ['>', ['length', ['get', 'description']], 20],
+                ['concat', ['slice', ['get', 'description'], 0, 20], '...'],
+                ['get', 'description']
+              ],
               '📍',
             ],
             'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
             'text-size': 12,
-            'text-offset': [0, -2.5],
-            'text-anchor': 'bottom',
+            'text-offset': [0, 1.2],
+            'text-anchor': 'top',
           },
           paint: {
             'text-color': '#ffffff',
@@ -372,7 +373,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
               }
             };
 
-            const createPopupContent = (mentionToUse: Mention = mention) => {
+            const createPopupContent = (mentionToUse: Mention = mention, viewCount: number | null = null) => {
               const currentMention = mentionToUse || mention;
               // Determine profile URL - use username if available
               const profileSlug = currentMention.account?.username;
@@ -462,6 +463,14 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                   
                   <!-- Content -->
                   <div style="margin-bottom: 8px;">
+                    ${currentMention.collection ? `
+                      <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+                        <span style="font-size: 12px;">${escapeHtml(currentMention.collection.emoji)}</span>
+                        <span style="font-size: 12px; color: #6b7280; font-weight: 500;">
+                          ${escapeHtml(currentMention.collection.title)}
+                        </span>
+                      </div>
+                    ` : ''}
                     ${currentMention.description ? `
                       <div style="font-size: 12px; color: #374151; line-height: 1.5; word-wrap: break-word;">
                         ${escapeHtml(currentMention.description)}
@@ -469,12 +478,21 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                     ` : ''}
                   </div>
                   
-                  <!-- Footer with date -->
+                  <!-- Footer with date and view count -->
                   <div style="padding-top: 8px;">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
                       <div style="font-size: 12px; color: #6b7280;">
                         ${formatDate(currentMention.created_at)}
                       </div>
+                      ${viewCount !== null ? `
+                        <div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                          <span>${viewCount}</span>
+                        </div>
+                      ` : ''}
                     </div>
                   </div>
                 </div>
@@ -486,12 +504,6 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
               popupRef.current.remove();
             }
 
-            // Update URL with mention parameter for shareable links
-            // Use Next.js router for proper state management
-            const params = new URLSearchParams(searchParams.toString());
-            params.set('mention', mention.id);
-            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-
             // Dispatch event to notify FloatingMapContainer to close location details
             window.dispatchEvent(new CustomEvent('mention-popup-opening', {
               detail: { mentionId: mention.id }
@@ -500,7 +512,62 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             // Set current mention ref before creating popup
             currentMentionRef.current = mention;
             
-            // Create popup immediately
+            // Track mention view (async, non-blocking)
+            const trackMentionView = () => {
+              const referrer = typeof document !== 'undefined' ? document.referrer : null;
+              const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
+              
+              // Generate or get device ID from localStorage
+              let deviceId: string | null = null;
+              if (typeof window !== 'undefined') {
+                deviceId = localStorage.getItem('analytics_device_id');
+                if (!deviceId) {
+                  deviceId = crypto.randomUUID();
+                  localStorage.setItem('analytics_device_id', deviceId);
+                }
+              }
+
+              fetch('/api/analytics/pin-view', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  pin_id: mention.id,
+                  referrer_url: referrer || null,
+                  user_agent: userAgent || null,
+                  session_id: deviceId,
+                }),
+                keepalive: true,
+              }).catch((error) => {
+                // Silently fail - don't break the page
+                if (process.env.NODE_ENV === 'development') {
+                  console.error('[MentionsLayer] Failed to track mention view:', error);
+                }
+              });
+            };
+
+            // Track view asynchronously (non-blocking)
+            if ('requestIdleCallback' in window) {
+              requestIdleCallback(trackMentionView, { timeout: 2000 });
+            } else {
+              setTimeout(trackMentionView, 1000);
+            }
+            
+            // Fetch view stats
+            const fetchViewStats = async (): Promise<number | null> => {
+              try {
+                const response = await fetch(`/api/analytics/pin-stats?pin_id=${mention.id}`);
+                if (!response.ok) return null;
+                const data = await response.json();
+                return data.stats?.total_views || 0;
+              } catch (error) {
+                if (process.env.NODE_ENV === 'development') {
+                  console.error('[MentionsLayer] Failed to fetch view stats:', error);
+                }
+                return null;
+              }
+            };
+
+            // Create popup immediately (without view count initially)
             const mapbox = await import('mapbox-gl');
             popupRef.current = new mapbox.default.Popup({
               offset: 25,
@@ -838,17 +905,19 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
 
             setTimeout(setupPopupHandlers, 0);
 
+            // Fetch and update view count asynchronously
+            fetchViewStats().then((viewCount) => {
+              if (popupRef.current && viewCount !== null) {
+                popupRef.current.setHTML(createPopupContent(mention, viewCount));
+                // Re-setup handlers after updating HTML
+                setTimeout(setupPopupHandlers, 0);
+              }
+            });
+
             // Cleanup popup ref when it closes
             popupRef.current.on('close', () => {
               currentMentionRef.current = null;
               popupRef.current = null;
-              // Clear mention parameter from URL when popup closes
-              const params = new URLSearchParams(searchParams.toString());
-              if (params.has('mention')) {
-                params.delete('mention');
-                const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
-                router.replace(newUrl, { scroll: false });
-              }
             });
           };
 
@@ -902,43 +971,6 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             }
           };
           window.addEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
-
-          // Listen for select-mention-by-id event (from URL param watcher)
-          selectMentionByIdHandlerRef.current = async (event: CustomEvent<{ mentionId: string }>) => {
-            if (!event.detail) return;
-            const { mentionId } = event.detail;
-            
-            // Wait a bit to ensure mentions are loaded
-            let mention = mentionsRef.current.find(m => m.id === mentionId);
-            if (!mention) {
-              // If mention not found, wait a bit and try again
-              await new Promise(resolve => setTimeout(resolve, 100));
-              mention = mentionsRef.current.find(m => m.id === mentionId);
-            }
-            
-            if (mention) {
-              // Check if popup is already open for this mention
-              if (currentMentionRef.current?.id === mentionId && popupRef.current) {
-                return; // Already open
-              }
-              
-              // Close existing popup if different mention
-              if (popupRef.current && currentMentionRef.current?.id !== mentionId) {
-                popupRef.current.remove();
-                popupRef.current = null;
-              }
-              
-              // Open popup for this mention
-              const fakeEvent = {
-                point: { x: 0, y: 0 },
-                lngLat: { lng: mention.lng, lat: mention.lat },
-                originalEvent: { stopPropagation: () => {} },
-              };
-              // Directly trigger the mention click handler logic
-              await handleMentionClick(fakeEvent);
-            }
-          };
-          window.addEventListener('select-mention-by-id', selectMentionByIdHandlerRef.current as EventListener);
 
           clickHandlersAddedRef.current = true;
         }
@@ -1089,10 +1121,6 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         window.removeEventListener('location-selected-on-map', locationSelectedHandlerRef.current);
         locationSelectedHandlerRef.current = null;
       }
-      if (selectMentionByIdHandlerRef.current) {
-        window.removeEventListener('select-mention-by-id', selectMentionByIdHandlerRef.current as EventListener);
-        selectMentionByIdHandlerRef.current = null;
-      }
       if (mentionCreatedHandlerRef.current) {
         window.removeEventListener('mention-created', mentionCreatedHandlerRef.current as EventListener);
         mentionCreatedHandlerRef.current = null;
@@ -1183,7 +1211,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         }
       }
     };
-  }, [map, mapLoaded, year]);
+  }, [map, mapLoaded, searchParams]);
 
   return null; // This component doesn't render anything
 }

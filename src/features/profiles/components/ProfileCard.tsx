@@ -2,13 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { UserIcon, EnvelopeIcon, PhoneIcon, PencilIcon, CheckIcon, XMarkIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { UserIcon, PhoneIcon, PencilIcon, CheckIcon, XMarkIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
 import { getDisplayName, formatJoinDate, TRAIT_OPTIONS, type TraitId } from '@/types/profile';
 import { AccountService } from '@/features/auth';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/features/auth';
+import { useAuth, useAuthStateSafe } from '@/features/auth';
 
 interface ProfileCardProps {
   account: ProfileAccount;
@@ -16,9 +18,14 @@ interface ProfileCardProps {
 }
 
 export default function ProfileCard({ account: initialAccount, isOwnProfile }: ProfileCardProps) {
+  const pathname = usePathname();
   const { user } = useAuth();
+  const { activeAccountId } = useAuthStateSafe();
   const { success, error: showError } = useToast();
   const [account, setAccount] = useState<ProfileAccount>(initialAccount);
+  
+  // Hide "View Profile" button if we're already on the profile page
+  const isOnProfilePage = pathname?.startsWith('/profile/');
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -75,9 +82,10 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
 
     try {
       const value = editValue.trim() || null;
+      // Use the account.id from the displayed account (should match activeAccountId)
       const updatedAccount = await AccountService.updateCurrentAccount({
         [field]: value,
-      });
+      }, account.id);
 
       setAccount(updatedAccount);
       setEditingField(null);
@@ -147,7 +155,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
       // Update account
       const updatedAccount = await AccountService.updateCurrentAccount({
         [field]: urlData.publicUrl,
-      });
+      }, account.id);
 
       setAccount(updatedAccount);
       success('Updated', `${field === 'cover_image_url' ? 'Cover' : 'Profile'} image updated`);
@@ -171,7 +179,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
 
       const updatedAccount = await AccountService.updateCurrentAccount({
         traits: newTraits.length > 0 ? (newTraits as any) : null,
-      });
+      }, account.id);
 
       setAccount(updatedAccount);
     } catch (err) {
@@ -332,7 +340,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
               {displayName}
             </h1>
             {isOwnProfile && (
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+              <div className="flex items-center gap-0.5 transition-all">
                 <button
                   onClick={() => startEditing('first_name', account.first_name)}
                   className="p-0.5 hover:bg-gray-100 rounded transition-colors"
@@ -398,7 +406,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
             {isOwnProfile && account.username && (
               <button
                 onClick={() => startEditing('username', account.username)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-100 rounded transition-all"
+                className="p-0.5 hover:bg-gray-100 rounded transition-all"
               >
                 <PencilIcon className="w-3 h-3 text-gray-400" />
               </button>
@@ -454,33 +462,10 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
           {isOwnProfile && account.bio && (
             <button
               onClick={() => startEditing('bio', account.bio)}
-              className="opacity-0 group-hover:opacity-100 ml-1.5 p-0.5 hover:bg-gray-100 rounded transition-all inline-flex items-center"
+              className="ml-1.5 p-0.5 hover:bg-gray-100 rounded transition-all inline-flex items-center"
             >
               <PencilIcon className="w-3 h-3 text-gray-400" />
             </button>
-          )}
-        </div>
-      )}
-
-      {/* Join Date */}
-      <div className="text-[10px] text-gray-500">
-        Joined {joinDate}
-      </div>
-
-      {/* Contact Info - Only for own profile */}
-      {isOwnProfile && (
-        <div className="space-y-1.5 pt-2">
-          {account.email && (
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <EnvelopeIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
-              <span>{account.email}</span>
-            </div>
-          )}
-          {account.phone && (
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <PhoneIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
-              <span>{account.phone}</span>
-            </div>
           )}
         </div>
       )}
@@ -541,6 +526,36 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
           </div>
         )}
       </div>
+
+      {/* Join Date */}
+      <div className="text-[10px] text-gray-500">
+        Joined {joinDate}
+      </div>
+
+      {/* Contact Info - Only for own profile */}
+      {isOwnProfile && (
+        <div className="space-y-1.5 pt-2">
+          {account.phone && (
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <PhoneIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
+              <span>{account.phone}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* View Profile Button */}
+      {account.username && !isOnProfilePage && (
+        <div className="pt-3 mt-3 border-t border-gray-200">
+          <Link
+            href={`/profile/${account.username}`}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors"
+          >
+            <span>View Profile</span>
+            <ArrowUpTrayIcon className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

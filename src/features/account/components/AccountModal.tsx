@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChartBarIcon, UserIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChartBarIcon, UserIcon, UserGroupIcon, IdentificationIcon } from '@heroicons/react/24/outline';
 import AnalyticsClient from './AnalyticsClient';
 import SettingsClient from './SettingsClient';
+import ProfileClient from './ProfileClient';
 import ProfilesClient from './ProfilesClient';
 import { useAccountData } from '../hooks/useAccountData';
 import { useAccountTabs } from '../hooks/useAccountTabs';
@@ -20,12 +21,28 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
   const { activeTab, setActiveTab } = useAccountTabs(initialTab, isOpen);
   const { account, userEmail, loading } = useAccountData(isOpen, activeTab);
 
-  // Build tabs array - profiles is available to all authenticated users
-  const tabs: Tab[] = [
-    { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
-    { id: 'settings', label: 'Settings', icon: UserIcon },
-    { id: 'profiles', label: 'Profiles', icon: UserGroupIcon },
-  ];
+  // Build tabs array - profile is available to everyone, profiles is only available to admins
+  const tabs: Tab[] = useMemo(() => {
+    const baseTabs: Tab[] = [
+      { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
+      { id: 'profile', label: 'Profile', icon: IdentificationIcon },
+      { id: 'settings', label: 'Settings', icon: UserIcon },
+    ];
+    
+    // Only include profiles tab if user is admin
+    if (account?.role === 'admin') {
+      baseTabs.push({ id: 'profiles', label: 'Profiles', icon: UserGroupIcon });
+    }
+    
+    return baseTabs;
+  }, [account?.role]);
+
+  // Redirect away from profiles tab if user is not admin
+  useEffect(() => {
+    if (activeTab === 'profiles' && account?.role !== 'admin') {
+      setActiveTab('settings');
+    }
+  }, [activeTab, account?.role, setActiveTab]);
 
   if (!isOpen) return null;
 
@@ -96,6 +113,7 @@ export default function AccountModal({ isOpen, onClose, initialTab, onAccountUpd
           ) : (
             <>
               {activeTab === 'analytics' && <AnalyticsClient />}
+              {activeTab === 'profile' && <ProfileClient />}
               {activeTab === 'settings' && account && <SettingsClient initialAccount={account} userEmail={userEmail} />}
               {activeTab === 'profiles' && <ProfilesClient />}
             </>

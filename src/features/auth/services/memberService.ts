@@ -299,8 +299,10 @@ export class AccountService {
 
   /**
    * Update the current user's account record
+   * @param data - Account data to update
+   * @param accountId - Optional account ID to update. If not provided, uses first account (for backward compatibility)
    */
-  static async updateCurrentAccount(data: UpdateAccountData): Promise<Account> {
+  static async updateCurrentAccount(data: UpdateAccountData, accountId?: string): Promise<Account> {
     return withAuthRetry(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -317,9 +319,6 @@ export class AccountService {
         throw new Error('Invalid phone format');
       }
 
-      // Ensure account exists
-      await this.ensureAccountExists();
-
       // Remove undefined values
       const cleanedData: UpdateAccountData = {};
       Object.entries(data).forEach(([key, value]) => {
@@ -328,22 +327,41 @@ export class AccountService {
         }
       });
 
-      // Get the first account for this user
-      const { data: existingAccount } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
+      let targetAccountId: string;
 
-      if (!existingAccount) {
-        throw new Error('Account not found');
+      if (accountId) {
+        // Verify user owns this account
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('id', accountId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (accountError || !account) {
+          throw new Error('Account not found or you do not have access to it');
+        }
+        targetAccountId = account.id;
+      } else {
+        // Fallback to first account (backward compatibility)
+        await this.ensureAccountExists();
+        const { data: existingAccount } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single();
+
+        if (!existingAccount) {
+          throw new Error('Account not found');
+        }
+        targetAccountId = existingAccount.id;
       }
 
       const { data: account, error } = await supabase
         .from('accounts')
         .update(cleanedData)
-        .eq('id', existingAccount.id)
+        .eq('id', targetAccountId)
         .select()
         .single();
 

@@ -1,8 +1,6 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
-import ProfileCard from '@/features/profiles/components/ProfileCard';
-import ProfileMentionsSection from '@/features/profiles/components/ProfileMentionsSection';
-import ProfileCollectionsList from '@/features/profiles/components/ProfileCollectionsList';
+import ProfilePageClient from '@/features/profiles/components/ProfilePageClient';
 import OwnershipToast from '@/features/profiles/components/OwnershipToast';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { Metadata } from 'next';
@@ -173,34 +171,12 @@ export default async function ProfilePage({ params }: Props) {
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
       <OwnershipToast isOwnProfile={isOwnProfile} />
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-          {/* Left Column - Profile */}
-          <div className="lg:col-span-3">
-        <ProfileCard 
+        <ProfilePageClient
           account={profileAccountData}
+          pins={mentions}
+          collections={collections}
           isOwnProfile={isOwnProfile}
         />
-          </div>
-
-          {/* Middle Column - Search Filters and Mentions */}
-          <div className="lg:col-span-6">
-        {mentions.length > 0 && (
-              <ProfileMentionsSection 
-                pins={mentions} 
-                collections={collections}
-                isOwnProfile={isOwnProfile} 
-              />
-        )}
-          </div>
-
-          {/* Right Column - Collections */}
-          <div className="lg:col-span-3">
-            <ProfileCollectionsList 
-              accountId={accountData.id}
-              isOwnProfile={isOwnProfile}
-            />
-          </div>
-        </div>
       </div>
     </SimplePageLayout>
   );

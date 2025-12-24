@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { PlusIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
-import { useActiveAccount } from '../contexts/ActiveAccountContext';
+import { useAuthStateSafe } from '@/features/auth';
 
 interface Account {
   id: string;
@@ -29,7 +29,7 @@ interface AccountsResponse {
 }
 
 export default function ProfilesClient() {
-  const { activeAccountId, setActiveAccountId, refreshActiveAccount } = useActiveAccount();
+  const { activeAccountId, setActiveAccountId, refreshAccount } = useAuthStateSafe();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -113,6 +113,8 @@ export default function ProfilesClient() {
       if (accounts.length === 0) {
         const newAccount = await response.json();
         await setActiveAccountId(newAccount.id);
+      } else {
+        await refreshAccount();
       }
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create account');
@@ -132,8 +134,6 @@ export default function ProfilesClient() {
     setSwitchingAccount(accountId);
     try {
       await setActiveAccountId(accountId);
-      // Refresh active account context to ensure all components update
-      await refreshActiveAccount();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to switch account');
     } finally {

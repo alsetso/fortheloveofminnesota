@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import type { ProfilePin } from '@/types/profile';
 import ProfileMap from './ProfileMap';
 import ProfilePinsList from './ProfilePinsList';
+import CreateMentionModal from '@/features/map/components/CreateMentionModal';
+import { MentionService } from '@/features/mentions/services/mentionService';
+import type { Mention } from '@/types/mention';
 
 import type { Collection } from '@/types/collection';
 
@@ -14,27 +17,37 @@ interface ProfileMentionsSectionProps {
   isOwnProfile: boolean;
   onPinClick?: (pin: ProfilePin) => void;
   onPinUpdated?: () => void;
+  selectedCollectionId?: string | null;
 }
 
 type VisibilityFilter = 'all' | 'public' | 'only_me';
 
 export default function ProfileMentionsSection({
-  pins,
+  pins = [],
   collections = [],
   isOwnProfile,
   onPinClick,
   onPinUpdated,
+  selectedCollectionId = null,
 }: ProfileMentionsSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createCoordinates, setCreateCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [localPins, setLocalPins] = useState<ProfilePin[]>(pins || []);
 
   const formatCoordinates = (lat: number, lng: number): string => {
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   };
 
+  // Update local pins when props change
+  useEffect(() => {
+    setLocalPins(pins || []);
+  }, [pins]);
+
   // Filter pins based on search and visibility
   const filteredPins = useMemo(() => {
-    let filtered = pins;
+    let filtered = localPins;
 
     // Apply visibility filter (only for owners)
     if (isOwnProfile && visibilityFilter !== 'all') {
@@ -52,21 +65,49 @@ export default function ProfileMentionsSection({
     }
 
     return filtered;
-  }, [pins, searchQuery, visibilityFilter, isOwnProfile]);
+  }, [localPins, searchQuery, visibilityFilter, isOwnProfile]);
 
-  if (pins.length === 0) {
-    return null;
-  }
+
+  const handleMentionCreated = (mention?: Mention) => {
+    if (mention) {
+      // Convert Mention to ProfilePin format
+      const newPin: ProfilePin = {
+        id: mention.id,
+        lat: mention.lat,
+        lng: mention.lng,
+        description: mention.description,
+        collection_id: mention.collection_id || null,
+        visibility: mention.visibility as 'public' | 'only_me',
+        created_at: mention.created_at,
+        updated_at: mention.updated_at,
+      };
+      
+      setLocalPins(prev => [newPin, ...prev]);
+      onPinUpdated?.();
+    }
+    setCreateModalOpen(false);
+    setCreateCoordinates(null);
+  };
+
+  const handleCloseModal = () => {
+    setCreateModalOpen(false);
+    setCreateCoordinates(null);
+  };
 
   return (
     <div className="space-y-3">
       {/* Map */}
-      <ProfileMap
-        pins={pins}
-        isOwnProfile={isOwnProfile}
-        searchQuery={searchQuery}
-        visibilityFilter={visibilityFilter}
-      />
+      <ProfileMap pins={filteredPins} />
+
+      {/* Create Mention Modal */}
+      {isOwnProfile && (
+        <CreateMentionModal
+          isOpen={createModalOpen}
+          onClose={handleCloseModal}
+          coordinates={createCoordinates}
+          onMentionCreated={handleMentionCreated}
+        />
+      )}
 
       {/* Search and Filters */}
       <div className="space-y-2">
@@ -121,11 +162,13 @@ export default function ProfileMentionsSection({
 
       {/* Mentions List */}
       <ProfilePinsList
-        pins={pins}
+        pins={localPins}
         collections={collections}
         isOwnProfile={isOwnProfile}
         onPinClick={onPinClick}
-        onPinUpdated={onPinUpdated}
+        onPinUpdated={() => {
+          onPinUpdated?.();
+        }}
         searchQuery={searchQuery}
         visibilityFilter={visibilityFilter}
         onSearchQueryChange={setSearchQuery}

@@ -11,12 +11,16 @@ interface ProfileCollectionsListProps {
   accountId: string;
   isOwnProfile: boolean;
   onCollectionUpdated?: () => void;
+  selectedCollectionId?: string | null;
+  onCollectionClick?: (collectionId: string | null) => void;
 }
 
 export default function ProfileCollectionsList({
   accountId,
   isOwnProfile,
   onCollectionUpdated,
+  selectedCollectionId = null,
+  onCollectionClick,
 }: ProfileCollectionsListProps) {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -354,7 +358,14 @@ export default function ProfileCollectionsList({
                   </div>
                 </div>
               ) : (
-                <div className="group">
+                <div 
+                  className={`group cursor-pointer ${
+                    selectedCollectionId === collection.id 
+                      ? 'bg-gray-100 border-gray-300' 
+                      : 'hover:bg-gray-50'
+                  } transition-colors`}
+                  onClick={() => onCollectionClick?.(collection.id)}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2 flex-1 min-w-0">
                       <span className="text-sm flex-shrink-0">{collection.emoji}</span>
@@ -366,7 +377,10 @@ export default function ProfileCollectionsList({
                       </div>
                     </div>
                     {isOwnProfile && (
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                      <div 
+                        className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           onClick={() => startEditing(collection)}
                           className="p-0.5 hover:bg-gray-100 rounded transition-colors"
@@ -398,3 +412,4 @@ export default function ProfileCollectionsList({
     </div>
   );
 }
+

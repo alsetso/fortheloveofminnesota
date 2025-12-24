@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { XMarkIcon, MagnifyingGlassIcon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, ArrowPathIcon, HomeIcon, HeartIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import MapScreenshotEditor from './MapScreenshotEditor';
 import { MentionService } from '@/features/mentions/services/mentionService';
@@ -14,7 +14,6 @@ import type { MapboxMapInstance, MapboxMouseEvent } from '@/types/mapbox-events'
 import { findCityByName, findCountyByName, updateCityCoordinates } from '@/features/atlas/services/atlasService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useActiveAccount } from '@/features/account/contexts/ActiveAccountContext';
 import { supabase } from '@/lib/supabase';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useWindowManager } from '@/components/ui/WindowManager';
@@ -26,7 +25,6 @@ import {
   type ExtractedFeature,
   CATEGORY_CONFIG,
 } from '@/features/map-metadata';
-import { POIService, type CreatePOIData } from '@/features/poi/services/poiService';
 
 // NOTE: Feature categorization is now handled by src/features/map-metadata/services/featureService.ts
 
@@ -113,17 +111,7 @@ export default function LocationSidebar({
     authLoadingRef.current = authLoading;
   }, [user, account, authLoading]);
   const { openWindow } = useWindowManager();
-  const searchParams = useSearchParams();
   const router = useRouter();
-  
-  // Check if POI mode is active
-  const isPOIMode = searchParams.get('tab') === 'poi';
-  
-  // POI creation state
-  const [poiClickLocation, setPoiClickLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [poiFeature, setPoiFeature] = useState<ExtractedFeature | null>(null);
-  const [showDropPinButton, setShowDropPinButton] = useState(false);
-  const [isCreatingPOI, setIsCreatingPOI] = useState(false);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Local Selection State (not in URL)
@@ -253,10 +241,9 @@ export default function LocationSidebar({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const temporaryMarkerRef = useRef<any>(null);
   const autofillCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isInitializingFromUrlRef = useRef(false);
 
   // Use active account from context
-  const { activeAccount, activeAccountId } = useActiveAccount();
+  const { account: activeAccount, activeAccountId } = useAuthStateSafe();
 
   // Update account info when active account changes
   useEffect(() => {
@@ -284,25 +271,51 @@ export default function LocationSidebar({
         temporaryMarkerRef.current = null;
       }
 
-      // Create temporary marker element with heart image
+      // Create temporary marker element with heart image in red pulsing circle
       const el = document.createElement('div');
       el.className = 'temporary-pin-marker';
+      
+      // Add pulsing animation style
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes pulse-red {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.6;
+          }
+        }
+        .temporary-pin-marker {
+          animation: pulse-red 1.5s ease-in-out infinite;
+        }
+      `;
+      if (!document.head.querySelector('#temporary-pin-marker-style')) {
+        style.id = 'temporary-pin-marker-style';
+        document.head.appendChild(style);
+      }
+      
       el.style.cssText = `
-        width: 32px;
-        height: 32px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background-color: #ef4444;
+        border: 2px solid white;
         cursor: pointer;
         pointer-events: none;
         display: flex;
         align-items: center;
         justify-content: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       `;
 
       const img = document.createElement('img');
       img.src = '/heart.png';
       img.style.cssText = `
-        width: 100%;
-        height: 100%;
+        width: 12px;
+        height: 12px;
         object-fit: contain;
+        filter: brightness(0) invert(1);
       `;
       el.appendChild(img);
 
@@ -1156,58 +1169,6 @@ export default function LocationSidebar({
     };
   }, [removeTemporaryPin, clearSelection]);
 
-  // Watch for mention URL parameter and close location details when present
-  useEffect(() => {
-    const mentionId = searchParams.get('mention');
-    
-    if (mentionId) {
-      // Close location details and remove temporary pin when mention parameter is present
-      clearSelection();
-      removeTemporaryPin();
-      setIsLocationDetailsExpanded(false);
-    }
-  }, [searchParams, removeTemporaryPin, clearSelection]);
-
-  // Initialize search query from URL parameter on mount
-  useEffect(() => {
-    const searchParam = searchParams.get('search');
-    if (searchParam && searchParam !== searchQuery) {
-      isInitializingFromUrlRef.current = true;
-      setSearchQuery(searchParam);
-      // Trigger search if there's a value
-      if (searchParam.trim().length >= 2) {
-        searchLocations(searchParam);
-      }
-      // Reset flag after state update
-      setTimeout(() => {
-        isInitializingFromUrlRef.current = false;
-      }, 0);
-    }
-  }, [searchParams, searchLocations]); // Run when searchParams change or component mounts
-
-  // Sync search query with URL parameter (skip during initialization from URL)
-  useEffect(() => {
-    // Skip URL update if we're initializing from URL
-    if (isInitializingFromUrlRef.current) {
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams.toString());
-    const currentSearchParam = params.get('search');
-    
-    // Only update URL if search query differs from URL param
-    if (searchQuery !== currentSearchParam) {
-      if (searchQuery.trim()) {
-        params.set('search', searchQuery);
-      } else {
-        params.delete('search');
-      }
-      router.replace(`?${params.toString()}`, { scroll: false });
-    }
-  }, [searchQuery, searchParams, router]);
-
-
-
   // Listen for mention hover updates for cursor tracker
   useEffect(() => {
     const handleMentionHoverUpdate = (event: Event) => {
@@ -1247,11 +1208,6 @@ export default function LocationSidebar({
         type: 'map-click',
       };
       setLocationData(locationDataForPin);
-      
-      // Dispatch location data for POI creation
-      window.dispatchEvent(new CustomEvent('poi-location-updated', {
-        detail: locationDataForPin
-      }));
       
       // Expand the inline pin form if user is authenticated
       // Username check happens on submit, not here
@@ -1299,54 +1255,7 @@ export default function LocationSidebar({
       return;
     }
     
-    // Clear mention parameter from URL if present (user is clicking elsewhere on map)
-    const mentionId = searchParams.get('mention');
-    if (mentionId) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete('mention');
-      router.replace(`?${params.toString()}`, { scroll: false });
-    }
-    
     const { lng, lat } = e.lngLat;
-    
-    // POI Mode: Check for POI label in map metadata
-    if (isPOIMode) {
-      try {
-        // Query map metadata layer for POI label
-        const featureResult = queryFeatureAtPoint(map, e.point);
-        const feature = featureResult && 'feature' in featureResult ? featureResult.feature : featureResult;
-        
-        if (feature && feature.hasUsefulData && feature.name) {
-          // POI label found - show drop pin button
-          setPoiClickLocation({ lat, lng });
-          setPoiFeature(feature);
-          setShowDropPinButton(true);
-          
-          // Incrementally zoom in on click
-          const mapboxMap = map as any;
-          const currentZoom = mapboxMap.getZoom();
-          const zoomIncrement = 2;
-          const targetZoom = Math.min(currentZoom + zoomIncrement, MAP_CONFIG.MAX_ZOOM);
-          
-          mapboxMap.flyTo({
-            center: [lng, lat],
-            zoom: targetZoom,
-            duration: 1000,
-          });
-          
-          return; // Don't continue with normal map click behavior
-        } else {
-          // No POI label found - hide button
-          setShowDropPinButton(false);
-          setPoiClickLocation(null);
-          setPoiFeature(null);
-        }
-      } catch (error) {
-        console.error('[FloatingMapContainer] Error querying POI feature:', error);
-        setShowDropPinButton(false);
-      }
-      return; // In POI mode, don't do normal map click behavior
-    }
     
     // Normal mode: Check if click hit a mention or pin - if so, don't show map click data
     try {
@@ -1514,61 +1423,7 @@ export default function LocationSidebar({
     };
     setLocationData(newLocationData);
 
-  }, [map, mapLoaded, addTemporaryPin, reverseGeocode, isPOIMode, user, account, searchParams, router]);
-  
-  // Handle POI creation
-  const handleCreatePOI = useCallback(async () => {
-    if (!poiClickLocation || !poiFeature || !user || !account || isCreatingPOI) return;
-    
-    setIsCreatingPOI(true);
-    
-    try {
-      const poiData: CreatePOIData = {
-        name: poiFeature.name || poiFeature.displayLabel || 'Unnamed POI',
-        category: poiFeature.category,
-        type: poiFeature.properties.type || poiFeature.category,
-        location: poiClickLocation,
-        emoji: poiFeature.icon || undefined,
-        description: poiFeature.displayLabel,
-        mapbox_source: poiFeature.sourceLayer || undefined,
-        mapbox_source_layer: poiFeature.sourceLayer || undefined,
-        mapbox_layer_id: poiFeature.layerId || undefined,
-        mapbox_properties: poiFeature.properties || undefined,
-        metadata: {
-          category: poiFeature.category,
-          label: poiFeature.label,
-          displayLabel: poiFeature.displayLabel,
-        },
-      };
-      
-      await POIService.createPOI(poiData);
-      
-      // Reset state
-      setShowDropPinButton(false);
-      setPoiClickLocation(null);
-      setPoiFeature(null);
-      
-      // Dispatch event to refresh POI list
-      window.dispatchEvent(new CustomEvent('poi-created'));
-      
-      // Show success feedback (optional)
-      console.log('[FloatingMapContainer] POI created successfully');
-    } catch (error) {
-      console.error('[FloatingMapContainer] Error creating POI:', error);
-      // You could show an error toast here
-    } finally {
-      setIsCreatingPOI(false);
-    }
-  }, [poiClickLocation, poiFeature, user, account, isCreatingPOI]);
-  
-  // Clear POI state when exiting POI mode
-  useEffect(() => {
-    if (!isPOIMode) {
-      setShowDropPinButton(false);
-      setPoiClickLocation(null);
-      setPoiFeature(null);
-    }
-  }, [isPOIMode]);
+  }, [map, mapLoaded, addTemporaryPin, reverseGeocode, user, account]);
 
   // NOTE: Mouse move is now handled by useFeatureTracking hook with throttling
 
@@ -1663,7 +1518,7 @@ export default function LocationSidebar({
       {/* Sidebar Container */}
       <div 
         className={`
-          fixed bottom-0 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out
+          fixed bottom-16 lg:bottom-0 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out
           h-auto max-h-full bg-transparent
           ${getSidebarWidth()}
         `}
@@ -2380,40 +2235,6 @@ export default function LocationSidebar({
       </div>
 
 
-
-      {/* POI Drop Pin Button - Shows when POI label is found */}
-      {isPOIMode && showDropPinButton && poiFeature && poiClickLocation && (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="bg-white border border-gray-200 rounded-md shadow-lg p-3 min-w-[200px]">
-            <div className="text-xs text-gray-600 mb-2">
-              <div className="font-medium text-gray-900">{poiFeature.name || poiFeature.displayLabel}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{poiFeature.category}</div>
-            </div>
-            <button
-              onClick={handleCreatePOI}
-              disabled={isCreatingPOI || !user || !account}
-              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCreatingPOI ? (
-                <>
-                  <ArrowPathIcon className="w-3 h-3 animate-spin" />
-                  <span>Creating...</span>
-                </>
-              ) : (
-                <>
-                  <MapPinIcon className="w-3 h-3" />
-                  <span>Drop Pin</span>
-                </>
-              )}
-            </button>
-            {(!user || !account) && (
-              <div className="text-[10px] text-gray-500 mt-1.5 text-center">
-                Sign in to create POI
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Coming Soon Modal */}
       {isComingSoonModalOpen && (

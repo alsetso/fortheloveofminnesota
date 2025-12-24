@@ -18,6 +18,11 @@ export class MentionService {
         username,
         first_name,
         image_url
+      ),
+      collections(
+        id,
+        emoji,
+        title
       )`;
     
     let query = supabase
@@ -149,6 +154,7 @@ export class MentionService {
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
         map_meta: data.map_meta || null,
+        collection_id: data.collection_id || null,
       })
       .select(`
         *,
@@ -157,6 +163,11 @@ export class MentionService {
           username,
           first_name,
           image_url
+        ),
+        collections(
+          id,
+          emoji,
+          title
         )
       `)
       .single();
@@ -208,6 +219,7 @@ export class MentionService {
         id: mention.id,
         description: mention.description,
         account_id: mention.account_id,
+        collection_emoji: (mention as any).collections?.emoji || null,
       },
     }));
 

@@ -42,6 +42,8 @@ export interface MapboxMapInstance {
     duration?: number;
   }) => void;
   remove: () => void;
+  resize: () => void;
+  fitBounds: (bounds: [[number, number], [number, number]], options?: { padding?: number; maxZoom?: number; duration?: number }) => void;
   addSource: (id: string, source: { type: string; data: GeoJSON.FeatureCollection }) => void;
   addLayer: (layer: { id: string; type: string; source: string; [key: string]: unknown }) => void;
   getLayer: (id: string) => { id: string; type: string; [key: string]: unknown } | null;

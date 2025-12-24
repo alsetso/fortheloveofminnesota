@@ -240,3 +240,4 @@ import { PostCreationCard } from '@/features/posts'; // ❌
 - ❌ No → `components/[domain]/` (temporary, migrate later)
 
 
+

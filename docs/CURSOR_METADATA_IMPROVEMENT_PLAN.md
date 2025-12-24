@@ -442,3 +442,4 @@ src/
 **Result**: Users can see what they're hovering over, that context is captured when they click, saved with their pin, and queryable later.
 
 
+

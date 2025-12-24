@@ -64,3 +64,4 @@ DROP TRIGGER IF EXISTS update_pin_collections_updated_at ON public.pin_collectio
 DROP TABLE IF EXISTS public.pin_collections CASCADE;
 
 
+

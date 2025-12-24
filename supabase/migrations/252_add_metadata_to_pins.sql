@@ -29,3 +29,4 @@ COMMENT ON COLUMN public.pins.location_metadata IS 'Mapbox feature metadata capt
 COMMENT ON COLUMN public.pins.atlas_metadata IS 'Atlas entity metadata captured at pin creation (entityId, entityType, name, emoji)';
 
 
+

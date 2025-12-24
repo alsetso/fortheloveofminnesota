@@ -282,3 +282,4 @@ COMMENT ON COLUMN public.accounts.updated_at IS 'Last update timestamp (auto-upd
 COMMENT ON COLUMN public.accounts.last_visit IS 'Last visit timestamp';
 
 
+

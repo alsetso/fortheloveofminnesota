@@ -177,3 +177,4 @@ COMMENT ON POLICY "Read own or public collections" ON public.pin_collections IS
   'Allows anyone to read public collections. Private collections are only visible to their owner (authenticated or guest).';
 
 
+

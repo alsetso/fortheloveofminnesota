@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -10,10 +10,13 @@ import {
   AdjustmentsHorizontalIcon,
   QuestionMarkCircleIcon,
   NewspaperIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline';
 import { Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
+import NavSearch from './NavSearch';
 import SecondarySidebar from './SecondarySidebar';
 import ExploreSecondaryContent from './ExploreSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
@@ -28,6 +31,8 @@ interface SidebarProps {
   map: MapboxMapInstance | null;
   pointsOfInterestVisible?: boolean;
   onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
+  atlasLayerVisible?: boolean;
+  onAtlasLayerVisibilityChange?: (visible: boolean) => void;
 }
 
 interface NavItem {
@@ -66,12 +71,11 @@ const allNavItems: NavItem[] = [
   },
 ];
 
-export default function Sidebar({ account, map, pointsOfInterestVisible, onPointsOfInterestVisibilityChange }: SidebarProps) {
+export default function Sidebar({ account, map, pointsOfInterestVisible, onPointsOfInterestVisibilityChange, atlasLayerVisible = true, onAtlasLayerVisibilityChange }: SidebarProps) {
   const navItems = allNavItems;
   const pathname = usePathname();
-  const { openAccount, openWelcome } = useAppModalContextSafe();
+  const { openAccount, openWelcome, openUpgrade } = useAppModalContextSafe();
   const [clickedNavItem, setClickedNavItem] = useState<string | null>(null);
-  const sidebarRef = useRef<HTMLElement>(null);
   const isHomepage = pathname === '/';
   
   // URL-based tab state (for all tabs on homepage)
@@ -137,49 +141,10 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
     }
   }, [urlTab, isHomepage, clickedNavItem, updateUrl]);
 
-  // Close sidebar when clicking outside (desktop only - mobile uses overlay)
+
+  // Prevent body scroll when secondary sidebar is open
   useEffect(() => {
-    if (!clickedNavItem) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      
-      // On mobile, secondary sidebar is full-screen overlay - don't close on outside click
-      // User must use back button or close button
-      if (window.innerWidth < 1024) return;
-      
-      if (
-        clickedNavItem &&
-        sidebarRef.current &&
-        !sidebarRef.current.contains(target)
-      ) {
-        // Check if click is not on the secondary sidebar
-        const secondarySidebar = target.closest('[data-secondary-sidebar]');
-        
-        // Check if click is on the map (mapbox canvas or map container)
-        const isMapClick = target.closest('.mapboxgl-canvas') || 
-                          target.closest('[class*="mapbox"]') ||
-                          target.closest('[class*="map-container"]');
-        
-        // Don't close if clicking on map or secondary sidebar
-        if (!secondarySidebar && !isMapClick) {
-          const tab = hrefToTab[clickedNavItem];
-          setClickedNavItem(null);
-          // Remove URL param when closing tab on homepage
-          if (isHomepage && tab) {
-            updateUrl(null);
-          }
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [clickedNavItem, isHomepage, updateUrl]);
-
-  // Prevent body scroll when mobile secondary sidebar is open
-  useEffect(() => {
-    if (clickedNavItem && window.innerWidth < 1024) {
+    if (clickedNavItem) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -191,8 +156,8 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
 
   return (
     <>
-      {/* Mobile Top Nav */}
-      <nav className="lg:hidden fixed top-0 left-0 right-0 z-[100] h-14">
+      {/* Top Nav - Shows on all screens */}
+      <nav className="fixed top-0 left-0 right-0 z-[100] h-14 bg-white border-b border-gray-200">
         <div className="relative flex items-center justify-between h-full px-3">
           {/* Logo - Left */}
           <Link href="/">
@@ -206,8 +171,38 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
             />
           </Link>
 
-          {/* Right side - Account Dropdown */}
+          {/* Search - Center */}
+          <NavSearch map={map} />
+
+          {/* Right side - Atlas Toggle, Upgrade Button & Account Dropdown */}
           <div className="flex items-center gap-2">
+            {/* Atlas Layer Toggle */}
+            {onAtlasLayerVisibilityChange && (
+              <button
+                onClick={() => onAtlasLayerVisibilityChange(!atlasLayerVisible)}
+                className={`p-1.5 rounded-md transition-colors ${
+                  atlasLayerVisible
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:bg-gray-50'
+                }`}
+                title={atlasLayerVisible ? 'Hide atlas layers' : 'Show atlas layers'}
+                aria-label={atlasLayerVisible ? 'Hide atlas layers' : 'Show atlas layers'}
+              >
+                {atlasLayerVisible ? (
+                  <EyeIcon className="w-4 h-4" />
+                ) : (
+                  <EyeSlashIcon className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            {account?.plan === 'hobby' && (
+              <button
+                onClick={() => openUpgrade()}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+              >
+                Upgrade
+              </button>
+            )}
             <AccountDropdown
               variant="light"
               onAccountClick={() => openAccount('settings')}
@@ -217,155 +212,7 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
         </div>
       </nav>
 
-      {/* Desktop Sidebar */}
-      <aside ref={sidebarRef} className="hidden lg:flex relative w-16 flex-shrink-0 flex-col h-screen bg-white border-r border-gray-200">
-        {/* Container 1: Logo */}
-        <div className="flex-shrink-0 p-2 border-b border-gray-200">
-          <Link
-            href="/"
-            className="flex flex-col items-center justify-center w-full px-1 group"
-            title="Home"
-          >
-            <div className="w-10 h-10 flex items-center justify-center rounded-md transition-colors group-hover:bg-gray-100">
-              <Image
-                src="/logo.png"
-                alt="Logo"
-                width={28}
-                height={28}
-                className="w-7 h-7"
-                unoptimized
-              />
-            </div>
-          </Link>
-        </div>
-
-        {/* Container 2: Navigation items */}
-        <nav className="flex-1 flex flex-col overflow-y-auto p-2">
-          <ul className="space-y-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-              const isOpen = clickedNavItem === item.href;
-              const hasSecondaryContent = !!item.secondaryContent;
-
-              return (
-                <li key={item.href}>
-                  <button
-                    onClick={() => hasSecondaryContent && handleNavItemClick(item.href)}
-                    className="flex flex-col items-center justify-center gap-1 px-1 py-2 group cursor-pointer w-full"
-                    title={item.label}
-                    type="button"
-                  >
-                    <div className={`
-                      w-8 h-8 flex items-center justify-center rounded-md transition-colors
-                      ${
-                        isOpen || active
-                          ? 'bg-gray-200'
-                          : 'group-hover:bg-gray-100'
-                      }
-                    `}>
-                      <Icon className={`w-5 h-5 ${
-                        isOpen || active ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'
-                      }`} />
-                    </div>
-                    <span className={`text-[10px] leading-tight text-center ${
-                      isOpen || active ? 'text-gray-900' : 'text-gray-600'
-                    }`}>
-                      {item.label}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        {/* Container 3: Controls button at bottom */}
-        <div className="flex-shrink-0 p-2 border-t border-gray-200">
-          <button
-            onClick={() => handleNavItemClick('#controls')}
-            className="flex flex-col items-center justify-center gap-1 px-1 py-2 group cursor-pointer w-full"
-            title="Controls"
-            type="button"
-          >
-            <div className={`
-              w-8 h-8 flex items-center justify-center rounded-md transition-colors
-              ${
-                clickedNavItem === '#controls'
-                  ? 'bg-gray-200'
-                  : 'group-hover:bg-gray-100'
-              }
-            `}>
-              <AdjustmentsHorizontalIcon className={`w-5 h-5 ${
-                clickedNavItem === '#controls' ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'
-              }`} />
-            </div>
-            <span className={`text-[10px] leading-tight text-center ${
-              clickedNavItem === '#controls' ? 'text-gray-900' : 'text-gray-600'
-            }`}>
-              Controls
-            </span>
-          </button>
-        </div>
-
-        {/* Desktop Secondary Sidebar - Shows on click */}
-        {clickedNavItem && (() => {
-          // Handle controls separately
-          if (clickedNavItem === '#controls') {
-            return (
-              <SecondarySidebar
-                isOpen={true}
-                label="Controls"
-                onMouseEnter={() => {}} // Keep open when hovering over secondary sidebar
-                onMouseLeave={() => {}} // Don't close on mouse leave
-                onClose={() => {
-                  const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
-                  setClickedNavItem(null);
-                  // Remove URL param when closing tab on homepage
-                  if (isHomepage && tab) {
-                    updateUrl(null);
-                  }
-                }}
-              >
-                <Map3DControlsSecondaryContent 
-                  map={map} 
-                  pointsOfInterestVisible={pointsOfInterestVisible}
-                  onPointsOfInterestVisibilityChange={onPointsOfInterestVisibilityChange}
-                />
-              </SecondarySidebar>
-            );
-          }
-
-          // Handle other nav items
-          const navItem = navItems.find(item => item.href === clickedNavItem);
-          const content = navItem?.secondaryContent;
-          if (!content) return null;
-          
-          return (
-            <SecondarySidebar
-              isOpen={true}
-              label={navItem?.label || ''}
-              onMouseEnter={() => {}} // Keep open when hovering over secondary sidebar
-              onMouseLeave={() => {}} // Don't close on mouse leave
-              onClose={() => {
-                const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
-                setClickedNavItem(null);
-                // Remove URL param when closing tab on homepage
-                if (isHomepage && tab) {
-                  updateUrl(null);
-                }
-              }}
-            >
-              {React.isValidElement(content)
-                ? React.cloneElement(content as React.ReactElement<any>, { map, mapLoaded: !!map })
-                : content
-              }
-            </SecondarySidebar>
-          );
-        })()}
-      </aside>
-
-      {/* Mobile Secondary Sidebar - Full screen overlay */}
+      {/* Secondary Sidebar - Full screen overlay for all screens */}
       {clickedNavItem && (() => {
         // Handle controls separately
         if (clickedNavItem === '#controls') {

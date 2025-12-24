@@ -15,3 +15,4 @@ export default function LocationPageClient({ locationId, locationSlug, type = 'c
   return null;
 }
 
+

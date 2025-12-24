@@ -172,3 +172,4 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA civic TO service_role;
 
 
 
+

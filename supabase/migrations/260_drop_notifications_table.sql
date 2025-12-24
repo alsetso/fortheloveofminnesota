@@ -35,3 +35,4 @@ DROP POLICY IF EXISTS "Admins can update all notifications" ON public.notificati
 DROP TABLE IF EXISTS public.notifications;
 
 
+

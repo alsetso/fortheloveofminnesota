@@ -51,7 +51,7 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out"
         style={{
           transform: 'translateY(100%)',
           maxHeight: '80vh',

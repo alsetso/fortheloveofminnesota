@@ -7,13 +7,13 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import FloatingMapContainer from './FloatingMapContainer';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
+import AtlasLayer from '@/features/atlas/components/AtlasLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
 import { useAuthStateSafe } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import Sidebar from '@/features/sidebar/components/Sidebar';
-import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import MobileNav from '@/components/layout/MobileNav';
 import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
 import MobileSecondarySheet from '@/components/layout/MobileSecondarySheet';
@@ -55,6 +55,9 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
+  
+  // Atlas layer visibility state (default true)
+  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(true);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -279,10 +282,12 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           map={mapInstanceRef.current}
           pointsOfInterestVisible={isPointsOfInterestVisible}
           onPointsOfInterestVisibilityChange={setIsPointsOfInterestVisible}
+          atlasLayerVisible={isAtlasLayerVisible}
+          onAtlasLayerVisibilityChange={setIsAtlasLayerVisible}
         />
 
         {/* Map and other components */}
-        <div className="flex-1 flex relative overflow-hidden lg:mt-0">
+        <div className="flex-1 flex relative overflow-hidden mt-14">
         {/* Mapbox Container */}
         <div 
           ref={mapContainer} 
@@ -293,6 +298,11 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         {/* Mentions Layer */}
         {mapLoaded && mapInstanceRef.current && (
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+        )}
+
+        {/* Atlas Layer - Cities, Schools, Parks */}
+        {mapLoaded && mapInstanceRef.current && (
+          <AtlasLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} visible={isAtlasLayerVisible} />
         )}
 
         {/* Points of Interest Layer */}
@@ -329,35 +339,16 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           </button>
         </div>
 
-        {/* Floating Account Dropdown - Top Right (desktop only, mobile has it in nav) */}
-        <div className="hidden lg:flex absolute top-4 right-4 z-20 pointer-events-auto items-center gap-2">
-          {account?.plan === 'hobby' && (
-            <button
-              onClick={() => openUpgrade()}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
-            >
-              Upgrade
-            </button>
-          )}
-          <AccountDropdown
-            variant="light"
-            onAccountClick={() => openAccount('settings')}
-            onSignInClick={() => openWelcome()}
-          />
-        </div>
-
-        {/* Mobile Navigation - Bottom overlay */}
-        <div className="lg:hidden">
-          <MobileNav 
-            onCreateClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            isCreateActive={isSidebarOpen}
-            onSecondaryContentClick={(itemId) => {
-              setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
-            }}
-            activeSecondaryContent={activeSecondaryContent}
-            map={mapInstanceRef.current}
-          />
-        </div>
+        {/* Navigation - Bottom overlay (all screens) */}
+        <MobileNav 
+          onCreateClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          isCreateActive={isSidebarOpen}
+          onSecondaryContentClick={(itemId) => {
+            setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
+          }}
+          activeSecondaryContent={activeSecondaryContent}
+          map={mapInstanceRef.current}
+        />
 
         {/* iOS-style Secondary Content Slide-up Sheets */}
         {activeSecondaryContent && (() => {

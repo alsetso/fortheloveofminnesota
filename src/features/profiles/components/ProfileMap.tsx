@@ -78,10 +78,16 @@ export default function ProfileMap({ pins = [] }: ProfileMapProps) {
         mapInstance.on('load', () => {
           if (mounted) {
             setMapLoaded(true);
+            // Trigger resize after a short delay to ensure container is fully rendered
+            setTimeout(() => {
+              if (mapInstance && !(mapInstance as MapboxMapInstance)._removed) {
+                mapInstance.resize();
+              }
+            }, 100);
           }
         });
 
-        // Fit bounds to pins if available
+        // Fit bounds to pins if available (only on initial load)
         if (pins.length > 0) {
           mapInstance.once('load', () => {
             if (!mounted) return;
@@ -124,6 +130,27 @@ export default function ProfileMap({ pins = [] }: ProfileMapProps) {
       }
     };
   }, []);
+
+  // Handle map resize when container size changes
+  useEffect(() => {
+    if (!mapLoaded || !mapInstanceRef.current || !mapContainer.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (mapInstanceRef.current && !(mapInstanceRef.current as MapboxMapInstance)._removed) {
+        setTimeout(() => {
+          if (mapInstanceRef.current && !(mapInstanceRef.current as MapboxMapInstance)._removed) {
+            mapInstanceRef.current.resize();
+          }
+        }, 100);
+      }
+    });
+
+    resizeObserver.observe(mapContainer.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [mapLoaded]);
 
   // Add pins to map
   useEffect(() => {
@@ -222,13 +249,38 @@ export default function ProfileMap({ pins = [] }: ProfileMapProps) {
           console.error('[ProfileMap] Error adding labels layer:', e);
         }
       }
+
+      // Fit bounds to filtered pins when they change (if map is already loaded)
+      if (pins.length > 0 && mapLoaded) {
+        const lngs = pins.map((p) => p.lng);
+        const lats = pins.map((p) => p.lat);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+
+        // Only fit bounds if we have valid coordinates
+        if (minLng !== Infinity && maxLng !== -Infinity && minLat !== Infinity && maxLat !== -Infinity) {
+          mapboxMap.fitBounds(
+            [
+              [minLng, minLat],
+              [maxLng, maxLat],
+            ],
+            {
+              padding: 50,
+              maxZoom: 14,
+              duration: 500,
+            }
+          );
+        }
+      }
     } catch (error) {
       console.error('[ProfileMap] Error setting up layers:', error);
     }
   }, [mapLoaded, pins]);
 
   return (
-    <div className="relative w-full aspect-square bg-gray-100 border border-gray-200 rounded-md overflow-hidden">
+    <div className="relative w-full h-full bg-gray-100 overflow-hidden">
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
     </div>
   );

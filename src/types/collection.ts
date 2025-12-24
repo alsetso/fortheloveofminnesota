@@ -24,3 +24,4 @@ export interface UpdateCollectionData {
   description?: string | null;
 }
 
+

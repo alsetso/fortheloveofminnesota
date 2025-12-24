@@ -86,3 +86,4 @@ COMMENT ON POLICY "Anonymous users can view accounts with public pins" ON public
   'Allows anonymous users to view safe columns (id, first_name, last_name, username, image_url) for accounts that have public pins. Column-level GRANT ensures sensitive fields are never exposed. This enables displaying pin creator information in map popups and feeds securely.';
 
 
+

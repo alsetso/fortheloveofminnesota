@@ -21,3 +21,4 @@ COMMENT ON COLUMN public.map_pins.description IS 'Text content for the pin (sing
 
 
 
+

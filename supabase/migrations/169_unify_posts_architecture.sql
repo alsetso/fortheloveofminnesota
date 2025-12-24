@@ -285,3 +285,4 @@ COMMENT ON COLUMN public.posts.full_address IS
 
 
 
+

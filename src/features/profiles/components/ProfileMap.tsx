@@ -674,9 +674,9 @@ export default function ProfileMap({
         
         return () => clearTimeout(timer);
       }
-    } else {
-      setShowCollectionToast(false);
     }
+    setShowCollectionToast(false);
+    return undefined;
   }, [selectedCollectionId, collections, pins]);
 
   return (

@@ -5,10 +5,32 @@ import { FAQ } from '@/types/faq';
 import FAQItem from '@/features/faqs/components/FAQItem';
 import QuestionSubmissionForm from '@/features/faqs/components/QuestionSubmissionForm';
 import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 export default function FAQsSecondaryContent() {
   const { user, account } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const isAdmin = account?.role === 'admin';
+
+  // Require authentication
+  if (!user) {
+    return (
+      <div className="space-y-3">
+        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-900">Sign In Required</p>
+            <p className="text-xs text-gray-600">You must be signed in to view FAQs.</p>
+            <button
+              onClick={() => openWelcome()}
+              className="w-full px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   const [faqs, setFaqs] = useState<FAQ[]>([]);
   const [loading, setLoading] = useState(true);

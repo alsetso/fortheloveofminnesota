@@ -168,6 +168,7 @@ export class MentionService {
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
         map_meta: data.map_meta || null,
+        atlas_meta: data.atlas_meta || null,
         collection_id: data.collection_id || null,
       })
       .select(`

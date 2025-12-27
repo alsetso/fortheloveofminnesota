@@ -61,6 +61,7 @@ export default function Map3DControlsSecondaryContent({
   const [waterVisible, setWaterVisible] = useState(true);
   const [landcoverVisible, setLandcoverVisible] = useState(true);
 
+
   // Initialize state from map
   useEffect(() => {
     if (!map) return;
@@ -276,6 +277,7 @@ export default function Map3DControlsSecondaryContent({
       console.warn('[Map3DControls] Error toggling layer:', e);
     }
   };
+
 
   const styleOptions: Array<{ value: MapStyle; label: string; icon: typeof GlobeAltIcon }> = [
     { value: 'streets', label: 'Streets', icon: MapIcon },

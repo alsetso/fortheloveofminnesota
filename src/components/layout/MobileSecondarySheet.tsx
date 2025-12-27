@@ -18,12 +18,10 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
     if (isOpen) {
       // Prevent body scroll when sheet is open
       document.body.style.overflow = 'hidden';
-      // Trigger animation
-      requestAnimationFrame(() => {
-        if (sheetRef.current) {
-          sheetRef.current.style.transform = 'translateY(0)';
-        }
-      });
+      // Set to visible immediately (no animation)
+      if (sheetRef.current) {
+        sheetRef.current.style.transform = 'translateY(0)';
+      }
     } else {
       // Restore body scroll
       document.body.style.overflow = '';
@@ -51,10 +49,10 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out flex flex-col"
         style={{
-          transform: 'translateY(100%)',
-          maxHeight: '80vh',
+          transform: 'translateY(0)',
+          height: '80vh',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
@@ -76,7 +74,7 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+        <div className="flex-1 overflow-y-auto">
           <div className="p-4">
             {children}
           </div>

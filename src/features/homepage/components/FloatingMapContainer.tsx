@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { XMarkIcon, MagnifyingGlassIcon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, ArrowPathIcon, HomeIcon, HeartIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import MapScreenshotEditor from './MapScreenshotEditor';
 import { MentionService } from '@/features/mentions/services/mentionService';
@@ -15,7 +16,6 @@ import { findCityByName, findCountyByName, updateCityCoordinates } from '@/featu
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { supabase } from '@/lib/supabase';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { useWindowManager } from '@/components/ui/WindowManager';
 import {
   useFeatureTracking,
@@ -27,6 +27,30 @@ import {
 } from '@/features/map-metadata';
 
 // NOTE: Feature categorization is now handled by src/features/map-metadata/services/featureService.ts
+
+const ATLAS_ICON_MAP: Record<string, string> = {
+  cities: '/city.png',
+  lakes: '/lakes.png',
+  parks: '/park_like.png',
+  schools: '/education.png',
+  neighborhoods: '/neighborhood.png',
+  churches: '/churches.png',
+  hospitals: '/hospital.png',
+  golf_courses: '/golf courses.png',
+  municipals: '/municiples.png',
+};
+
+const ATLAS_ENTITY_LABELS: Record<string, string> = {
+  cities: 'City',
+  lakes: 'Lake',
+  parks: 'Park',
+  schools: 'School',
+  neighborhoods: 'Neighborhood',
+  churches: 'Church',
+  hospitals: 'Hospital',
+  golf_courses: 'Golf Course',
+  municipals: 'Municipal',
+};
 
 interface MapboxFeature {
   id: string;
@@ -96,6 +120,9 @@ export default function LocationSidebar({
   onLocationSelect,
   onPinClick,
 }: LocationSidebarProps) {
+  // Feature flag: Show location details accordion (hidden but logic preserved)
+  const SHOW_LOCATION_DETAILS = false;
+  
   // Auth state - use isLoading to ensure auth is initialized before making decisions
   const { user, account, isLoading: authLoading } = useAuthStateSafe();
   const { openWelcome, openOnboarding, openAccount } = useAppModalContextSafe();
@@ -182,6 +209,15 @@ export default function LocationSidebar({
   const [parkCreateMessage, setParkCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isMetadataOpen, setIsMetadataOpen] = useState(false);
   const [isLocationDetailsExpanded, setIsLocationDetailsExpanded] = useState(false);
+  const [isAtlasEntityOpen, setIsAtlasEntityOpen] = useState(false);
+  const [isAtlasEntityRawOpen, setIsAtlasEntityRawOpen] = useState(false);
+  
+  // Atlas entity state
+  const [atlasEntityData, setAtlasEntityData] = useState<Record<string, any> | null>(null);
+  const [atlasEntityTableName, setAtlasEntityTableName] = useState<string | null>(null);
+  const [atlasEntityLoading, setAtlasEntityLoading] = useState(false);
+  const [atlasEntityError, setAtlasEntityError] = useState<string | null>(null);
+  const pendingAtlasEventRef = useRef<{ id: string; name: string; table_name: string; lat: number; lng: number } | null>(null);
   
   // Inline pin creation form state
   const [isDropHeartExpanded, setIsDropHeartExpanded] = useState(false);
@@ -198,7 +234,6 @@ export default function LocationSidebar({
   const [isPinSubmitting, setIsPinSubmitting] = useState(false);
   const [isPinUploading, setIsPinUploading] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
-  const [showVisibilityTooltip, setShowVisibilityTooltip] = useState(false);
   const [showCameraTooltip, setShowCameraTooltip] = useState(false);
   const pinFileInputRef = useRef<HTMLInputElement>(null);
   
@@ -232,6 +267,195 @@ export default function LocationSidebar({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationData?.coordinates?.lat, locationData?.coordinates?.lng]);
+
+  // Abort controller for canceling in-flight atlas entity fetches
+  const atlasEntityAbortControllerRef = useRef<AbortController | null>(null);
+  
+  // Function to process atlas entity event (extracted for reuse)
+  const processAtlasEntityEvent = useCallback((eventData: { id: string; name: string; table_name: string; lat: number; lng: number }) => {
+    // Store atlas entity coordinates
+    atlasEntityCoordinatesRef.current = {
+      lat: eventData.lat,
+      lng: eventData.lng,
+    };
+    
+    // Set location data for the clicked atlas entity
+    setLocationData({
+      coordinates: {
+        lat: eventData.lat,
+        lng: eventData.lng,
+      },
+      address: eventData.name,
+      placeName: eventData.name,
+      type: 'map-click', // Mark as map-click to distinguish from search
+    });
+    
+    // Reset accordion states
+    setIsAtlasEntityOpen(false);
+    setIsAtlasEntityRawOpen(false);
+    setIsMetadataOpen(false);
+    
+    // Create new abort controller for this fetch
+    const abortController = new AbortController();
+    atlasEntityAbortControllerRef.current = abortController;
+    
+    // Fetch entity data
+    const fetchEntityData = async () => {
+      setAtlasEntityLoading(true);
+      setAtlasEntityError(null);
+      
+      try {
+        const response = await fetch(`/api/atlas/${eventData.table_name}/${eventData.id}`, {
+          signal: abortController.signal,
+        });
+        
+        // Check if request was aborted
+        if (abortController.signal.aborted) {
+          return;
+        }
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || `Failed to fetch ${eventData.table_name} entity`);
+        }
+        
+        const data = await response.json();
+        
+        // Check again if request was aborted before setting state
+        if (abortController.signal.aborted) {
+          return;
+        }
+        
+        setAtlasEntityData(data);
+        setAtlasEntityTableName(eventData.table_name);
+      } catch (err) {
+        // Don't set error if request was aborted
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+        
+        console.error('[FloatingMapContainer] Error fetching atlas entity:', err);
+        setAtlasEntityError(err instanceof Error ? err.message : 'Failed to load entity data');
+        setAtlasEntityData(null);
+        setAtlasEntityTableName(null);
+        setIsAtlasEntityOpen(false);
+        setIsAtlasEntityRawOpen(false);
+        atlasEntityCoordinatesRef.current = null;
+      } finally {
+        // Only update loading state if this is still the active request
+        if (!abortController.signal.aborted) {
+          setAtlasEntityLoading(false);
+        }
+      }
+    };
+    
+    fetchEntityData();
+  }, []);
+
+  // Listen for atlas-entity-click event to fetch and display entity details
+  useEffect(() => {
+    const handleAtlasEntityClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        id: string;
+        name: string;
+        table_name: string;
+        emoji: string;
+        lat: number;
+        lng: number;
+      }>;
+      
+      if (!customEvent.detail?.id || !customEvent.detail?.table_name) return;
+      
+      // Cancel any in-flight fetch
+      if (atlasEntityAbortControllerRef.current) {
+        atlasEntityAbortControllerRef.current.abort();
+      }
+      
+      // Clear previous atlas entity data immediately (for atlas pin to atlas pin switching)
+      setAtlasEntityData(null);
+      setAtlasEntityTableName(null);
+      setAtlasEntityError(null);
+      setIsAtlasEntityOpen(false);
+      setIsAtlasEntityRawOpen(false);
+      atlasEntityCoordinatesRef.current = null;
+      
+      const eventData = {
+        id: customEvent.detail.id,
+        name: customEvent.detail.name,
+        table_name: customEvent.detail.table_name,
+        lat: customEvent.detail.lat,
+        lng: customEvent.detail.lng,
+      };
+      
+      // If sidebar is already open, process immediately
+      // Otherwise, store for processing when sidebar opens
+      if (isOpen) {
+        processAtlasEntityEvent(eventData);
+      } else {
+        pendingAtlasEventRef.current = eventData;
+      }
+    };
+
+    window.addEventListener('atlas-entity-click', handleAtlasEntityClick);
+    return () => {
+      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick);
+    };
+  }, [isOpen, processAtlasEntityEvent]);
+
+  // Store atlas entity coordinates to track when location changes
+  const atlasEntityCoordinatesRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  // Process pending atlas event when sidebar opens (for cases where event came before sidebar opened)
+  useEffect(() => {
+    if (isOpen && pendingAtlasEventRef.current) {
+      const eventData = pendingAtlasEventRef.current;
+      pendingAtlasEventRef.current = null;
+      processAtlasEntityEvent(eventData);
+    } else if (!isOpen) {
+      // Cancel any in-flight fetch
+      if (atlasEntityAbortControllerRef.current) {
+        atlasEntityAbortControllerRef.current.abort();
+        atlasEntityAbortControllerRef.current = null;
+      }
+      
+      // Clear atlas entity data when sidebar closes
+      setAtlasEntityData(null);
+      setAtlasEntityTableName(null);
+      setAtlasEntityError(null);
+      setIsAtlasEntityOpen(false);
+      setIsAtlasEntityRawOpen(false);
+      pendingAtlasEventRef.current = null;
+      atlasEntityCoordinatesRef.current = null;
+    }
+  }, [isOpen, processAtlasEntityEvent]);
+
+  // Clear atlas entity data when location changes to a different location (not from atlas pin)
+  useEffect(() => {
+    if (locationData && atlasEntityCoordinatesRef.current && atlasEntityData) {
+      const { lat, lng } = locationData.coordinates;
+      const atlasCoords = atlasEntityCoordinatesRef.current;
+      
+      // Check if coordinates have changed (with small tolerance for floating point)
+      const coordsChanged = 
+        Math.abs(lat - atlasCoords.lat) > 0.0001 || 
+        Math.abs(lng - atlasCoords.lng) > 0.0001;
+      
+      // Only clear if location changed AND it's not from an atlas entity click
+      // (atlas entity clicks set locationData with the same coordinates, so we check type)
+      if (coordsChanged && locationData.type !== 'map-click') {
+        // Location changed to a different place (via search, etc.) - clear atlas entity data
+        if (atlasEntityAbortControllerRef.current) {
+          atlasEntityAbortControllerRef.current.abort();
+          atlasEntityAbortControllerRef.current = null;
+        }
+        setAtlasEntityData(null);
+        setAtlasEntityTableName(null);
+        setIsAtlasEntityOpen(false);
+        setIsAtlasEntityRawOpen(false);
+        atlasEntityCoordinatesRef.current = null;
+      }
+    }
+  }, [locationData?.coordinates?.lat, locationData?.coordinates?.lng, locationData?.type, atlasEntityData]);
 
 
   // Refs
@@ -616,6 +840,19 @@ export default function LocationSidebar({
     };
     setLocationData(newLocationData);
 
+    // Clear atlas entity data when selecting from search
+    if (atlasEntityAbortControllerRef.current) {
+      atlasEntityAbortControllerRef.current.abort();
+      atlasEntityAbortControllerRef.current = null;
+    }
+    setAtlasEntityData(null);
+    setAtlasEntityTableName(null);
+    setAtlasEntityError(null);
+    setIsAtlasEntityOpen(false);
+    setIsAtlasEntityRawOpen(false);
+    pendingAtlasEventRef.current = null;
+    atlasEntityCoordinatesRef.current = null;
+
     // Clear search input after selection
     setSearchQuery('');
 
@@ -820,6 +1057,13 @@ export default function LocationSidebar({
         } : null,
       };
 
+      // Include full atlas entity metadata (raw response) if mention is being created on an atlas entity
+      // This captures the complete entity data as returned from the API, including all fields
+      const atlasMeta = atlasEntityData && atlasEntityTableName ? {
+        ...atlasEntityData, // Include the full raw response
+        table_name: atlasEntityTableName, // Ensure table_name is included (may not be in API response)
+      } : null;
+
       const mentionData: CreateMentionData = {
         lat: locationData.coordinates.lat,
         lng: locationData.coordinates.lng,
@@ -827,6 +1071,7 @@ export default function LocationSidebar({
         visibility: pinVisibility,
         post_date: postDate,
         map_meta: mapMeta,
+        atlas_meta: atlasMeta,
       };
 
       const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
@@ -848,7 +1093,7 @@ export default function LocationSidebar({
       setIsPinSubmitting(false);
       setIsPinUploading(false);
     }
-  }, [locationData, pinFeature, pinDescription, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome]);
+  }, [locationData, pinFeature, pinDescription, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, atlasEntityData, atlasEntityTableName, user, resetPinForm, removeTemporaryPin, openOnboarding, openWelcome, activeAccountId]);
 
   // Map control handlers
   const handleZoomIn = useCallback(() => {
@@ -1257,6 +1502,29 @@ export default function LocationSidebar({
     
     const { lng, lat } = e.lngLat;
     
+    // Check if click hit an atlas layer - if so, don't clear atlas entity data
+    // (atlas-entity-click event will handle it)
+    let clickedOnAtlasLayer = false;
+    try {
+      const atlasLayers = ['atlas-layer-point', 'atlas-layer-label'];
+      const existingAtlasLayers = atlasLayers.filter(layerId => {
+        try {
+          return mapboxMap.getLayer(layerId) !== undefined;
+        } catch {
+          return false;
+        }
+      });
+      
+      if (existingAtlasLayers.length > 0) {
+        const atlasFeatures = mapboxMap.queryRenderedFeatures(e.point, {
+          layers: existingAtlasLayers,
+        });
+        clickedOnAtlasLayer = atlasFeatures.length > 0;
+      }
+    } catch (queryError) {
+      // Continue if query fails
+    }
+    
     // Normal mode: Check if click hit a mention or pin - if so, don't show map click data
     try {
       const mapboxMap = map as any;
@@ -1289,6 +1557,23 @@ export default function LocationSidebar({
       }
     } catch (queryError) {
       // Continue with map click if query fails
+    }
+    
+    // Clear atlas entity data if clicking on map (not on an atlas layer)
+    // The atlas-entity-click event will handle setting it when an atlas pin is clicked
+    if (!clickedOnAtlasLayer) {
+      // Cancel any in-flight fetch
+      if (atlasEntityAbortControllerRef.current) {
+        atlasEntityAbortControllerRef.current.abort();
+        atlasEntityAbortControllerRef.current = null;
+      }
+      setAtlasEntityData(null);
+      setAtlasEntityTableName(null);
+      setAtlasEntityError(null);
+      setIsAtlasEntityOpen(false);
+      setIsAtlasEntityRawOpen(false);
+      pendingAtlasEventRef.current = null;
+      atlasEntityCoordinatesRef.current = null;
     }
 
     // Incrementally zoom in on click
@@ -1518,12 +1803,13 @@ export default function LocationSidebar({
       {/* Sidebar Container */}
       <div 
         className={`
-          fixed bottom-16 lg:bottom-0 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out
+          fixed bottom-12 lg:bottom-0 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out
           h-auto max-h-full bg-transparent
           ${getSidebarWidth()}
         `}
         style={{
           pointerEvents: 'auto',
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
         <div className="flex flex-col p-4 lg:p-4">
@@ -1566,6 +1852,15 @@ export default function LocationSidebar({
           <div className="relative flex items-center">
               {/* Screenshot Editor */}
             <MapScreenshotEditor map={map} mapLoaded={mapLoaded} />
+
+            {/* Admin Badge */}
+            {isAdmin && (
+              <div className="px-2 py-1 border-l border-gray-200">
+                <span className="px-1.5 py-0.5 text-[9px] font-medium text-gray-700 bg-gray-100 rounded">
+                  Admin
+                </span>
+              </div>
+            )}
 
             {/* Search Input */}
             <div className="relative flex-1 border-l border-gray-200">
@@ -1691,6 +1986,56 @@ export default function LocationSidebar({
                           </span>
                         </div>
                       )}
+
+                      {/* Metadata Preview Containers */}
+                      <div className="space-y-1.5 pb-2">
+                        {/* Atlas Meta Container - Show if atlas entity data exists */}
+                        {atlasEntityData && atlasEntityTableName ? (() => {
+                          const iconPath = ATLAS_ICON_MAP[atlasEntityTableName] || '/custom.png';
+                          const entityLabel = ATLAS_ENTITY_LABELS[atlasEntityTableName] || atlasEntityTableName;
+                          
+                          return (
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                              <div className="flex items-center gap-1.5">
+                                {iconPath && (
+                                  <div className="relative w-3 h-3 flex-shrink-0">
+                                    <Image
+                                      src={iconPath}
+                                      alt={atlasEntityTableName}
+                                      width={12}
+                                      height={12}
+                                      className="w-full h-full object-contain"
+                                      unoptimized
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[10px] text-gray-700 truncate">
+                                    {atlasEntityData.name || atlasEntityTableName}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 ml-1">
+                                    ({entityLabel})
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          /* Map Meta Container - Only show if atlas meta is not available */
+                          pinFeature && (pinFeature.name || pinFeature.properties?.class || pinFeature.label) && (
+                            <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                              <div className="flex items-center gap-1.5">
+                                {pinFeature.icon && (
+                                  <span className="text-xs flex-shrink-0">{pinFeature.icon}</span>
+                                )}
+                                <span className="text-[10px] text-gray-700 truncate">
+                                  {pinFeature.name || (pinFeature.properties?.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        )}
+                      </div>
                       
                       {/* Caption */}
                       <div>
@@ -1707,130 +2052,92 @@ export default function LocationSidebar({
                           rows={5}
                           disabled={isPinSubmitting || isPinUploading}
                         />
-                        <div className="flex justify-end mt-0.5">
+                        <div className="flex items-center justify-between mt-0.5">
+                          {/* Date Selector - Collapsible */}
+                          <div>
+                            {!showPostDateInput ? (
+                              <button
+                                type="button"
+                                onClick={() => setShowPostDateInput(true)}
+                                className="text-xs text-gray-600 hover:text-gray-900 underline"
+                                disabled={isPinSubmitting || isPinUploading}
+                              >
+                                Post Date
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <div className="grid grid-cols-3 gap-1">
+                                  <input
+                                    type="number"
+                                    value={pinEventMonth}
+                                    onChange={(e) => {
+                                      const monthValue = e.target.value;
+                                      if (!monthValue || (monthValue >= '1' && monthValue <= '12')) {
+                                        setPinEventMonth(monthValue);
+                                        setPinError(null);
+                                      }
+                                    }}
+                                    min="1"
+                                    max="12"
+                                    placeholder="M"
+                                    className="w-10 px-2 py-1 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                    disabled={isPinSubmitting || isPinUploading}
+                                    autoFocus
+                                  />
+                                  <input
+                                    type="number"
+                                    value={pinEventDay}
+                                    onChange={(e) => {
+                                      const dayValue = e.target.value;
+                                      if (!dayValue || (dayValue >= '1' && dayValue <= '31')) {
+                                        setPinEventDay(dayValue);
+                                        setPinError(null);
+                                      }
+                                    }}
+                                    min="1"
+                                    max="31"
+                                    placeholder="D"
+                                    className="w-10 px-2 py-1 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                    disabled={isPinSubmitting || isPinUploading}
+                                  />
+                                  <input
+                                    type="number"
+                                    value={pinEventYear}
+                                    onChange={(e) => {
+                                      const yearValue = e.target.value;
+                                      setPinEventYear(yearValue);
+                                      setPinError(null);
+                                    }}
+                                    min={new Date().getFullYear() - 100}
+                                    max={new Date().getFullYear()}
+                                    placeholder="Y"
+                                    className="w-12 px-2 py-1 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                    disabled={isPinSubmitting || isPinUploading}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowPostDateInput(false);
+                                    setPinEventMonth('');
+                                    setPinEventDay('');
+                                    setPinEventYear('');
+                                  }}
+                                  className="text-[10px] text-gray-400 hover:text-gray-600"
+                                  disabled={isPinSubmitting || isPinUploading}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {/* Character Count */}
                           <span className={`text-[10px] ${pinDescription.length >= 240 ? 'text-red-500' : 'text-gray-400'}`}>
                             {pinDescription.length}/240
                           </span>
                         </div>
                       </div>
 
-                      {/* Date Selector - Collapsible */}
-                      <div>
-                        {!showPostDateInput ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowPostDateInput(true)}
-                            className="text-xs text-gray-600 hover:text-gray-900 underline"
-                            disabled={isPinSubmitting || isPinUploading}
-                          >
-                            Post Date
-                          </button>
-                        ) : (
-                          <div className="space-y-2">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              When did this happen? (optional)
-                            </label>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <input
-                                  type="number"
-                                  value={pinEventMonth}
-                                  onChange={(e) => {
-                                    const monthValue = e.target.value;
-                                    if (!monthValue || (monthValue >= '1' && monthValue <= '12')) {
-                                      setPinEventMonth(monthValue);
-                                      setPinError(null);
-                                    }
-                                  }}
-                                  min="1"
-                                  max="12"
-                                  placeholder="Month"
-                                  className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                                  disabled={isPinSubmitting || isPinUploading}
-                                  autoFocus
-                                />
-                              </div>
-                              <div>
-                                <input
-                                  type="number"
-                                  value={pinEventDay}
-                                  onChange={(e) => {
-                                    const dayValue = e.target.value;
-                                    if (!dayValue || (dayValue >= '1' && dayValue <= '31')) {
-                                      setPinEventDay(dayValue);
-                                      setPinError(null);
-                                    }
-                                  }}
-                                  min="1"
-                                  max="31"
-                                  placeholder="Day"
-                                  className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                                  disabled={isPinSubmitting || isPinUploading}
-                                />
-                              </div>
-                              <div>
-                                <input
-                                  type="number"
-                                  value={pinEventYear}
-                                  onChange={(e) => {
-                                    const yearValue = e.target.value;
-                                    setPinEventYear(yearValue);
-                                    setPinError(null);
-                                  }}
-                                  min={new Date().getFullYear() - 100}
-                                  max={new Date().getFullYear()}
-                                  placeholder="Year"
-                                  className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                                  disabled={isPinSubmitting || isPinUploading}
-                                />
-                              </div>
-                            </div>
-                            <p className="text-[10px] text-gray-500 mt-0.5">
-                              Enter month, day, and/or year to filter this mention by date on the map
-                            </p>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Visibility Toggle */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div 
-                          className="flex items-center gap-1.5 relative ml-auto"
-                          onMouseEnter={() => !user && setShowVisibilityTooltip(true)}
-                          onMouseLeave={() => setShowVisibilityTooltip(false)}
-                        >
-                          <span className={`text-[10px] ${pinVisibility === 'public' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-                            Public
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setPinVisibility(pinVisibility === 'public' ? 'only_me' : 'public')}
-                            disabled={isPinSubmitting || !user}
-                            className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
-                              pinVisibility === 'only_me' ? 'bg-gray-700' : 'bg-gray-300'
-                            }`}
-                            role="switch"
-                            aria-checked={pinVisibility === 'only_me'}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-                                pinVisibility === 'only_me' ? 'translate-x-3' : 'translate-x-0'
-                              }`}
-                            />
-                          </button>
-                          <span className={`text-[10px] ${pinVisibility === 'only_me' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-                            Only Me
-                          </span>
-                          
-                          {!user && showVisibilityTooltip && (
-                            <div className="absolute bottom-full right-0 mb-1 z-50 w-40 bg-white border border-gray-200 rounded-md shadow-lg p-2">
-                              <p className="text-[10px] text-gray-600">
-                                Sign in for private mentions
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
 
                       {/* Error */}
                       {pinError && (
@@ -1881,8 +2188,8 @@ export default function LocationSidebar({
                   VIEWING SECTION: What the user clicked on (read-only context)
                   ═══════════════════════════════════════════════════════════════ */}
               
-              {/* Location Details - Accordion */}
-              {locationData && !isDropHeartExpanded && (
+              {/* Location Details - Accordion - Hidden but logic preserved for future use */}
+              {SHOW_LOCATION_DETAILS && locationData && !isDropHeartExpanded && (
                 <div className="border-b border-gray-200">
                   {/* Accordion Header */}
                   <div
@@ -2077,31 +2384,43 @@ export default function LocationSidebar({
               {/* ═══════════════════════════════════════════════════════════════
                   MAP FEATURE - Inline feature info with subtle visual distinction
                   Shows captured Mapbox feature metadata from click location
+                  Admin only - shows accordion dropdown and metadata details
                   ═══════════════════════════════════════════════════════════════ */}
               {locationData && pinFeature && !isDropHeartExpanded && (
-                <div className="relative">
-                  {/* Accordion Button - Icon and Name */}
-                  <button
-                    onClick={() => setIsMetadataOpen(!isMetadataOpen)}
-                    className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-base flex-shrink-0">{pinFeature.icon}</span>
-                      <span className="text-sm font-medium text-gray-900 truncate">
-                        {pinFeature.name || (pinFeature.properties.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
-                      </span>
+                <div className="relative border-b-0">
+                  {/* Accordion Button - Icon and Name - Admin only shows dropdown arrow */}
+                  {isAdmin ? (
+                    <button
+                      onClick={() => setIsMetadataOpen(!isMetadataOpen)}
+                      className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors cursor-pointer border-b-0"
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-base flex-shrink-0">{pinFeature.icon}</span>
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {pinFeature.name || (pinFeature.properties.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {isMetadataOpen ? (
+                          <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                        ) : (
+                          <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                        )}
+                      </div>
+                    </button>
+                  ) : (
+                    <div className="w-full flex items-center px-2 py-1.5">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-base flex-shrink-0">{pinFeature.icon}</span>
+                        <span className="text-sm font-medium text-gray-900 truncate">
+                          {pinFeature.name || (pinFeature.properties.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {isMetadataOpen ? (
-                        <ChevronUpIcon className="w-3 h-3 text-gray-500" />
-                      ) : (
-                        <ChevronDownIcon className="w-3 h-3 text-gray-500" />
-                      )}
-                    </div>
-                  </button>
+                  )}
 
-                  {/* Accordion Content - Type info, Layer info, and Properties */}
-                  {isMetadataOpen && (
+                  {/* Accordion Content - Type info, Layer info, and Properties - Admin only */}
+                  {isAdmin && isMetadataOpen && (
                     <div className="px-2 pb-2 space-y-1.5">
                       {/* Type info - subtle inline display */}
                       <div className="flex items-center gap-1.5 pt-1 border-t border-gray-100">
@@ -2173,8 +2492,169 @@ export default function LocationSidebar({
 
 
               {/* ═══════════════════════════════════════════════════════════════
-                  SECONDARY ACTIONS: User-facing tools (simplified)
+                  ATLAS ENTITY - Accordion with admin-only raw response
+                  Shows atlas entity details (parks, schools, cities, etc.)
+                  Admin only - shows accordion dropdown and raw response
                   ═══════════════════════════════════════════════════════════════ */}
+              {atlasEntityData && locationData && !isDropHeartExpanded && (
+                <div className="relative border-b-0">
+                  {atlasEntityLoading && (
+                    <div className="text-center py-4">
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-2" />
+                      <p className="text-xs text-gray-600">Loading entity data...</p>
+                    </div>
+                  )}
+                  
+                  {atlasEntityError && (
+                    <div className="bg-red-50 border border-red-200 rounded-md p-2">
+                      <p className="text-xs font-medium text-red-800">Error</p>
+                      <p className="text-xs text-red-600 mt-1">{atlasEntityError}</p>
+                    </div>
+                  )}
+                  
+                  {!atlasEntityLoading && !atlasEntityError && atlasEntityData && atlasEntityTableName && (() => {
+                    const tableName = atlasEntityTableName;
+                    const iconPath = ATLAS_ICON_MAP[tableName] || '/custom.png';
+                    const entityLabel = ATLAS_ENTITY_LABELS[tableName] || tableName;
+                    
+                    return (
+                      <>
+                        {/* Accordion Button - Icon and Name - Admin only shows dropdown arrow */}
+                        {isAdmin ? (
+                          <button
+                            onClick={() => setIsAtlasEntityOpen(!isAtlasEntityOpen)}
+                            className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors cursor-pointer border-b-0"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {iconPath && (
+                                <div className="relative w-4 h-4 flex-shrink-0">
+                                  <Image
+                                    src={iconPath}
+                                    alt={entityLabel}
+                                    width={16}
+                                    height={16}
+                                    className="w-full h-full object-contain"
+                                    unoptimized
+                                  />
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-gray-900 truncate">
+                                {atlasEntityData.name || entityLabel}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {isAtlasEntityOpen ? (
+                                <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                              ) : (
+                                <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                              )}
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="w-full flex items-center px-2 py-1.5">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {iconPath && (
+                                <div className="relative w-4 h-4 flex-shrink-0">
+                                  <Image
+                                    src={iconPath}
+                                    alt={entityLabel}
+                                    width={16}
+                                    height={16}
+                                    className="w-full h-full object-contain"
+                                    unoptimized
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-medium text-gray-900 truncate">
+                                  {atlasEntityData.name || entityLabel}
+                                </span>
+                                <p className="text-xs text-gray-500">{entityLabel}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Accordion Content - Description, Action Button, and Raw Response - Admin only */}
+                        {isAdmin && isAtlasEntityOpen && (
+                          <div className="px-2 pb-2 space-y-2">
+                            {/* Description */}
+                            {atlasEntityData.description && (
+                              <p className="text-xs text-gray-600 pt-1 border-t border-gray-100">
+                                {atlasEntityData.description}
+                              </p>
+                            )}
+
+                            {/* Raw Response Accordion - Admin only */}
+                            <div className="border-t border-gray-200 pt-2">
+                              <button
+                                onClick={() => setIsAtlasEntityRawOpen(!isAtlasEntityRawOpen)}
+                                className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors"
+                              >
+                                <span className="text-xs font-medium text-gray-700">Raw Response</span>
+                                {isAtlasEntityRawOpen ? (
+                                  <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                                ) : (
+                                  <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                                )}
+                              </button>
+
+                              {isAtlasEntityRawOpen && (
+                                <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md overflow-hidden">
+                                  <div className="max-h-[150px] overflow-y-auto">
+                                    <table className="w-full text-xs">
+                                      <thead className="sticky top-0 bg-gray-100">
+                                        <tr className="border-b border-gray-200">
+                                          <th className="text-left p-2 font-semibold text-gray-700">Key</th>
+                                          <th className="text-left p-2 font-semibold text-gray-700">Value</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {Object.entries(atlasEntityData).map(([key, value]) => (
+                                          <tr key={key} className="border-b border-gray-200 last:border-b-0">
+                                            <td className="p-2 font-medium text-gray-600 align-top">{key}</td>
+                                            <td className="p-2 text-gray-900 break-words">
+                                              {value === null ? (
+                                                <span className="text-gray-400 italic">null</span>
+                                              ) : value === undefined ? (
+                                                <span className="text-gray-400 italic">undefined</span>
+                                              ) : typeof value === 'object' ? (
+                                                <pre className="text-xs font-mono bg-white p-2 rounded border border-gray-200 overflow-x-auto">
+                                                  {JSON.stringify(value, null, 2)}
+                                                </pre>
+                                              ) : typeof value === 'boolean' ? (
+                                                <span className="font-mono">{String(value)}</span>
+                                              ) : (
+                                                String(value)
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Non-admin content - Always visible */}
+                        {!isAdmin && (
+                          <div className="px-2 pb-2">
+                            {/* Description */}
+                            {atlasEntityData.description && (
+                              <p className="text-xs text-gray-600">
+                                {atlasEntityData.description}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* ═══════════════════════════════════════════════════════════════
                   ADMIN PANEL: Compact admin tools - All open modal for review

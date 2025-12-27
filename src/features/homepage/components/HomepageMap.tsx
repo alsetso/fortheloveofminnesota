@@ -60,7 +60,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(true);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { isModalOpen, openWelcome, openAccount, openUpgrade, openAtlasEntity } = useAppModalContextSafe();
+  const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
   
   // URL-based state (only year filter)
   useUrlMapState();
@@ -104,7 +104,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
     };
   }, []);
 
-  // Listen for atlas-entity-click event to open entity modal
+  // Listen for atlas-entity-click event - show in FloatingMapContainer instead of modal
   useEffect(() => {
     const handleAtlasEntityClick = (event: Event) => {
       const customEvent = event as CustomEvent<{
@@ -117,7 +117,9 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
       }>;
       
       if (customEvent.detail?.id && customEvent.detail?.table_name) {
-        openAtlasEntity(customEvent.detail.id, customEvent.detail.table_name);
+        // Open the FloatingMapContainer instead of the modal
+        setIsSidebarOpen(true);
+        // The FloatingMapContainer will handle fetching and displaying the entity data
       }
     };
 
@@ -125,7 +127,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
     return () => {
       window.removeEventListener('atlas-entity-click', handleAtlasEntityClick);
     };
-  }, [openAtlasEntity]);
+  }, []);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -362,16 +364,18 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           </button>
         </div>
 
-        {/* Navigation - Bottom overlay (all screens) */}
-        <MobileNav 
-          onCreateClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          isCreateActive={isSidebarOpen}
-          onSecondaryContentClick={(itemId) => {
-            setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
-          }}
-          activeSecondaryContent={activeSecondaryContent}
-          map={mapInstanceRef.current}
-        />
+        {/* Navigation - Bottom overlay (all screens) - Hide when FloatingMapContainer is open */}
+        {!(isSidebarOpen && !isModalOpen) && (
+          <MobileNav 
+            onCreateClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            isCreateActive={isSidebarOpen}
+            onSecondaryContentClick={(itemId) => {
+              setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
+            }}
+            activeSecondaryContent={activeSecondaryContent}
+            map={mapInstanceRef.current}
+          />
+        )}
 
         {/* iOS-style Secondary Content Slide-up Sheets */}
         {activeSecondaryContent && (() => {

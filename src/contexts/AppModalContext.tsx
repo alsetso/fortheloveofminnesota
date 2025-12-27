@@ -43,7 +43,6 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openIntelligence: () => {},
       openAnalytics: () => {},
       openAtlas: () => {},
-      openAtlasEntity: () => {},
       openComingSoon: () => {},
       openSuccessPin: () => {},
       updateSuccessPin: () => {},

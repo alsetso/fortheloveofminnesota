@@ -37,6 +37,14 @@ export default function MobileNav({
   
   const secondaryNavItems = getMobileNavItems(account);
 
+  // Handle profile click - remove URL parameters
+  const handleProfileClick = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    router.push(profileHref);
+  };
+
   // Build all nav items (Secondary items, Create, Profile)
   const allNavItems = [
     ...secondaryNavItems.map(item => ({
@@ -57,7 +65,8 @@ export default function MobileNav({
       isActive: isCreateActive,
       onClick: onCreateClick,
     }] : []),
-    {
+    // Only show profile if user is logged in
+    ...(account ? [{
       id: 'profile',
       type: 'link' as const,
       href: profileHref,
@@ -65,7 +74,8 @@ export default function MobileNav({
       icon: UserIcon,
       iconSolid: UserIcon,
       isActive: isProfileActive,
-    },
+      onClick: handleProfileClick,
+    }] : []),
   ];
 
   // Calculate visible vs overflow items
@@ -81,6 +91,46 @@ export default function MobileNav({
     const baseClasses = "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors";
 
     if (item.type === 'link') {
+      // For profile, use onClick handler to remove URL params
+      if (item.id === 'profile' && item.onClick) {
+        return (
+          <button
+            key={item.id}
+            onClick={item.onClick}
+            className={baseClasses}
+          >
+            {item.id === 'profile' ? (
+              <>
+                <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border ${item.isActive ? 'border-gray-900' : 'border-gray-300'}`}>
+                  {account?.image_url ? (
+                    <Image
+                      src={account.image_url}
+                      alt={account.username || 'Profile'}
+                      width={20}
+                      height={20}
+                      className="w-full h-full object-cover"
+                      unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+                    />
+                  ) : (
+                    <UserIcon className={`w-3 h-3 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
+                  )}
+                </div>
+                <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {item.label}
+                </span>
+              </>
+            ) : (
+              <>
+                <Icon className={`w-5 h-5 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
+                <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {item.label}
+                </span>
+              </>
+            )}
+          </button>
+        );
+      }
+
       return (
         <Link
           key={item.id}
@@ -127,8 +177,15 @@ export default function MobileNav({
       >
         {item.id === 'create' ? (
           <>
-            <div className={`w-5 h-5 flex items-center justify-center ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-              <PlusIcon className={`w-5 h-5 transition-transform ${item.isActive ? 'rotate-45' : ''}`} />
+            <div className={`w-5 h-5 flex items-center justify-center ${item.isActive ? 'opacity-100' : 'opacity-80'}`}>
+              <Image
+                src="/heart.png"
+                alt="Create"
+                width={20}
+                height={20}
+                className="w-5 h-5"
+                unoptimized
+              />
             </div>
             <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
               {item.label}
@@ -154,7 +211,9 @@ export default function MobileNav({
     iconSolid: item.iconSolid,
     isActive: item.isActive,
     onClick: item.type === 'link' 
-      ? () => router.push(item.href!)
+      ? (item.id === 'profile' && item.onClick) 
+        ? () => item.onClick?.()
+        : () => router.push(item.href!)
       : item.onClick || (() => {}),
   }));
 

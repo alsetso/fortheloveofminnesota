@@ -22,12 +22,10 @@ export default function MobileNavMorePopup({ isOpen, onClose, items }: MobileNav
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      // Trigger animation
-      requestAnimationFrame(() => {
-        if (popupRef.current) {
-          popupRef.current.style.transform = 'translateY(0)';
-        }
-      });
+      // Set to visible immediately (no animation)
+      if (popupRef.current) {
+        popupRef.current.style.transform = 'translateY(0)';
+      }
     } else {
       document.body.style.overflow = '';
     }
@@ -53,10 +51,10 @@ export default function MobileNavMorePopup({ isOpen, onClose, items }: MobileNav
       {/* Popup */}
       <div
         ref={popupRef}
-        className="fixed bottom-16 left-0 right-0 z-[60] bg-white rounded-t-2xl transition-transform duration-200 ease-out border-t border-gray-200"
+        className="fixed bottom-16 left-0 right-0 z-[60] bg-white rounded-t-2xl transition-transform duration-200 ease-out border-t border-gray-200 flex flex-col"
         style={{
-          transform: 'translateY(100%)',
-          maxHeight: '80vh',
+          transform: 'translateY(0)',
+          height: '80vh',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
@@ -78,7 +76,7 @@ export default function MobileNavMorePopup({ isOpen, onClose, items }: MobileNav
         </div>
 
         {/* Items */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+        <div className="flex-1 overflow-y-auto">
           <div className="py-2 flex flex-wrap items-center justify-center">
             {items.map((item) => {
               const Icon = item.isActive && item.iconSolid ? item.iconSolid : item.icon;

@@ -26,6 +26,10 @@ const ICON_MAP: Record<string, string> = {
   parks: '/park_like.png',
   schools: '/education.png',
   neighborhoods: '/neighborhood.png',
+  churches: '/churches.png',
+  hospitals: '/hospital.png',
+  golf_courses: '/golf courses.png',
+  municipals: '/municiples.png',
 };
 
 // Icon image IDs for Mapbox
@@ -35,6 +39,10 @@ const ICON_IMAGE_IDS: Record<string, string> = {
   parks: 'atlas-icon-park',
   schools: 'atlas-icon-education',
   neighborhoods: 'atlas-icon-neighborhood',
+  churches: 'atlas-icon-churches',
+  hospitals: 'atlas-icon-hospitals',
+  golf_courses: 'atlas-icon-golf-courses',
+  municipals: 'atlas-icon-municipals',
 };
 
 /**
@@ -58,63 +66,153 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
   useEffect(() => {
     if (!map || !mapLoaded || !visible) {
       // Remove layers if not visible
-      const mapboxMap = map as any;
-      try {
-        if (mapboxMap.getLayer(pointLabelLayerId)) {
-          mapboxMap.removeLayer(pointLabelLayerId);
+      if (map) {
+        const mapboxMap = map as any;
+        try {
+          if (mapboxMap.getLayer(pointLabelLayerId)) {
+            mapboxMap.removeLayer(pointLabelLayerId);
+          }
+          if (mapboxMap.getLayer(pointLayerId)) {
+            mapboxMap.removeLayer(pointLayerId);
+          }
+          if (mapboxMap.getSource(sourceId)) {
+            mapboxMap.removeSource(sourceId);
+          }
+        } catch (e) {
+          // Ignore cleanup errors
         }
-        if (mapboxMap.getLayer(pointLayerId)) {
-          mapboxMap.removeLayer(pointLayerId);
-        }
-        if (mapboxMap.getSource(sourceId)) {
-          mapboxMap.removeSource(sourceId);
-        }
-      } catch (e) {
-        // Ignore cleanup errors
+      }
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AtlasLayer] Skipping load - map:', !!map, 'mapLoaded:', mapLoaded, 'visible:', visible);
       }
       return;
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[AtlasLayer] Starting load - map exists:', !!map, 'mapLoaded:', mapLoaded, 'visible:', visible);
     }
 
     let mounted = true;
 
     const loadEntities = async () => {
-      if (isAddingLayersRef.current) return;
+      if (isAddingLayersRef.current) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Already adding layers, skipping...');
+        }
+        return;
+      }
       
       try {
         isAddingLayersRef.current = true;
         const mapboxMap = map as any;
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] loadEntities started, mounted:', mounted);
+        }
 
         // Fetch all entities (cities, lakes, parks, schools, neighborhoods) from unified atlas_entities view
-        const { data: entitiesData, error: entitiesError } = await supabase
-          .from('atlas_entities')
-          .select('id, name, emoji, lat, lng, table_name')
-          .in('table_name', ['cities', 'lakes', 'parks', 'schools', 'neighborhoods'])
-          .not('lat', 'is', null)
-          .not('lng', 'is', null);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Fetching entities from atlas_entities...');
+        }
+        
+        // Fetch entities - split into separate queries for each type to avoid 1000 row limit
+        const [citiesResult, parksResult, schoolsResult, neighborhoodsResult, lakesResult, churchesResult, hospitalsResult, golfCoursesResult, municipalsResult] = await Promise.all([
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'cities').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'parks').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'schools').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'neighborhoods').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'lakes').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'churches').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'hospitals').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'golf_courses').not('lat', 'is', null).not('lng', 'is', null),
+          supabase.from('atlas_entities').select('id, name, emoji, lat, lng, table_name').eq('table_name', 'municipals').not('lat', 'is', null).not('lng', 'is', null),
+        ]);
+        
+        // Combine all results
+        const entitiesData = [
+          ...(citiesResult.data || []),
+          ...(parksResult.data || []),
+          ...(schoolsResult.data || []),
+          ...(neighborhoodsResult.data || []),
+          ...(lakesResult.data || []),
+          ...(churchesResult.data || []),
+          ...(hospitalsResult.data || []),
+          ...(golfCoursesResult.data || []),
+          ...(municipalsResult.data || []),
+        ];
+        
+        const entitiesError = citiesResult.error || parksResult.error || schoolsResult.error || neighborhoodsResult.error || lakesResult.error || churchesResult.error || hospitalsResult.error || golfCoursesResult.error || municipalsResult.error;
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[AtlasLayer] Fetched separately - Cities: ${citiesResult.data?.length || 0}, Parks: ${parksResult.data?.length || 0}, Schools: ${schoolsResult.data?.length || 0}, Neighborhoods: ${neighborhoodsResult.data?.length || 0}, Lakes: ${lakesResult.data?.length || 0}, Churches: ${churchesResult.data?.length || 0}, Hospitals: ${hospitalsResult.data?.length || 0}, Golf Courses: ${golfCoursesResult.data?.length || 0}, Municipals: ${municipalsResult.data?.length || 0}`);
+        }
 
         if (entitiesError) {
           console.error('[AtlasLayer] Error fetching entities:', entitiesError);
+          isAddingLayersRef.current = false;
+          return;
         }
 
-        if (!mounted) return;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Fetched', entitiesData?.length || 0, 'entities');
+          // Count by table_name
+          const counts = (entitiesData || []).reduce((acc: Record<string, number>, entity: any) => {
+            acc[entity.table_name] = (acc[entity.table_name] || 0) + 1;
+            return acc;
+          }, {});
+          console.log('[AtlasLayer] Entity counts by type:', JSON.stringify(counts, null, 2));
+          // Show sample lakes if any
+          const lakes = (entitiesData || []).filter((e: any) => e.table_name === 'lakes');
+          if (lakes.length > 0) {
+            console.log(`[AtlasLayer] Found ${lakes.length} lakes, sample:`, lakes.slice(0, 3));
+          } else {
+            console.warn('[AtlasLayer] No lakes found in fetched data!');
+          }
+        }
+
+        if (!mounted) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AtlasLayer] Component unmounted, stopping');
+          }
+          isAddingLayersRef.current = false;
+          return;
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Processing', entitiesData?.length || 0, 'entities...');
+        }
 
         // Map entities to AtlasEntity format
-        const entities: AtlasEntity[] = (entitiesData || []).map((entity: any) => ({
-          id: entity.id,
-          name: entity.name,
-          emoji: entity.emoji || '',
-          lat: Number(entity.lat),
-          lng: Number(entity.lng),
-          table_name: entity.table_name,
-        }));
+        try {
+          const entities: AtlasEntity[] = (entitiesData || []).map((entity: any) => ({
+            id: entity.id,
+            name: entity.name,
+            emoji: entity.emoji || '',
+            lat: Number(entity.lat),
+            lng: Number(entity.lng),
+            table_name: entity.table_name,
+          }));
 
-        entitiesRef.current = entities;
+          entitiesRef.current = entities;
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AtlasLayer] Successfully mapped', entities.length, 'entities');
+          }
+        } catch (mappingError) {
+          console.error('[AtlasLayer] Error mapping entities:', mappingError);
+          isAddingLayersRef.current = false;
+          return;
+        }
 
         // Validate we have data
         if (entitiesRef.current.length === 0) {
           console.warn('[AtlasLayer] No entities found to display');
           isAddingLayersRef.current = false;
           return;
+        }
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Mapped', entitiesRef.current.length, 'entities to AtlasEntity format');
         }
 
         // Convert to GeoJSON with validation
@@ -151,6 +249,8 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
 
         if (process.env.NODE_ENV === 'development') {
           console.log('[AtlasLayer] Loaded entities:', entitiesRef.current.length, 'valid features:', geoJSON.features.length);
+          console.log('[AtlasLayer] Map style loaded:', mapboxMap.isStyleLoaded());
+          console.log('[AtlasLayer] Sample entities:', entitiesRef.current.slice(0, 3));
         }
 
         // Check if source already exists
@@ -195,10 +295,22 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
         }
 
         // Add source (only after style is loaded)
-        mapboxMap.addSource(sourceId, {
-          type: 'geojson',
-          data: geoJSON,
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Adding source with', geoJSON.features.length, 'features...');
+        }
+        try {
+          mapboxMap.addSource(sourceId, {
+            type: 'geojson',
+            data: geoJSON,
+          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AtlasLayer] Source added successfully');
+          }
+        } catch (sourceError) {
+          console.error('[AtlasLayer] Error adding source:', sourceError);
+          isAddingLayersRef.current = false;
+          return;
+        }
 
         // Verify source exists before adding layers
         if (!mapboxMap.getSource(sourceId)) {
@@ -213,6 +325,10 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
             for (const [tableName, imagePath] of Object.entries(ICON_MAP)) {
               const imageId = ICON_IMAGE_IDS[tableName];
               
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`[AtlasLayer] Loading icon for ${tableName}: ${imagePath} (id: ${imageId})`);
+              }
+              
               // Check if image already exists
               if (!mapboxMap.hasImage(imageId)) {
                 // Create an Image element and wait for it to load
@@ -220,8 +336,16 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
                 img.crossOrigin = 'anonymous';
                 
                 await new Promise((resolve, reject) => {
-                  img.onload = resolve;
-                  img.onerror = reject;
+                  img.onload = () => {
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(`[AtlasLayer] Icon loaded: ${tableName}`);
+                    }
+                    resolve(null);
+                  };
+                  img.onerror = (err) => {
+                    console.error(`[AtlasLayer] Failed to load icon for ${tableName}:`, err);
+                    reject(err);
+                  };
                   img.src = imagePath;
                 });
                 
@@ -242,10 +366,21 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
                   // Get ImageData and add to map with pixelRatio for retina displays
                   const imageData = ctx.getImageData(0, 0, 64, 64);
                   mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
+                  
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log(`[AtlasLayer] Icon added to map: ${tableName} (${imageId})`);
+                  }
+                }
+              } else {
+                if (process.env.NODE_ENV === 'development') {
+                  console.log(`[AtlasLayer] Icon already exists: ${tableName} (${imageId})`);
                 }
               }
             }
             iconsLoadedRef.current = true;
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[AtlasLayer] All icons loaded successfully');
+            }
           } catch (error) {
             console.error('[AtlasLayer] Failed to load atlas icons:', error);
             // Continue anyway - icons may show as missing
@@ -272,7 +407,15 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
                 ICON_IMAGE_IDS.schools,
                 ['==', ['get', 'table_name'], 'neighborhoods'],
                 ICON_IMAGE_IDS.neighborhoods,
-                '', // fallback
+                ['==', ['get', 'table_name'], 'churches'],
+                ICON_IMAGE_IDS.churches,
+                ['==', ['get', 'table_name'], 'hospitals'],
+                ICON_IMAGE_IDS.hospitals,
+                ['==', ['get', 'table_name'], 'golf_courses'],
+                ICON_IMAGE_IDS.golf_courses,
+                ['==', ['get', 'table_name'], 'municipals'],
+                ICON_IMAGE_IDS.municipals,
+                'atlas-icon-city', // fallback to city icon
               ],
               'icon-size': [
                 'interpolate',
@@ -293,15 +436,35 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
           };
 
           // Try to add before mentions point layer if it exists
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AtlasLayer] Adding point layer...');
+          }
           try {
             if (mapboxMap.getLayer('map-mentions-point')) {
               mapboxMap.addLayer(pointLayerOptions, 'map-mentions-point');
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AtlasLayer] Point layer added before map-mentions-point');
+              }
             } else {
               mapboxMap.addLayer(pointLayerOptions);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AtlasLayer] Point layer added');
+              }
             }
           } catch (beforeIdError) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[AtlasLayer] Error adding with beforeId, trying without:', beforeIdError);
+            }
             // Fallback: add without beforeId
-            mapboxMap.addLayer(pointLayerOptions);
+            try {
+              mapboxMap.addLayer(pointLayerOptions);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AtlasLayer] Point layer added (fallback)');
+              }
+            } catch (fallbackError) {
+              console.error('[AtlasLayer] Error adding point layer (fallback):', fallbackError);
+              throw fallbackError;
+            }
           }
         } catch (e) {
           console.error('[AtlasLayer] Error adding point layer:', e);
@@ -310,6 +473,9 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
         }
 
         // Add labels for points (positioned above icon, similar to MentionsLayer)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Adding label layer...');
+        }
         try {
           const labelLayerOptions: any = {
             id: pointLabelLayerId,
@@ -335,6 +501,14 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
                 '#eab308', // yellow
                 ['==', ['get', 'table_name'], 'lakes'],
                 '#0ea5e9', // light blue
+                ['==', ['get', 'table_name'], 'churches'],
+                '#8b5cf6', // purple
+                ['==', ['get', 'table_name'], 'hospitals'],
+                '#ef4444', // red
+                ['==', ['get', 'table_name'], 'golf_courses'],
+                '#10b981', // emerald
+                ['==', ['get', 'table_name'], 'municipals'],
+                '#6366f1', // indigo
                 '#000000', // fallback black
               ],
               'text-halo-color': '#ffffff',
@@ -347,12 +521,29 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
           try {
             if (mapboxMap.getLayer('map-mentions-point-label')) {
               mapboxMap.addLayer(labelLayerOptions, 'map-mentions-point-label');
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AtlasLayer] Label layer added before map-mentions-point-label');
+              }
             } else {
               mapboxMap.addLayer(labelLayerOptions);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AtlasLayer] Label layer added');
+              }
             }
           } catch (beforeIdError) {
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[AtlasLayer] Error adding label with beforeId, trying without:', beforeIdError);
+            }
             // Fallback: add without beforeId
-            mapboxMap.addLayer(labelLayerOptions);
+            try {
+              mapboxMap.addLayer(labelLayerOptions);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AtlasLayer] Label layer added (fallback)');
+              }
+            } catch (fallbackError) {
+              console.error('[AtlasLayer] Error adding label layer (fallback):', fallbackError);
+              throw fallbackError;
+            }
           }
         } catch (e) {
           console.error('[AtlasLayer] Error adding label layer:', e);
@@ -369,6 +560,9 @@ export default function AtlasLayer({ map, mapLoaded, visible = true }: AtlasLaye
         }
 
         isAddingLayersRef.current = false;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AtlasLayer] Successfully added all layers!');
+        }
 
         // Add click handlers (only once)
         if (!clickHandlersAddedRef.current) {

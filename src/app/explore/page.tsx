@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import ExplorePageClient from '@/features/atlas/components/ExplorePageClient';
-import YearFilter from '@/features/atlas/components/YearFilter';
+import InlineAtlasMap from '@/features/atlas/components/InlineAtlasMap';
 import { BuildingOffice2Icon, RectangleGroupIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { createServerClient } from '@/lib/supabaseServer';
@@ -279,7 +279,54 @@ export default async function ExplorePage() {
               Whether you&apos;re researching demographics, planning a visit, or looking for detailed information about Minnesota locations, 
               our directories provide access to comprehensive data about all cities and counties in the Land of 10,000 Lakes.
             </p>
-            <YearFilter />
+          </div>
+
+          {/* Inline Atlas Map */}
+          <div className="mb-3">
+            <InlineAtlasMap height="400px" />
+            
+            {/* Atlas Legend */}
+            <div className="mt-3 bg-white rounded-md border border-gray-200 p-[10px]">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2">Map Legend</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                <div className="flex items-center gap-1.5">
+                  <img src="/city.png" alt="City" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Cities</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/neighborhood.png" alt="Neighborhood" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Neighborhoods</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/park_like.png" alt="Park" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Parks</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/education.png" alt="School" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Schools</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/lakes.png" alt="Lake" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Lakes</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/churches.png" alt="Church" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Churches</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/hospital.png" alt="Hospital" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Hospitals</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/golf courses.png" alt="Golf Course" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Golf Courses</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <img src="/municiples.png" alt="Municipal" className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs text-gray-600">Municipals</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Enhanced Quick Stats */}

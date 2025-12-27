@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 
 interface HomepageStats {
@@ -22,9 +23,13 @@ interface HomepageStats {
 }
 
 export default function MobileOverlay() {
+  const pathname = usePathname();
   const [isVisible, setIsVisible] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<HomepageStats | null>(null);
+
+  // Only show on homepage
+  const isHomepage = pathname === '/';
 
   useEffect(() => {
     setMounted(true);
@@ -49,7 +54,7 @@ export default function MobileOverlay() {
   };
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || !isHomepage) return;
 
     // Check if mobile (viewport width < 768px)
     const checkMobile = () => {
@@ -63,7 +68,7 @@ export default function MobileOverlay() {
     return () => {
       window.removeEventListener('resize', checkMobile);
     };
-  }, [mounted]);
+  }, [mounted, isHomepage]);
 
   useEffect(() => {
     if (isVisible) {
@@ -80,7 +85,7 @@ export default function MobileOverlay() {
     setIsVisible(false);
   };
 
-  if (!mounted || !isVisible) return null;
+  if (!mounted || !isVisible || !isHomepage) return null;
 
   return (
     <div className="fixed inset-0 z-[200] bg-white flex items-center justify-center p-[10px]">

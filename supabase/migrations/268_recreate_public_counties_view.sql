@@ -143,3 +143,5 @@ COMMENT ON FUNCTION public.counties_delete_trigger() IS
   'INSTEAD OF DELETE trigger for public.counties view. Routes deletes to atlas.counties table.';
 
 
+
+

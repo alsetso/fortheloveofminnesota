@@ -25,3 +25,5 @@ COMMENT ON COLUMN public.map_pins.media_url IS 'URL to photo or video associated
 
 
 
+
+

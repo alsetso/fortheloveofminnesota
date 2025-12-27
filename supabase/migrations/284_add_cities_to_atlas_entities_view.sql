@@ -201,3 +201,4 @@ COMMENT ON VIEW atlas.atlas_entities IS 'Unified view combining all atlas entity
 COMMENT ON COLUMN atlas.atlas_entities.table_name IS 'Source table name: cities, neighborhoods, schools, parks, lakes, watertowers, cemeteries, golf_courses, hospitals, airports, churches, municipals, roads, radio_and_news';
 COMMENT ON COLUMN atlas.atlas_entities.emoji IS 'Emoji icon for the entity type: 🏙️ cities, 🏘️ neighborhoods, 🎓 schools, 🌳 parks, 💧 lakes, 🗼 watertowers, 🪦 cemeteries, ⛳ golf_courses, 🏥 hospitals, ✈️ airports, ⛪ churches, 🏛️ municipals, 🛣️ roads, 📻 radio_and_news';
 
+

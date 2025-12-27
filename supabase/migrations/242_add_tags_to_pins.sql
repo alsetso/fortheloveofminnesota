@@ -22,3 +22,5 @@ COMMENT ON COLUMN public.pins.tags IS 'Array of text labels for organizing pins 
 
 
 
+
+

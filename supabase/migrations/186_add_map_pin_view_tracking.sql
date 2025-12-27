@@ -202,3 +202,5 @@ COMMENT ON COLUMN public.map_pins.view_count IS 'Total number of times this pin 
 
 
 
+
+

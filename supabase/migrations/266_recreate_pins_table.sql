@@ -238,3 +238,5 @@ COMMENT ON POLICY "Users and guests can insert pins" ON public.pins IS
   'Allows authenticated users to insert pins they own, and anonymous guests to insert pins with guest accounts. Guest accounts are identified by NULL user_id and non-NULL guest_id.';
 
 
+
+

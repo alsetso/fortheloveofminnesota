@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { supabase } from '@/lib/supabase';
 
 interface AtlasEntityModalProps {
   isOpen: boolean;
@@ -12,7 +11,6 @@ interface AtlasEntityModalProps {
   tableName: string;
 }
 
-// Icon mapping: table_name -> image path (matches AtlasLayer)
 const ICON_MAP: Record<string, string> = {
   cities: '/city.png',
   lakes: '/lakes.png',
@@ -21,7 +19,6 @@ const ICON_MAP: Record<string, string> = {
   neighborhoods: '/neighborhood.png',
 };
 
-// Entity type labels
 const ENTITY_LABELS: Record<string, string> = {
   cities: 'City',
   lakes: 'Lake',
@@ -39,6 +36,7 @@ export default function AtlasEntityModal({
   const [entityData, setEntityData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRawResponseOpen, setIsRawResponseOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !entityId || !tableName) {
@@ -53,7 +51,6 @@ export default function AtlasEntityModal({
       setError(null);
 
       try {
-        // Fetch from API route that queries atlas schema
         const response = await fetch(`/api/atlas/${tableName}/${entityId}`);
         
         if (!response.ok) {
@@ -85,41 +82,19 @@ export default function AtlasEntityModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-md border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-md border border-gray-200 w-full max-w-md overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-[10px] flex-shrink-0">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              {iconPath && (
-                <div className="relative w-6 h-6">
-                  <Image
-                    src={iconPath}
-                    alt={entityLabel}
-                    width={24}
-                    height={24}
-                    className="w-full h-full object-contain"
-                    unoptimized
-                  />
-                </div>
-              )}
-              <h2 className="text-sm font-semibold text-gray-900">
-                {entityLabel} Details
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label="Close"
-            >
-              <XMarkIcon className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
+        <div className="p-[10px]">
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-[10px] right-[10px] p-1 text-gray-500 hover:text-gray-700 transition-colors"
+            aria-label="Close"
+          >
+            <XMarkIcon className="w-3 h-3" />
+          </button>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-[10px] pt-0">
           {loading && (
             <div className="text-center py-8">
               <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-2" />
@@ -136,49 +111,95 @@ export default function AtlasEntityModal({
 
           {!loading && !error && entityData && (
             <div className="space-y-3">
-              {/* Entity Name */}
-              {entityData.name && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Name</p>
-                  <p className="text-xs text-gray-900">{entityData.name}</p>
-                </div>
-              )}
+              {/* Landing Page Style: Headline */}
+              <div className="text-center space-y-1.5">
+                {iconPath && (
+                  <div className="flex justify-center">
+                    <div className="relative w-8 h-8">
+                      <Image
+                        src={iconPath}
+                        alt={entityLabel}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-contain"
+                        unoptimized
+                      />
+                    </div>
+                  </div>
+                )}
+                <h1 className="text-sm font-semibold text-gray-900">
+                  {entityData.name || `${entityLabel} Details`}
+                </h1>
+                <p className="text-xs text-gray-600">
+                  {entityData.description || `View details and information about this ${entityLabel.toLowerCase()}`}
+                </p>
+              </div>
 
-              {/* Raw Response Table */}
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-2">Raw Response</p>
-                <div className="bg-gray-50 border border-gray-200 rounded-md overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-100 border-b border-gray-200">
-                        <th className="text-left p-2 font-semibold text-gray-700">Key</th>
-                        <th className="text-left p-2 font-semibold text-gray-700">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(entityData).map(([key, value]) => (
-                        <tr key={key} className="border-b border-gray-200 last:border-b-0">
-                          <td className="p-2 font-medium text-gray-600 align-top">{key}</td>
-                          <td className="p-2 text-gray-900 break-words">
-                            {value === null ? (
-                              <span className="text-gray-400 italic">null</span>
-                            ) : value === undefined ? (
-                              <span className="text-gray-400 italic">undefined</span>
-                            ) : typeof value === 'object' ? (
-                              <pre className="text-xs font-mono bg-white p-2 rounded border border-gray-200 overflow-x-auto">
-                                {JSON.stringify(value, null, 2)}
-                              </pre>
-                            ) : typeof value === 'boolean' ? (
-                              <span className="font-mono">{String(value)}</span>
-                            ) : (
-                              String(value)
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              {/* Action Button */}
+              <button
+                onClick={() => {
+                  // Action for general members - could navigate, open link, etc.
+                  if (entityData.website_url) {
+                    window.open(entityData.website_url, '_blank');
+                  } else if (entityData.slug) {
+                    window.location.href = `/explore/${tableName}/${entityData.slug}`;
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-700 rounded-md transition-colors"
+              >
+                {entityData.website_url ? 'Visit Website' : entityData.slug ? 'View Details' : 'Learn More'}
+              </button>
+
+              {/* Raw Response Accordion */}
+              <div className="border-t border-gray-200 pt-3">
+                <button
+                  onClick={() => setIsRawResponseOpen(!isRawResponseOpen)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <span className="text-xs font-medium text-gray-700">Raw Response</span>
+                  {isRawResponseOpen ? (
+                    <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                  )}
+                </button>
+
+                {isRawResponseOpen && (
+                  <div className="mt-2 bg-gray-50 border border-gray-200 rounded-md overflow-hidden">
+                    <div className="max-h-[150px] overflow-y-auto">
+                      <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-gray-100">
+                          <tr className="border-b border-gray-200">
+                            <th className="text-left p-2 font-semibold text-gray-700">Key</th>
+                            <th className="text-left p-2 font-semibold text-gray-700">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(entityData).map(([key, value]) => (
+                            <tr key={key} className="border-b border-gray-200 last:border-b-0">
+                              <td className="p-2 font-medium text-gray-600 align-top">{key}</td>
+                              <td className="p-2 text-gray-900 break-words">
+                                {value === null ? (
+                                  <span className="text-gray-400 italic">null</span>
+                                ) : value === undefined ? (
+                                  <span className="text-gray-400 italic">undefined</span>
+                                ) : typeof value === 'object' ? (
+                                  <pre className="text-xs font-mono bg-white p-2 rounded border border-gray-200 overflow-x-auto">
+                                    {JSON.stringify(value, null, 2)}
+                                  </pre>
+                                ) : typeof value === 'boolean' ? (
+                                  <span className="font-mono">{String(value)}</span>
+                                ) : (
+                                  String(value)
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

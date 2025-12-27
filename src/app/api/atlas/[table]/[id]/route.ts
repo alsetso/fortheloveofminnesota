@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 
-// Valid atlas table names
 const VALID_TABLES = [
   'cities',
   'neighborhoods',
@@ -42,9 +41,6 @@ export async function GET(
 
     const supabase = createServerClient();
 
-    // Query from atlas schema using .schema() method
-    // Type assertion needed because TypeScript only allows 'public' schema,
-    // but we need to query from 'atlas' schema
     const { data, error } = await (supabase as any)
       .schema('atlas')
       .from(table)
@@ -69,4 +65,5 @@ export async function GET(
     );
   }
 }
+
 

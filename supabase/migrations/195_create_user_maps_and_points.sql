@@ -354,3 +354,5 @@ COMMENT ON FUNCTION public.user_has_map_access(UUID, public.map_permission) IS '
 
 
 
+
+

@@ -40,6 +40,7 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openOnboarding: () => {},
       openAccount: () => {},
       openUpgrade: () => {},
+      openIntelligence: () => {},
       openAnalytics: () => {},
       openAtlas: () => {},
       openAtlasEntity: () => {},
@@ -47,6 +48,7 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openSuccessPin: () => {},
       updateSuccessPin: () => {},
       closeModal: () => {},
+      getIntelligenceContext: () => null,
       getAtlasContext: () => undefined,
     };
   }

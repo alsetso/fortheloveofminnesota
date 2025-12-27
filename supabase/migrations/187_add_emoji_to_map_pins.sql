@@ -18,3 +18,5 @@ COMMENT ON COLUMN public.map_pins.emoji IS 'Emoji character(s) to display with t
 
 
 
+
+

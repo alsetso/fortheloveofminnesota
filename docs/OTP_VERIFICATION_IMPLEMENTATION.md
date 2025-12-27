@@ -525,3 +525,5 @@ Ensure your Supabase project has:
 - [ ] User session persists after verification
 
 
+
+

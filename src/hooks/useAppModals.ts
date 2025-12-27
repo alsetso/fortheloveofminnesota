@@ -15,6 +15,7 @@ export type AppModalType =
   | 'account'
   | 'upgrade'
   // Map/Feature modals
+  | 'intelligence'
   | 'analytics'
   | 'atlas'
   | 'atlasEntity'
@@ -53,9 +54,11 @@ export interface AppModalState {
 
 // Non-serializable context (stored in memory, not URL)
 const modalContext: {
+  intelligenceLocation: { lat: number; lng: number; placeName?: string; address?: string } | null;
   atlasEntityData: unknown;
   analyticsPinName?: string;
 } = {
+  intelligenceLocation: null,
   atlasEntityData: undefined,
   analyticsPinName: undefined,
 };
@@ -72,6 +75,7 @@ export interface UseAppModalsReturn {
   openUpgrade: (feature?: string) => void;
   
   // Feature modals
+  openIntelligence: (location?: { lat: number; lng: number; placeName?: string; address?: string }) => void;
   openAnalytics: (pinId: string, pinName?: string) => void;
   openAtlas: (mode: 'create' | 'edit', entityType: string, data?: unknown) => void;
   openAtlasEntity: (entityId: string, tableName: string) => void;
@@ -83,6 +87,7 @@ export interface UseAppModalsReturn {
   closeModal: () => void;
   
   // Helpers
+  getIntelligenceContext: () => typeof modalContext.intelligenceLocation;
   getAtlasContext: () => typeof modalContext.atlasEntityData;
 }
 
@@ -115,6 +120,11 @@ export function useAppModals(): UseAppModalsReturn {
   }, []);
 
   // Feature modals
+  const openIntelligence = useCallback((location?: { lat: number; lng: number; placeName?: string; address?: string }) => {
+    modalContext.intelligenceLocation = location || null;
+    setModal({ type: 'intelligence' });
+  }, []);
+
   const openAnalytics = useCallback((pinId: string, pinName?: string) => {
     modalContext.analyticsPinName = pinName;
     setModal({
@@ -176,6 +186,7 @@ export function useAppModals(): UseAppModalsReturn {
   // Close modal
   const closeModal = useCallback(() => {
     // Clear context
+    modalContext.intelligenceLocation = null;
     modalContext.atlasEntityData = undefined;
     modalContext.analyticsPinName = undefined;
     
@@ -183,6 +194,7 @@ export function useAppModals(): UseAppModalsReturn {
   }, []);
 
   // Context getters
+  const getIntelligenceContext = useCallback(() => modalContext.intelligenceLocation, []);
   const getAtlasContext = useCallback(() => modalContext.atlasEntityData, []);
 
   return {
@@ -192,6 +204,7 @@ export function useAppModals(): UseAppModalsReturn {
     openOnboarding,
     openAccount,
     openUpgrade,
+    openIntelligence,
     openAnalytics,
     openAtlas,
     openAtlasEntity,
@@ -199,6 +212,7 @@ export function useAppModals(): UseAppModalsReturn {
     openSuccessPin,
     updateSuccessPin,
     closeModal,
+    getIntelligenceContext,
     getAtlasContext,
   };
 }

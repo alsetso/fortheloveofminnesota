@@ -1157,7 +1157,20 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       if (map && typeof map.getSource === 'function') {
         try {
           const mapboxMap = map as any;
-          const existingSource = map.getSource(sourceId);
+          
+          // Check if map has been removed or is in invalid state
+          if (mapboxMap._removed) {
+            return;
+          }
+          
+          // Safely check if getSource is still callable
+          let existingSource;
+          try {
+            existingSource = map.getSource(sourceId);
+          } catch (sourceError) {
+            // getSource may fail if map is partially destroyed
+            return;
+          }
           
           if (existingSource) {
             // Remove layers in reverse order of creation
@@ -1189,10 +1202,8 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             }
           }
         } catch (e) {
-          // Map may be in an invalid state - ignore cleanup errors
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[MentionsLayer] Error during cleanup:', e);
-          }
+          // Map may be in an invalid state - ignore cleanup errors silently
+          // Don't log warnings for cleanup errors as they're expected when map is destroyed
         }
       }
       

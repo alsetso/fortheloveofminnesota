@@ -5,7 +5,6 @@ import OwnershipToast from '@/features/profiles/components/OwnershipToast';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { Metadata } from 'next';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
-import type { Mention } from '@/types/mention';
 import type { Collection } from '@/types/collection';
 
 export const dynamic = 'force-dynamic';
@@ -181,5 +180,3 @@ export default async function ProfilePage({ params }: Props) {
     </SimplePageLayout>
   );
 }
-
-

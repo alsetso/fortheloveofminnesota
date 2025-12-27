@@ -313,7 +313,11 @@ export default function ProfileCollectionsList({
           {collections.map((collection) => (
             <div
               key={collection.id}
-              className="border border-gray-200 rounded-md p-[10px] bg-white hover:bg-gray-50 transition-colors"
+              className={`border rounded-md p-[10px] bg-white hover:bg-gray-50 transition-colors ${
+                selectedCollectionId === collection.id
+                  ? 'border-gray-900'
+                  : 'border-gray-200'
+              }`}
             >
               {editingId === collection.id ? (
                 <div className="space-y-2">
@@ -359,11 +363,7 @@ export default function ProfileCollectionsList({
                 </div>
               ) : (
                 <div 
-                  className={`group cursor-pointer ${
-                    selectedCollectionId === collection.id 
-                      ? 'bg-gray-100 border-gray-300' 
-                      : 'hover:bg-gray-50'
-                  } transition-colors`}
+                  className="group cursor-pointer"
                   onClick={() => onCollectionClick?.(collection.id)}
                 >
                   <div className="flex items-start justify-between gap-2">

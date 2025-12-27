@@ -10,7 +10,7 @@ import { getDisplayName, formatJoinDate, TRAIT_OPTIONS, type TraitId } from '@/t
 import { AccountService } from '@/features/auth';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
-import { useAuth, useAuthStateSafe } from '@/features/auth';
+import { useAuth } from '@/features/auth';
 
 interface ProfileCardProps {
   account: ProfileAccount;
@@ -20,7 +20,6 @@ interface ProfileCardProps {
 export default function ProfileCard({ account: initialAccount, isOwnProfile }: ProfileCardProps) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { activeAccountId } = useAuthStateSafe();
   const { success, error: showError } = useToast();
   const [account, setAccount] = useState<ProfileAccount>(initialAccount);
   
@@ -82,7 +81,6 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
 
     try {
       const value = editValue.trim() || null;
-      // Use the account.id from the displayed account (should match activeAccountId)
       const updatedAccount = await AccountService.updateCurrentAccount({
         [field]: value,
       }, account.id);

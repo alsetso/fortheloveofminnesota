@@ -8,7 +8,6 @@ import ProfilePinsList from './ProfilePinsList';
 import CreateMentionModal from '@/features/map/components/CreateMentionModal';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
-
 import type { Collection } from '@/types/collection';
 
 interface ProfileMentionsSectionProps {
@@ -18,6 +17,10 @@ interface ProfileMentionsSectionProps {
   onPinClick?: (pin: ProfilePin) => void;
   onPinUpdated?: () => void;
   selectedCollectionId?: string | null;
+  publicPins?: ProfilePin[];
+  accountId: string;
+  accountUsername?: string | null;
+  accountImageUrl?: string | null;
 }
 
 type VisibilityFilter = 'all' | 'public' | 'only_me';
@@ -29,6 +32,10 @@ export default function ProfileMentionsSection({
   onPinClick,
   onPinUpdated,
   selectedCollectionId = null,
+  publicPins = [],
+  accountId,
+  accountUsername,
+  accountImageUrl,
 }: ProfileMentionsSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all');
@@ -45,9 +52,15 @@ export default function ProfileMentionsSection({
     setLocalPins(pins || []);
   }, [pins]);
 
-  // Filter pins based on search and visibility
+
+  // Filter pins based on search, visibility, and collection
   const filteredPins = useMemo(() => {
     let filtered = localPins;
+
+    // Apply collection filter
+    if (selectedCollectionId) {
+      filtered = filtered.filter((pin) => pin.collection_id === selectedCollectionId);
+    }
 
     // Apply visibility filter (only for owners)
     if (isOwnProfile && visibilityFilter !== 'all') {
@@ -65,7 +78,7 @@ export default function ProfileMentionsSection({
     }
 
     return filtered;
-  }, [localPins, searchQuery, visibilityFilter, isOwnProfile]);
+  }, [localPins, searchQuery, visibilityFilter, isOwnProfile, selectedCollectionId]);
 
 
   const handleMentionCreated = (mention?: Mention) => {
@@ -158,6 +171,21 @@ export default function ProfileMentionsSection({
             </button>
           </div>
         )}
+      </div>
+
+      {/* Profile Map - Public Pins Only */}
+      <div className="border border-gray-200 rounded-md overflow-hidden bg-white relative">
+        <div className="aspect-square w-full">
+          <ProfileMap 
+            pins={publicPins} 
+            accountId={accountId}
+            isOwnProfile={isOwnProfile}
+            accountUsername={accountUsername}
+            accountImageUrl={accountImageUrl}
+            selectedCollectionId={selectedCollectionId}
+            collections={collections}
+          />
+        </div>
       </div>
 
       {/* Mentions List */}

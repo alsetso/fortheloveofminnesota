@@ -23,8 +23,6 @@ interface ProfileMentionsSectionProps {
   accountImageUrl?: string | null;
 }
 
-type VisibilityFilter = 'all' | 'public' | 'only_me';
-
 export default function ProfileMentionsSection({
   pins = [],
   collections = [],
@@ -38,7 +36,6 @@ export default function ProfileMentionsSection({
   accountImageUrl,
 }: ProfileMentionsSectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('all');
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createCoordinates, setCreateCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [localPins, setLocalPins] = useState<ProfilePin[]>(pins || []);
@@ -53,18 +50,13 @@ export default function ProfileMentionsSection({
   }, [pins]);
 
 
-  // Filter pins based on search, visibility, and collection
+  // Filter pins based on search and collection
   const filteredPins = useMemo(() => {
     let filtered = localPins;
 
     // Apply collection filter
     if (selectedCollectionId) {
       filtered = filtered.filter((pin) => pin.collection_id === selectedCollectionId);
-    }
-
-    // Apply visibility filter (only for owners)
-    if (isOwnProfile && visibilityFilter !== 'all') {
-      filtered = filtered.filter((pin) => pin.visibility === visibilityFilter);
     }
 
     // Apply search filter
@@ -78,7 +70,7 @@ export default function ProfileMentionsSection({
     }
 
     return filtered;
-  }, [localPins, searchQuery, visibilityFilter, isOwnProfile, selectedCollectionId]);
+  }, [localPins, searchQuery, selectedCollectionId]);
 
 
   const handleMentionCreated = (mention?: Mention) => {
@@ -109,9 +101,6 @@ export default function ProfileMentionsSection({
 
   return (
     <div className="space-y-3">
-      {/* Map */}
-      <ProfileMap pins={filteredPins} />
-
       {/* Create Mention Modal */}
       {isOwnProfile && (
         <CreateMentionModal
@@ -135,42 +124,6 @@ export default function ProfileMentionsSection({
             className="w-full pl-8 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
           />
         </div>
-
-        {/* Visibility Filter - Only for owners */}
-        {isOwnProfile && (
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => setVisibilityFilter('all')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                visibilityFilter === 'all'
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setVisibilityFilter('public')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                visibilityFilter === 'public'
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Public
-            </button>
-            <button
-              onClick={() => setVisibilityFilter('only_me')}
-              className={`px-2 py-1 text-xs rounded transition-colors ${
-                visibilityFilter === 'only_me'
-                  ? 'bg-gray-200 text-gray-900 font-medium'
-                  : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              Private
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Profile Map - Public Pins Only */}
@@ -190,17 +143,13 @@ export default function ProfileMentionsSection({
 
       {/* Mentions List */}
       <ProfilePinsList
-        pins={localPins}
+        pins={filteredPins}
         collections={collections}
         isOwnProfile={isOwnProfile}
         onPinClick={onPinClick}
         onPinUpdated={() => {
           onPinUpdated?.();
         }}
-        searchQuery={searchQuery}
-        visibilityFilter={visibilityFilter}
-        onSearchQueryChange={setSearchQuery}
-        onVisibilityFilterChange={setVisibilityFilter}
       />
     </div>
   );

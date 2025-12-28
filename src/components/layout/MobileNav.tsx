@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -10,14 +10,65 @@ import { useAuthStateSafe } from '@/features/auth';
 import { getMobileNavItems, type MobileNavItemId } from '@/features/sidebar/config/mobileNavConfig';
 import { useResponsiveNavItems } from './useResponsiveNavItems';
 import MobileNavMorePopup from './MobileNavMorePopup';
-import type { MapboxMapInstance } from '@/types/mapbox-events';
+
+// Constants
+const NAV_ITEM_MIN_WIDTH = 60;
+const NAV_CONTAINER_PADDING = 16;
+const NAV_MORE_BUTTON_WIDTH = 60;
+
+// Types
+interface BaseNavItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  iconSolid?: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+}
+
+interface ButtonNavItem extends BaseNavItem {
+  type: 'button';
+  onClick: () => void;
+}
+
+interface LinkNavItem extends BaseNavItem {
+  type: 'link';
+  href: string;
+  onClick?: () => void;
+}
+
+type NavItem = ButtonNavItem | LinkNavItem;
 
 interface MobileNavProps {
   onCreateClick?: () => void;
   isCreateActive?: boolean;
   onSecondaryContentClick?: (itemId: MobileNavItemId) => void;
   activeSecondaryContent?: MobileNavItemId | null;
-  map?: MapboxMapInstance | null;
+}
+
+// Profile Avatar Component
+function ProfileAvatar({ 
+  account, 
+  isActive 
+}: { 
+  account: { image_url?: string | null; username?: string | null } | null; 
+  isActive: boolean;
+}) {
+  return (
+    <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border ${isActive ? 'border-gray-900' : 'border-gray-300'}`}>
+      {account?.image_url ? (
+        <Image
+          src={account.image_url}
+          alt={account.username || 'Profile'}
+          width={20}
+          height={20}
+          className="w-full h-full object-cover"
+          unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+        />
+      ) : (
+        <UserIcon className={`w-3 h-3 ${isActive ? 'text-gray-900' : 'text-gray-500'}`} />
+      )}
+    </div>
+  );
 }
 
 export default function MobileNav({ 
@@ -25,8 +76,7 @@ export default function MobileNav({
   isCreateActive = false,
   onSecondaryContentClick,
   activeSecondaryContent = null,
-  map,
-}: MobileNavProps = {}) {
+}: MobileNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { account } = useAuthStateSafe();
@@ -38,55 +88,57 @@ export default function MobileNav({
   const secondaryNavItems = getMobileNavItems(account);
 
   // Handle profile click - remove URL parameters
-  const handleProfileClick = (e?: React.MouseEvent) => {
+  const handleProfileClick = useCallback((e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
     }
     router.push(profileHref);
-  };
+  }, [router, profileHref]);
 
   // Build all nav items (Secondary items, Create, Profile)
-  const allNavItems = [
-    ...secondaryNavItems.map(item => ({
-      id: item.id,
-      type: 'button' as const,
-      label: item.label,
-      icon: item.icon,
-      iconSolid: item.iconSolid,
-      isActive: activeSecondaryContent === item.id,
-      onClick: () => onSecondaryContentClick?.(item.id),
-    })),
-    ...(onCreateClick ? [{
-      id: 'create',
-      type: 'button' as const,
-      label: 'Create',
-      icon: PlusIcon,
-      iconSolid: PlusIcon,
-      isActive: isCreateActive,
-      onClick: onCreateClick,
-    }] : []),
-    // Only show profile if user is logged in
-    ...(account ? [{
-      id: 'profile',
-      type: 'link' as const,
-      href: profileHref,
-      label: 'Profile',
-      icon: UserIcon,
-      iconSolid: UserIcon,
-      isActive: isProfileActive,
-      onClick: handleProfileClick,
-    }] : []),
-  ];
+  const allNavItems = useMemo<NavItem[]>(() => {
+    const items: NavItem[] = [
+      ...secondaryNavItems.map<ButtonNavItem>(item => ({
+        id: item.id,
+        type: 'button',
+        label: item.label,
+        icon: item.icon,
+        iconSolid: item.iconSolid,
+        isActive: activeSecondaryContent === item.id,
+        onClick: () => onSecondaryContentClick?.(item.id),
+      })),
+      ...(onCreateClick ? [{
+        id: 'create',
+        type: 'button' as const,
+        label: 'Create',
+        icon: PlusIcon,
+        iconSolid: PlusIcon,
+        isActive: isCreateActive,
+        onClick: onCreateClick,
+      } as ButtonNavItem] : []),
+      ...(account ? [{
+        id: 'profile',
+        type: 'link' as const,
+        href: profileHref,
+        label: 'Profile',
+        icon: UserIcon,
+        iconSolid: UserIcon,
+        isActive: isProfileActive,
+        onClick: handleProfileClick,
+      } as LinkNavItem] : []),
+    ];
+    return items;
+  }, [secondaryNavItems, activeSecondaryContent, onSecondaryContentClick, onCreateClick, isCreateActive, account, profileHref, isProfileActive, handleProfileClick]);
 
   // Calculate visible vs overflow items
   const { visibleItems, overflowItems, containerRef } = useResponsiveNavItems(allNavItems, {
-    minItemWidth: 60,
-    containerPadding: 16,
-    moreButtonWidth: 60,
+    minItemWidth: NAV_ITEM_MIN_WIDTH,
+    containerPadding: NAV_CONTAINER_PADDING,
+    moreButtonWidth: NAV_MORE_BUTTON_WIDTH,
   });
 
   // Render nav item
-  const renderNavItem = (item: typeof allNavItems[0]) => {
+  const renderNavItem = (item: NavItem) => {
     const Icon = item.isActive && item.iconSolid ? item.iconSolid : item.icon;
     const baseClasses = "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors";
 
@@ -98,35 +150,12 @@ export default function MobileNav({
             key={item.id}
             onClick={item.onClick}
             className={baseClasses}
+            aria-label={item.label}
           >
-            {item.id === 'profile' ? (
-              <>
-                <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border ${item.isActive ? 'border-gray-900' : 'border-gray-300'}`}>
-                  {account?.image_url ? (
-                    <Image
-                      src={account.image_url}
-                      alt={account.username || 'Profile'}
-                      width={20}
-                      height={20}
-                      className="w-full h-full object-cover"
-                      unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-                    />
-                  ) : (
-                    <UserIcon className={`w-3 h-3 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
-                  )}
-                </div>
-                <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                  {item.label}
-                </span>
-              </>
-            ) : (
-              <>
-                <Icon className={`w-5 h-5 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
-                <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                  {item.label}
-                </span>
-              </>
-            )}
+            <ProfileAvatar account={account} isActive={item.isActive} />
+            <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+              {item.label}
+            </span>
           </button>
         );
       }
@@ -134,25 +163,13 @@ export default function MobileNav({
       return (
         <Link
           key={item.id}
-          href={item.href!}
+          href={item.href}
           className={baseClasses}
+          aria-label={item.label}
         >
           {item.id === 'profile' ? (
             <>
-              <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border ${item.isActive ? 'border-gray-900' : 'border-gray-300'}`}>
-                {account?.image_url ? (
-                  <Image
-                    src={account.image_url}
-                    alt={account.username || 'Profile'}
-                    width={20}
-                    height={20}
-                    className="w-full h-full object-cover"
-                    unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-                  />
-                ) : (
-                  <UserIcon className={`w-3 h-3 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
-                )}
-              </div>
+              <ProfileAvatar account={account} isActive={item.isActive} />
               <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
                 {item.label}
               </span>
@@ -174,6 +191,7 @@ export default function MobileNav({
         key={item.id}
         onClick={item.onClick}
         className={baseClasses}
+        aria-label={item.label}
       >
         {item.id === 'create' ? (
           <>
@@ -204,18 +222,20 @@ export default function MobileNav({
   };
 
   // Prepare overflow items for popup
-  const overflowPopupItems = overflowItems.map(item => ({
-    id: item.id,
-    label: item.label,
-    icon: item.icon,
-    iconSolid: item.iconSolid,
-    isActive: item.isActive,
-    onClick: item.type === 'link' 
-      ? (item.id === 'profile' && item.onClick) 
-        ? () => item.onClick?.()
-        : () => router.push(item.href!)
-      : item.onClick || (() => {}),
-  }));
+  const overflowPopupItems = useMemo(() => {
+    return overflowItems.map(item => ({
+      id: item.id,
+      label: item.label,
+      icon: item.icon,
+      iconSolid: item.iconSolid,
+      isActive: item.isActive,
+      onClick: item.type === 'link' 
+        ? (item.id === 'profile' && item.onClick) 
+          ? () => item.onClick?.()
+          : () => router.push(item.href)
+        : item.onClick,
+    }));
+  }, [overflowItems, router]);
 
   return (
     <>
@@ -233,6 +253,7 @@ export default function MobileNav({
             <button
               onClick={() => setIsMoreOpen(true)}
               className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors"
+              aria-label="More navigation options"
             >
               {isMoreOpen ? (
                 <EllipsisHorizontalIconSolid className="w-5 h-5 text-gray-900" />

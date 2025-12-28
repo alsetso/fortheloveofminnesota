@@ -83,7 +83,7 @@ export function useResponsiveNavItems<T>(
       resizeObserver.disconnect();
       window.removeEventListener('resize', calculateVisibleItems);
     };
-  }, [items.length, minItemWidth, containerPadding, gap, moreButtonWidth]);
+  }, [items, minItemWidth, containerPadding, gap, moreButtonWidth]);
 
   const visibleItems = items.slice(0, visibleCount);
   const overflowItems = items.slice(visibleCount);

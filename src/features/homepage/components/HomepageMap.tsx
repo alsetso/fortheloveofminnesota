@@ -373,7 +373,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
               setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
             }}
             activeSecondaryContent={activeSecondaryContent}
-            map={mapInstanceRef.current}
           />
         )}
 

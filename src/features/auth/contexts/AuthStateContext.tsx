@@ -83,12 +83,14 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
   // Track previous account ID to detect changes
   const previousAccountIdRef = useRef<string | null>(null);
 
-  // Load active account ID from localStorage on mount
+  // Load active account ID from localStorage on mount and set cookie
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
       if (stored) {
         setActiveAccountIdState(stored);
+        // Set cookie so server-side can access active account ID
+        document.cookie = `active_account_id=${stored}; path=/; SameSite=Strict; max-age=31536000`;
       }
     }
   }, []);
@@ -168,6 +170,8 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
       setActiveAccountIdState(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+        // Clear the cookie
+        document.cookie = 'active_account_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
       }
       return;
     }
@@ -183,6 +187,8 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
           if (stored) {
             accountId = stored;
             setActiveAccountIdState(stored);
+            // Set cookie so server-side can access active account ID
+            document.cookie = `active_account_id=${stored}; path=/; SameSite=Strict; max-age=31536000`;
           }
         }
 
@@ -194,6 +200,8 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
             setActiveAccountIdState(accountId);
             if (typeof window !== 'undefined') {
               localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, accountId);
+              // Set cookie so server-side can access active account ID
+              document.cookie = `active_account_id=${accountId}; path=/; SameSite=Strict; max-age=31536000`;
             }
           }
           if (needsOnboarding) {
@@ -309,11 +317,18 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
       
       setUser(null);
       setAccount(null);
+      setActiveAccountIdState(null);
       
       // Clear session storage
       localStorage.removeItem('freemap_sessions');
       localStorage.removeItem('freemap_current_session');
       localStorage.removeItem('freemap_api_usage');
+      localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+      
+      // Clear the active account cookie
+      if (typeof window !== 'undefined') {
+        document.cookie = 'active_account_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
+      }
     } finally {
       setIsLoading(false);
     }
@@ -354,6 +369,8 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
         setAccount(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+          // Clear the cookie
+          document.cookie = 'active_account_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
           window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId: null, account: null } }));
         }
         return;
@@ -379,6 +396,9 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     setActiveAccountIdState(accountId);
     if (typeof window !== 'undefined') {
       localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, accountId);
+      // Set cookie so server-side can access active account ID
+      // Use SameSite=Strict for security, path=/ to make it available site-wide
+      document.cookie = `active_account_id=${accountId}; path=/; SameSite=Strict; max-age=31536000`; // 1 year
     }
     // useEffect automatically loads account when activeAccountId changes
   }, [user, activeAccountId]);

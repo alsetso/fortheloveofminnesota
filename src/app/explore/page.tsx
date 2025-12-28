@@ -289,42 +289,42 @@ export default async function ExplorePage() {
             <div className="mt-3 bg-white rounded-md border border-gray-200 p-[10px]">
               <h3 className="text-xs font-semibold text-gray-900 mb-2">Map Legend</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <div className="flex items-center gap-1.5">
+                <Link href="/explore/atlas/cities" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/city.png" alt="City" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Cities</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Cities</span>
+                </Link>
+                <Link href="/explore/atlas/neighborhoods" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/neighborhood.png" alt="Neighborhood" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Neighborhoods</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Neighborhoods</span>
+                </Link>
+                <Link href="/explore/atlas/parks" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/park_like.png" alt="Park" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Parks</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Parks</span>
+                </Link>
+                <Link href="/explore/atlas/schools" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/education.png" alt="School" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Schools</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Schools</span>
+                </Link>
+                <Link href="/explore/atlas/lakes" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/lakes.png" alt="Lake" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Lakes</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Lakes</span>
+                </Link>
+                <Link href="/explore/atlas/churches" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/churches.png" alt="Church" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Churches</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Churches</span>
+                </Link>
+                <Link href="/explore/atlas/hospitals" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/hospital.png" alt="Hospital" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Hospitals</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Hospitals</span>
+                </Link>
+                <Link href="/explore/atlas/golf_courses" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/golf courses.png" alt="Golf Course" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Golf Courses</span>
-                </div>
-                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Golf Courses</span>
+                </Link>
+                <Link href="/explore/atlas/municipals" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
                   <img src="/municiples.png" alt="Municipal" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600">Municipals</span>
-                </div>
+                  <span className="text-xs text-gray-600 hover:text-gray-900">Municipals</span>
+                </Link>
               </div>
             </div>
           </div>

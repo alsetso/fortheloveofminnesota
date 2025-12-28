@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { PlusIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import { useAuthStateSafe } from '@/features/auth';
@@ -29,6 +30,7 @@ interface AccountsResponse {
 }
 
 export default function ProfilesClient() {
+  const router = useRouter();
   const { activeAccountId, setActiveAccountId, refreshAccount } = useAuthStateSafe();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +137,8 @@ export default function ProfilesClient() {
     setSwitchingAccount(accountId);
     try {
       await setActiveAccountId(accountId);
+      // Refresh server components to pick up the new active account cookie
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to switch account');
     } finally {

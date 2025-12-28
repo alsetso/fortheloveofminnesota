@@ -1,24 +1,21 @@
 import React from 'react';
 import {
   GlobeAltIcon,
-  NewspaperIcon,
   QuestionMarkCircleIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import {
   GlobeAltIcon as GlobeAltIconSolid,
-  NewspaperIcon as NewspaperIconSolid,
   QuestionMarkCircleIcon as QuestionMarkCircleIconSolid,
   Cog6ToothIcon as Cog6ToothIconSolid,
 } from '@heroicons/react/24/solid';
 import ExploreSecondaryContent from '../components/ExploreSecondaryContent';
-import NewsSecondaryContent from '../components/NewsSecondaryContent';
 import FAQsSecondaryContent from '../components/FAQsSecondaryContent';
 import Map3DControlsSecondaryContent from '../components/Map3DControlsSecondaryContent';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import type { Account } from '@/features/auth';
 
-export type MobileNavItemId = 'explore' | 'news' | 'faqs' | 'controls';
+export type MobileNavItemId = 'explore' | 'faqs' | 'controls';
 
 export interface MobileNavItemConfig {
   id: MobileNavItemId;
@@ -54,13 +51,6 @@ export const mobileNavConfig: MobileNavItemConfig[] = [
         onPointsOfInterestVisibilityChange={onPointsOfInterestVisibilityChange}
       />
     ),
-  },
-  {
-    id: 'news',
-    label: 'News',
-    icon: NewspaperIcon,
-    iconSolid: NewspaperIconSolid,
-    getContent: () => <NewsSecondaryContent />,
   },
   {
     id: 'faqs',

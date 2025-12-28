@@ -51,13 +51,33 @@ export const getServerAuth = cache(async (): Promise<ServerAuthUser | null> => {
       return null;
     }
 
-    // Get account role - query by user_id (accounts.id is a separate UUID, user_id references auth.users)
-    const { data: accountData, error: accountError } = await supabase
-      .from('accounts')
-      .select('role, first_name, last_name')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
+    // Get active account ID from cookie (set by client when switching accounts)
+    const activeAccountIdCookie = cookieStore.get('active_account_id');
+    const activeAccountId = activeAccountIdCookie?.value || null;
+
+    // Get account role - use active account ID if available, otherwise get first account
+    let accountData, accountError;
+    if (activeAccountId) {
+      // Verify the active account belongs to this user before using it
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('role, first_name, last_name')
+        .eq('id', activeAccountId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      accountData = data;
+      accountError = error;
+    } else {
+      // Fallback to first account if no active account ID in cookie
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('role, first_name, last_name')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      accountData = data;
+      accountError = error;
+    }
 
     if (accountError) {
       console.error('Error fetching account:', accountError);

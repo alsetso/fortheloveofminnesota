@@ -106,6 +106,8 @@ export default function AccountDropdown({
       }
       await setActiveAccountId(accountId);
       setIsOpen(false);
+      // Refresh server components to pick up the new active account cookie
+      router.refresh();
     } catch (error) {
       console.error('Error switching account:', error);
     }

@@ -10,6 +10,7 @@ import {
   GlobeAltIcon,
   UserIcon,
   QuestionMarkCircleIcon,
+  NewspaperIcon,
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import AppSearch from '@/features/search/components/AppSearch';
@@ -49,6 +50,7 @@ export default function SimpleNav() {
   const navLinks = [
     { href: '/', label: 'Home', icon: HomeIcon },
     { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
+    { href: '/news', label: 'News', icon: NewspaperIcon },
     { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
   ];
 

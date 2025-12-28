@@ -111,6 +111,14 @@ interface LocationSidebarProps {
   isOpen?: boolean;
   onLocationSelect?: (coordinates: { lat: number; lng: number }) => void;
   onPinClick?: (pinData: { id: string; name: string; coordinates: { lat: number; lng: number }; address?: string; description?: string }) => void;
+  selectedAtlasEntity?: {
+    id: string;
+    name: string;
+    table_name: string;
+    lat: number;
+    lng: number;
+  } | null;
+  onAtlasEntityClear?: () => void;
 }
 
 export default function LocationSidebar({ 
@@ -119,6 +127,8 @@ export default function LocationSidebar({
   isOpen = true,
   onLocationSelect,
   onPinClick,
+  selectedAtlasEntity: propSelectedAtlasEntity,
+  onAtlasEntityClear,
 }: LocationSidebarProps) {
   // Feature flag: Show location details accordion (hidden but logic preserved)
   const SHOW_LOCATION_DETAILS = false;
@@ -215,9 +225,9 @@ export default function LocationSidebar({
   // Atlas entity state
   const [atlasEntityData, setAtlasEntityData] = useState<Record<string, any> | null>(null);
   const [atlasEntityTableName, setAtlasEntityTableName] = useState<string | null>(null);
+  const [atlasEntityTypeData, setAtlasEntityTypeData] = useState<Record<string, any> | null>(null);
   const [atlasEntityLoading, setAtlasEntityLoading] = useState(false);
   const [atlasEntityError, setAtlasEntityError] = useState<string | null>(null);
-  const pendingAtlasEventRef = useRef<{ id: string; name: string; table_name: string; lat: number; lng: number } | null>(null);
   
   // Inline pin creation form state
   const [isDropHeartExpanded, setIsDropHeartExpanded] = useState(false);
@@ -290,6 +300,9 @@ export default function LocationSidebar({
       type: 'map-click', // Mark as map-click to distinguish from search
     });
     
+    // Expand the form to show atlas meta
+    setIsDropHeartExpanded(true);
+    
     // Reset accordion states
     setIsAtlasEntityOpen(false);
     setIsAtlasEntityRawOpen(false);
@@ -328,6 +341,32 @@ export default function LocationSidebar({
         
         setAtlasEntityData(data);
         setAtlasEntityTableName(eventData.table_name);
+        console.log('[FloatingMapContainer] Entity data fetched:', data);
+        console.log('[FloatingMapContainer] Table name:', eventData.table_name);
+        
+        // Fetch atlas_types metadata for this table
+        try {
+          console.log('[FloatingMapContainer] Fetching atlas type for slug:', eventData.table_name);
+          const { data: typeData, error: typeError } = await (supabase as any)
+            .schema('atlas')
+            .from('atlas_types')
+            .select('*')
+            .eq('slug', eventData.table_name)
+            .single();
+          
+          console.log('[FloatingMapContainer] Atlas type fetch result:', { typeData, typeError });
+          
+          if (!typeError && typeData) {
+            setAtlasEntityTypeData(typeData);
+            console.log('[FloatingMapContainer] Atlas type data set:', typeData);
+          } else {
+            console.warn('[FloatingMapContainer] No atlas type data found or error:', typeError);
+            setAtlasEntityTypeData(null);
+          }
+        } catch (err) {
+          console.error('[FloatingMapContainer] Error fetching atlas type:', err);
+          setAtlasEntityTypeData(null);
+        }
       } catch (err) {
         // Don't set error if request was aborted
         if (err instanceof Error && err.name === 'AbortError') {
@@ -338,6 +377,7 @@ export default function LocationSidebar({
         setAtlasEntityError(err instanceof Error ? err.message : 'Failed to load entity data');
         setAtlasEntityData(null);
         setAtlasEntityTableName(null);
+        setAtlasEntityTypeData(null);
         setIsAtlasEntityOpen(false);
         setIsAtlasEntityRawOpen(false);
         atlasEntityCoordinatesRef.current = null;
@@ -351,83 +391,25 @@ export default function LocationSidebar({
     
     fetchEntityData();
   }, []);
-
-  // Listen for atlas-entity-click event to fetch and display entity details
+  
+  // Process selected atlas entity from props
   useEffect(() => {
-    const handleAtlasEntityClick = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        id: string;
-        name: string;
-        table_name: string;
-        emoji: string;
-        lat: number;
-        lng: number;
-      }>;
-      
-      if (!customEvent.detail?.id || !customEvent.detail?.table_name) return;
-      
-      // Cancel any in-flight fetch
-      if (atlasEntityAbortControllerRef.current) {
-        atlasEntityAbortControllerRef.current.abort();
-      }
-      
-      // Clear previous atlas entity data immediately (for atlas pin to atlas pin switching)
+    if (propSelectedAtlasEntity) {
+      processAtlasEntityEvent(propSelectedAtlasEntity);
+    } else {
+      // Clear when entity is deselected
       setAtlasEntityData(null);
       setAtlasEntityTableName(null);
+      setAtlasEntityTypeData(null);
       setAtlasEntityError(null);
       setIsAtlasEntityOpen(false);
       setIsAtlasEntityRawOpen(false);
       atlasEntityCoordinatesRef.current = null;
-      
-      const eventData = {
-        id: customEvent.detail.id,
-        name: customEvent.detail.name,
-        table_name: customEvent.detail.table_name,
-        lat: customEvent.detail.lat,
-        lng: customEvent.detail.lng,
-      };
-      
-      // If sidebar is already open, process immediately
-      // Otherwise, store for processing when sidebar opens
-      if (isOpen) {
-        processAtlasEntityEvent(eventData);
-      } else {
-        pendingAtlasEventRef.current = eventData;
-      }
-    };
-
-    window.addEventListener('atlas-entity-click', handleAtlasEntityClick);
-    return () => {
-      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick);
-    };
-  }, [isOpen, processAtlasEntityEvent]);
+    }
+  }, [propSelectedAtlasEntity, processAtlasEntityEvent]);
 
   // Store atlas entity coordinates to track when location changes
   const atlasEntityCoordinatesRef = useRef<{ lat: number; lng: number } | null>(null);
-
-  // Process pending atlas event when sidebar opens (for cases where event came before sidebar opened)
-  useEffect(() => {
-    if (isOpen && pendingAtlasEventRef.current) {
-      const eventData = pendingAtlasEventRef.current;
-      pendingAtlasEventRef.current = null;
-      processAtlasEntityEvent(eventData);
-    } else if (!isOpen) {
-      // Cancel any in-flight fetch
-      if (atlasEntityAbortControllerRef.current) {
-        atlasEntityAbortControllerRef.current.abort();
-        atlasEntityAbortControllerRef.current = null;
-      }
-      
-      // Clear atlas entity data when sidebar closes
-      setAtlasEntityData(null);
-      setAtlasEntityTableName(null);
-      setAtlasEntityError(null);
-      setIsAtlasEntityOpen(false);
-      setIsAtlasEntityRawOpen(false);
-      pendingAtlasEventRef.current = null;
-      atlasEntityCoordinatesRef.current = null;
-    }
-  }, [isOpen, processAtlasEntityEvent]);
 
   // Clear atlas entity data when location changes to a different location (not from atlas pin)
   useEffect(() => {
@@ -450,6 +432,7 @@ export default function LocationSidebar({
         }
         setAtlasEntityData(null);
         setAtlasEntityTableName(null);
+        setAtlasEntityTypeData(null);
         setIsAtlasEntityOpen(false);
         setIsAtlasEntityRawOpen(false);
         atlasEntityCoordinatesRef.current = null;
@@ -847,10 +830,10 @@ export default function LocationSidebar({
     }
     setAtlasEntityData(null);
     setAtlasEntityTableName(null);
+    setAtlasEntityTypeData(null);
     setAtlasEntityError(null);
     setIsAtlasEntityOpen(false);
     setIsAtlasEntityRawOpen(false);
-    pendingAtlasEventRef.current = null;
     atlasEntityCoordinatesRef.current = null;
 
     // Clear search input after selection
@@ -1059,9 +1042,11 @@ export default function LocationSidebar({
 
       // Include full atlas entity metadata (raw response) if mention is being created on an atlas entity
       // This captures the complete entity data as returned from the API, including all fields
+      // Also includes atlas_types metadata (icon_path, name, description, etc.)
       const atlasMeta = atlasEntityData && atlasEntityTableName ? {
         ...atlasEntityData, // Include the full raw response
         table_name: atlasEntityTableName, // Ensure table_name is included (may not be in API response)
+        type_meta: atlasEntityTypeData || null, // Include atlas_types metadata if available
       } : null;
 
       const mentionData: CreateMentionData = {
@@ -1569,10 +1554,10 @@ export default function LocationSidebar({
       }
       setAtlasEntityData(null);
       setAtlasEntityTableName(null);
+      setAtlasEntityTypeData(null);
       setAtlasEntityError(null);
       setIsAtlasEntityOpen(false);
       setIsAtlasEntityRawOpen(false);
-      pendingAtlasEventRef.current = null;
       atlasEntityCoordinatesRef.current = null;
     }
 
@@ -1781,17 +1766,6 @@ export default function LocationSidebar({
   // Sidebar expands if either location data or selected pin exists, or search is focused
   const hasData = locationData !== null;
   const isExpanded = hasData || isSearchFocused;
-  
-  // Determine width based on state: panels open = wider, expanded = medium, collapsed = narrow
-  const getSidebarWidth = () => {
-    if (isExpanded) {
-      // Has data or search focused - medium
-      return 'w-full lg:w-[500px]';
-    } else {
-      // Collapsed - narrow (default 500px)
-      return 'w-full lg:w-[500px]';
-    }
-  };
 
   // Search input is always in the sidebar
   // When collapsed (no data), background is transparent but search stays visible
@@ -1800,34 +1774,22 @@ export default function LocationSidebar({
 
   return (
     <>
-      {/* Sidebar Container */}
-      <div 
-        className={`
-          fixed bottom-12 lg:bottom-0 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 ease-in-out
-          h-auto max-h-full bg-transparent
-          ${getSidebarWidth()}
-        `}
-        style={{
-          pointerEvents: 'auto',
-          paddingBottom: 'env(safe-area-inset-bottom)',
-        }}
-      >
-        <div className="flex flex-col p-4 lg:p-4">
-        {/* Cursor Tracker - Above sidebar */}
-        <CursorTracker 
-          feature={hoverFeature} 
-          mentionId={hoveredMention?.id || null}
-          mention={hoveredMention?.mention || null}
-          className="mb-2 hidden lg:block" 
-        />
-        
-        {/* Sidebar Card Container - Unified container for toolbar and all dropdowns */}
-        <div className="relative bg-white border border-gray-200 rounded-lg overflow-hidden transition-all duration-300 ease-in-out" style={{ pointerEvents: 'auto', zIndex: 50 }}>
+      <div className="w-full flex flex-col">
+      {/* Cursor Tracker - Above sidebar */}
+      <CursorTracker 
+        feature={hoverFeature} 
+        mentionId={hoveredMention?.id || null}
+        mention={hoveredMention?.mention || null}
+        className="mb-2 hidden lg:block" 
+      />
+      
+      {/* Inline Container - No floating card styling */}
+      <div className="relative w-full bg-transparent overflow-hidden transition-all duration-300 ease-in-out" style={{ pointerEvents: 'auto', zIndex: 50 }}>
           {/* Suggestions Panel - Inline */}
           {showSuggestions && suggestions.length > 0 && (
             <div
               ref={suggestionsRef}
-              className="border-b border-gray-200 max-h-64 overflow-y-auto transition-all duration-300 ease-in-out"
+              className="border-b border-gray-200 max-h-48 overflow-y-auto transition-all duration-300 ease-in-out"
               style={{ pointerEvents: 'auto' }}
             >
               {suggestions.map((feature, index) => (
@@ -1835,21 +1797,21 @@ export default function LocationSidebar({
                   key={feature.id}
                   onClick={() => handleSuggestionSelect(feature)}
                   onMouseEnter={() => setSelectedIndex(index)}
-                  className={`w-full text-left px-4 py-2.5 transition-colors border-b border-gray-100 last:border-b-0 ${
+                  className={`w-full text-left px-2 py-1.5 transition-colors border-b border-gray-100 last:border-b-0 ${
                     selectedIndex === index
                       ? 'bg-gray-50'
                       : 'hover:bg-gray-50'
                   }`}
                 >
-                  <div className="text-sm font-medium text-gray-900">{feature.text}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">{feature.place_name}</div>
+                  <div className="text-xs font-medium text-gray-900">{feature.text}</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">{feature.place_name}</div>
                 </button>
               ))}
             </div>
           )}
 
           {/* Toolbar Row */}
-          <div className="relative flex items-center">
+          <div className="relative flex items-center border-b border-gray-200">
               {/* Screenshot Editor */}
             <MapScreenshotEditor map={map} mapLoaded={mapLoaded} />
 
@@ -1864,7 +1826,7 @@ export default function LocationSidebar({
 
             {/* Search Input */}
             <div className="relative flex-1 border-l border-gray-200">
-              <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+              <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -1889,14 +1851,14 @@ export default function LocationSidebar({
                   }
                 }}
                 placeholder="Search locations..."
-                className={`w-full pl-11 py-3 text-sm bg-transparent border-0 text-gray-900 placeholder-gray-400 focus:outline-none focus:placeholder-gray-300 transition-all ${
-                  searchQuery || isSearching ? 'pr-10' : 'pr-3'
+                className={`w-full pl-8 pr-8 py-2 text-xs bg-transparent border-0 text-gray-900 placeholder-gray-400 focus:outline-none focus:placeholder-gray-300 transition-all ${
+                  searchQuery || isSearching ? 'pr-8' : 'pr-2'
                 }`}
                 style={{ pointerEvents: 'auto', position: 'relative', zIndex: 50 }}
               />
               {isSearching && (
-                <div className="absolute right-3.5 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                  <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
                 </div>
               )}
               {!isSearching && searchQuery && (
@@ -1911,12 +1873,12 @@ export default function LocationSidebar({
                     clearLocation();
                     searchInputRef.current?.focus();
                   }}
-                  className="absolute right-3.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 hover:text-gray-900 transition-colors flex items-center justify-center"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400 hover:text-gray-900 transition-colors flex items-center justify-center"
                   style={{ pointerEvents: 'auto', position: 'absolute', zIndex: 60 }}
                   title="Clear search"
                   type="button"
                 >
-                  <XMarkIcon className="w-4 h-4" />
+                  <XMarkIcon className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -1925,20 +1887,20 @@ export default function LocationSidebar({
           {/* Content Sections - Only shown when expanded and no panel is open */}
           {isExpanded && !showSuggestions && (
             <div
-              className="border-t border-gray-200 overflow-y-auto"
+              className="overflow-y-auto"
               style={{ 
-                maxHeight: 'calc(100vh - 140px)',
+                maxHeight: 'calc(100vh - 200px)',
                 minHeight: 0,
               }}
             >
-              <div className="p-4 space-y-3">
+              <div className="p-2 space-y-2">
 
               {/* Search focused placeholder - shown when no location selected yet */}
               {isSearchFocused && !hasData && (
-                <div className="text-center py-6">
-                  <MapPinIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Search for a location or click on the map</p>
-                  <p className="text-xs text-gray-400 mt-1">Location details will appear here</p>
+                <div className="text-center py-4">
+                  <MapPinIcon className="w-6 h-6 text-gray-300 mx-auto mb-1.5" />
+                  <p className="text-xs text-gray-500">Search for a location or click on the map</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Location details will appear here</p>
                 </div>
               )}
 
@@ -1946,10 +1908,10 @@ export default function LocationSidebar({
                   PRIMARY ACTION: Mention Heart - Inline expandable form
                   ═══════════════════════════════════════════════════════════════ */}
               {locationData && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {/* Expanded Form */}
                   {isDropHeartExpanded && (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {/* Address Header with Back Button */}
                       <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
                         <button
@@ -1989,51 +1951,41 @@ export default function LocationSidebar({
 
                       {/* Metadata Preview Containers */}
                       <div className="space-y-1.5 pb-2">
-                        {/* Atlas Meta Container - Show if atlas entity data exists */}
-                        {atlasEntityData && atlasEntityTableName ? (() => {
-                          const iconPath = ATLAS_ICON_MAP[atlasEntityTableName] || '/custom.png';
-                          const entityLabel = ATLAS_ENTITY_LABELS[atlasEntityTableName] || atlasEntityTableName;
-                          
-                          return (
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
-                              <div className="flex items-center gap-1.5">
-                                {iconPath && (
-                                  <div className="relative w-3 h-3 flex-shrink-0">
-                                    <Image
-                                      src={iconPath}
-                                      alt={atlasEntityTableName}
-                                      width={12}
-                                      height={12}
-                                      className="w-full h-full object-contain"
-                                      unoptimized
-                                    />
-                                  </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-[10px] text-gray-700 truncate">
-                                    {atlasEntityData.name || atlasEntityTableName}
-                                  </span>
-                                  <span className="text-[9px] text-gray-500 ml-1">
-                                    ({entityLabel})
-                                  </span>
-                                </div>
-                              </div>
+                        {/* Debug: Show state values */}
+                        {process.env.NODE_ENV === 'development' && (
+                          <div className="text-[8px] text-gray-400 p-1 bg-gray-50 rounded">
+                            Debug: atlasEntityData={atlasEntityData ? 'exists' : 'null'}, 
+                            atlasEntityTableName={atlasEntityTableName || 'null'},
+                            atlasEntityTypeData={atlasEntityTypeData ? 'exists' : 'null'}
+                          </div>
+                        )}
+                        
+                        {/* Map Meta Container - Show if available */}
+                        {pinFeature && (pinFeature.name || pinFeature.properties?.class || pinFeature.label) && (
+                          <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                            <div className="flex items-center gap-1.5">
+                              {pinFeature.icon && (
+                                <span className="text-xs flex-shrink-0">{pinFeature.icon}</span>
+                              )}
+                              <span className="text-[10px] text-gray-700 truncate">
+                                {pinFeature.name || (pinFeature.properties?.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
+                              </span>
                             </div>
-                          );
-                        })() : (
-                          /* Map Meta Container - Only show if atlas meta is not available */
-                          pinFeature && (pinFeature.name || pinFeature.properties?.class || pinFeature.label) && (
-                            <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
-                              <div className="flex items-center gap-1.5">
-                                {pinFeature.icon && (
-                                  <span className="text-xs flex-shrink-0">{pinFeature.icon}</span>
-                                )}
-                                <span className="text-[10px] text-gray-700 truncate">
-                                  {pinFeature.name || (pinFeature.properties?.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
-                                </span>
-                              </div>
+                          </div>
+                        )}
+                        
+                        {/* Atlas Meta Container - Show if atlas entity data exists (below map meta) */}
+                        {atlasEntityData && atlasEntityTableName && (
+                          <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[10px] text-gray-700 truncate">
+                                {atlasEntityData.name || atlasEntityTableName}
+                              </span>
+                              <span className="text-[9px] text-gray-500 ml-1">
+                                ({atlasEntityTypeData?.name || atlasEntityTableName})
+                              </span>
                             </div>
-                          )
+                          </div>
                         )}
                       </div>
                       
@@ -2047,7 +1999,7 @@ export default function LocationSidebar({
                             }
                           }}
                           maxLength={240}
-                          className="w-full px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none bg-transparent"
+                          className="w-full px-2 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none bg-transparent"
                           placeholder="What's going on here?"
                           rows={5}
                           disabled={isPinSubmitting || isPinUploading}
@@ -2151,7 +2103,7 @@ export default function LocationSidebar({
                         <button
                           onClick={handleSubmitPin}
                           disabled={isPinSubmitting || !pinDescription.trim() || !user}
-                          className="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors disabled:opacity-50"
+                          className="flex-1 px-2 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors disabled:opacity-50"
                         >
                           {isPinSubmitting ? 'Posting...' : 'Post'}
                         </button>
@@ -2175,7 +2127,7 @@ export default function LocationSidebar({
                         // Allow form to expand - username check happens on submit
                         setIsDropHeartExpanded(true);
                       }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors shadow-sm"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors shadow-sm"
                     >
                       <span>Mention</span>
                       <HeartIcon className="w-5 h-5" />
@@ -2395,8 +2347,8 @@ export default function LocationSidebar({
                       className="w-full flex items-center justify-between px-2 py-1.5 text-left hover:bg-gray-50 transition-colors cursor-pointer border-b-0"
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-base flex-shrink-0">{pinFeature.icon}</span>
-                        <span className="text-sm font-medium text-gray-900 truncate">
+                        <span className="text-sm flex-shrink-0">{pinFeature.icon}</span>
+                        <span className="text-xs font-medium text-gray-900 truncate">
                           {pinFeature.name || (pinFeature.properties.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
                         </span>
                       </div>
@@ -2411,8 +2363,8 @@ export default function LocationSidebar({
                   ) : (
                     <div className="w-full flex items-center px-2 py-1.5">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-base flex-shrink-0">{pinFeature.icon}</span>
-                        <span className="text-sm font-medium text-gray-900 truncate">
+                        <span className="text-sm flex-shrink-0">{pinFeature.icon}</span>
+                        <span className="text-xs font-medium text-gray-900 truncate">
                           {pinFeature.name || (pinFeature.properties.class ? pinFeature.properties.class.replace(/_/g, ' ') : pinFeature.label)}
                         </span>
                       </div>
@@ -2499,9 +2451,9 @@ export default function LocationSidebar({
               {atlasEntityData && locationData && !isDropHeartExpanded && (
                 <div className="relative border-b-0">
                   {atlasEntityLoading && (
-                    <div className="text-center py-4">
-                      <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-2" />
-                      <p className="text-xs text-gray-600">Loading entity data...</p>
+                    <div className="text-center py-3">
+                      <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin mx-auto mb-1.5" />
+                      <p className="text-[10px] text-gray-600">Loading entity data...</p>
                     </div>
                   )}
                   
@@ -2538,7 +2490,7 @@ export default function LocationSidebar({
                                   />
                                 </div>
                               )}
-                              <span className="text-sm font-medium text-gray-900 truncate">
+                              <span className="text-xs font-medium text-gray-900 truncate">
                                 {atlasEntityData.name || entityLabel}
                               </span>
                             </div>
@@ -2566,10 +2518,10 @@ export default function LocationSidebar({
                                 </div>
                               )}
                               <div className="flex-1 min-w-0">
-                                <span className="text-sm font-medium text-gray-900 truncate">
+                                <span className="text-xs font-medium text-gray-900 truncate">
                                   {atlasEntityData.name || entityLabel}
                                 </span>
-                                <p className="text-xs text-gray-500">{entityLabel}</p>
+                                <p className="text-[10px] text-gray-500">{entityLabel}</p>
                               </div>
                             </div>
                           </div>
@@ -2711,10 +2663,7 @@ export default function LocationSidebar({
           )}
 
         </div>
-        </div>
       </div>
-
-
 
       {/* Coming Soon Modal */}
       {isComingSoonModalOpen && (

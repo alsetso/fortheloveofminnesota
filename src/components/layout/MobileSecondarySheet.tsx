@@ -49,7 +49,7 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
       {/* Sheet */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out flex flex-col"
+        className="fixed bottom-0 left-0 lg:left-16 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out flex flex-col"
         style={{
           transform: 'translateY(0)',
           height: '80vh',

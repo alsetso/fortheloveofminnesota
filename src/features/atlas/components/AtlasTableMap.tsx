@@ -1,16 +1,14 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
-interface AtlasRecordMapProps {
-  lat: number;
-  lng: number;
-  name: string;
+interface AtlasTableMapProps {
   tableName: string;
+  records: Record<string, any>[];
   height?: string;
   className?: string;
 }
@@ -41,21 +39,78 @@ const ICON_IMAGE_IDS: Record<string, string> = {
   municipals: 'atlas-icon-municipals',
 };
 
-export default function AtlasRecordMap({
-  lat,
-  lng,
-  name,
+export default function AtlasTableMap({
   tableName,
-  height = '300px',
+  records,
+  height = '400px',
   className = '',
-}: AtlasRecordMapProps) {
+}: AtlasTableMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<import('mapbox-gl').Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const iconsLoadedRef = useRef<boolean>(false);
 
+  // Filter records with valid coordinates
+  const recordsWithCoords = useMemo(() => {
+    return records.filter(
+      (record) => record.lat && record.lng && !isNaN(parseFloat(record.lat)) && !isNaN(parseFloat(record.lng))
+    );
+  }, [records]);
+
+  // Update map data when records change
+  useEffect(() => {
+    if (!map.current || !mapLoaded || recordsWithCoords.length === 0) return;
+
+    const updateMapData = async () => {
+      const mapboxMap = map.current as any;
+      const sourceId = 'atlas-table-points';
+
+      // Update source data if source exists
+      if (mapboxMap.getSource(sourceId)) {
+        const geoJsonData = {
+          type: 'FeatureCollection' as const,
+          features: recordsWithCoords.map((record) => ({
+            type: 'Feature' as const,
+            id: record.id,
+            geometry: {
+              type: 'Point' as const,
+              coordinates: [parseFloat(record.lng), parseFloat(record.lat)] as [number, number],
+            },
+            properties: {
+              id: record.id,
+              name: record.name || '',
+              table_name: tableName,
+            },
+          })),
+        };
+
+        const source = mapboxMap.getSource(sourceId) as any;
+        if (source && source.setData) {
+          source.setData(geoJsonData);
+        }
+
+        // Fit bounds to all points if multiple records
+        if (recordsWithCoords.length > 1 && map.current) {
+          const mapbox = await loadMapboxGL();
+          const bounds = new mapbox.LngLatBounds();
+          recordsWithCoords.forEach((record) => {
+            bounds.extend([parseFloat(record.lng), parseFloat(record.lat)]);
+          });
+          map.current.fitBounds(bounds, {
+            padding: 40,
+            duration: 1000,
+          });
+        }
+      }
+    };
+
+    updateMapData();
+  }, [recordsWithCoords, mapLoaded, tableName]);
+
+  // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
-    if (!lat || !lng) return;
+    if (recordsWithCoords.length === 0) return;
 
     if (!MAP_CONFIG.MAPBOX_TOKEN) {
       console.error('Mapbox token missing');
@@ -72,11 +127,21 @@ export default function AtlasRecordMap({
 
         if (!mapContainer.current) return;
 
+        // Calculate center and bounds from records
+        const lngs = recordsWithCoords.map((r) => parseFloat(r.lng));
+        const lats = recordsWithCoords.map((r) => parseFloat(r.lat));
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const centerLng = (minLng + maxLng) / 2;
+        const centerLat = (minLat + maxLat) / 2;
+
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
           style: MAP_CONFIG.MAPBOX_STYLE,
-          center: [lng, lat],
-          zoom: 15,
+          center: [centerLng, centerLat],
+          zoom: recordsWithCoords.length === 1 ? 15 : 10,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
             [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
@@ -93,16 +158,16 @@ export default function AtlasRecordMap({
 
         mapInstance.on('load', async () => {
           const mapboxMap = mapInstance as any;
-          const sourceId = 'atlas-record-point';
-          const pointLayerId = 'atlas-record-point-layer';
-          const labelLayerId = 'atlas-record-label-layer';
+          const sourceId = 'atlas-table-points';
+          const pointLayerId = 'atlas-table-points-layer';
+          const labelLayerId = 'atlas-table-labels-layer';
 
           // Get icon path and image ID for this table
           const iconPath = ICON_MAP[tableName] || '/city.png';
           const imageId = ICON_IMAGE_IDS[tableName] || ICON_IMAGE_IDS.cities;
 
           // Load custom icon image
-          if (!mapboxMap.hasImage(imageId)) {
+          if (!iconsLoadedRef.current && !mapboxMap.hasImage(imageId)) {
             try {
               const img = new Image();
               img.crossOrigin = 'anonymous';
@@ -127,27 +192,28 @@ export default function AtlasRecordMap({
                 const imageData = ctx.getImageData(0, 0, 64, 64);
                 mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
               }
+              iconsLoadedRef.current = true;
             } catch (error) {
-              console.error('[AtlasRecordMap] Failed to load icon:', error);
+              console.error('[AtlasTableMap] Failed to load icon:', error);
             }
           }
 
-          // Create GeoJSON source with single point
+          // Create GeoJSON source with points
           const geoJsonData = {
             type: 'FeatureCollection' as const,
-            features: [
-              {
-                type: 'Feature' as const,
-                geometry: {
-                  type: 'Point' as const,
-                  coordinates: [lng, lat] as [number, number],
-                },
-                properties: {
-                  name,
-                  table_name: tableName,
-                },
+            features: recordsWithCoords.map((record) => ({
+              type: 'Feature' as const,
+              id: record.id,
+              geometry: {
+                type: 'Point' as const,
+                coordinates: [parseFloat(record.lng), parseFloat(record.lat)] as [number, number],
               },
-            ],
+              properties: {
+                id: record.id,
+                name: record.name || '',
+                table_name: tableName,
+              },
+            })),
           };
 
           // Add source
@@ -163,7 +229,19 @@ export default function AtlasRecordMap({
             source: sourceId,
             layout: {
               'icon-image': imageId,
-              'icon-size': 1.0,
+              'icon-size': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 0.15,
+                5, 0.25,
+                10, 0.4,
+                12, 0.5,
+                14, 0.65,
+                16, 0.8,
+                18, 1.0,
+                20, 1.2,
+              ],
               'icon-anchor': 'center',
               'icon-allow-overlap': true,
             },
@@ -189,6 +267,18 @@ export default function AtlasRecordMap({
             },
           });
 
+          // Fit bounds to all points if multiple records
+          if (recordsWithCoords.length > 1) {
+            const bounds = new mapbox.LngLatBounds();
+            recordsWithCoords.forEach((record) => {
+              bounds.extend([parseFloat(record.lng), parseFloat(record.lat)]);
+            });
+            mapInstance.fitBounds(bounds, {
+              padding: 40,
+              duration: 1000,
+            });
+          }
+
           setMapLoaded(true);
           
           // Add 3D building extrusions
@@ -201,14 +291,14 @@ export default function AtlasRecordMap({
           if (map.current) {
             const mapboxMap = map.current as any;
             try {
-              if (mapboxMap.getLayer('atlas-record-label-layer')) {
-                mapboxMap.removeLayer('atlas-record-label-layer');
+              if (mapboxMap.getLayer('atlas-table-labels-layer')) {
+                mapboxMap.removeLayer('atlas-table-labels-layer');
               }
-              if (mapboxMap.getLayer('atlas-record-point-layer')) {
-                mapboxMap.removeLayer('atlas-record-point-layer');
+              if (mapboxMap.getLayer('atlas-table-points-layer')) {
+                mapboxMap.removeLayer('atlas-table-points-layer');
               }
-              if (mapboxMap.getSource('atlas-record-point')) {
-                mapboxMap.removeSource('atlas-record-point');
+              if (mapboxMap.getSource('atlas-table-points')) {
+                mapboxMap.removeSource('atlas-table-points');
               }
             } catch (e) {
               // Ignore cleanup errors
@@ -220,15 +310,15 @@ export default function AtlasRecordMap({
           }
         };
       } catch (error) {
-        console.error('Error initializing atlas record map:', error);
+        console.error('Error initializing atlas table map:', error);
         return undefined;
       }
     };
 
     initMap();
-  }, [lat, lng, name, tableName]);
+  }, [tableName, recordsWithCoords]);
 
-  if (!lat || !lng) {
+  if (recordsWithCoords.length === 0) {
     return null;
   }
 

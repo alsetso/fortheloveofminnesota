@@ -63,7 +63,7 @@ export default function AtlasTableRecordList({
         // Build array of field elements with separators
         // Use record.id with index fallback to ensure uniqueness
         const recordId = record.id || `record-${index}`;
-        const fieldElements: JSX.Element[] = [];
+        const fieldElements: React.ReactElement[] = [];
         
         // Add name (as link to detail page)
         if (record.name) {

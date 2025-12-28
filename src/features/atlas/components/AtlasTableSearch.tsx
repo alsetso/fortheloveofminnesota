@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AtlasTableRecordList from './AtlasTableRecordList';
+import AtlasTableMap from './AtlasTableMap';
 
 interface AtlasTableSearchProps {
   tableName: string;
@@ -51,6 +52,13 @@ export default function AtlasTableSearch({
           Showing {filteredRecords.length} of {records.length} records
         </p>
       )}
+
+      {/* Map */}
+      <AtlasTableMap
+        tableName={tableName}
+        records={filteredRecords}
+        height="400px"
+      />
 
       {/* Records List */}
       <AtlasTableRecordList

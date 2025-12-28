@@ -1,10 +1,12 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { createServerClient } from '@/lib/supabaseServer';
 import { getServerAuth } from '@/lib/authServer';
 import AtlasTableSearch from '@/features/atlas/components/AtlasTableSearch';
+import { getAtlasTypeBySlug } from '@/features/atlas/services/atlasTypesService';
+import AtlasComingSoonModal from '@/features/atlas/components/AtlasComingSoonModal';
 
 export const revalidate = 3600;
 
@@ -99,31 +101,38 @@ export default async function AtlasTablePage({ params }: Props) {
     notFound();
   }
 
-  const config = TABLE_CONFIG[table_name];
+  // Fetch atlas type configuration
+  const atlasType = await getAtlasTypeBySlug(table_name);
+  
+  // Use atlas type config if available, otherwise fallback to hardcoded config
+  const config = atlasType ? {
+    label: atlasType.name,
+    icon: atlasType.icon_path,
+    description: atlasType.description || TABLE_CONFIG[table_name]?.description || '',
+  } : TABLE_CONFIG[table_name];
+
+  if (!config) {
+    notFound();
+  }
+
+  // Check status and control access
+  if (atlasType?.status === 'coming_soon') {
+    // Show coming soon modal (handled by client component)
+  }
   const supabase = createServerClient();
   const auth = await getServerAuth();
   // Only show admin actions if accounts.role is exactly 'admin'
   const isAdmin = auth?.role === 'admin';
 
   // Fetch all records from the atlas table
-  // Cities uses public view, others use atlas schema
-  let records, error;
-  if (table_name === 'cities') {
-    const result = await supabase
-      .from('cities')
-      .select('*')
-      .order('name', { ascending: true });
-    records = result.data;
-    error = result.error;
-  } else {
-    const result = await (supabase as any)
-      .schema('atlas')
-      .from(table_name)
-      .select('*')
-      .order('name', { ascending: true });
-    records = result.data;
-    error = result.error;
-  }
+  // All tables are in atlas schema (cities was moved to atlas schema)
+  const result = await (supabase as any)
+    .schema('atlas')
+    .from(table_name)
+    .select('*')
+    .order('name', { ascending: true });
+  const records = result.data;
+  const error = result.error;
 
   if (error) {
     console.error(`[AtlasTablePage] Error fetching ${table_name}:`, error);
@@ -136,7 +145,8 @@ export default async function AtlasTablePage({ params }: Props) {
   const cityMap: Record<string, string> = {};
   
   if (cityIds.length > 0) {
-    const { data: cities } = await supabase
+    const { data: cities } = await (supabase as any)
+      .schema('atlas')
       .from('cities')
       .select('id, name')
       .in('id', cityIds);
@@ -155,8 +165,12 @@ export default async function AtlasTablePage({ params }: Props) {
   }));
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
-      <div className="max-w-4xl mx-auto">
+    <>
+      {atlasType?.status === 'coming_soon' && (
+        <AtlasComingSoonModal typeName={atlasType.name} />
+      )}
+      <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+        <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <nav className="mb-3" aria-label="Breadcrumb">
           <ol className="flex items-center gap-2 text-xs text-gray-600">
@@ -241,6 +255,7 @@ export default async function AtlasTablePage({ params }: Props) {
         </div>
       </div>
     </SimplePageLayout>
+    </>
   );
 }
 

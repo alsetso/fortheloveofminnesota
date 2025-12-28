@@ -13,8 +13,8 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
 
   const isDark = variant === 'dark';
   const footerClasses = fixed
-    ? `fixed bottom-0 left-0 right-0 z-10 ${isDark ? 'bg-black/50 backdrop-blur-sm text-gray-300 border-t border-white/10' : 'bg-[#f4f2ef] text-gray-700 border-t border-gray-200'}`
-    : `${isDark ? 'bg-black/50 backdrop-blur-sm text-gray-300 mt-auto border-t border-white/10' : 'bg-[#f4f2ef] text-gray-700 mt-auto border-t border-gray-200'}`;
+    ? `fixed bottom-0 left-0 right-0 z-10 ${isDark ? 'bg-[#2b2b2b] text-gray-300 border-t border-[#3a3a3a]' : 'bg-[#f4f2ef] text-gray-700 border-t border-gray-200'}`
+    : `${isDark ? 'bg-[#2b2b2b] text-gray-300 mt-auto border-t border-[#3a3a3a]' : 'bg-[#f4f2ef] text-gray-700 mt-auto border-t border-gray-200'}`;
 
   return (
     <footer className={footerClasses} role="contentinfo">
@@ -63,10 +63,26 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 </li>
                 <li>
                   <Link 
-                    href="/" 
+                    href="/news" 
                     className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
                   >
-                    Feed
+                    News
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/faqs" 
+                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    FAQs
+                  </Link>
+                </li>
+                <li>
+                  <Link 
+                    href="/contact" 
+                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    Contact
                   </Link>
                 </li>
               </ul>
@@ -96,21 +112,13 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                     Settings
                   </Link>
                 </li>
-                <li>
-                  <Link 
-                    href="/contact" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    Contact
-                  </Link>
-                </li>
               </ul>
             </nav>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className={`pt-3 border-t ${isDark ? 'border-white/10' : 'border-gray-200'}`}>
+        <div className={`pt-3 border-t ${isDark ? 'border-[#3a3a3a]' : 'border-gray-200'}`}>
           <div className="flex flex-col md:flex-row items-center justify-between gap-2">
             <p className={`text-xs text-center md:text-left ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
               © {currentYear} For the Love of Minnesota. All rights reserved.

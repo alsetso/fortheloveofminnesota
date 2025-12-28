@@ -51,7 +51,7 @@ export default function MobileNavMorePopup({ isOpen, onClose, items }: MobileNav
       {/* Popup */}
       <div
         ref={popupRef}
-        className="fixed bottom-16 left-0 right-0 z-[60] bg-white rounded-t-2xl transition-transform duration-200 ease-out border-t border-gray-200 flex flex-col"
+        className="fixed bottom-16 left-0 lg:left-16 right-0 z-[60] bg-white rounded-t-2xl transition-transform duration-200 ease-out border-t border-gray-200 flex flex-col"
         style={{
           transform: 'translateY(0)',
           height: '80vh',

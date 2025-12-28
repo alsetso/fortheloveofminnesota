@@ -11,6 +11,9 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import Image from 'next/image';
+import { createServerClient } from '@/lib/supabaseServer';
+import { getLatestNewsGen } from '@/features/news/services/newsService';
+import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
 
 export const metadata: Metadata = {
   title: 'For the Love of Minnesota',
@@ -35,9 +38,92 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Home() {
+export default async function Home() {
+  const supabase = createServerClient();
+  
+  // Fetch visible atlas types from database
+  const visibleTypes = await getVisibleAtlasTypes();
+
+  // Fetch counts for each visible atlas type
+  const countPromises = visibleTypes.map(async (type) => {
+    try {
+      const { count, error } = await supabase
+        .from('atlas_entities')
+        .select('*', { count: 'exact', head: true })
+        .eq('table_name', type.slug)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null);
+      
+      if (error) {
+        console.warn(`[HomePage] Error fetching count for ${type.slug}:`, error);
+        return { slug: type.slug, count: 0 };
+      }
+      
+      return { slug: type.slug, count: count || 0 };
+    } catch (error) {
+      console.error(`[HomePage] Error fetching count for ${type.slug}:`, error);
+      return { slug: type.slug, count: 0 };
+    }
+  });
+
+  const counts = await Promise.all(countPromises);
+  const countMap = counts.reduce((acc, { slug, count }) => {
+    acc[slug] = count;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Fetch latest news
+  const latestNews = await getLatestNewsGen();
+  const apiResponse = latestNews?.api_response as {
+    articles?: Array<{
+      id: string;
+      title: string;
+      link: string;
+      snippet: string;
+      photoUrl?: string;
+      thumbnailUrl?: string;
+      publishedAt?: string;
+      source?: {
+        name?: string;
+      };
+    }>;
+  } | null;
+  const newsArticles = apiResponse?.articles || [];
+
+  // Helper functions for source display
+  const getSourceInitials = (sourceName: string | undefined): string => {
+    if (!sourceName) return 'NEW';
+    const cleaned = sourceName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return cleaned.slice(0, 3) || 'NEW';
+  };
+
+  const getSourceColor = (sourceName: string | undefined): { bg: string; text: string } => {
+    const softColors = [
+      { bg: 'bg-blue-100', text: 'text-blue-700' },
+      { bg: 'bg-green-100', text: 'text-green-700' },
+      { bg: 'bg-purple-100', text: 'text-purple-700' },
+      { bg: 'bg-pink-100', text: 'text-pink-700' },
+      { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+      { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+      { bg: 'bg-teal-100', text: 'text-teal-700' },
+      { bg: 'bg-orange-100', text: 'text-orange-700' },
+      { bg: 'bg-cyan-100', text: 'text-cyan-700' },
+      { bg: 'bg-rose-100', text: 'text-rose-700' },
+      { bg: 'bg-amber-100', text: 'text-amber-700' },
+      { bg: 'bg-violet-100', text: 'text-violet-700' },
+    ];
+
+    if (!sourceName) return softColors[0];
+    let hash = 0;
+    for (let i = 0; i < sourceName.length; i++) {
+      hash = sourceName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % softColors.length;
+    return softColors[index];
+  };
+
   return (
-    <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3">
+    <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3" footerVariant="dark">
       <div className="max-w-4xl mx-auto">
         <div className="space-y-6">
         {/* V4: Community-Focused Hero with Large Desktop Heading */}
@@ -66,13 +152,13 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Archive Mentions Section */}
+        {/* How It Works Section */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900">Archive Your Minnesota Story</h2>
+          <h2 className="text-sm font-semibold text-gray-900">HOW IT WORKS</h2>
           <p className="text-xs text-gray-600">
             Drop pins on the map to archive special places, memories, and moments across Minnesota. Each mention becomes part of your personal collection and the community archive.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
             <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
               <div className="flex items-start gap-2">
                 <MapPinIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
@@ -81,10 +167,6 @@ export default function Home() {
                   <p className="text-xs text-gray-600">
                     Click anywhere on the Minnesota map to drop a pin. Add descriptions, photos, dates, and choose visibility.
                   </p>
-                  <Link href="/map" className="inline-flex items-center gap-1 text-xs font-medium text-gray-900 hover:underline mt-1">
-                    <span>Start archiving</span>
-                    <ArrowRightIcon className="w-3 h-3" />
-                  </Link>
                 </div>
               </div>
             </div>
@@ -99,79 +181,109 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
-              <div className="flex items-start gap-2">
-                <BuildingLibraryIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
-                <div className="space-y-0.5 flex-1">
-                  <p className="text-xs font-medium text-gray-900">Contribute to the Archive</p>
-                  <p className="text-xs text-gray-600">
-                    Every mention adds to Minnesota's collective memory. Public pins help others discover and connect with places across the state.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
-        {/* Atlas Legend */}
+        {/* Atlas Tables Grid */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900">Map Legend</h2>
+          <h2 className="text-sm font-semibold text-gray-900">ATLAS</h2>
           <p className="text-xs text-gray-600">
-            Explore Minnesota's geography with our interactive atlas layers. <Link href="/map" className="text-gray-900 font-medium hover:underline">View on map</Link>
+            Complete directory of all Minnesota atlas layers. Explore comprehensive geographic and demographic datasets covering cities, neighborhoods, schools, parks, lakes, hospitals, churches, and more.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            <Link href="/explore/atlas/cities" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/city.png" alt="City" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Cities</span>
-            </Link>
-            <Link href="/explore/atlas/neighborhoods" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/neighborhood.png" alt="Neighborhood" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Neighborhoods</span>
-            </Link>
-            <Link href="/explore/atlas/parks" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/park_like.png" alt="Park" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Parks</span>
-            </Link>
-            <Link href="/explore/atlas/schools" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/education.png" alt="School" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Schools</span>
-            </Link>
-            <Link href="/explore/atlas/lakes" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/lakes.png" alt="Lake" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Lakes</span>
-            </Link>
-            <Link href="/explore/atlas/churches" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/churches.png" alt="Church" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Churches</span>
-            </Link>
-            <Link href="/explore/atlas/hospitals" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/hospital.png" alt="Hospital" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Hospitals</span>
-            </Link>
-            <Link href="/explore/atlas/golf_courses" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/golf courses.png" alt="Golf Course" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Golf Courses</span>
-            </Link>
-            <Link href="/explore/atlas/municipals" className="flex items-center gap-1.5 transition-colors group">
-              <Image src="/municiples.png" alt="Municipal" width={16} height={16} className="w-4 h-4 flex-shrink-0" unoptimized />
-              <span className="text-xs text-gray-600 group-hover:text-gray-900">Municipals</span>
-            </Link>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {visibleTypes.map((type) => {
+              const count = countMap[type.slug] || 0;
+              return (
+                <Link
+                  key={type.slug}
+                  href={`/explore/atlas/${type.slug}`}
+                  className="bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start gap-2">
+                    {type.icon_path && (
+                      <Image
+                        src={type.icon_path}
+                        alt={type.name}
+                        width={16}
+                        height={16}
+                        className="w-4 h-4 flex-shrink-0 mt-0.5"
+                        unoptimized
+                      />
+                    )}
+                    <div className="flex-1 space-y-0.5">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
+                        {count > 0 && (
+                          <span className="text-[10px] text-gray-500">({count.toLocaleString()})</span>
+                        )}
+                      </div>
+                      {type.description && (
+                        <p className="text-xs text-gray-600">{type.description}</p>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
-        {/* Pro/Business Section */}
-        <section className="bg-gray-900 border border-gray-800 rounded-md p-[10px] space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">For Professionals & Businesses</h2>
-            <span className="text-xs font-medium text-gray-300">$20/mo</span>
-          </div>
-          <p className="text-xs text-gray-400">
-            Pro accounts unlock powerful tools for Minnesota professionals, real estate agents, developers, and businesses.
-          </p>
-          <Link href="/contact" className="inline-flex items-center gap-1 text-xs font-medium text-white hover:text-gray-200 transition-colors">
-            <span>Learn More</span>
-            <ArrowRightIcon className="w-3 h-3" />
-          </Link>
+        {/* News Section */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-900">NEWS</h2>
+          {newsArticles.length > 0 ? (
+            <>
+              <div className="space-y-2">
+                {newsArticles.map((article) => {
+                  const sourceInitials = getSourceInitials(article.source?.name);
+                  const sourceColor = getSourceColor(article.source?.name);
+                  
+                  return (
+                    <Link
+                      key={article.id}
+                      href={article.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex gap-2">
+                        {/* Source Avatar */}
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full ${sourceColor.bg} flex items-center justify-center border border-gray-200`}>
+                          <span className={`text-[10px] font-semibold ${sourceColor.text} leading-none`}>
+                            {sourceInitials}
+                          </span>
+                        </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <h3 className="text-xs font-semibold text-gray-900 line-clamp-2">{article.title}</h3>
+                          {article.snippet && (
+                            <p className="text-xs text-gray-600 line-clamp-2">{article.snippet}</p>
+                          )}
+                          {article.publishedAt && (
+                            <div className="flex items-center gap-1 pt-0.5">
+                              <span className="text-[10px] text-gray-500">
+                                {new Date(article.publishedAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+              <Link
+                href="/news"
+                className="inline-flex items-center gap-1 text-xs font-medium text-gray-900 hover:underline transition-colors"
+              >
+                <span>See More</span>
+                <ArrowRightIcon className="w-3 h-3" />
+              </Link>
+            </>
+          ) : (
+            <p className="text-xs text-gray-600">No news articles available.</p>
+          )}
         </section>
         </div>
       </div>

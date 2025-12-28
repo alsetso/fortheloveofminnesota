@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { ArrowTopRightOnSquareIcon, ClockIcon, MagnifyingGlassIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { hasRemainingCredits, getRemainingCredits, useCredit } from '@/lib/newsRateLimit';
+import Link from 'next/link';
+import { ClockIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
@@ -11,158 +10,112 @@ interface NewsArticle {
   id: string;
   title: string;
   link: string;
-  snippet: string;
-  photoUrl: string | null;
-  thumbnailUrl: string | null;
   publishedAt: string;
-  authors: string[];
   source: {
-    url: string;
     name: string;
-    logoUrl: string | null;
-    faviconUrl: string | null;
-    publicationId: string;
   };
-  relatedTopics: string[];
 }
 
-interface NewsResponse {
-  requestId: string;
-  articles: NewsArticle[];
-  count: number;
+interface LatestNewsResponse {
+  success: boolean;
+  data?: {
+    articles: NewsArticle[];
+    count: number;
+    generatedAt: string;
+    createdAt: string;
+  };
+  error?: string;
 }
-
-interface QueryOption {
-  label: string;
-  query: string;
-}
-
-const MINNESOTA_QUERIES: QueryOption[] = [
-  { label: 'Breaking News', query: 'Breaking news in Minnesota today' },
-  { label: 'Today\'s Events', query: 'What happened in Minnesota today' },
-  { label: 'Local Updates', query: 'Minnesota local news updates' },
-  { label: 'Twin Cities', query: 'Twin Cities breaking news now' },
-  { label: 'Incidents', query: 'Minnesota incidents reported today' },
-  { label: 'Community Alerts', query: 'Minnesota community alerts and notices' },
-  { label: 'Public Safety', query: 'Minnesota public safety news today' },
-  { label: 'Government', query: 'Minnesota government and politics news today' },
-  { label: 'Major Events', query: 'Major events happening in Minnesota today' },
-  { label: 'Latest Headlines', query: 'Latest Minnesota headlines right now' },
-];
 
 export default function NewsSecondaryContent() {
-  const { account, user } = useAuthStateSafe();
-  const { openUpgrade, openWelcome } = useAppModalContextSafe();
-  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
-
-  // Require authentication
-  if (!user) {
-    return (
-      <div className="space-y-3">
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-gray-900">Sign In Required</p>
-            <p className="text-xs text-gray-600">You must be signed in to view news content.</p>
-            <button
-              onClick={() => openWelcome()}
-              className="w-full px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { user } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   
-  const [selectedQuery, setSelectedQuery] = useState<string | null>(null);
   const [articles, setArticles] = useState<NewsArticle[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [remainingCredits, setRemainingCredits] = useState<number>(1);
-  const [customSearchQuery, setCustomSearchQuery] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
-  
-  // Filter parameters
-  const [limit, setLimit] = useState<string>('50');
-  const [timePublished, setTimePublished] = useState<string>('1y');
-  const [source, setSource] = useState<string>('');
-  const [country, setCountry] = useState<string>('US');
-  const [lang, setLang] = useState<string>('en');
+  const [isToday, setIsToday] = useState(false);
 
-  // Update remaining credits on mount and when credits change
+  // Get source initials
+  const getSourceInitials = (sourceName: string | undefined): string => {
+    if (!sourceName) return 'NEW';
+    const cleaned = sourceName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return cleaned.slice(0, 3) || 'NEW';
+  };
+
+  // Get source color
+  const getSourceColor = (sourceName: string | undefined): { bg: string; text: string } => {
+    const softColors = [
+      { bg: 'bg-blue-100', text: 'text-blue-700' },
+      { bg: 'bg-green-100', text: 'text-green-700' },
+      { bg: 'bg-purple-100', text: 'text-purple-700' },
+      { bg: 'bg-pink-100', text: 'text-pink-700' },
+      { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+      { bg: 'bg-indigo-100', text: 'text-indigo-700' },
+      { bg: 'bg-teal-100', text: 'text-teal-700' },
+      { bg: 'bg-orange-100', text: 'text-orange-700' },
+      { bg: 'bg-cyan-100', text: 'text-cyan-700' },
+      { bg: 'bg-rose-100', text: 'text-rose-700' },
+      { bg: 'bg-amber-100', text: 'text-amber-700' },
+      { bg: 'bg-violet-100', text: 'text-violet-700' },
+    ];
+
+    if (!sourceName) return softColors[0];
+    let hash = 0;
+    for (let i = 0; i < sourceName.length; i++) {
+      hash = sourceName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % softColors.length;
+    return softColors[index];
+  };
+
+  // Check if date is today
+  const isDateToday = (dateString: string): boolean => {
+    const date = new Date(dateString);
+    const today = new Date();
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // Fetch latest news
   useEffect(() => {
-    setRemainingCredits(getRemainingCredits());
-  }, []);
+    const fetchLatestNews = async () => {
+      setLoading(true);
+      setError(null);
 
-  const performSearch = async (query: string) => {
-    if (!query.trim()) {
-      setError('Please enter a search query');
-      return;
-    }
+      try {
+        const response = await fetch('/api/news/latest');
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch news');
+        }
 
-    if (selectedQuery === query && articles.length > 0) {
-      // If clicking the same query, clear results
-      setSelectedQuery(null);
-      setArticles([]);
-      return;
-    }
-
-    // Check rate limit before making request
-    if (!hasRemainingCredits()) {
-      setError('Daily search limit reached. You have used your 1 free search credit for today.');
-      return;
-    }
-
-    // Use a credit
-    const creditUsed = useCredit();
-    if (!creditUsed) {
-      setError('Daily search limit reached. You have used your 1 free search credit for today.');
-      return;
-    }
-
-    // Update remaining credits display
-    setRemainingCredits(getRemainingCredits());
-
-    setSelectedQuery(query);
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Build query parameters
-      const params = new URLSearchParams();
-      params.append('query', query);
-      if (limit) params.append('limit', limit);
-      if (timePublished) params.append('time_published', timePublished);
-      if (source.trim()) params.append('source', source.trim());
-      if (country) params.append('country', country);
-      if (lang) params.append('lang', lang);
-
-      const response = await fetch(`/api/news?${params.toString()}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch news');
+        const data: LatestNewsResponse = await response.json();
+        
+        if (data.success && data.data) {
+          setArticles(data.data.articles || []);
+          // Check if news was generated today
+          const generatedToday = isDateToday(data.data.generatedAt || data.data.createdAt);
+          setIsToday(generatedToday);
+        } else {
+          setArticles([]);
+          setIsToday(false);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load news');
+        setArticles([]);
+        setIsToday(false);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const data: NewsResponse = await response.json();
-      setArticles(data.articles || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load news');
-      setArticles([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQueryClick = async (query: string) => {
-    await performSearch(query);
-  };
-
-  const handleCustomSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await performSearch(customSearchQuery.trim());
-  };
+    fetchLatestNews();
+  }, []);
 
   const formatDate = (dateString: string) => {
     try {
@@ -188,274 +141,93 @@ export default function NewsSecondaryContent() {
     }
   };
 
-  const hasCredits = remainingCredits > 0;
+  // Require authentication
+  if (!user) {
+    return (
+      <div className="space-y-3">
+        <div className="px-2 py-1.5">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-gray-900">Sign In Required</p>
+            <p className="text-xs text-gray-600">You must be signed in to view news content.</p>
+            <button
+              onClick={() => openWelcome()}
+              className="w-full px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
-      {/* Search Queries */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-gray-900">Minnesota News</h3>
-          <span className="text-xs text-gray-500">
-            {remainingCredits} search credit{remainingCredits !== 1 ? 's' : ''}
-          </span>
-        </div>
+      <div>
+        <div className="text-xs text-gray-600 font-medium mb-2">Today's News</div>
         
-        {/* Custom Search Input */}
-        <form onSubmit={handleCustomSearch} className="space-y-1.5">
-          <div className="relative">
-            <input
-              type="text"
-              value={customSearchQuery}
-              onChange={(e) => setCustomSearchQuery(e.target.value)}
-              placeholder="Search news..."
-              disabled={loading || !hasCredits}
-              className={`
-                w-full px-2 py-1.5 pr-8 rounded-md text-xs border border-gray-200
-                focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300
-                disabled:opacity-50 disabled:cursor-not-allowed
-                ${hasCredits ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-500'}
-              `}
-            />
-            <button
-              type="submit"
-              disabled={loading || !hasCredits || !customSearchQuery.trim()}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <MagnifyingGlassIcon className="w-3 h-3" />
-            </button>
+        {/* Loading State */}
+        {loading && (
+          <div className="px-2 py-1.5">
+            <p className="text-xs text-gray-600">Loading news...</p>
           </div>
-          
-          {/* Filters Toggle */}
-          <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <span>Filters</span>
-            {showFilters ? (
-              <ChevronUpIcon className="w-3 h-3" />
-            ) : (
-              <ChevronDownIcon className="w-3 h-3" />
-            )}
-          </button>
-          
-          {/* Filters Panel */}
-          {showFilters && (
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px] space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                {/* Limit */}
-                <div className="space-y-0.5">
-                  <label className="text-xs text-gray-600">Limit</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="500"
-                    value={limit}
-                    onChange={(e) => setLimit(e.target.value)}
-                    disabled={loading || !hasCredits}
-                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
-                
-                {/* Time Published */}
-                <div className="space-y-0.5">
-                  <label className="text-xs text-gray-600">Time Published</label>
-                  <select
-                    value={timePublished}
-                    onChange={(e) => setTimePublished(e.target.value)}
-                    disabled={loading || !hasCredits}
-                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="anytime">Anytime</option>
-                    <option value="1h">Last Hour</option>
-                    <option value="24h">Last 24 Hours</option>
-                    <option value="7d">Last 7 Days</option>
-                    <option value="30d">Last 30 Days</option>
-                    <option value="1y">Last Year</option>
-                  </select>
-                </div>
-                
-                {/* Country */}
-                <div className="space-y-0.5">
-                  <label className="text-xs text-gray-600">Country</label>
-                  <input
-                    type="text"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    placeholder="US"
-                    disabled={loading || !hasCredits}
-                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
-                
-                {/* Language */}
-                <div className="space-y-0.5">
-                  <label className="text-xs text-gray-600">Language</label>
-                  <input
-                    type="text"
-                    value={lang}
-                    onChange={(e) => setLang(e.target.value)}
-                    placeholder="en"
-                    disabled={loading || !hasCredits}
-                    className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                </div>
-              </div>
-              
-              {/* Source */}
-              <div className="space-y-0.5">
-                <label className="text-xs text-gray-600">Source Domain (optional)</label>
-                <input
-                  type="text"
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                  placeholder="e.g., cnn.com"
-                  disabled={loading || !hasCredits}
-                  className="w-full px-2 py-1 rounded-md text-xs border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-gray-300 focus:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-            </div>
-          )}
-        </form>
+        )}
 
-        <div className="flex flex-wrap gap-1.5">
-          {MINNESOTA_QUERIES.map((option) => {
-            const isActive = selectedQuery === option.query;
-            const isLoading = loading && selectedQuery === option.query;
-            
-            return (
-              <button
-                key={option.query}
-                onClick={() => handleQueryClick(option.query)}
-                disabled={loading || !hasCredits}
-                className={`
-                  px-2 py-1 rounded-md text-xs transition-colors
-                  ${
-                    isActive
-                      ? 'bg-gray-200 text-gray-900 font-medium'
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900 border border-gray-200'
-                  }
-                  ${(loading && !isLoading) || !hasCredits ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                {isLoading ? 'Loading...' : option.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Loading State */}
-      {loading && (
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <p className="text-xs text-gray-600">Loading news...</p>
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="bg-white border border-red-200 rounded-md p-[10px]">
-          <p className="text-xs text-red-600">{error}</p>
-        </div>
-      )}
-
-      {/* Upgrade CTA when credits are used */}
-      {!isPro && remainingCredits === 0 && (
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <div className="space-y-2">
-            <div>
-              <p className="text-xs font-medium text-gray-900">Daily search limit reached</p>
-              <p className="text-xs text-gray-600 mt-0.5">You've used your 1 free search credit for today.</p>
-            </div>
-            <button
-              onClick={() => openUpgrade('news-search')}
-              className="w-full px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
-            >
-              Upgrade to Pro for Unlimited Searches
-            </button>
+        {/* Error State or No News Today */}
+        {!loading && (!isToday || articles.length === 0) && (
+          <div className="px-2 py-1.5">
+            <p className="text-xs text-gray-600">Our admin is still asleep.</p>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Articles */}
-      {!loading && articles.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-gray-900">
-              Results ({articles.length})
-            </h3>
-            <span className="text-xs text-gray-500">{selectedQuery}</span>
-          </div>
-          <div className="space-y-2">
+        {/* Articles */}
+        {!loading && isToday && articles.length > 0 && (
+          <div className="space-y-0.5">
             {articles.map((article) => {
-              const imageUrl = article.thumbnailUrl || article.photoUrl;
+              const sourceColor = getSourceColor(article.source?.name);
+              const sourceInitials = getSourceInitials(article.source?.name);
               
               return (
-                <div
+                <a
                   key={article.id}
-                  className="bg-white border border-gray-200 rounded-md p-[10px]"
+                  href={article.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2 px-2 py-1.5 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                 >
-                  <div className="flex gap-2">
-                    {/* Image */}
-                    {imageUrl && (
-                      <div className="flex-shrink-0 w-16 h-16 relative rounded overflow-hidden bg-gray-100">
-                        <Image
-                          src={imageUrl}
-                          alt={article.title}
-                          fill
-                          className="object-cover"
-                          sizes="64px"
-                          unoptimized
-                          onError={(e) => {
-                            // Hide image on error
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                          }}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 space-y-1.5">
-                      <div className="space-y-0.5">
-                        <a
-                          href={article.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-medium text-gray-900 hover:text-gray-700 line-clamp-2 flex items-start gap-1 group"
-                        >
-                          <span className="flex-1">{article.title}</span>
-                          <ArrowTopRightOnSquareIcon className="w-3 h-3 text-gray-400 group-hover:text-gray-600 flex-shrink-0 mt-0.5" />
-                        </a>
-                        {article.snippet && (
-                          <p className="text-xs text-gray-600 line-clamp-2">{article.snippet}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span className="truncate">{article.source.name}</span>
-                        <span>•</span>
-                        <div className="flex items-center gap-1">
-                          <ClockIcon className="w-3 h-3" />
-                          <span>{formatDate(article.publishedAt)}</span>
-                        </div>
+                  {/* Source Circle */}
+                  <div className={`w-5 h-5 rounded-full ${sourceColor.bg} ${sourceColor.text} flex items-center justify-center flex-shrink-0 text-[10px] font-medium mt-0.5`}>
+                    {sourceInitials}
+                  </div>
+                  
+                  {/* Title and Date */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium break-words">{article.title}</div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
+                      <span className="truncate">{article.source?.name}</span>
+                      <span>•</span>
+                      <div className="flex items-center gap-1">
+                        <ClockIcon className="w-3 h-3" />
+                        <span>{formatDate(article.publishedAt)}</span>
                       </div>
                     </div>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Empty State */}
-      {!loading && !error && selectedQuery && articles.length === 0 && (
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <p className="text-xs text-gray-600">No articles found for this query.</p>
-        </div>
-      )}
+      {/* See More Button */}
+      <div className="border-t border-gray-200 pt-3">
+        <Link
+          href="/news"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+        >
+          See More
+        </Link>
+      </div>
     </div>
   );
 }
-

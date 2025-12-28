@@ -84,10 +84,10 @@ export default function SecondarySidebar({
         </div>
       </aside>
 
-      {/* Desktop: Positioned sidebar */}
+      {/* Desktop: Positioned sidebar - to the right of main sidebar */}
       <aside
         data-secondary-sidebar
-        className="hidden lg:block absolute left-full top-0 h-full bg-white border-r border-gray-200 shadow-lg w-64 z-40 transform transition-transform duration-300 ease-out"
+        className="hidden lg:block fixed left-16 top-0 bottom-0 bg-white border-r border-gray-200 shadow-lg w-64 z-[101] transform transition-transform duration-300 ease-out"
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >

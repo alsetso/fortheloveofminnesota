@@ -6,6 +6,7 @@ import InlineAtlasMap from '@/features/atlas/components/InlineAtlasMap';
 import { BuildingOffice2Icon, RectangleGroupIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { createServerClient } from '@/lib/supabaseServer';
+import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -158,6 +159,9 @@ function generateBreadcrumbStructuredData() {
 export default async function ExplorePage() {
   const supabase = createServerClient();
   
+  // Fetch visible atlas types for map legend
+  const visibleTypes = await getVisibleAtlasTypes();
+  
   // Fetch quick stats for preview
   const { count: cityCount } = await supabase
     .from('cities')
@@ -289,42 +293,18 @@ export default async function ExplorePage() {
             <div className="mt-3 bg-white rounded-md border border-gray-200 p-[10px]">
               <h3 className="text-xs font-semibold text-gray-900 mb-2">Map Legend</h3>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                <Link href="/explore/atlas/cities" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/city.png" alt="City" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Cities</span>
-                </Link>
-                <Link href="/explore/atlas/neighborhoods" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/neighborhood.png" alt="Neighborhood" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Neighborhoods</span>
-                </Link>
-                <Link href="/explore/atlas/parks" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/park_like.png" alt="Park" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Parks</span>
-                </Link>
-                <Link href="/explore/atlas/schools" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/education.png" alt="School" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Schools</span>
-                </Link>
-                <Link href="/explore/atlas/lakes" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/lakes.png" alt="Lake" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Lakes</span>
-                </Link>
-                <Link href="/explore/atlas/churches" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/churches.png" alt="Church" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Churches</span>
-                </Link>
-                <Link href="/explore/atlas/hospitals" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/hospital.png" alt="Hospital" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Hospitals</span>
-                </Link>
-                <Link href="/explore/atlas/golf_courses" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/golf courses.png" alt="Golf Course" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Golf Courses</span>
-                </Link>
-                <Link href="/explore/atlas/municipals" className="flex items-center gap-1.5 hover:text-gray-900 transition-colors">
-                  <img src="/municiples.png" alt="Municipal" className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-xs text-gray-600 hover:text-gray-900">Municipals</span>
-                </Link>
+                {visibleTypes.map((type) => (
+                  <Link
+                    key={type.slug}
+                    href={`/explore/atlas/${type.slug}`}
+                    className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                  >
+                    {type.icon_path && (
+                      <img src={type.icon_path} alt={type.name} className="w-4 h-4 flex-shrink-0" />
+                    )}
+                    <span className="text-xs text-gray-600 hover:text-gray-900">{type.name}</span>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>

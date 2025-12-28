@@ -99,34 +99,34 @@ export default function MobileNav({
   const allNavItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [
       ...secondaryNavItems.map<ButtonNavItem>(item => ({
-        id: item.id,
+      id: item.id,
         type: 'button',
-        label: item.label,
-        icon: item.icon,
-        iconSolid: item.iconSolid,
-        isActive: activeSecondaryContent === item.id,
-        onClick: () => onSecondaryContentClick?.(item.id),
-      })),
-      ...(onCreateClick ? [{
-        id: 'create',
-        type: 'button' as const,
-        label: 'Create',
-        icon: PlusIcon,
-        iconSolid: PlusIcon,
-        isActive: isCreateActive,
-        onClick: onCreateClick,
+      label: item.label,
+      icon: item.icon,
+      iconSolid: item.iconSolid,
+      isActive: activeSecondaryContent === item.id,
+      onClick: () => onSecondaryContentClick?.(item.id),
+    })),
+    ...(onCreateClick ? [{
+      id: 'create',
+      type: 'button' as const,
+      label: 'Create',
+      icon: PlusIcon,
+      iconSolid: PlusIcon,
+      isActive: isCreateActive,
+      onClick: onCreateClick,
       } as ButtonNavItem] : []),
-      ...(account ? [{
-        id: 'profile',
-        type: 'link' as const,
-        href: profileHref,
-        label: 'Profile',
-        icon: UserIcon,
-        iconSolid: UserIcon,
-        isActive: isProfileActive,
-        onClick: handleProfileClick,
+    ...(account ? [{
+      id: 'profile',
+      type: 'link' as const,
+      href: profileHref,
+      label: 'Profile',
+      icon: UserIcon,
+      iconSolid: UserIcon,
+      isActive: isProfileActive,
+      onClick: handleProfileClick,
       } as LinkNavItem] : []),
-    ];
+  ];
     return items;
   }, [secondaryNavItems, activeSecondaryContent, onSecondaryContentClick, onCreateClick, isCreateActive, account, profileHref, isProfileActive, handleProfileClick]);
 
@@ -153,9 +153,9 @@ export default function MobileNav({
             aria-label={item.label}
           >
             <ProfileAvatar account={account} isActive={item.isActive} />
-            <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-              {item.label}
-            </span>
+                <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {item.label}
+                </span>
           </button>
         );
       }
@@ -224,17 +224,17 @@ export default function MobileNav({
   // Prepare overflow items for popup
   const overflowPopupItems = useMemo(() => {
     return overflowItems.map(item => ({
-      id: item.id,
-      label: item.label,
-      icon: item.icon,
-      iconSolid: item.iconSolid,
-      isActive: item.isActive,
-      onClick: item.type === 'link' 
-        ? (item.id === 'profile' && item.onClick) 
-          ? () => item.onClick?.()
+    id: item.id,
+    label: item.label,
+    icon: item.icon,
+    iconSolid: item.iconSolid,
+    isActive: item.isActive,
+    onClick: item.type === 'link' 
+      ? (item.id === 'profile' && item.onClick) 
+        ? () => item.onClick?.()
           : () => router.push(item.href)
         : item.onClick,
-    }));
+  }));
   }, [overflowItems, router]);
 
   return (

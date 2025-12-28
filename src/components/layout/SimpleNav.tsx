@@ -7,10 +7,12 @@ import { useAuthStateSafe, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import {
   HomeIcon,
+  MapIcon,
   GlobeAltIcon,
   UserIcon,
   QuestionMarkCircleIcon,
   NewspaperIcon,
+  BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import AppSearch from '@/features/search/components/AppSearch';
@@ -49,8 +51,10 @@ export default function SimpleNav() {
   // Nav links
   const navLinks = [
     { href: '/', label: 'Home', icon: HomeIcon },
+    { href: '/map', label: 'Map', icon: MapIcon },
     { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
     { href: '/news', label: 'News', icon: NewspaperIcon },
+    { href: '/gov', label: 'Gov', icon: BuildingOfficeIcon },
     { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
   ];
 
@@ -131,9 +135,9 @@ export default function SimpleNav() {
     </div>
   );
 
-  // Logo based on auth state
-  const logo = user && account ? '/logo.png' : '/word_logo.png';
-  const logoAlt = user && account ? 'For the Love of Minnesota Emblem' : 'For the Love of Minnesota';
+  // Logo - always use logo.png
+  const logo = '/logo.png';
+  const logoAlt = 'For the Love of Minnesota';
 
   // Compact search for logged-in users
   const searchSection = user && account && !isMapPage ? (

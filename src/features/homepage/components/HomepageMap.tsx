@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
-import FloatingMapContainer from './FloatingMapContainer';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
 import AtlasLayer from '@/features/atlas/components/AtlasLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
@@ -14,11 +14,8 @@ import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import Sidebar from '@/features/sidebar/components/Sidebar';
-import MobileNav from '@/components/layout/MobileNav';
 import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
-import MobileSecondarySheet from '@/components/layout/MobileSecondarySheet';
-import { getMobileNavItems, type MobileNavItemId } from '@/features/sidebar/config/mobileNavConfig';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import AccountDropdown from '@/features/auth/components/AccountDropdown';
 
 interface HomepageMapProps {
   cities: Array<{
@@ -40,6 +37,7 @@ interface HomepageMapProps {
 export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   // Track page view
   usePageView();
+  const pathname = usePathname();
   
   // Map state
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -47,8 +45,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [mentionsRefreshKey, setMentionsRefreshKey] = useState(0);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeSecondaryContent, setActiveSecondaryContent] = useState<MobileNavItemId | null>(null);
   const initializedRef = useRef(false);
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
@@ -58,6 +54,15 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   
   // Atlas layer visibility state (default true)
   const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(true);
+  
+  // Atlas entity state (managed at parent level)
+  const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<{
+    id: string;
+    name: string;
+    table_name: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -104,29 +109,15 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
     };
   }, []);
 
-  // Listen for atlas-entity-click event - show in FloatingMapContainer instead of modal
-  useEffect(() => {
-    const handleAtlasEntityClick = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        id: string;
-        name: string;
-        table_name: string;
-        emoji: string;
-        lat: number;
-        lng: number;
-      }>;
-      
-      if (customEvent.detail?.id && customEvent.detail?.table_name) {
-        // Open the FloatingMapContainer instead of the modal
-        setIsSidebarOpen(true);
-        // The FloatingMapContainer will handle fetching and displaying the entity data
-      }
-    };
-
-    window.addEventListener('atlas-entity-click', handleAtlasEntityClick);
-    return () => {
-      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick);
-    };
+  // Handle atlas entity click
+  const handleAtlasEntityClick = useCallback((entity: {
+    id: string;
+    name: string;
+    table_name: string;
+    lat: number;
+    lng: number;
+  }) => {
+    setSelectedAtlasEntity(entity);
   }, []);
 
   // Listen for mention hover events to prevent mention creation
@@ -309,10 +300,32 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           onPointsOfInterestVisibilityChange={setIsPointsOfInterestVisible}
           atlasLayerVisible={isAtlasLayerVisible}
           onAtlasLayerVisibilityChange={setIsAtlasLayerVisible}
+          onLocationSelect={handleLocationSelect}
+          selectedAtlasEntity={selectedAtlasEntity}
+          onAtlasEntityClear={() => setSelectedAtlasEntity(null)}
         />
 
         {/* Map and other components */}
-        <div className="flex-1 flex relative overflow-hidden mt-14">
+        <div className="flex-1 flex relative overflow-hidden ml-16">
+        {/* Top Right Controls - Account & Upgrade */}
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+          {/* Upgrade Button */}
+          {account?.plan === 'hobby' && (
+            <button
+              onClick={() => openUpgrade()}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+            >
+              Upgrade
+            </button>
+          )}
+          {/* Account Dropdown */}
+          <AccountDropdown
+            variant="light"
+            onAccountClick={() => openAccount('settings')}
+            onSignInClick={() => openWelcome()}
+          />
+        </div>
+
         {/* Mapbox Container */}
         <div 
           ref={mapContainer} 
@@ -327,7 +340,12 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
 
         {/* Atlas Layer - Cities, Schools, Parks */}
         {mapLoaded && mapInstanceRef.current && (
-          <AtlasLayer map={mapInstanceRef.current} mapLoaded={mapLoaded} visible={isAtlasLayerVisible} />
+          <AtlasLayer 
+            map={mapInstanceRef.current} 
+            mapLoaded={mapLoaded} 
+            visible={isAtlasLayerVisible}
+            onEntityClick={handleAtlasEntityClick}
+          />
         )}
 
         {/* Points of Interest Layer */}
@@ -339,64 +357,9 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           />
         )}
 
-        {/* Left Sidebar */}
-        <FloatingMapContainer
-          map={mapInstanceRef.current}
-          mapLoaded={mapLoaded}
-          isOpen={isSidebarOpen && !isModalOpen}
-          onLocationSelect={handleLocationSelect}
-        />
-
-
         {/* Homepage Stats Handle */}
         <HomepageStatsHandle />
 
-        {/* Create Button - Toggles FloatingMapContainer */}
-        <div className="absolute bottom-4 right-4 z-20 pointer-events-auto">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={`bg-white border border-gray-200 rounded-md p-2.5 text-gray-900 hover:bg-gray-50 transition-colors shadow-sm ${
-              isSidebarOpen ? 'bg-gray-100' : ''
-            }`}
-            aria-label={isSidebarOpen ? 'Close create panel' : 'Open create panel'}
-          >
-            <PlusIcon className={`w-5 h-5 transition-transform ${isSidebarOpen ? 'rotate-45' : ''}`} />
-          </button>
-        </div>
-
-        {/* Navigation - Bottom overlay (all screens) - Hide when FloatingMapContainer is open */}
-        {!(isSidebarOpen && !isModalOpen) && (
-          <MobileNav 
-            onCreateClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            isCreateActive={isSidebarOpen}
-            onSecondaryContentClick={(itemId) => {
-              setActiveSecondaryContent(activeSecondaryContent === itemId ? null : itemId);
-            }}
-            activeSecondaryContent={activeSecondaryContent}
-          />
-        )}
-
-        {/* iOS-style Secondary Content Slide-up Sheets */}
-        {activeSecondaryContent && (() => {
-          const navItems = getMobileNavItems(account);
-          const item = navItems.find(i => i.id === activeSecondaryContent);
-          if (!item) return null;
-
-          return (
-            <MobileSecondarySheet
-              isOpen={!!activeSecondaryContent}
-              onClose={() => setActiveSecondaryContent(null)}
-              title={item.label}
-            >
-              {item.getContent({ 
-                map: mapInstanceRef.current, 
-                account,
-                pointsOfInterestVisible: isPointsOfInterestVisible,
-                onPointsOfInterestVisibilityChange: setIsPointsOfInterestVisible,
-              })}
-            </MobileSecondarySheet>
-          );
-        })()}
 
         {/* Loading/Error Overlay */}
         {!mapLoaded && (

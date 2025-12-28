@@ -7,6 +7,7 @@ import { getServerAuth } from '@/lib/authServer';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import AtlasRecordDetailClient from '@/features/atlas/components/AtlasRecordDetailClient';
 import AtlasRecordMap from '@/features/atlas/components/AtlasRecordMap';
+import { getAtlasTypeBySlug } from '@/features/atlas/services/atlasTypesService';
 
 export const revalidate = 3600;
 
@@ -63,27 +64,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const config = TABLE_CONFIG[table_name];
+  const atlasType = await getAtlasTypeBySlug(table_name);
+  const config = atlasType ? {
+    label: atlasType.name,
+    icon: atlasType.icon_path,
+    description: atlasType.description || TABLE_CONFIG[table_name]?.description || '',
+  } : TABLE_CONFIG[table_name];
+  
+  if (!config) {
+    return {
+      title: 'Atlas Record Not Found',
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
   const supabase = createServerClient();
 
   // Fetch record for metadata
-  let record;
-  if (table_name === 'cities') {
-    const { data } = await supabase
-      .from('cities')
-      .select('name, meta_title, meta_description')
-      .eq('id', id)
-      .single();
-    record = data;
-  } else {
-    const { data } = await (supabase as any)
-      .schema('atlas')
-      .from(table_name)
-      .select('name, meta_title, meta_description')
-      .eq('id', id)
-      .single();
-    record = data;
-  }
+  // All tables are in atlas schema
+  const { data: record } = await (supabase as any)
+    .schema('atlas')
+    .from(table_name)
+    .select('name, meta_title, meta_description')
+    .eq('id', id)
+    .single();
 
   if (!record) {
     return {
@@ -149,31 +155,28 @@ export default async function AtlasRecordPage({ params }: Props) {
     notFound();
   }
 
-  const config = TABLE_CONFIG[table_name];
+  const atlasType = await getAtlasTypeBySlug(table_name);
+  const config = atlasType ? {
+    label: atlasType.name,
+    icon: atlasType.icon_path,
+    description: atlasType.description || TABLE_CONFIG[table_name]?.description || '',
+  } : TABLE_CONFIG[table_name];
+  
+  if (!config) {
+    notFound();
+  }
+  
   const supabase = createServerClient();
   const auth = await getServerAuth();
   const isAdmin = auth?.role === 'admin';
 
-  // Fetch the record
-  let record, error;
-  if (table_name === 'cities') {
-    const result = await supabase
-      .from('cities')
-      .select('*')
-      .eq('id', id)
-      .single();
-    record = result.data;
-    error = result.error;
-  } else {
-    const result = await (supabase as any)
-      .schema('atlas')
-      .from(table_name)
-      .select('*')
-      .eq('id', id)
-      .single();
-    record = result.data;
-    error = result.error;
-  }
+  // Fetch the record - all tables are in atlas schema
+  const { data: record, error } = await (supabase as any)
+    .schema('atlas')
+    .from(table_name)
+    .select('*')
+    .eq('id', id)
+    .single();
 
   if (error || !record) {
     notFound();
@@ -292,7 +295,7 @@ export default async function AtlasRecordPage({ params }: Props) {
               const value = recordData[key];
               if (value === null || value === undefined || value === '') return null;
 
-              let displayValue: string | JSX.Element = String(value);
+              let displayValue: string | React.ReactElement = String(value);
               
               // Format special fields
               if (key === 'lat' || key === 'lng') {

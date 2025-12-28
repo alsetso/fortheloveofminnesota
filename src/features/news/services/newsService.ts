@@ -79,7 +79,7 @@ export async function saveNewsGen(
     api_response_keys: Object.keys(apiResponse as Record<string, unknown>),
   });
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('news_gen')
     .insert(insertData)
     .select()

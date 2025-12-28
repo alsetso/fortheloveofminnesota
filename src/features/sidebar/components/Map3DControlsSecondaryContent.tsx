@@ -5,11 +5,6 @@ import {
   CubeIcon,
   EyeIcon,
   EyeSlashIcon,
-  MapIcon,
-  GlobeAltIcon,
-  SunIcon,
-  MoonIcon,
-  ArrowPathIcon,
   ArrowUturnLeftIcon,
   ArrowRightIcon,
   TagIcon,
@@ -279,62 +274,8 @@ export default function Map3DControlsSecondaryContent({
   };
 
 
-  const styleOptions: Array<{ value: MapStyle; label: string; icon: typeof GlobeAltIcon }> = [
-    { value: 'streets', label: 'Streets', icon: MapIcon },
-    { value: 'satellite', label: 'Satellite', icon: GlobeAltIcon },
-    { value: 'light', label: 'Light', icon: SunIcon },
-    { value: 'dark', label: 'Dark', icon: MoonIcon },
-    { value: 'outdoors', label: 'Outdoors', icon: Squares2X2Icon },
-  ];
-
   return (
     <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-120px)]">
-      {/* Map Style */}
-      <div className="relative">
-        {!isPro && (
-          <div 
-            className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm rounded flex flex-col items-center justify-center gap-2 p-4"
-            onClick={() => openUpgrade('map-style')}
-          >
-            <LockClosedIcon className="w-5 h-5 text-gray-400" />
-            <p className="text-xs font-medium text-gray-700">Pro Feature</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openUpgrade('map-style');
-              }}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
-            >
-              Upgrade to Pro
-            </button>
-          </div>
-        )}
-        <div className="text-xs text-gray-600 font-medium mb-2">Map Style</div>
-        <div className="space-y-1">
-          {styleOptions.map((option) => {
-            const Icon = option.icon;
-            const isActive = mapStyle === option.value;
-            return (
-              <button
-                key={option.value}
-                onClick={() => isPro && changeMapStyle(option.value)}
-                disabled={!isPro}
-                className={`
-                  w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors
-                  ${isActive
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }
-                  ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
-                `}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{option.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {/* 3D View Controls */}
       <div>

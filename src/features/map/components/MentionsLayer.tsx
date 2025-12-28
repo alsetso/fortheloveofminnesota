@@ -7,6 +7,11 @@ import type { Mention } from '@/types/mention';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import {
+  buildMentionsLabelLayout,
+  buildMentionsLabelPaint,
+  buildMentionsIconLayout,
+} from '@/features/map/config/layerStyles';
 
 interface MentionsLayerProps {
   map: MapboxMapInstance;
@@ -204,28 +209,15 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
 
         // Add points as mention icons with zoom-based sizing
         try {
+          const iconLayout = buildMentionsIconLayout();
           map.addLayer({
             id: pointLayerId,
             type: 'symbol',
             source: sourceId,
-          layout: {
-            'icon-image': mentionImageId,
-            'icon-size': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              0, 0.15,   // At zoom 0, size is 0.15 (small for overview)
-              5, 0.25,   // At zoom 5, size is 0.25
-              10, 0.4,   // At zoom 10, size is 0.4
-              12, 0.5,   // At zoom 12, size is 0.5
-              14, 0.65,  // At zoom 14, size is 0.65
-              16, 0.8,   // At zoom 16, size is 0.8
-              18, 1.0,   // At zoom 18, size is 1.0 (full size)
-              20, 1.2,   // At zoom 20, size is 1.2 (larger when zoomed in)
-            ],
-            'icon-anchor': 'center',
-            'icon-allow-overlap': true,
-          },
+            layout: {
+              ...iconLayout,
+              'icon-image': mentionImageId,
+            },
           });
         } catch (e) {
           console.error('[MentionsLayer] Error adding point layer:', e);
@@ -239,29 +231,8 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             id: pointLabelLayerId,
             type: 'symbol',
             source: sourceId,
-          layout: {
-            'text-field': [
-              'case',
-              ['has', 'description'],
-              [
-                'case',
-                ['>', ['length', ['get', 'description']], 20],
-                ['concat', ['slice', ['get', 'description'], 0, 20], '...'],
-                ['get', 'description']
-              ],
-              '📍',
-            ],
-            'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-            'text-size': 12,
-            'text-offset': [0, 1.2],
-            'text-anchor': 'top',
-          },
-          paint: {
-            'text-color': '#000000',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2,
-            'text-halo-blur': 1,
-          },
+            layout: buildMentionsLabelLayout(),
+            paint: buildMentionsLabelPaint(),
           });
         } catch (e) {
           console.error('[MentionsLayer] Error adding label layer:', e);
@@ -992,49 +963,40 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
     loadMentions();
 
     // Re-add mentions when map style changes (e.g., switching to satellite)
-    // 'styledata' fires multiple times during style change - debounce to handle only the final one
-    const handleStyleData = () => {
+    // Use 'style.load' instead of 'styledata' - fires once when style is fully loaded
+    // This minimizes flash by re-adding layers immediately after style loads
+    const handleStyleLoad = () => {
       if (!mounted) return;
       
-      // Clear any pending timeout to debounce multiple styledata events
-      if (styleChangeTimeoutRef.current) {
-        clearTimeout(styleChangeTimeoutRef.current);
+      const mapboxMap = map as any;
+      if (!mapboxMap.isStyleLoaded()) return;
+      
+      // Check if source already exists (shouldn't after style change, but check anyway)
+      const sourceExists = !!mapboxMap.getSource(sourceId);
+      if (sourceExists) {
+        return;
       }
       
-      // Debounce style change handling - wait 100ms after last styledata event
-      styleChangeTimeoutRef.current = setTimeout(() => {
-        if (!mounted) return;
-        
-        const mapboxMap = map as any;
-        if (!mapboxMap.isStyleLoaded()) return;
-        
-        // Check if our source was removed by the style change
-        const sourceExists = !!mapboxMap.getSource(sourceId);
-        if (sourceExists) {
-          // Source still exists, no need to re-add
-          return;
-        }
-        
-        // Prevent concurrent re-initialization
-        if (isHandlingStyleChangeRef.current) return;
-        isHandlingStyleChangeRef.current = true;
-        
-        // Reset flags and reload mentions since style change cleared our layers
-        isAddingLayersRef.current = false;
-        clickHandlersAddedRef.current = false;
-        
-        loadMentions().finally(() => {
-          isHandlingStyleChangeRef.current = false;
-        });
-      }, 100);
+      // Prevent concurrent re-initialization
+      if (isHandlingStyleChangeRef.current) return;
+      isHandlingStyleChangeRef.current = true;
+      
+      // Reset flags and reload mentions immediately
+      isAddingLayersRef.current = false;
+      clickHandlersAddedRef.current = false;
+      
+      loadMentions().finally(() => {
+        isHandlingStyleChangeRef.current = false;
+      });
     };
 
-    // Subscribe to style changes
+    // Subscribe to style.load event - fires once when style is fully loaded
+    // This is better than 'styledata' which fires multiple times and requires debouncing
     try {
-      map.on('styledata', handleStyleData);
+      map.on('style.load', handleStyleLoad);
     } catch (e) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[MentionsLayer] Error subscribing to styledata:', e);
+        console.warn('[MentionsLayer] Error subscribing to style.load:', e);
       }
     }
 
@@ -1133,8 +1095,8 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       // Remove event listeners safely
       if (map && typeof map.off === 'function') {
         try {
-          // Remove styledata listener
-          map.off('styledata', handleStyleData);
+          // Remove style.load listener
+          map.off('style.load', handleStyleLoad);
         } catch (e) {
           // Event listener may not exist or map may be removed
           if (process.env.NODE_ENV === 'development') {

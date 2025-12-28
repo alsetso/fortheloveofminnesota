@@ -3,6 +3,7 @@ import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { createServerClient } from '@/lib/supabaseServer';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
 
 export const revalidate = 3600;
 
@@ -36,52 +37,37 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Atlas table configuration with icons and labels
-const ATLAS_TABLES = [
-  { tableName: 'cities', label: 'Cities', icon: '/city.png', description: 'Complete directory of all Minnesota cities' },
-  { tableName: 'neighborhoods', label: 'Neighborhoods', icon: '/neighborhood.png', description: 'Neighborhoods and districts across Minnesota' },
-  { tableName: 'parks', label: 'Parks', icon: '/park_like.png', description: 'Parks and recreational areas' },
-  { tableName: 'schools', label: 'Schools', icon: '/education.png', description: 'K-12 schools, universities, and colleges' },
-  { tableName: 'lakes', label: 'Lakes', icon: '/lakes.png', description: 'Lakes and water bodies' },
-  { tableName: 'churches', label: 'Churches', icon: '/churches.png', description: 'Churches and places of worship' },
-  { tableName: 'hospitals', label: 'Hospitals', icon: '/hospital.png', description: 'Hospitals and medical facilities' },
-  { tableName: 'golf_courses', label: 'Golf Courses', icon: '/golf courses.png', description: 'Golf courses and clubs' },
-  { tableName: 'municipals', label: 'Municipals', icon: '/municiples.png', description: 'Municipal buildings and facilities' },
-  { tableName: 'watertowers', label: 'Watertowers', icon: null, description: 'Water towers across Minnesota' },
-  { tableName: 'cemeteries', label: 'Cemeteries', icon: null, description: 'Cemeteries and memorial sites' },
-  { tableName: 'airports', label: 'Airports', icon: null, description: 'Airports and aviation facilities' },
-  { tableName: 'roads', label: 'Roads', icon: null, description: 'Roads, highways, and transportation routes' },
-  { tableName: 'radio_and_news', label: 'Radio & News', icon: null, description: 'Radio stations and news outlets' },
-];
-
 export default async function AtlasPage() {
   const supabase = createServerClient();
+  
+  // Fetch visible atlas types from database
+  const visibleTypes = await getVisibleAtlasTypes();
 
-  // Fetch counts for each atlas table
-  const countPromises = ATLAS_TABLES.map(async (table) => {
+  // Fetch counts for each visible atlas type
+  const countPromises = visibleTypes.map(async (type) => {
     try {
       const { count, error } = await supabase
         .from('atlas_entities')
         .select('*', { count: 'exact', head: true })
-        .eq('table_name', table.tableName)
+        .eq('table_name', type.slug)
         .not('lat', 'is', null)
         .not('lng', 'is', null);
       
       if (error) {
-        console.warn(`[AtlasPage] Error fetching count for ${table.tableName}:`, error);
-        return { tableName: table.tableName, count: 0 };
+        console.warn(`[AtlasPage] Error fetching count for ${type.slug}:`, error);
+        return { slug: type.slug, count: 0 };
       }
       
-      return { tableName: table.tableName, count: count || 0 };
+      return { slug: type.slug, count: count || 0 };
     } catch (error) {
-      console.error(`[AtlasPage] Error fetching count for ${table.tableName}:`, error);
-      return { tableName: table.tableName, count: 0 };
+      console.error(`[AtlasPage] Error fetching count for ${type.slug}:`, error);
+      return { slug: type.slug, count: 0 };
     }
   });
 
   const counts = await Promise.all(countPromises);
-  const countMap = counts.reduce((acc, { tableName, count }) => {
-    acc[tableName] = count;
+  const countMap = counts.reduce((acc, { slug, count }) => {
+    acc[slug] = count;
     return acc;
   }, {} as Record<string, number>);
 
@@ -119,19 +105,19 @@ export default async function AtlasPage() {
 
         {/* Atlas Tables Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
-          {ATLAS_TABLES.map((table) => {
-            const count = countMap[table.tableName] || 0;
+          {visibleTypes.map((type) => {
+            const count = countMap[type.slug] || 0;
             return (
               <Link
-                key={table.tableName}
-                href={`/explore/atlas/${table.tableName}`}
+                key={type.slug}
+                href={`/explore/atlas/${type.slug}`}
                 className="bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-start gap-2">
-                  {table.icon && (
+                  {type.icon_path && (
                     <Image
-                      src={table.icon}
-                      alt={table.label}
+                      src={type.icon_path}
+                      alt={type.name}
                       width={16}
                       height={16}
                       className="w-4 h-4 flex-shrink-0 mt-0.5"
@@ -140,12 +126,14 @@ export default async function AtlasPage() {
                   )}
                   <div className="flex-1 space-y-0.5">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-gray-900">{table.label}</h3>
+                      <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
                       {count > 0 && (
                         <span className="text-[10px] text-gray-500">({count.toLocaleString()})</span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-600">{table.description}</p>
+                    {type.description && (
+                      <p className="text-xs text-gray-600">{type.description}</p>
+                    )}
                   </div>
                 </div>
               </Link>

@@ -9,9 +9,18 @@ type NewsGenInsert = Database['public']['Tables']['news_gen']['Insert'];
  * Get the latest news generation from the database
  * Returns the most recent news_gen record (for all users to view)
  * Uses service client to bypass RLS since this is public data
+ * Falls back to anon client if service role key is not available (e.g., during build)
  */
 export async function getLatestNewsGen(): Promise<NewsGen | null> {
-  const supabase = createServiceClient();
+  let supabase;
+  
+  try {
+    supabase = createServiceClient();
+  } catch (error) {
+    // Fallback to anon client if service role key is not available (e.g., during build)
+    const { createServerClient } = require('@/lib/supabaseServer');
+    supabase = createServerClient();
+  }
 
   const { data, error } = await supabase
     .from('news_gen')

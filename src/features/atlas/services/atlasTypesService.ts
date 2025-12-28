@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabaseServer';
+import { createServerClient, createServiceClient } from '@/lib/supabaseServer';
 
 export interface AtlasType {
   id: string;
@@ -15,9 +15,17 @@ export interface AtlasType {
 
 /**
  * Fetch all atlas types from database
+ * Falls back to anon client if service role key is not available (e.g., during build)
  */
 export async function getAtlasTypes(): Promise<AtlasType[]> {
-  const supabase = createServerClient();
+  let supabase;
+  
+  try {
+    supabase = createServiceClient();
+  } catch (error) {
+    // Fallback to anon client if service role key is not available (e.g., during build)
+    supabase = createServerClient();
+  }
   
   const { data, error } = await (supabase as any)
     .schema('atlas')

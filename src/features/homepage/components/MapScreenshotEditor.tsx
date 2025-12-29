@@ -25,7 +25,12 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
     color: string;
     align: 'left' | 'center' | 'right';
   } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [isEditingText, setIsEditingText] = useState(false);
+  const [editingTextValue, setEditingTextValue] = useState('');
+  const textInputRef = useRef<HTMLInputElement>(null);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
   const [finalScreenshot, setFinalScreenshot] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const screenshotContainerRef = useRef<HTMLDivElement>(null);
@@ -284,24 +289,72 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
   }, [screenshot]);
 
   // Draw text overlay on canvas
-  const drawTextOverlay = useCallback((ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  // Scales font size based on the ratio between preview display size and actual image size
+  const drawTextOverlay = useCallback((ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) => {
     if (!textOverlay || !textOverlay.text.trim()) return;
 
     ctx.save();
-    ctx.font = `${textOverlay.fontSize}px sans-serif`;
+    
+    // Calculate scale factor: get the actual displayed image size from DOM
+    let fontSize = textOverlay.fontSize;
+    if (imageContainerRef.current) {
+      const imgElement = imageContainerRef.current.querySelector('img') as HTMLImageElement;
+      if (imgElement) {
+        // Get the actual displayed size (accounting for max-width: 600px, max-height: 400px, object-fit: contain)
+        const displayedRect = imgElement.getBoundingClientRect();
+        const displayedWidth = displayedRect.width;
+        
+        // Calculate scale factor: canvas size / displayed size
+        const scaleFactor = canvasWidth / displayedWidth;
+        fontSize = textOverlay.fontSize * scaleFactor;
+      }
+    }
+    
+    ctx.font = `${fontSize}px sans-serif`;
     ctx.fillStyle = textOverlay.color;
     ctx.textAlign = textOverlay.align;
     ctx.textBaseline = 'top';
 
     // Calculate text position based on percentage
-    let x = (textOverlay.x / 100) * width;
-    const y = (textOverlay.y / 100) * height;
+    let x = (textOverlay.x / 100) * canvasWidth;
+    const y = (textOverlay.y / 100) * canvasHeight;
 
     // Adjust x based on alignment
     if (textOverlay.align === 'center') {
-      x = width / 2;
+      x = canvasWidth / 2;
     } else if (textOverlay.align === 'right') {
-      x = width - ((100 - textOverlay.x) / 100) * width;
+      x = canvasWidth - ((100 - textOverlay.x) / 100) * canvasWidth;
+    }
+
+    // Calculate max width for text wrapping (80% of canvas width)
+    const maxTextWidth = canvasWidth * 0.8;
+    let textX = x;
+    if (textOverlay.align === 'center') {
+      textX = x;
+    } else if (textOverlay.align === 'right') {
+      textX = x;
+    } else {
+      textX = Math.max(0, Math.min(x, canvasWidth - maxTextWidth));
+    }
+
+    // Word wrap text
+    const words = textOverlay.text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    words.forEach((word) => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxTextWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+    if (currentLine) {
+      lines.push(currentLine);
     }
 
     // Draw text with shadow for readability
@@ -310,7 +363,15 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
     
-    ctx.fillText(textOverlay.text, x, y);
+    const lineHeight = fontSize * 1.2;
+    lines.forEach((line, index) => {
+      const lineY = y + (index * lineHeight);
+      // Ensure text doesn't go outside canvas bounds
+      if (lineY + lineHeight <= canvasHeight) {
+        ctx.fillText(line, textX, lineY);
+      }
+    });
+    
     ctx.restore();
   }, [textOverlay]);
 
@@ -371,9 +432,9 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
   }, [croppedScreenshot, screenshot, selectedCropSize, textOverlay, drawTextOverlay]);
 
   // Auto-update final screenshot when text overlay changes (debounced)
+  // Only update when not dragging or editing to avoid performance issues
   useEffect(() => {
-    if (!textOverlay || !textOverlay.text.trim()) {
-      setFinalScreenshot(null);
+    if (!textOverlay || !textOverlay.text.trim() || isDragging || isEditingText) {
       return;
     }
 
@@ -382,7 +443,15 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
     }, 500); // Debounce by 500ms
 
     return () => clearTimeout(timeoutId);
-  }, [textOverlay, captureFinalScreenshot]);
+  }, [textOverlay, captureFinalScreenshot, isDragging, isEditingText]);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingText && textInputRef.current) {
+      textInputRef.current.focus();
+      textInputRef.current.select();
+    }
+  }, [isEditingText]);
 
   const handleClose = useCallback(() => {
     setIsScreenshotPreviewOpen(false);
@@ -391,7 +460,8 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
     setSelectedCropSize(null);
     setTextOverlay(null);
     setFinalScreenshot(null);
-    setIsEditingText(false);
+    setIsDragging(false);
+    setDragStart(null);
   }, []);
 
   // Modal content
@@ -410,81 +480,51 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
               </button>
             </div>
 
-            {/* Crop Size Selection */}
-            <div className="px-3 py-2 border-b border-gray-200">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-medium text-gray-700">Crop Size:</span>
-                <button
-                  onClick={() => cropScreenshot(1920, 1080)}
-                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    selectedCropSize?.width === 1920 && selectedCropSize?.height === 1080
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  1920 × 1080
-                </button>
-                <button
-                  onClick={() => cropScreenshot(1080, 1080)}
-                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    selectedCropSize?.width === 1080 && selectedCropSize?.height === 1080
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  1080 × 1080
-                </button>
-                <button
-                  onClick={() => cropScreenshot(1080, 1920)}
-                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    selectedCropSize?.width === 1080 && selectedCropSize?.height === 1920
-                      ? 'bg-gray-900 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  1080 × 1920
-                </button>
-                {selectedCropSize && (
-                  <button
-                    onClick={() => {
+            {/* Controls */}
+            <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between gap-2">
+              {/* Size Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-700">Size:</span>
+                <select
+                  value={selectedCropSize ? `${selectedCropSize.width}x${selectedCropSize.height}` : 'original'}
+                  onChange={(e) => {
+                    if (e.target.value === 'original') {
                       setCroppedScreenshot(null);
                       setSelectedCropSize(null);
                       setFinalScreenshot(null);
-                    }}
-                    className="ml-auto px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-900"
-                  >
-                    Reset
-                  </button>
-                )}
+                    } else {
+                      const [width, height] = e.target.value.split('x').map(Number);
+                      cropScreenshot(width, height);
+                    }
+                  }}
+                  className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
+                >
+                  <option value="original">Original</option>
+                  <option value="1920x1080">1920 × 1080</option>
+                  <option value="1080x1080">1080 × 1080</option>
+                  <option value="1080x1920">1080 × 1920</option>
+                </select>
               </div>
-            </div>
 
-            {/* Text Overlay Controls */}
-            <div className="px-3 py-2 border-b border-gray-200 space-y-2">
+              {/* Add Text Button */}
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    if (!textOverlay) {
+                {!textOverlay ? (
+                  <button
+                    onClick={() => {
                       setTextOverlay({
                         text: 'Add your text here',
                         x: 50,
                         y: 20,
                         fontSize: 32,
-                        color: '#ffffff',
+                        color: '#000000',
                         align: 'center',
                       });
-                      setIsEditingText(true);
-                    } else {
-                      setIsEditingText(!isEditingText);
-                    }
-                  }}
-                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                    textOverlay ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {textOverlay ? 'Edit Text' : 'Add Text'}
-                </button>
-                {textOverlay && (
+                    }}
+                    className="px-2 py-1 text-xs font-medium rounded transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  >
+                    Add Text
+                  </button>
+                ) : (
                   <button
                     onClick={() => {
                       setTextOverlay(null);
@@ -496,83 +536,54 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
                   </button>
                 )}
               </div>
-              {isEditingText && textOverlay && (
-                <div className="space-y-2 pt-2 border-t border-gray-100">
-                  <input
-                    type="text"
-                    value={textOverlay.text}
-                    onChange={(e) => setTextOverlay({ ...textOverlay, text: e.target.value })}
-                    placeholder="Enter text"
-                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  />
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-600">Size:</label>
-                    <input
-                      type="range"
-                      min="16"
-                      max="72"
-                      value={textOverlay.fontSize}
-                      onChange={(e) => setTextOverlay({ ...textOverlay, fontSize: parseInt(e.target.value) })}
-                      className="flex-1"
-                    />
-                    <span className="text-xs text-gray-600 w-8">{textOverlay.fontSize}px</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-600">Color:</label>
-                    <input
-                      type="color"
-                      value={textOverlay.color}
-                      onChange={(e) => setTextOverlay({ ...textOverlay, color: e.target.value })}
-                      className="w-8 h-8 rounded border border-gray-300"
-                    />
-                    <select
-                      value={textOverlay.align}
-                      onChange={(e) => setTextOverlay({ ...textOverlay, align: e.target.value as 'left' | 'center' | 'right' })}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded"
-                    >
-                      <option value="left">Left</option>
-                      <option value="center">Center</option>
-                      <option value="right">Right</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-xs text-gray-600">Position:</label>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-500 w-12">X:</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={textOverlay.x}
-                          onChange={(e) => setTextOverlay({ ...textOverlay, x: parseInt(e.target.value) })}
-                          className="flex-1"
-                        />
-                        <span className="text-xs text-gray-600 w-8">{textOverlay.x}%</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-500 w-12">Y:</span>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={textOverlay.y}
-                          onChange={(e) => setTextOverlay({ ...textOverlay, y: parseInt(e.target.value) })}
-                          className="flex-1"
-                        />
-                        <span className="text-xs text-gray-600 w-8">{textOverlay.y}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Screenshot Image */}
             <div ref={screenshotContainerRef} className="relative bg-gray-100 overflow-auto flex-1 flex items-center justify-center p-6">
-              <div className="relative bg-white rounded-md p-4 shadow-sm border border-gray-200 max-w-full max-h-full">
+              <div 
+                ref={imageContainerRef}
+                className="relative bg-white rounded-md p-4 shadow-sm border border-gray-200 max-w-full max-h-full"
+                onMouseMove={(e) => {
+                  if (isDragging && dragStart && textOverlay && imageContainerRef.current) {
+                    e.preventDefault();
+                    const rect = imageContainerRef.current.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+                    setTextOverlay({
+                      ...textOverlay,
+                      x: Math.max(0, Math.min(100, x)),
+                      y: Math.max(0, Math.min(100, y)),
+                    });
+                    setFinalScreenshot(null); // Reset to show live preview while dragging
+                  }
+                }}
+                onMouseUp={() => {
+                  if (isDragging) {
+                    setIsDragging(false);
+                    setDragStart(null);
+                    // Trigger final screenshot update after drag ends
+                    if (textOverlay) {
+                      setTimeout(() => {
+                        captureFinalScreenshot();
+                      }, 100);
+                    }
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (isDragging) {
+                    setIsDragging(false);
+                    setDragStart(null);
+                    // Trigger final screenshot update after drag ends
+                    if (textOverlay) {
+                      setTimeout(() => {
+                        captureFinalScreenshot();
+                      }, 100);
+                    }
+                  }
+                }}
+              >
                 <img
-                  src={finalScreenshot || croppedScreenshot || screenshot}
+                  src={croppedScreenshot || screenshot}
                   alt="Map screenshot"
                   className="max-w-full max-h-full"
                   style={{
@@ -581,22 +592,86 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
                     maxHeight: '400px',
                   }}
                 />
-                {/* Text Overlay Preview - Only show if not using final screenshot */}
-                {!finalScreenshot && textOverlay && textOverlay.text.trim() && (
+                {/* Draggable Text Overlay */}
+                {textOverlay && textOverlay.text.trim() && (
                   <div
-                    className="absolute pointer-events-none"
+                    className="absolute"
                     style={{
                       left: `${textOverlay.x}%`,
                       top: `${textOverlay.y}%`,
-                      transform: `translate(${textOverlay.align === 'center' ? '-50%' : textOverlay.align === 'right' ? '-100%' : '0'}, 0)`,
-                      fontSize: `${textOverlay.fontSize}px`,
-                      color: textOverlay.color,
-                      textAlign: textOverlay.align,
-                      textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
+                      transform: `translate(${textOverlay.align === 'center' ? '-50%' : textOverlay.align === 'right' ? '-100%' : '0'}, -50%)`,
                       maxWidth: '90%',
+                      zIndex: 10,
                     }}
                   >
-                    {textOverlay.text}
+                    {isEditingText ? (
+                      <input
+                        ref={textInputRef}
+                        type="text"
+                        maxLength={120}
+                        value={editingTextValue}
+                        onChange={(e) => {
+                          if (e.target.value.length <= 120) {
+                            setEditingTextValue(e.target.value);
+                          }
+                        }}
+                        onBlur={() => {
+                          if (editingTextValue.trim()) {
+                            setTextOverlay({ ...textOverlay, text: editingTextValue });
+                          }
+                          setIsEditingText(false);
+                          setFinalScreenshot(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (editingTextValue.trim()) {
+                              setTextOverlay({ ...textOverlay, text: editingTextValue });
+                            }
+                            setIsEditingText(false);
+                            setFinalScreenshot(null);
+                          } else if (e.key === 'Escape') {
+                            setIsEditingText(false);
+                            setEditingTextValue(textOverlay.text);
+                          }
+                        }}
+                        className="px-2 py-1 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        style={{
+                          fontSize: `${textOverlay.fontSize}px`,
+                          color: textOverlay.color,
+                          minWidth: '150px',
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <div
+                        className="cursor-move select-none"
+                        style={{
+                          fontSize: `${textOverlay.fontSize}px`,
+                          color: textOverlay.color,
+                          textAlign: textOverlay.align,
+                          textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
+                          userSelect: 'none',
+                          maxWidth: '80%',
+                          wordWrap: 'break-word',
+                          overflowWrap: 'break-word',
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setIsDragging(true);
+                          setDragStart({ x: e.clientX, y: e.clientY });
+                        }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEditingTextValue(textOverlay.text);
+                          setIsEditingText(true);
+                        }}
+                      >
+                        {textOverlay.text}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -636,9 +711,9 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
   return (
     <>
       {/* Screenshot Icon */}
-      <div className="border-l border-gray-200">
+      <div>
         <button
-          className={`flex items-center justify-center w-11 h-11 text-gray-700 hover:bg-gray-50 transition-all duration-150 pointer-events-auto ${
+          className={`flex items-center justify-center w-8 h-8 rounded-md text-gray-700 hover:bg-gray-50 transition-all duration-150 pointer-events-auto ${
             isCapturingScreenshot ? 'bg-gray-100' : ''
           }`}
           title="Screenshot"
@@ -650,9 +725,9 @@ export default function MapScreenshotEditor({ map, mapLoaded }: MapScreenshotEdi
           disabled={isCapturingScreenshot || !mapLoaded}
         >
           {isCapturingScreenshot ? (
-            <ArrowPathIcon className="w-5 h-5 animate-spin" />
+            <ArrowPathIcon className="w-4 h-4 animate-spin" />
           ) : (
-            <CameraIcon className="w-5 h-5" />
+            <CameraIcon className="w-4 h-4" />
           )}
         </button>
       </div>

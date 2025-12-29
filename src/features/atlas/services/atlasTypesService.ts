@@ -64,11 +64,11 @@ export async function getAtlasTypeBySlug(slug: string): Promise<AtlasType | null
 
 /**
  * Get visible atlas types (for listings/navigation)
- * Returns types where is_visible = true and status = 'active'
+ * Returns types where is_visible = true and status = 'active' or 'coming_soon'
  */
 export async function getVisibleAtlasTypes(): Promise<AtlasType[]> {
   const types = await getAtlasTypes();
-  return types.filter(t => t.is_visible && t.status === 'active');
+  return types.filter(t => t.is_visible && (t.status === 'active' || t.status === 'coming_soon'));
 }
 
 /**

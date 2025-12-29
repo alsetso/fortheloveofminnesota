@@ -16,6 +16,7 @@ import { useUrlMapState } from '../hooks/useUrlMapState';
 import Sidebar from '@/features/sidebar/components/Sidebar';
 import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
+import MapScreenshotEditor from './MapScreenshotEditor';
 
 interface HomepageMapProps {
   cities: Array<{
@@ -307,8 +308,12 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
 
         {/* Map and other components */}
         <div className="flex-1 flex relative overflow-hidden ml-16">
-        {/* Top Right Controls - Account & Upgrade */}
+        {/* Top Right Controls - Camera, Account & Upgrade */}
         <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+          {/* Camera/Screenshot Button */}
+          {mapLoaded && mapInstanceRef.current && (
+            <MapScreenshotEditor map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+          )}
           {/* Upgrade Button */}
           {account?.plan === 'hobby' && (
             <button

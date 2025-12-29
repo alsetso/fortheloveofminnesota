@@ -38,26 +38,25 @@ export async function getLatestNewsGen(): Promise<NewsGen | null> {
 }
 
 /**
- * Check if news was generated today
- * Returns true if there's a news_gen record created today
+ * Check if news was generated within the last 24 hours
+ * Returns true if there's a news_gen record created in the last 24 hours
  * Uses service client to bypass RLS
  */
-export async function hasNewsGeneratedToday(): Promise<boolean> {
+export async function hasNewsGeneratedRecently(): Promise<boolean> {
   const supabase = createServiceClient();
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStart = today.toISOString();
+  // Check for records in the last 24 hours
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from('news_gen')
     .select('id')
-    .gte('created_at', todayStart)
+    .gte('created_at', twentyFourHoursAgo)
     .limit(1)
     .maybeSingle();
 
   if (error) {
-    console.error('Error checking if news generated today:', error);
+    console.error('Error checking if news generated recently:', error);
     return false;
   }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowTopRightOnSquareIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
+import Link from 'next/link';
 
 interface NewsArticle {
   id: string;
@@ -41,6 +42,7 @@ export default function NewsPageClient() {
   const isAdmin = account?.role === 'admin';
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [displayedCount, setDisplayedCount] = useState(5);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,23 +163,17 @@ export default function NewsPageClient() {
     return softColors[index];
   };
 
-  // Require authentication
-  if (!user) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-900">Sign In Required</p>
-          <p className="text-xs text-gray-600">You must be signed in to view news content.</p>
-        </div>
-      </div>
-    );
-  }
 
-  // Check if news was generated today
-  const isToday = generatedAt ? (() => {
-    const genDate = new Date(generatedAt);
-    const today = new Date();
-    return genDate.toDateString() === today.toDateString();
+  // Check if news was generated in the last 24 hours
+  const isRecent = generatedAt ? (() => {
+    try {
+      const genDate = new Date(generatedAt);
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      return genDate >= twentyFourHoursAgo;
+    } catch {
+      return false;
+    }
   })() : false;
 
   return (
@@ -191,14 +187,14 @@ export default function NewsPageClient() {
               <div className="space-y-0.5">
                 <p className="text-xs font-medium text-gray-900">Admin: Generate News</p>
                 <p className="text-xs text-gray-600">
-                  {isToday 
-                    ? 'News was generated today. Only one API call per day is allowed.'
+                  {isRecent 
+                    ? 'News was generated in the last 24 hours. Please wait before generating again.'
                     : 'Generate news for "Minnesota, MN" from the last 24 hours.'}
                 </p>
               </div>
               <button
                 onClick={handleGenerate}
-                disabled={generating || loading || isToday}
+                disabled={generating || loading || isRecent}
                 className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {generating ? 'Generating...' : 'Generate'}
@@ -247,7 +243,7 @@ export default function NewsPageClient() {
               </div>
             </div>
             <div className="space-y-2">
-              {articles.map((article) => {
+              {articles.slice(0, displayedCount).map((article) => {
                 const sourceInitials = getSourceInitials(article.source.name);
                 const sourceColor = getSourceColor(article.source.name);
                 
@@ -294,6 +290,25 @@ export default function NewsPageClient() {
                 );
               })}
             </div>
+            
+            {/* Load More Button */}
+            {articles.length > displayedCount && (
+              <button
+                onClick={() => setDisplayedCount(prev => Math.min(prev + 5, articles.length))}
+                className="w-full px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
+              >
+                Load More ({articles.length - displayedCount} remaining)
+              </button>
+            )}
+            
+            {/* See More News Link */}
+            <Link
+              href="/news"
+              className="inline-flex items-center gap-1 text-xs font-medium text-gray-900 hover:underline transition-colors"
+            >
+              <span>See More News</span>
+              <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+            </Link>
           </div>
         )}
 

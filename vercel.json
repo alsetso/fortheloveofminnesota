@@ -3,7 +3,13 @@
   "devCommand": "npm run dev",
   "installCommand": "npm ci --ignore-scripts",
   "framework": "nextjs",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/news/cron",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
 
 

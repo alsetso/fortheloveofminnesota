@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { XMarkIcon, MagnifyingGlassIcon, Cog6ToothIcon, InformationCircleIcon, MapPinIcon, FingerPrintIcon, Square3Stack3DIcon, SparklesIcon, BuildingOffice2Icon, ExclamationTriangleIcon, AcademicCapIcon, SunIcon, GlobeAmericasIcon, ChevronDownIcon, ChevronUpIcon, WrenchScrewdriverIcon, ArrowPathIcon, HomeIcon, HeartIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import MapScreenshotEditor from './MapScreenshotEditor';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { LocationLookupService } from '@/features/map/services/locationLookupService';
 import type { CreateMentionData } from '@/types/mention';
@@ -19,7 +18,6 @@ import { supabase } from '@/lib/supabase';
 import { useWindowManager } from '@/components/ui/WindowManager';
 import {
   useFeatureTracking,
-  CursorTracker,
   FeatureCard,
   queryFeatureAtPoint,
   type ExtractedFeature,
@@ -247,15 +245,11 @@ export default function LocationSidebar({
   const [showCameraTooltip, setShowCameraTooltip] = useState(false);
   const pinFileInputRef = useRef<HTMLInputElement>(null);
   
-  // Feature tracking hook - handles hover and click feature capture with throttling
+  // Feature tracking hook - handles click feature capture
   const {
-    hoverFeature,
     clickFeature: hookClickFeature,
     clearClickFeature,
   } = useFeatureTracking(map, mapLoaded, { throttleMs: 50 });
-
-  // Track hovered mention for cursor tracker
-  const [hoveredMention, setHoveredMention] = useState<{ id: string; mention: any } | null>(null);
   
   // Sync hook's captured click feature to our state
   // This ensures we use the ref-based capture (always current) rather than stale state
@@ -1399,35 +1393,12 @@ export default function LocationSidebar({
     };
   }, [removeTemporaryPin, clearSelection]);
 
-  // Listen for mention hover updates for cursor tracker
-  useEffect(() => {
-    const handleMentionHoverUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ mentionId: string | null; mention: any }>;
-      const { mentionId, mention } = customEvent.detail || {};
-      if (mentionId && mention) {
-        setHoveredMention({ id: mentionId, mention });
-      } else {
-        setHoveredMention(null);
-      }
-    };
-
-    window.addEventListener('mention-hover-update', handleMentionHoverUpdate);
-
-    return () => {
-      window.removeEventListener('mention-hover-update', handleMentionHoverUpdate);
-    };
-  }, []);
 
   // Listen for double-click on map to show location and expand pin form
   useEffect(() => {
     const handleShowLocationForPin = async (event: Event) => {
       const customEvent = event as CustomEvent;
       const { lat, lng } = customEvent.detail;
-      
-      // Don't open location details if hovering over a mention
-      if (hoveredMention) {
-        return;
-      }
       
       // Reverse geocode and select the location
       const geocodedData = await reverseGeocode(lat, lng);
@@ -1462,7 +1433,7 @@ export default function LocationSidebar({
     return () => {
       window.removeEventListener('show-location-for-mention', handleShowLocationForPin);
     };
-  }, [map, mapLoaded, reverseGeocode, addTemporaryPin, hoveredMention]);
+  }, [map, mapLoaded, reverseGeocode, addTemporaryPin]);
 
   const handleMapClick = useCallback(async (e: MapboxMouseEvent) => {
     if (!map || !mapLoaded) return;
@@ -1477,11 +1448,6 @@ export default function LocationSidebar({
 
     // If clicked on a mention, don't open location details (mention click handler will handle it)
     if (features.length > 0) {
-      return;
-    }
-
-    // Also check if hovering over a mention
-    if (hoveredMention) {
       return;
     }
     
@@ -1708,7 +1674,7 @@ export default function LocationSidebar({
         map.off('click', handleMapClick as any);
       }
     };
-  }, [map, mapLoaded, handleMapClick, hoveredMention]);
+  }, [map, mapLoaded, handleMapClick]);
 
   // Cleanup search timeout and temporary marker
   useEffect(() => {
@@ -1775,14 +1741,6 @@ export default function LocationSidebar({
   return (
     <>
       <div className="w-full flex flex-col">
-      {/* Cursor Tracker - Above sidebar */}
-      <CursorTracker 
-        feature={hoverFeature} 
-        mentionId={hoveredMention?.id || null}
-        mention={hoveredMention?.mention || null}
-        className="mb-2 hidden lg:block" 
-      />
-      
       {/* Inline Container - No floating card styling */}
       <div className="relative w-full bg-transparent overflow-hidden transition-all duration-300 ease-in-out" style={{ pointerEvents: 'auto', zIndex: 50 }}>
           {/* Suggestions Panel - Inline */}
@@ -1812,9 +1770,6 @@ export default function LocationSidebar({
 
           {/* Toolbar Row */}
           <div className="relative flex items-center border-b border-gray-200">
-              {/* Screenshot Editor */}
-            <MapScreenshotEditor map={map} mapLoaded={mapLoaded} />
-
             {/* Admin Badge */}
             {isAdmin && (
               <div className="px-2 py-1 border-l border-gray-200">

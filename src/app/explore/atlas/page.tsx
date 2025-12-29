@@ -107,35 +107,58 @@ export default async function AtlasPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
           {visibleTypes.map((type) => {
             const count = countMap[type.slug] || 0;
+            const isComingSoon = type.status === 'coming_soon';
+            const content = (
+              <div className="flex items-start gap-2">
+                {type.icon_path && (
+                  <Image
+                    src={type.icon_path}
+                    alt={type.name}
+                    width={16}
+                    height={16}
+                    className="w-4 h-4 flex-shrink-0 mt-0.5"
+                    unoptimized
+                  />
+                )}
+                <div className="flex-1 space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {isComingSoon && (
+                        <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                          Coming Soon
+                        </span>
+                      )}
+                      {count > 0 && !isComingSoon && (
+                        <span className="text-[10px] text-gray-500">({count.toLocaleString()})</span>
+                      )}
+                    </div>
+                  </div>
+                  {type.description && (
+                    <p className="text-xs text-gray-600">{type.description}</p>
+                  )}
+                </div>
+              </div>
+            );
+
+            if (isComingSoon) {
+              return (
+                <div
+                  key={type.slug}
+                  className="bg-white rounded-md border border-gray-200 p-[10px] opacity-75"
+                >
+                  {content}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={type.slug}
                 href={`/explore/atlas/${type.slug}`}
                 className="bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-start gap-2">
-                  {type.icon_path && (
-                    <Image
-                      src={type.icon_path}
-                      alt={type.name}
-                      width={16}
-                      height={16}
-                      className="w-4 h-4 flex-shrink-0 mt-0.5"
-                      unoptimized
-                    />
-                  )}
-                  <div className="flex-1 space-y-0.5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
-                      {count > 0 && (
-                        <span className="text-[10px] text-gray-500">({count.toLocaleString()})</span>
-                      )}
-                    </div>
-                    {type.description && (
-                      <p className="text-xs text-gray-600">{type.description}</p>
-                    )}
-                  </div>
-                </div>
+                {content}
               </Link>
             );
           })}

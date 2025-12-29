@@ -11,6 +11,7 @@ import {
   QuestionMarkCircleIcon,
   NewspaperIcon,
   BuildingOfficeIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -70,6 +71,7 @@ const hrefToTab: Record<string, SidebarTab> = {
   '/location': null as any,
   '/explore': 'explore' as SidebarTab,
   '/news': 'news' as SidebarTab,
+  '/calendar': null as any,
   '/faqs': 'faqs' as SidebarTab,
   '/gov': null as any,
   '#controls': 'controls' as SidebarTab,
@@ -94,6 +96,11 @@ const mainNavItems: NavItem[] = [
     label: 'News', 
     icon: NewspaperIcon,
     secondaryContent: <NewsSecondaryContent />,
+  },
+  { 
+    href: '/calendar', 
+    label: 'Calendar', 
+    icon: CalendarIcon,
   },
   { 
     href: '/gov', 

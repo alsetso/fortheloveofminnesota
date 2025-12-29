@@ -13,6 +13,7 @@ import {
   QuestionMarkCircleIcon,
   NewspaperIcon,
   BuildingOfficeIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import AppSearch from '@/features/search/components/AppSearch';
@@ -54,6 +55,7 @@ export default function SimpleNav() {
     { href: '/map', label: 'Map', icon: MapIcon },
     { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
     { href: '/news', label: 'News', icon: NewspaperIcon },
+    { href: '/calendar', label: 'Calendar', icon: CalendarIcon },
     { href: '/gov', label: 'Gov', icon: BuildingOfficeIcon },
     { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
   ];

@@ -175,6 +175,7 @@ export class EventService {
         lng: data.lng || null,
         account_id: account_id,
         visibility: data.visibility || 'public',
+        tags: data.tags && data.tags.length > 0 ? data.tags : null,
         archived: false,
       })
       .select(`
@@ -236,6 +237,11 @@ export class EventService {
       if (end < start) {
         throw new Error('End date must be after start date');
       }
+    }
+
+    // Handle tags in update
+    if (data.tags !== undefined) {
+      updateData.tags = data.tags && data.tags.length > 0 ? data.tags : null;
     }
 
     const { data: event, error } = await supabase

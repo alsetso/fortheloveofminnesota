@@ -7,8 +7,6 @@ import { ProfileProvider } from '@/features/profiles/contexts/ProfileContext';
 import { WindowManagerProvider } from '@/components/ui/WindowManager';
 import { AppModalProvider } from '@/contexts/AppModalContext';
 import { StripeProvider } from './StripeProvider';
-import PageLoadingOverlay from '@/features/feed/components/PageLoadingOverlay';
-import MobileOverlay from '@/components/modals/MobileOverlay';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -24,8 +22,6 @@ export function Providers({ children }: ProvidersProps) {
               <WindowManagerProvider>
                 <Suspense fallback={null}>
                   <AppModalProvider>
-                    <MobileOverlay />
-                    <PageLoadingOverlay />
                     {children}
                   </AppModalProvider>
                 </Suspense>

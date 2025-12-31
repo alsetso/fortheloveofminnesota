@@ -19,10 +19,6 @@ interface SimplePageLayoutProps {
    */
   contentPadding?: string;
   /**
-   * Footer variant (light or dark)
-   */
-  footerVariant?: 'light' | 'dark';
-  /**
    * Hide the footer (useful when compact footer is present in content)
    */
   hideFooter?: boolean;
@@ -51,7 +47,6 @@ export default function SimplePageLayout({
   containerMaxWidth = '7xl',
   backgroundColor = 'bg-[#f4f2ef]',
   contentPadding = 'px-[10px] py-3',
-  footerVariant = 'light',
   hideFooter = false,
   hideNav = false,
   toolbar,
@@ -82,7 +77,7 @@ export default function SimplePageLayout({
       </main>
 
       {/* Footer */}
-      {!hideFooter && <Footer variant={footerVariant} />}
+      {!hideFooter && <Footer />}
     </div>
   );
 }

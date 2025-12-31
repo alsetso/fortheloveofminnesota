@@ -5,16 +5,14 @@ import Logo from './Logo';
 
 interface FooterProps {
   fixed?: boolean;
-  variant?: 'light' | 'dark';
 }
 
-export default function Footer({ fixed = false, variant = 'light' }: FooterProps) {
+export default function Footer({ fixed = false }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
-  const isDark = variant === 'dark';
   const footerClasses = fixed
-    ? `fixed bottom-0 left-0 right-0 z-10 ${isDark ? 'bg-[#2b2b2b] text-gray-300 border-t border-[#3a3a3a]' : 'bg-[#f4f2ef] text-gray-700 border-t border-gray-200'}`
-    : `${isDark ? 'bg-[#2b2b2b] text-gray-300 mt-auto border-t border-[#3a3a3a]' : 'bg-[#f4f2ef] text-gray-700 mt-auto border-t border-gray-200'}`;
+    ? 'fixed bottom-0 left-0 right-0 z-10 bg-[#2b2b2b] text-gray-300 border-t border-[#3a3a3a]'
+    : 'bg-[#2b2b2b] text-gray-300 mt-auto border-t border-[#3a3a3a]';
 
   return (
     <footer className={footerClasses} role="contentinfo">
@@ -25,14 +23,14 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
             <div className="flex items-center space-x-2 mb-2">
               <Logo size="sm" variant="default" />
             </div>
-            <p className={`text-xs mb-3 max-w-md leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className="text-xs mb-3 max-w-md leading-relaxed text-gray-400">
               For the Love of Minnesota
             </p>
           </div>
 
           {/* Navigation */}
           <div>
-            <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h3 className="text-xs font-semibold uppercase tracking-wide mb-2 text-white">
               Navigation
             </h3>
             <nav aria-label="Main navigation">
@@ -40,7 +38,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     Home
                   </Link>
@@ -48,7 +46,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/map" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     Map
                   </Link>
@@ -56,15 +54,15 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/explore" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     Explore
                   </Link>
                 </li>
                 <li>
                   <Link 
-                    href="/news" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    href="/calendar/news" 
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     News
                   </Link>
@@ -72,7 +70,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/faqs" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     FAQs
                   </Link>
@@ -80,7 +78,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/contact" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     Contact
                   </Link>
@@ -91,7 +89,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
 
           {/* Account & Legal */}
           <div>
-            <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            <h3 className="text-xs font-semibold uppercase tracking-wide mb-2 text-white">
               Account & Legal
             </h3>
             <nav aria-label="Account and legal navigation">
@@ -99,7 +97,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/?modal=welcome" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     Sign In
                   </Link>
@@ -107,7 +105,7 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
                 <li>
                   <Link 
                     href="/account/settings" 
-                    className={`text-xs transition-colors ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
                     Settings
                   </Link>
@@ -118,12 +116,12 @@ export default function Footer({ fixed = false, variant = 'light' }: FooterProps
         </div>
 
         {/* Bottom Bar */}
-        <div className={`pt-3 border-t ${isDark ? 'border-[#3a3a3a]' : 'border-gray-200'}`}>
+        <div className="pt-3 border-t border-[#3a3a3a]">
           <div className="flex flex-col md:flex-row items-center justify-between gap-2">
-            <p className={`text-xs text-center md:text-left ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+            <p className="text-xs text-center md:text-left text-gray-400">
               © {currentYear} For the Love of Minnesota. All rights reserved.
             </p>
-            <div className={`flex items-center gap-4 text-xs ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
+            <div className="flex items-center gap-4 text-xs text-gray-500">
               <span>Minnesota, United States</span>
             </div>
           </div>

@@ -1,110 +1,140 @@
 import { createServerClientWithAuth, createServiceClient } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
-import type { Database } from '@/types/supabase';
 
-type NewsGen = Database['public']['Tables']['news_gen']['Row'];
-type NewsGenInsert = Database['public']['Tables']['news_gen']['Insert'];
+// Types for news schema
+export interface NewsPrompt {
+  id: string;
+  account_id: string;
+  user_input: string;
+  api_response: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewsPromptInsert {
+  account_id: string;
+  user_input: string;
+  api_response: Record<string, unknown>;
+}
 
 /**
- * Get the latest news generation from the database
- * Returns the most recent news_gen record (for all users to view)
+ * Get the latest news prompt from the database
+ * Returns the most recent prompt record
  * Uses service client to bypass RLS since this is public data
- * Falls back to anon client if service role key is not available (e.g., during build)
  */
-export async function getLatestNewsGen(): Promise<NewsGen | null> {
+export async function getLatestPrompt(): Promise<NewsPrompt | null> {
   let supabase;
   
   try {
     supabase = createServiceClient();
   } catch (error) {
-    // Fallback to anon client if service role key is not available (e.g., during build)
     const { createServerClient } = require('@/lib/supabaseServer');
     supabase = createServerClient();
   }
 
-  const { data, error } = await supabase
-    .from('news_gen')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Use RPC function to query news.prompt
+  const { data, error } = await supabase.rpc('get_latest_prompt');
 
   if (error) {
-    console.error('Error fetching latest news_gen:', error);
+    console.error('Error fetching latest prompt:', error);
     return null;
   }
 
-  return data;
+  // RPC returns array, get first result
+  return (data && data.length > 0) ? data[0] : null;
 }
 
 /**
  * Check if news was generated within the last 24 hours
- * Returns true if there's a news_gen record created in the last 24 hours
- * Uses service client to bypass RLS
+ * Returns true if there's a prompt record created in the last 24 hours
  */
 export async function hasNewsGeneratedRecently(): Promise<boolean> {
   const supabase = createServiceClient();
 
-  // Check for records in the last 24 hours
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-  const { data, error } = await supabase
-    .from('news_gen')
-    .select('id')
-    .gte('created_at', twentyFourHoursAgo)
-    .limit(1)
-    .maybeSingle();
+  // Use RPC function to check news.prompt
+  const { data, error } = await supabase.rpc('has_news_generated_recently');
 
   if (error) {
     console.error('Error checking if news generated recently:', error);
     return false;
   }
 
-  return !!data;
+  return data === true;
 }
 
 /**
- * Save news generation to database
+ * Save news prompt to database
  * Requires admin role (enforced by RLS)
- * Saves to public.news_gen table
+ * Saves to news.prompt table
+ * Trigger automatically extracts articles to news.generated
  */
-export async function saveNewsGen(
+export async function savePrompt(
   accountId: string,
   userInput: string,
   apiResponse: unknown
-): Promise<NewsGen | null> {
+): Promise<NewsPrompt | null> {
   const supabase = await createServerClientWithAuth(cookies());
 
-  const insertData: NewsGenInsert = {
+  const insertData: NewsPromptInsert = {
     account_id: accountId,
     user_input: userInput,
     api_response: apiResponse as Record<string, unknown>,
   };
 
-  console.log('[saveNewsGen] Inserting into public.news_gen:', {
+  console.log('[savePrompt] Inserting into news.prompt:', {
     account_id: accountId,
     user_input: userInput,
-    api_response_keys: Object.keys(apiResponse as Record<string, unknown>),
   });
 
-  const { data, error } = await (supabase as any)
-    .from('news_gen')
-    .insert(insertData)
-    .select()
-    .single();
+  // Use RPC function to insert into news.prompt
+  const { data, error } = await supabase.rpc('insert_prompt', {
+    p_account_id: accountId,
+    p_user_input: userInput,
+    p_api_response: apiResponse as Record<string, unknown>,
+  });
 
   if (error) {
-    console.error('[saveNewsGen] Error saving to public.news_gen:', error);
-    console.error('[saveNewsGen] Error details:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-    });
+    console.error('[savePrompt] Error saving to news.prompt:', error);
     return null;
   }
 
-  console.log('[saveNewsGen] Successfully saved to public.news_gen:', data?.id);
-  return data;
+  // RPC returns array, get first result
+  const result = (data && data.length > 0) ? data[0] : null;
+  console.log('[savePrompt] Successfully saved:', result?.id);
+  return result;
 }
+
+/**
+ * Save news prompt using service client (for cron jobs)
+ * Bypasses RLS for automated processes
+ */
+export async function savePromptWithService(
+  accountId: string,
+  userInput: string,
+  apiResponse: unknown
+): Promise<NewsPrompt | null> {
+  const supabase = createServiceClient();
+
+  const insertData: NewsPromptInsert = {
+    account_id: accountId,
+    user_input: userInput,
+    api_response: apiResponse as Record<string, unknown>,
+  };
+
+  // Use RPC function to insert into news.prompt
+  const { data, error } = await supabase.rpc('insert_prompt', {
+    p_account_id: accountId,
+    p_user_input: userInput,
+    p_api_response: apiResponse as Record<string, unknown>,
+    });
+
+  if (error) {
+    console.error('[savePromptWithService] Error:', error);
+    return null;
+  }
+
+  // RPC returns array, get first result
+  return (data && data.length > 0) ? data[0] : null;
+}
+
 

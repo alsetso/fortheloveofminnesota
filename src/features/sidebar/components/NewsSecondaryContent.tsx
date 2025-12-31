@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ClockIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { getSourceInitials, getSourceColor, formatDate } from '@/features/news/utils/newsHelpers';
 
 interface NewsArticle {
   id: string;
@@ -19,8 +20,8 @@ interface NewsArticle {
 interface LatestNewsResponse {
   success: boolean;
   data?: {
-    articles: NewsArticle[];
-    count: number;
+  articles: NewsArticle[];
+  count: number;
     generatedAt: string;
     createdAt: string;
   };
@@ -36,38 +37,6 @@ export default function NewsSecondaryContent() {
   const [error, setError] = useState<string | null>(null);
   const [isToday, setIsToday] = useState(false);
 
-  // Get source initials
-  const getSourceInitials = (sourceName: string | undefined): string => {
-    if (!sourceName) return 'NEW';
-    const cleaned = sourceName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    return cleaned.slice(0, 3) || 'NEW';
-  };
-
-  // Get source color
-  const getSourceColor = (sourceName: string | undefined): { bg: string; text: string } => {
-    const softColors = [
-      { bg: 'bg-blue-100', text: 'text-blue-700' },
-      { bg: 'bg-green-100', text: 'text-green-700' },
-      { bg: 'bg-purple-100', text: 'text-purple-700' },
-      { bg: 'bg-pink-100', text: 'text-pink-700' },
-      { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-      { bg: 'bg-indigo-100', text: 'text-indigo-700' },
-      { bg: 'bg-teal-100', text: 'text-teal-700' },
-      { bg: 'bg-orange-100', text: 'text-orange-700' },
-      { bg: 'bg-cyan-100', text: 'text-cyan-700' },
-      { bg: 'bg-rose-100', text: 'text-rose-700' },
-      { bg: 'bg-amber-100', text: 'text-amber-700' },
-      { bg: 'bg-violet-100', text: 'text-violet-700' },
-    ];
-
-    if (!sourceName) return softColors[0];
-    let hash = 0;
-    for (let i = 0; i < sourceName.length; i++) {
-      hash = sourceName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % softColors.length;
-    return softColors[index];
-  };
 
   // Check if date is today
   const isDateToday = (dateString: string): boolean => {
@@ -83,16 +52,16 @@ export default function NewsSecondaryContent() {
   // Fetch latest news
   useEffect(() => {
     const fetchLatestNews = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
+    try {
         const response = await fetch('/api/news/latest');
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to fetch news');
-        }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch news');
+      }
 
         const data: LatestNewsResponse = await response.json();
         
@@ -105,48 +74,25 @@ export default function NewsSecondaryContent() {
           setArticles([]);
           setIsToday(false);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load news');
-        setArticles([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load news');
+      setArticles([]);
         setIsToday(false);
-      } finally {
-        setLoading(false);
-      }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
 
     fetchLatestNews();
   }, []);
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) {
-        return 'Today';
-      } else if (diffDays === 1) {
-        return 'Yesterday';
-      } else if (diffDays < 7) {
-        return `${diffDays} days ago`;
-      } else if (diffDays < 30) {
-        const weeks = Math.floor(diffDays / 7);
-        return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
-      } else {
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      }
-    } catch {
-      return dateString;
-    }
-  };
 
   // Require authentication
   if (!user) {
-    return (
-      <div className="space-y-3">
+  return (
+    <div className="space-y-3">
         <div className="px-2 py-1.5">
-          <div className="space-y-2">
+      <div className="space-y-2">
             <p className="text-xs font-medium text-gray-900">Sign In Required</p>
             <p className="text-xs text-gray-600">You must be signed in to view news content.</p>
             <button
@@ -165,22 +111,22 @@ export default function NewsSecondaryContent() {
     <div className="space-y-3">
       <div>
         <div className="text-xs text-gray-600 font-medium mb-2">Today's News</div>
-        
-        {/* Loading State */}
-        {loading && (
+
+      {/* Loading State */}
+      {loading && (
           <div className="px-2 py-1.5">
-            <p className="text-xs text-gray-600">Loading news...</p>
-          </div>
-        )}
+          <p className="text-xs text-gray-600">Loading news...</p>
+        </div>
+      )}
 
         {/* Error State or No News Today */}
         {!loading && (!isToday || articles.length === 0) && (
           <div className="px-2 py-1.5">
             <p className="text-xs text-gray-600">Our admin is still asleep.</p>
-          </div>
-        )}
+        </div>
+      )}
 
-        {/* Articles */}
+      {/* Articles */}
         {!loading && isToday && articles.length > 0 && (
           <div className="space-y-0.5">
             {articles.map((article) => {
@@ -188,46 +134,44 @@ export default function NewsSecondaryContent() {
               const sourceInitials = getSourceInitials(article.source?.name);
               
               return (
-                <a
+                <Link
                   key={article.id}
-                  href={article.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href={`/news/${article.id}`}
                   className="flex items-start gap-2 px-2 py-1.5 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                 >
                   {/* Source Circle */}
                   <div className={`w-5 h-5 rounded-full ${sourceColor.bg} ${sourceColor.text} flex items-center justify-center flex-shrink-0 text-[10px] font-medium mt-0.5`}>
                     {sourceInitials}
-                  </div>
+                      </div>
                   
                   {/* Title and Date */}
                   <div className="flex-1 min-w-0">
                     <div className="font-medium break-words">{article.title}</div>
                     <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
                       <span className="truncate">{article.source?.name}</span>
-                      <span>•</span>
-                      <div className="flex items-center gap-1">
-                        <ClockIcon className="w-3 h-3" />
-                        <span>{formatDate(article.publishedAt)}</span>
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <ClockIcon className="w-3 h-3" />
+                          <span>{formatDate(article.publishedAt)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </a>
+                </Link>
               );
             })}
           </div>
         )}
-      </div>
+        </div>
 
       {/* See More Button */}
       <div className="border-t border-gray-200 pt-3">
         <Link
-          href="/news"
+          href="/calendar/news"
           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
         >
           See More
         </Link>
-      </div>
+        </div>
     </div>
   );
 }

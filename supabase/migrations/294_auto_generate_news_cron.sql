@@ -115,7 +115,7 @@ COMMENT ON FUNCTION public.auto_generate_news IS
 
 -- Schedule news generation to run every 24 hours at 6 AM Central Time (noon UTC)
 -- Adjust the cron schedule as needed
-DO $$
+DO $cron_setup$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     -- Remove existing job if it exists
@@ -140,7 +140,7 @@ BEGIN
     RAISE NOTICE 'pg_cron extension not available. Job must be scheduled externally or via Supabase dashboard.';
     RAISE NOTICE 'To enable pg_cron, go to Supabase Dashboard > Database > Extensions and enable pg_cron.';
   END IF;
-END $$;
+END $cron_setup$;
 
 -- ============================================================================
 -- STEP 3: Grant permissions

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronDownIcon, CalendarIcon, ClockIcon, MapPinIcon, NewspaperIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, CalendarIcon, ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { format, addDays, isToday, isSameDay, startOfDay } from 'date-fns';
 import { EventService } from '@/features/events/services/eventService';
 import type { Event } from '@/types/event';
 import Link from 'next/link';
-import { getStartOfDayCentral, isSameDayCentral } from '@/lib/timezone';
+import Image from 'next/image';
+import { isSameDayCentral } from '@/lib/timezone';
+import { getSourceInitials, getSourceColor } from '@/features/news/utils/newsHelpers';
 
 interface NewsArticle {
   id: string;
@@ -63,7 +65,7 @@ export default function HomepageCalendarAccordion() {
 
         setEvents(fetchedEvents);
 
-        // Fetch news
+        // Fetch news (only once on initial load)
         try {
           const newsResponse = await fetch('/api/news/latest');
           const newsData = await newsResponse.json();
@@ -123,10 +125,10 @@ export default function HomepageCalendarAccordion() {
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-4 h-4 text-gray-700" />
-          <h2 className="text-sm font-semibold text-gray-900">CALENDAR</h2>
+        <h2 className="text-sm font-semibold text-gray-900">CALENDAR</h2>
         </div>
         <p className="text-xs text-gray-600">
-          View community events on a daily calendar. Navigate forward and back up to 365 days.
+          View community events and news on a daily calendar. Navigate forward and back up to 365 days.
         </p>
       </div>
 
@@ -142,15 +144,15 @@ export default function HomepageCalendarAccordion() {
             </span>
           )}
           {(selectedDayEvents.length > 0 || selectedDayNews.length > 0) && (
-            <span className="text-[10px] font-medium text-gray-500">
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-500">
               {selectedDayEvents.length > 0 && (
                 <span>{selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}</span>
               )}
-              {selectedDayEvents.length > 0 && selectedDayNews.length > 0 && <span> • </span>}
+              {selectedDayEvents.length > 0 && selectedDayNews.length > 0 && <span>•</span>}
               {selectedDayNews.length > 0 && (
                 <span>{selectedDayNews.length} news</span>
               )}
-            </span>
+            </div>
           )}
         </div>
       </div>
@@ -191,9 +193,11 @@ export default function HomepageCalendarAccordion() {
                     <span className={`text-[8px] ${
                       isSelected ? 'text-gray-700' : isTodayDate ? 'text-red-600' : 'text-gray-500'
                     }`}>
-                      {dayEvents.length > 0 && <span>{dayEvents.length}</span>}
-                      {dayEvents.length > 0 && dayNews.length > 0 && <span>/</span>}
-                      {dayNews.length > 0 && <span>{dayNews.length}</span>}
+                      {dayEvents.length > 0 && dayNews.length > 0 
+                        ? `${dayEvents.length}/${dayNews.length}`
+                        : dayEvents.length > 0 
+                        ? dayEvents.length 
+                        : dayNews.length}
                     </span>
                   )}
                 </div>
@@ -220,92 +224,122 @@ export default function HomepageCalendarAccordion() {
           <p className="text-xs text-red-600">{error}</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {/* Events */}
+        <div className="space-y-3">
+          {/* Events Section */}
           {selectedDayEvents.length > 0 && (
-            <>
-              <h3 className="text-xs font-semibold text-gray-900">
-                Events ({selectedDayEvents.length})
-              </h3>
-              {selectedDayEvents.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/calendar/events#event-${event.id}`}
-                  className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
-                >
-                  <div className="space-y-1.5">
-                    <h4 className="text-xs font-semibold text-gray-900 line-clamp-2">
-                      {event.title}
-                    </h4>
-                    {event.description && (
-                      <p className="text-[10px] text-gray-600 line-clamp-2">
-                        {event.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                      <div className="flex items-center gap-0.5">
-                        <ClockIcon className="w-3 h-3" />
-                        <span>
-                          {format(new Date(event.start_date), 'h:mm a')}
-                          {event.end_date && ` - ${format(new Date(event.end_date), 'h:mm a')}`}
-                        </span>
-                      </div>
-                      {event.location_name && (
-                        <>
-                          <span>•</span>
-                          <div className="flex items-center gap-0.5">
-                            <MapPinIcon className="w-3 h-3" />
-                            <span className="truncate">{event.location_name}</span>
-                          </div>
-                        </>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-3 h-3 text-gray-700" />
+                <h3 className="text-xs font-semibold text-gray-900">
+                  Events ({selectedDayEvents.length})
+                </h3>
+              </div>
+              <div className="space-y-1.5">
+                {selectedDayEvents.map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/calendar/events#event-${event.id}`}
+                    className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="space-y-1.5">
+                      <h4 className="text-xs font-semibold text-gray-900 line-clamp-2">
+                        {event.title}
+                      </h4>
+                      {event.description && (
+                        <p className="text-[10px] text-gray-600 line-clamp-2">
+                          {event.description}
+                        </p>
                       )}
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                        <div className="flex items-center gap-0.5">
+                          <ClockIcon className="w-3 h-3" />
+                          <span>
+                            {format(new Date(event.start_date), 'h:mm a')}
+                            {event.end_date && ` - ${format(new Date(event.end_date), 'h:mm a')}`}
+                          </span>
+                        </div>
+                        {event.location_name && (
+                          <>
+                            <span>•</span>
+                            <div className="flex items-center gap-0.5">
+                              <MapPinIcon className="w-3 h-3" />
+                              <span className="truncate">{event.location_name}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
 
-          {/* News */}
+          {/* News Section */}
           {selectedDayNews.length > 0 && (
-            <>
-              {selectedDayEvents.length > 0 && <div className="pt-2" />}
-              <h3 className="text-xs font-semibold text-gray-900">
-                News ({selectedDayNews.length})
-              </h3>
-              {selectedDayNews.map((article) => (
-                <a
-                  key={article.id}
-                  href={article.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-start gap-1">
-                      <NewspaperIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                      <h4 className="text-xs font-semibold text-gray-900 line-clamp-2 flex-1">
-                        {article.title}
-                      </h4>
-                      <ArrowTopRightOnSquareIcon className="w-3 h-3 text-gray-400 flex-shrink-0 mt-0.5" />
-                    </div>
-                    {article.snippet && (
-                      <p className="text-[10px] text-gray-600 line-clamp-2">
-                        {article.snippet}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                      <span className="truncate">{article.source.name}</span>
-                      <span>•</span>
-                      <div className="flex items-center gap-0.5">
-                        <ClockIcon className="w-3 h-3" />
-                        <span>{format(new Date(article.publishedAt), 'h:mm a')}</span>
+            <div className="space-y-2">
+              {selectedDayEvents.length > 0 && (
+                <div className="border-t border-gray-200 pt-3" />
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-900">
+                  News ({selectedDayNews.length})
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {selectedDayNews.map((article) => {
+                  const sourceInitials = getSourceInitials(article.source.name);
+                  const sourceColor = getSourceColor(article.source.name);
+                  
+                  return (
+                      <Link
+                      key={article.id}
+                        href={`/news/${article.id}`}
+                      className="flex items-start gap-2 bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
+                    >
+                      {/* Photo Image */}
+                      {article.photoUrl ? (
+                        <div className="relative flex-shrink-0 w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-100">
+                          <Image
+                            src={article.photoUrl}
+                            alt={article.title}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                            unoptimized
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className={`flex-shrink-0 w-16 h-16 rounded border border-gray-200 ${sourceColor.bg} flex items-center justify-center`}>
+                          <span className={`text-[10px] font-semibold ${sourceColor.text} leading-none`}>
+                          {sourceInitials}
+                        </span>
                       </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </>
+                      )}
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <h4 className="text-xs font-semibold text-gray-900 line-clamp-2">
+                          {article.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                          <span>{article.source.name}</span>
+                          <span>•</span>
+                          <div className="flex items-center gap-0.5">
+                            <ClockIcon className="w-3 h-3" />
+                            <span>{format(new Date(article.publishedAt), 'h:mm a')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           )}
 
           {/* Empty State */}

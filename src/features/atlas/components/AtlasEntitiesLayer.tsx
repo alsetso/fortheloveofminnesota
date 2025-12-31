@@ -275,7 +275,7 @@ export default function AtlasEntitiesLayer({
 
         // Build text-color expression based on table_name
         const textColorExpression = buildAtlasTextColorExpression(uniqueTables);
-        
+
         // Add label layer
         mapboxMap.addLayer({
           id: pointLabelLayerId,
@@ -296,11 +296,11 @@ export default function AtlasEntitiesLayer({
             if (feature && onEntityClick) {
               const props = feature.properties;
               onEntityClick({
-                id: props.id,
-                name: props.name,
-                table_name: props.table_name,
-                lat: e.lngLat.lat,
-                lng: e.lngLat.lng,
+                  id: props.id,
+                  name: props.name,
+                  table_name: props.table_name,
+                  lat: e.lngLat.lat,
+                  lng: e.lngLat.lng,
               });
             }
           });

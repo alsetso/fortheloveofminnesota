@@ -4,6 +4,9 @@ import { createServerClient } from '@/lib/supabaseServer';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
+import { handleQueryError } from '@/lib/utils/errorHandling';
 
 export const revalidate = 3600;
 
@@ -53,15 +56,17 @@ export default async function AtlasPage() {
         .not('lat', 'is', null)
         .not('lng', 'is', null);
       
-      if (error) {
-        console.warn(`[AtlasPage] Error fetching count for ${type.slug}:`, error);
-        return { slug: type.slug, count: 0 };
-      }
-      
-      return { slug: type.slug, count: count || 0 };
+      return handleQueryError(
+        error,
+        `AtlasPage: count for ${type.slug}`,
+        { slug: type.slug, count: count || 0 }
+      );
     } catch (error) {
-      console.error(`[AtlasPage] Error fetching count for ${type.slug}:`, error);
-      return { slug: type.slug, count: 0 };
+      return handleQueryError(
+        error,
+        `AtlasPage: count for ${type.slug}`,
+        { slug: type.slug, count: 0 }
+      );
     }
   });
 
@@ -73,25 +78,15 @@ export default async function AtlasPage() {
 
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+      <PageViewTracker />
       <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb Navigation */}
-        <nav className="mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2 text-xs text-gray-600">
-            <li>
-              <Link href="/" className="hover:text-gray-900 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                Explore
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="text-gray-900 font-medium" aria-current="page">Atlas</li>
-          </ol>
-        </nav>
+        <ExploreBreadcrumbs
+          items={[
+            { name: 'Home', href: '/' },
+            { name: 'Explore', href: '/explore' },
+            { name: 'Atlas', href: '/explore/atlas', isCurrentPage: true },
+          ]}
+        />
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
@@ -109,20 +104,20 @@ export default async function AtlasPage() {
             const count = countMap[type.slug] || 0;
             const isComingSoon = type.status === 'coming_soon';
             const content = (
-              <div className="flex items-start gap-2">
-                {type.icon_path && (
-                  <Image
-                    src={type.icon_path}
-                    alt={type.name}
-                    width={16}
-                    height={16}
-                    className="w-4 h-4 flex-shrink-0 mt-0.5"
-                    unoptimized
-                  />
-                )}
-                <div className="flex-1 space-y-0.5">
+                <div className="flex items-start gap-2">
+                  {type.icon_path && (
+                    <Image
+                      src={type.icon_path}
+                      alt={type.name}
+                      width={16}
+                      height={16}
+                      className="w-4 h-4 flex-shrink-0 mt-0.5"
+                      unoptimized
+                    />
+                  )}
+                  <div className="flex-1 space-y-0.5">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
+                      <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {isComingSoon && (
                         <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
@@ -133,12 +128,12 @@ export default async function AtlasPage() {
                         <span className="text-[10px] text-gray-500">({count.toLocaleString()})</span>
                       )}
                     </div>
+                    </div>
+                    {type.description && (
+                      <p className="text-xs text-gray-600">{type.description}</p>
+                    )}
                   </div>
-                  {type.description && (
-                    <p className="text-xs text-gray-600">{type.description}</p>
-                  )}
                 </div>
-              </div>
             );
 
             if (isComingSoon) {

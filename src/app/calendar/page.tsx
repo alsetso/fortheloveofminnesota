@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import CalendarPageClient from '@/features/calendar/components/CalendarPageClient';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export const metadata: Metadata = {
   title: 'Calendar | For the Love of Minnesota',
@@ -54,6 +55,7 @@ export const metadata: Metadata = {
 export default function CalendarPage() {
   return (
     <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3">
+      <PageViewTracker />
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb */}
         <nav className="mb-3" aria-label="Breadcrumb">

@@ -4,6 +4,12 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { CitiesListView } from '@/features/atlas/components/CitiesListView';
 import Link from 'next/link';
 import { StarIcon } from '@heroicons/react/24/solid';
+import { formatNumber } from '@/lib/utils/formatting';
+import { generateCitiesStructuredData, generateBreadcrumbStructuredData } from '@/lib/utils/structuredData';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
+import { handleQueryError } from '@/lib/utils/errorHandling';
+import { generateCitiesMetadata } from '@/lib/utils/metadata';
+import type { CityListItem } from '@/types/explore';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -14,123 +20,9 @@ export async function generateMetadata(): Promise<Metadata> {
     .from('cities')
     .select('*', { count: 'exact', head: true });
   
-  const cityCount = count || 0;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  
-  return {
-    title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
-    description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location. Find detailed information about Minneapolis, St. Paul, Duluth, Rochester, and all other Minnesota cities. Updated directory with population data and city profiles.`,
-    keywords: ['Minnesota cities', 'MN cities', 'city directory', 'Minneapolis', 'St. Paul', 'Duluth', 'Rochester', 'Minnesota demographics', 'city population', 'Minnesota locations'],
-    openGraph: {
-      title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
-      description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location. Find detailed information about every city in Minnesota.`,
-      url: `${baseUrl}/explore/cities`,
-      siteName: 'For the Love of Minnesota',
-      images: [
-        {
-          url: '/logo.png',
-          width: 1200,
-          height: 630,
-          type: 'image/png',
-          alt: 'Minnesota Cities Directory - Complete List of All Cities in Minnesota',
-        },
-      ],
-      locale: 'en_US',
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
-      description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location.`,
-      images: ['/logo.png'],
-    },
-    alternates: {
-      canonical: `${baseUrl}/explore/cities`,
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-  };
+  return generateCitiesMetadata(count || 0);
 }
 
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
-
-function generateStructuredData(cities: Array<{ id: string; name: string; slug: string; population: number; county: string | null }>) {
-  const totalPopulation = cities.reduce((sum, c) => sum + c.population, 0);
-  
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: 'Minnesota Cities Directory',
-    description: `Complete directory of all ${cities.length} cities in Minnesota with population data and city profiles.`,
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/cities`,
-    mainEntity: {
-      '@type': 'ItemList',
-      numberOfItems: cities.length,
-      itemListElement: cities.slice(0, 50).map((city, index) => ({
-        '@type': 'ListItem',
-        position: index + 1,
-        item: {
-          '@type': 'City',
-          name: city.name,
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/city/${city.slug}`,
-          population: city.population,
-          containedInPlace: city.county ? {
-            '@type': 'County',
-            name: city.county,
-          } : undefined,
-        },
-      })),
-    },
-    about: {
-      '@type': 'State',
-      name: 'Minnesota',
-      '@id': 'https://www.wikidata.org/wiki/Q1527',
-    },
-    statistics: {
-      '@type': 'StatisticalPopulation',
-      populationTotal: totalPopulation,
-      numberOfItems: cities.length,
-    },
-  };
-}
-
-function generateBreadcrumbStructuredData() {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Explore',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: 'Cities',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/cities`,
-      },
-    ],
-  };
-}
 
 export default async function CitiesListPage() {
   const supabase = createServerClient();
@@ -141,15 +33,20 @@ export default async function CitiesListPage() {
     .select('id, name, slug, population, county, favorite, website_url')
     .order('population', { ascending: false }) as { data: { id: string; name: string; slug: string; population: number | null; county: string | null; favorite: boolean | null; website_url: string | null }[] | null; error: any };
 
-  if (error) {
-    // Log error but continue with empty array to prevent page crash
-    console.error('[CitiesListPage] Error fetching cities:', error);
-  }
-
-  const allCities = (cities || []) as { id: string; name: string; slug: string; population: number | null; county: string | null; favorite: boolean | null; website_url: string | null }[];
+  const allCities: CityListItem[] = handleQueryError(
+    error,
+    'CitiesListPage: cities',
+    (cities || []) as CityListItem[]
+  );
   const totalPopulation = allCities.reduce((sum, c) => sum + (c.population || 0), 0);
-  const structuredData = generateStructuredData(allCities.filter(c => c.population !== null) as { id: string; name: string; slug: string; population: number; county: string | null }[]);
-  const breadcrumbData = generateBreadcrumbStructuredData();
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
+  const citiesWithPopulation = allCities.filter(c => c.population !== null) as { id: string; name: string; slug: string; population: number; county: string | null }[];
+  const structuredData = generateCitiesStructuredData(citiesWithPopulation, totalPopulation);
+  const breadcrumbData = generateBreadcrumbStructuredData([
+    { name: 'Home', url: `${baseUrl}/` },
+    { name: 'Explore', url: `${baseUrl}/explore` },
+    { name: 'Cities', url: `${baseUrl}/explore/cities` },
+  ]);
 
   return (
     <>
@@ -163,24 +60,13 @@ export default async function CitiesListPage() {
       />
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
         <div className="max-w-4xl mx-auto">
-          {/* Breadcrumb Navigation */}
-          <nav className="mb-3" aria-label="Breadcrumb">
-            <ol className="flex items-center gap-2 text-xs text-gray-600">
-              <li>
-                <Link href="/" className="hover:text-gray-900 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li>
-                <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                  Explore
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li className="text-gray-900 font-medium" aria-current="page">Cities</li>
-            </ol>
-          </nav>
+          <ExploreBreadcrumbs
+            items={[
+              { name: 'Home', href: '/' },
+              { name: 'Explore', href: '/explore' },
+              { name: 'Cities', href: '/explore/cities', isCurrentPage: true },
+            ]}
+          />
 
           {/* Header */}
           <div className="mb-3 space-y-1.5">

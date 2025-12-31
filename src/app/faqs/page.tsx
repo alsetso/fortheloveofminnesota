@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import FAQsClient from '@/features/faqs/components/FAQsClient';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export const metadata: Metadata = {
   title: 'FAQs | For the Love of Minnesota',
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default function FAQsPage() {
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+      <PageViewTracker />
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb */}
         <nav className="mb-3" aria-label="Breadcrumb">

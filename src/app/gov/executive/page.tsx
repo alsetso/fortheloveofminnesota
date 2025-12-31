@@ -1,63 +1,34 @@
 import { Metadata } from 'next';
+import { generateBranchMetadata } from '@/features/civic/utils/metadata';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
-import Link from 'next/link';
-import ExecutiveChart from './ExecutiveChart';
-import ExecutivePageClient from './ExecutivePageClient';
+import GovPageViewTracker from '../components/GovPageViewTracker';
+import OrgChart from '@/features/civic/components/OrgChart';
+import { getCivicOrgBySlug } from '@/features/civic/services/civicService';
+import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import { BuildingOfficeIcon } from '@heroicons/react/24/outline';
 
 export const revalidate = 3600;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  
-  return {
-    title: 'Minnesota Executive Branch | For the Love of Minnesota',
-    description: 'Minnesota Executive Branch structure including the Governor, Lieutenant Governor, and state departments.',
-    keywords: ['Minnesota governor', 'Tim Walz', 'Minnesota executive branch', 'Minnesota state departments'],
-    openGraph: {
-      title: 'Minnesota Executive Branch | For the Love of Minnesota',
-      description: 'Minnesota Executive Branch structure including the Governor, Lieutenant Governor, and state departments.',
-      url: `${baseUrl}/gov/executive`,
-      siteName: 'For the Love of Minnesota',
-      images: [
-        {
-          url: '/logo.png',
-          width: 1200,
-          height: 630,
-          type: 'image/png',
-          alt: 'Minnesota Executive Branch',
-        },
-      ],
-      locale: 'en_US',
-      type: 'website',
-    },
-    alternates: {
-      canonical: `${baseUrl}/gov/executive`,
-    },
-  };
+  return generateBranchMetadata(
+    'Executive',
+    'Minnesota Executive Branch structure including the Governor, Lieutenant Governor, and state departments.',
+    ['Minnesota governor', 'Tim Walz', 'Minnesota executive branch', 'Minnesota state departments']
+  );
 }
 
-export default function ExecutivePage() {
+export default async function ExecutivePage() {
+  const org = await getCivicOrgBySlug('executive');
+
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
-        <nav className="mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2 text-xs text-gray-600">
-            <li>
-              <Link href="/" className="hover:text-gray-900 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/gov" className="hover:text-gray-900 transition-colors">
-                Government
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="text-gray-900 font-medium" aria-current="page">Executive</li>
-          </ol>
-        </nav>
+        <Breadcrumbs items={[
+          { label: 'Home', href: '/' },
+          { label: 'Government', href: '/gov' },
+          { label: 'Executive', href: null },
+        ]} />
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
@@ -70,9 +41,9 @@ export default function ExecutivePage() {
         </div>
 
         {/* Executive Chart */}
-        <ExecutiveChart />
+        <OrgChart org={org} icon={<BuildingOfficeIcon className="w-4 h-4 text-gray-500" />} />
       </div>
-      <ExecutivePageClient />
+      <GovPageViewTracker />
     </SimplePageLayout>
   );
 }

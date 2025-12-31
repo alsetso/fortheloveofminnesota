@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { EnvelopeIcon } from '@heroicons/react/24/outline';
 import ContactPageClient from '@/features/contact/components/ContactPageClient';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export const metadata: Metadata = {
   title: 'Contact Us | For the Love of Minnesota',
@@ -59,6 +60,8 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <SimplePageLayout containerMaxWidth="lg" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3">
+      <PageViewTracker />
+      <ContactPageClient />
       <div className="space-y-3">
         {/* Header */}
         <div className="space-y-1.5">
@@ -86,7 +89,7 @@ export default function ContactPage() {
                 href="mailto:hi@fortheloveofminnesota.com"
                 className="text-xs text-gray-600 hover:text-gray-900 transition-colors break-all"
               >
-                hi@fortheloveofminnesota.com
+                loveofminnesota@gmail.com
               </a>
               <p className="text-xs text-gray-500 mt-1">
                 We typically respond within 24-48 hours during business days.

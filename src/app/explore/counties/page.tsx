@@ -4,6 +4,9 @@ import { createServerClient } from '@/lib/supabaseServer';
 import { CountiesListView } from '@/features/atlas/components/CountiesListView';
 import Link from 'next/link';
 import { StarIcon } from '@heroicons/react/24/solid';
+import { formatNumber, formatArea } from '@/lib/utils/formatting';
+import { generateCountiesStructuredData, generateBreadcrumbStructuredData } from '@/lib/utils/structuredData';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -14,133 +17,9 @@ export async function generateMetadata(): Promise<Metadata> {
     .from('counties')
     .select('*', { count: 'exact', head: true });
   
-  const countyCount = count || 87;
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  
-  return {
-    title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
-    description: `Complete directory of all ${countyCount} Minnesota counties. Browse all counties by name, population, and area. Find detailed information about Hennepin County, Ramsey County, Dakota County, and all other Minnesota counties. Updated directory with population data and county profiles.`,
-    keywords: ['Minnesota counties', 'MN counties', 'county directory', 'Hennepin County', 'Ramsey County', 'Dakota County', 'Minnesota demographics', 'county population', 'Minnesota geography'],
-    openGraph: {
-      title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
-      description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area. Find detailed information about every county in Minnesota.`,
-      url: `${baseUrl}/explore/counties`,
-      siteName: 'For the Love of Minnesota',
-      images: [
-        {
-          url: '/logo.png',
-          width: 1200,
-          height: 630,
-          type: 'image/png',
-          alt: 'Minnesota Counties Directory - Complete List of All Counties in Minnesota',
-        },
-      ],
-      locale: 'en_US',
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
-      description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area.`,
-      images: ['/logo.png'],
-    },
-    alternates: {
-      canonical: `${baseUrl}/explore/counties`,
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-  };
+  return generateCountiesMetadata(count || 87);
 }
 
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
-
-function formatArea(area: number): string {
-  return `${formatNumber(area)} sq mi`;
-}
-
-function generateStructuredData(counties: Array<{ id: string; name: string; slug: string | null; population: number; area_sq_mi: number | null }>) {
-  const totalPopulation = counties.reduce((sum, c) => sum + c.population, 0);
-  const totalArea = counties.reduce((sum, c) => sum + Number(c.area_sq_mi || 0), 0);
-  
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: 'Minnesota Counties Directory',
-    description: `Complete directory of all ${counties.length} counties in Minnesota with population data, area information, and county profiles.`,
-    url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/counties`,
-    mainEntity: {
-      '@type': 'ItemList',
-      numberOfItems: counties.length,
-      itemListElement: counties
-        .filter(c => c.slug !== null)
-        .slice(0, 50)
-        .map((county, index) => ({
-          '@type': 'ListItem',
-          position: index + 1,
-          item: {
-            '@type': 'County',
-            name: county.name,
-            url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/county/${county.slug}`,
-            population: county.population,
-            area: county.area_sq_mi ? {
-              '@type': 'QuantitativeValue',
-              value: county.area_sq_mi,
-              unitCode: 'MI2',
-            } : undefined,
-          },
-        })),
-    },
-    about: {
-      '@type': 'State',
-      name: 'Minnesota',
-      '@id': 'https://www.wikidata.org/wiki/Q1527',
-    },
-    statistics: {
-      '@type': 'StatisticalPopulation',
-      populationTotal: totalPopulation,
-      numberOfItems: counties.length,
-      areaTotal: totalArea,
-    },
-  };
-}
-
-function generateBreadcrumbStructuredData() {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Explore',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: 'Counties',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore/counties`,
-      },
-    ],
-  };
-}
 
 export default async function CountiesListPage() {
   const supabase = createServerClient();
@@ -151,23 +30,20 @@ export default async function CountiesListPage() {
     .select('id, name, slug, population, area_sq_mi, favorite')
     .order('name', { ascending: true });
 
-  if (error) {
-    // Log error but continue with empty array to prevent page crash
-    console.error('[CountiesListPage] Error fetching counties:', error);
-  }
-
-  const allCounties = (counties || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    population: number;
-    area_sq_mi: number | null;
-    favorite: boolean | null;
-  }>;
+  const allCounties: CountyListItem[] = handleQueryError(
+    error,
+    'CountiesListPage: counties',
+    (counties || []) as CountyListItem[]
+  );
   const totalPopulation = allCounties.reduce((sum, c) => sum + c.population, 0);
   const totalArea = allCounties.reduce((sum, c) => sum + Number(c.area_sq_mi || 0), 0);
-  const structuredData = generateStructuredData(allCounties);
-  const breadcrumbData = generateBreadcrumbStructuredData();
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
+  const structuredData = generateCountiesStructuredData(allCounties, totalPopulation, totalArea);
+  const breadcrumbData = generateBreadcrumbStructuredData([
+    { name: 'Home', url: `${baseUrl}/` },
+    { name: 'Explore', url: `${baseUrl}/explore` },
+    { name: 'Counties', url: `${baseUrl}/explore/counties` },
+  ]);
 
   return (
     <>
@@ -181,24 +57,13 @@ export default async function CountiesListPage() {
       />
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
         <div className="max-w-4xl mx-auto">
-          {/* Breadcrumb Navigation */}
-          <nav className="mb-3" aria-label="Breadcrumb">
-            <ol className="flex items-center gap-2 text-xs text-gray-600">
-              <li>
-                <Link href="/" className="hover:text-gray-900 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li>
-                <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                  Explore
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li className="text-gray-900 font-medium" aria-current="page">Counties</li>
-            </ol>
-          </nav>
+          <ExploreBreadcrumbs
+            items={[
+              { name: 'Home', href: '/' },
+              { name: 'Explore', href: '/explore' },
+              { name: 'Counties', href: '/explore/counties', isCurrentPage: true },
+            ]}
+          />
 
           {/* Header */}
           <div className="mb-3 space-y-1.5">

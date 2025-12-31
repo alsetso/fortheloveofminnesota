@@ -2,30 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminApiAccess } from '@/lib/adminHelpers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
-import { hasNewsGeneratedRecently, saveNewsGen } from '@/features/news/services/newsService';
-
-interface NewsArticle {
-  article_id: string;
-  title: string;
-  link: string;
-  snippet: string;
-  photo_url: string | null;
-  thumbnail_url: string | null;
-  published_datetime_utc: string;
-  authors: string[];
-  source_url: string;
-  source_name: string;
-  source_logo_url: string | null;
-  source_favicon_url: string | null;
-  source_publication_id: string;
-  related_topics: string[];
-}
-
-interface NewsResponse {
-  status: string;
-  request_id: string;
-  data: NewsArticle[];
-}
+import { hasNewsGeneratedRecently, savePrompt } from '@/features/news/services/newsService';
+import { fetchNewsFromRapidAPI, deduplicateArticles, formatNewsArticles } from '@/features/news/services/newsApiService';
+import { handleApiError } from '@/lib/apiErrorHandler';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,43 +67,22 @@ export async function POST(request: NextRequest) {
 
     // Default query: "Minnesota, MN" with 24 hours
     const query = 'Minnesota, MN';
-    const limit = ''; // No limit - get all news
     const timePublished = '1d'; // 24 hours
     const country = 'US';
     const lang = 'en';
 
-    const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'RapidAPI key not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Build URL
-    const baseUrl = 'https://real-time-news-data.p.rapidapi.com/search';
-    const urlParams = new URLSearchParams();
-    urlParams.append('query', query);
-    urlParams.append('limit', limit);
-    urlParams.append('time_published', timePublished);
-    urlParams.append('country', country);
-    urlParams.append('lang', lang);
-
-    const url = `${baseUrl}?${urlParams.toString()}`;
-
-    // Make API call
-    let response: Response;
+    // Fetch news from RapidAPI using shared service
+    let data;
     try {
-      response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'x-rapidapi-host': 'real-time-news-data.p.rapidapi.com',
-          'x-rapidapi-key': apiKey,
-        },
+      data = await fetchNewsFromRapidAPI({
+        query,
+        timePublished,
+        country,
+        lang,
+        // No limit - get all news
       });
-    } catch (fetchError: any) {
-      if (fetchError?.code === 'ERR_TLS_CERT_ALTNAME_INVALID' || fetchError?.message?.includes('certificate')) {
-        console.error('SSL certificate error with news API endpoint:', fetchError.message);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('SSL certificate')) {
         return NextResponse.json(
           { 
             error: 'SSL certificate validation failed. The news API endpoint may be temporarily unavailable or misconfigured.',
@@ -133,61 +91,12 @@ export async function POST(request: NextRequest) {
           { status: 502 }
         );
       }
-      throw fetchError;
+      return handleApiError(error, 'Failed to fetch news from RapidAPI');
     }
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unable to read error response');
-      console.error('RapidAPI error:', response.status, errorText);
-      return NextResponse.json(
-        { 
-          error: 'Failed to fetch news data', 
-          details: errorText,
-          status: response.status 
-        },
-        { status: response.status >= 500 ? 502 : response.status }
-      );
-    }
-
-    const data: NewsResponse = await response.json();
-
-    // Check if status is OK
-    if (data.status !== 'OK') {
-      return NextResponse.json(
-        { 
-          error: 'News API returned non-OK status', 
-          status: data.status 
-        },
-        { status: 502 }
-      );
-    }
-
-    // Format the response and remove duplicates by article_id
-    const articleMap = new Map<string, typeof data.data[0]>();
-    (data.data || []).forEach((article) => {
-      if (!articleMap.has(article.article_id)) {
-        articleMap.set(article.article_id, article);
-      }
-    });
-
-    const formattedArticles = Array.from(articleMap.values()).map((article) => ({
-      id: article.article_id,
-      title: article.title,
-      link: article.link,
-      snippet: article.snippet,
-      photoUrl: article.photo_url,
-      thumbnailUrl: article.thumbnail_url,
-      publishedAt: article.published_datetime_utc,
-      authors: article.authors || [],
-      source: {
-        url: article.source_url,
-        name: article.source_name,
-        logoUrl: article.source_logo_url,
-        faviconUrl: article.source_favicon_url,
-        publicationId: article.source_publication_id,
-      },
-      relatedTopics: article.related_topics || [],
-    }));
+    // Deduplicate and format articles
+    const deduplicated = deduplicateArticles(data.data || []);
+    const formattedArticles = formatNewsArticles(deduplicated);
 
     // Prepare response for storage
     const apiResponse = {
@@ -195,17 +104,16 @@ export async function POST(request: NextRequest) {
       articles: formattedArticles,
       count: formattedArticles.length,
       query,
-      limit,
       timePublished,
       country,
       lang,
       generatedAt: new Date().toISOString(),
     };
 
-    // Save to database
-    const savedNews = await saveNewsGen(accountId, query, apiResponse);
+    // Save to database (uses news.prompt, trigger auto-extracts to news.generated)
+    const savedPrompt = await savePrompt(accountId, query, apiResponse);
 
-    if (!savedNews) {
+    if (!savedPrompt) {
       return NextResponse.json(
         { error: 'Failed to save news to database' },
         { status: 500 }
@@ -218,11 +126,7 @@ export async function POST(request: NextRequest) {
       data: apiResponse,
     });
   } catch (error) {
-    console.error('Error in POST /api/news/generate:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+    return handleApiError(error, 'Error in POST /api/news/generate');
   }
 }
 

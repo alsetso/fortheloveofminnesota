@@ -6,6 +6,7 @@ import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import { Metadata } from 'next';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,6 +169,7 @@ export default async function ProfilePage({ params }: Props) {
 
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+      <PageViewTracker page_url={`/profile/${slug}`} />
       <OwnershipToast isOwnProfile={isOwnProfile} />
       <div className="max-w-7xl mx-auto">
         <ProfilePageClient

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { StarIcon } from '@heroicons/react/24/solid';
 import React from 'react';
 import { usePageView } from '@/hooks/usePageView';
+import { formatNumber, formatArea } from '@/lib/utils/formatting';
+import { highlightMatch } from '@/lib/utils/textHighlight';
 
 type County = {
   id: string;
@@ -20,36 +22,6 @@ interface CountiesListViewProps {
 }
 
 type SortOption = 'name' | 'population' | 'area';
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
-
-function formatArea(area: number): string {
-  return `${formatNumber(area)} sq mi`;
-}
-
-function highlightMatch(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  
-  const lowerText = text.toLowerCase();
-  const lowerQuery = query.toLowerCase().trim();
-  const index = lowerText.indexOf(lowerQuery);
-  
-  if (index === -1) return text;
-  
-  const before = text.substring(0, index);
-  const match = text.substring(index, index + query.length);
-  const after = text.substring(index + query.length);
-  
-  return (
-    <>
-      {before}
-      <span className="bg-yellow-200 font-semibold">{match}</span>
-      {after}
-    </>
-  );
-}
 
 export function CountiesListView({ counties }: CountiesListViewProps) {
   usePageView(); // Track page view

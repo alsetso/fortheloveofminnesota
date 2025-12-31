@@ -10,6 +10,22 @@ import CityEditButton from '@/features/atlas/components/CityEditButton';
 import CityMap from '@/features/atlas/components/CityMap';
 import { City } from '@/features/admin/services/cityAdminService';
 import { StarIcon } from '@heroicons/react/24/solid';
+import { sanitizeCountyNameForQuery } from '@/lib/utils/querySanitization';
+import { formatNumber } from '@/lib/utils/formatting';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
+import { handleQueryError } from '@/lib/utils/errorHandling';
+import type {
+  NeighborhoodEntity,
+  SchoolEntity,
+  ParkEntity,
+  WatertowerEntity,
+  CemeteryEntity,
+  GolfCourseEntity,
+  HospitalEntity,
+  AirportEntity,
+  ChurchEntity,
+  MunicipalEntity,
+} from '@/types/explore';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -43,76 +59,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .single();
 
   if (!city) {
-    return {
-      title: 'City Not Found',
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    return generateNotFoundMetadata();
   }
 
-  const cityMeta = city as {
-    name: string;
-    population: number | null;
-    county: string | null;
-    meta_title: string | null;
-    meta_description: string | null;
-  };
-
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  const url = `${baseUrl}/explore/city/${slug}`;
-  const title = cityMeta.meta_title || `${cityMeta.name}, Minnesota | City Information`;
-  const populationText = cityMeta.population !== null ? cityMeta.population.toLocaleString() : 'N/A';
-  const description = cityMeta.meta_description || `${cityMeta.name}, Minnesota. Population: ${populationText}${cityMeta.county ? `, County: ${cityMeta.county}` : ''}. Information about ${cityMeta.name} including demographics, location, and resources.`;
-
-  return {
-    title,
-    description,
-    keywords: [
-      cityMeta.name,
-      `${cityMeta.name} Minnesota`,
-      'Minnesota city',
-      'MN city',
-      'city information',
-      'city demographics',
-      'city population',
-      cityMeta.county || '',
-      `${cityMeta.name} county`,
-      'Minnesota geography',
-    ],
-    openGraph: {
-      title,
-      description,
-      url,
-      siteName: 'For the Love of Minnesota',
-      locale: 'en_US',
-      type: 'website',
+  return generateCityMetadata(
+    city as {
+      name: string;
+      population: number | null;
+      county: string | null;
+      meta_title: string | null;
+      meta_description: string | null;
     },
-    twitter: {
-      card: 'summary',
-      title,
-      description,
-    },
-    alternates: {
-      canonical: url,
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-  };
-}
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
+    slug
+  );
 }
 
 export default async function CityPage({ params }: Props) {
@@ -168,11 +127,8 @@ export default async function CityPage({ params }: Props) {
   }> = [];
   
   if (cityData.county) {
-    // Extract county name base (without "County" suffix) for matching
-    const countyNameBase = cityData.county.replace(/\s+County$/, '');
-    const countyNameFull = cityData.county.includes('County') 
-      ? cityData.county 
-      : `${cityData.county} County`;
+    // Sanitize county name for safe use in queries
+    const { base: countyNameBase, full: countyNameFull } = sanitizeCountyNameForQuery(cityData.county);
     
     const { data: sameCountyCities, error: sameCountyError } = await supabase
       .from('cities')
@@ -181,12 +137,10 @@ export default async function CityPage({ params }: Props) {
       .order('population', { ascending: false })
       .limit(100); // High limit to get all cities in county
     
-    if (sameCountyError) {
-      // Log error but continue with empty array
-      console.error('[CityPage] Error fetching same county cities:', sameCountyError);
-    }
-    
-    sameCountyCitiesData = (sameCountyCities || []) as Array<{
+    sameCountyCitiesData = handleQueryError(
+      sameCountyError,
+      'CityPage: same county cities',
+      (sameCountyCities || []) as Array<{
       id: string;
       name: string;
       slug: string | null;
@@ -205,12 +159,7 @@ export default async function CityPage({ params }: Props) {
     .order('population', { ascending: false })
     .limit(20);
 
-  if (favoriteCitiesError) {
-    // Log error but continue with empty array
-    console.error('[CityPage] Error fetching favorite cities:', favoriteCitiesError);
-  }
-
-  const favoriteCitiesData = (favoriteCities || []) as Array<{
+  const favoriteCitiesData: Array<{
     id: string;
     name: string;
     slug: string | null;
@@ -218,211 +167,82 @@ export default async function CityPage({ params }: Props) {
     county: string | null;
     favorite: boolean | null;
     website_url: string | null;
-  }>;
+  }> = handleQueryError(
+    favoriteCitiesError,
+    'CityPage: favorite cities',
+    (favoriteCities || []) as Array<{
+      id: string;
+      name: string;
+      slug: string | null;
+      population: number | null;
+      county: string | null;
+      favorite: boolean | null;
+      website_url: string | null;
+    }>
+  );
 
-  // Fetch all atlas entities for this city
+  // Fetch all atlas entities for this city in parallel
   const cityId = cityData.id;
   
-  // Neighborhoods
-  const { data: neighborhoods } = await supabase
-    .from('neighborhoods')
-    .select('id, name, slug, lat, lng, description')
-    .eq('city_id', cityId)
-    .order('name');
+  const [
+    neighborhoodsResult,
+    schoolsResult,
+    parksResult,
+    watertowersResult,
+    cemeteriesResult,
+    golfCoursesResult,
+    hospitalsResult,
+    airportsResult,
+    churchesResult,
+    municipalsResult,
+  ] = await Promise.all([
+    supabase.from('neighborhoods').select('id, name, slug, lat, lng, description').eq('city_id', cityId).order('name'),
+    supabase.from('schools').select('id, name, slug, lat, lng, school_type, description').eq('city_id', cityId).order('name'),
+    supabase.from('parks').select('id, name, slug, lat, lng, park_type, description').eq('city_id', cityId).order('name'),
+    supabase.from('watertowers').select('id, name, slug, lat, lng, description').eq('city_id', cityId).order('name'),
+    supabase.from('cemeteries').select('id, name, slug, lat, lng, description').eq('city_id', cityId).order('name'),
+    supabase.from('golf_courses').select('id, name, slug, lat, lng, course_type, holes, description').eq('city_id', cityId).order('name'),
+    supabase.from('hospitals').select('id, name, slug, lat, lng, hospital_type, description').eq('city_id', cityId).order('name'),
+    supabase.from('airports').select('id, name, slug, lat, lng, airport_type, iata_code, icao_code, description').eq('city_id', cityId).order('name'),
+    supabase.from('churches').select('id, name, slug, lat, lng, church_type, denomination, description').eq('city_id', cityId).order('name'),
+    supabase.from('municipals').select('id, name, slug, lat, lng, municipal_type, description').eq('city_id', cityId).order('name'),
+  ]);
 
-  // Schools
-  const { data: schools } = await supabase
-    .from('schools')
-    .select('id, name, slug, lat, lng, school_type, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Parks
-  const { data: parks } = await supabase
-    .from('parks')
-    .select('id, name, slug, lat, lng, park_type, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Watertowers
-  const { data: watertowers } = await supabase
-    .from('watertowers')
-    .select('id, name, slug, lat, lng, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Cemeteries
-  const { data: cemeteries } = await supabase
-    .from('cemeteries')
-    .select('id, name, slug, lat, lng, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Golf Courses
-  const { data: golfCourses } = await supabase
-    .from('golf_courses')
-    .select('id, name, slug, lat, lng, course_type, holes, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Hospitals
-  const { data: hospitals } = await supabase
-    .from('hospitals')
-    .select('id, name, slug, lat, lng, hospital_type, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Airports
-  const { data: airports } = await supabase
-    .from('airports')
-    .select('id, name, slug, lat, lng, airport_type, iata_code, icao_code, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Churches
-  const { data: churches } = await supabase
-    .from('churches')
-    .select('id, name, slug, lat, lng, church_type, denomination, description')
-    .eq('city_id', cityId)
-    .order('name');
-
-  // Municipals
-  const { data: municipals } = await supabase
-    .from('municipals')
-    .select('id, name, slug, lat, lng, municipal_type, description')
-    .eq('city_id', cityId)
-    .order('name');
+  const neighborhoods = neighborhoodsResult.data;
+  const schools = schoolsResult.data;
+  const parks = parksResult.data;
+  const watertowers = watertowersResult.data;
+  const cemeteries = cemeteriesResult.data;
+  const golfCourses = golfCoursesResult.data;
+  const hospitals = hospitalsResult.data;
+  const airports = airportsResult.data;
+  const churches = churchesResult.data;
+  const municipals = municipalsResult.data;
 
   // Type assertions for atlas entities
-  const neighborhoodsData = (neighborhoods || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    description: string | null;
-  }>;
-
-  const schoolsData = (schools || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    school_type: string | null;
-    description: string | null;
-  }>;
-
-  const parksData = (parks || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    park_type: string | null;
-    description: string | null;
-  }>;
-
-  const watertowersData = (watertowers || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    description: string | null;
-  }>;
-
-  const cemeteriesData = (cemeteries || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    description: string | null;
-  }>;
-
-  const golfCoursesData = (golfCourses || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    course_type: string | null;
-    holes: number | null;
-    description: string | null;
-  }>;
-
-  const hospitalsData = (hospitals || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    hospital_type: string | null;
-    description: string | null;
-  }>;
-
-  const airportsData = (airports || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    airport_type: string | null;
-    iata_code: string | null;
-    icao_code: string | null;
-    description: string | null;
-  }>;
-
-  const churchesData = (churches || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    church_type: string | null;
-    denomination: string | null;
-    description: string | null;
-  }>;
-
-  const municipalsData = (municipals || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    lat: number | null;
-    lng: number | null;
-    municipal_type: string | null;
-    description: string | null;
-  }>;
+  const neighborhoodsData: NeighborhoodEntity[] = (neighborhoods || []) as NeighborhoodEntity[];
+  const schoolsData: SchoolEntity[] = (schools || []) as SchoolEntity[];
+  const parksData: ParkEntity[] = (parks || []) as ParkEntity[];
+  const watertowersData: WatertowerEntity[] = (watertowers || []) as WatertowerEntity[];
+  const cemeteriesData: CemeteryEntity[] = (cemeteries || []) as CemeteryEntity[];
+  const golfCoursesData: GolfCourseEntity[] = (golfCourses || []) as GolfCourseEntity[];
+  const hospitalsData: HospitalEntity[] = (hospitals || []) as HospitalEntity[];
+  const airportsData: AirportEntity[] = (airports || []) as AirportEntity[];
+  const churchesData: ChurchEntity[] = (churches || []) as ChurchEntity[];
+  const municipalsData: MunicipalEntity[] = (municipals || []) as MunicipalEntity[];
 
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" hideFooter={false}>
       <CityPageClient cityId={cityData.id} citySlug={cityData.slug || slug} />
       <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb Navigation */}
-        <nav className="mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2 text-xs text-gray-600">
-            <li>
-              <Link href="/" className="hover:text-gray-900 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                Explore
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore/cities" className="hover:text-gray-900 transition-colors">
-                Cities
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="text-gray-900 font-medium" aria-current="page">{cityData.name}</li>
-          </ol>
-        </nav>
+        <ExploreBreadcrumbs
+          items={[
+            { name: 'Home', href: '/' },
+            { name: 'Explore', href: '/explore' },
+            { name: 'Cities', href: '/explore/cities' },
+            { name: cityData.name, href: `/explore/city/${cityData.slug || slug}`, isCurrentPage: true },
+          ]}
+        />
 
         {/* Government-style header */}
         <div className="mb-3 pb-3 border-b border-gray-200">
@@ -674,22 +494,6 @@ export default async function CityPage({ params }: Props) {
             </section>
           )}
         </div>
-
-          {/* Atlas Entities Sections */}
-          {(neighborhoodsData && neighborhoodsData.length > 0) && (
-            <section>
-              <h2 className="text-sm font-semibold text-gray-900 mb-1.5">Neighborhoods ({neighborhoodsData.length})</h2>
-              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-                <ul className="list-none space-y-1 text-xs text-gray-600">
-                  {neighborhoodsData.map((n) => (
-                    <li key={n.id} className="leading-relaxed">
-                      <span className="text-gray-400">•</span> {n.name}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </section>
-          )}
 
           {/* Atlas Entities Sections */}
           {(neighborhoodsData && neighborhoodsData.length > 0) && (

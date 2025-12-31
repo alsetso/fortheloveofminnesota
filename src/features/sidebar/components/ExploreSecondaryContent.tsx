@@ -45,7 +45,7 @@ export default function ExploreSecondaryContent({ map }: ExploreSecondaryContent
           const visibility: Record<string, boolean> = {};
           types.forEach((type: { slug: string; status: string }) => {
             if (type.status === 'active') {
-              visibility[type.slug] = true;
+            visibility[type.slug] = true;
             }
           });
           setAtlasEntityVisibility(visibility);
@@ -186,9 +186,9 @@ export default function ExploreSecondaryContent({ map }: ExploreSecondaryContent
                 </div>
                 {isActive && (
                   isVisible ? (
-                    <EyeIcon className="w-4 h-4" />
-                  ) : (
-                    <EyeSlashIcon className="w-4 h-4" />
+                  <EyeIcon className="w-4 h-4" />
+                ) : (
+                  <EyeSlashIcon className="w-4 h-4" />
                   )
                 )}
               </button>
@@ -199,12 +199,12 @@ export default function ExploreSecondaryContent({ map }: ExploreSecondaryContent
 
       {/* See More Button */}
       <div className="border-t border-gray-200 pt-3">
-        <Link
+          <Link
           href="/explore"
           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
         >
           See More
-        </Link>
+            </Link>
       </div>
     </div>
   );

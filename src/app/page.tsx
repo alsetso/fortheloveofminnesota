@@ -8,13 +8,16 @@ import {
   MagnifyingGlassIcon,
   ArrowRightIcon,
   MapIcon,
+  UserGroupIcon,
+  ScaleIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createServerClient } from '@/lib/supabaseServer';
-import { getLatestNewsGen } from '@/features/news/services/newsService';
 import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
 import HomepageCalendarAccordion from '@/features/calendar/components/HomepageCalendarAccordion';
+import HomepageViewTracker from '@/components/analytics/HomepageViewTracker';
 
 export const metadata: Metadata = {
   title: 'For the Love of Minnesota',
@@ -73,58 +76,9 @@ export default async function Home() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Fetch latest news
-  const latestNews = await getLatestNewsGen();
-  const apiResponse = latestNews?.api_response as {
-    articles?: Array<{
-      id: string;
-      title: string;
-      link: string;
-      snippet: string;
-      photoUrl?: string;
-      thumbnailUrl?: string;
-      publishedAt?: string;
-      source?: {
-        name?: string;
-      };
-    }>;
-  } | null;
-  const newsArticles = apiResponse?.articles || [];
-
-  // Helper functions for source display
-  const getSourceInitials = (sourceName: string | undefined): string => {
-    if (!sourceName) return 'NEW';
-    const cleaned = sourceName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    return cleaned.slice(0, 3) || 'NEW';
-  };
-
-  const getSourceColor = (sourceName: string | undefined): { bg: string; text: string } => {
-    const softColors = [
-      { bg: 'bg-blue-100', text: 'text-blue-700' },
-      { bg: 'bg-green-100', text: 'text-green-700' },
-      { bg: 'bg-purple-100', text: 'text-purple-700' },
-      { bg: 'bg-pink-100', text: 'text-pink-700' },
-      { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-      { bg: 'bg-indigo-100', text: 'text-indigo-700' },
-      { bg: 'bg-teal-100', text: 'text-teal-700' },
-      { bg: 'bg-orange-100', text: 'text-orange-700' },
-      { bg: 'bg-cyan-100', text: 'text-cyan-700' },
-      { bg: 'bg-rose-100', text: 'text-rose-700' },
-      { bg: 'bg-amber-100', text: 'text-amber-700' },
-      { bg: 'bg-violet-100', text: 'text-violet-700' },
-    ];
-
-    if (!sourceName) return softColors[0];
-    let hash = 0;
-    for (let i = 0; i < sourceName.length; i++) {
-      hash = sourceName.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const index = Math.abs(hash) % softColors.length;
-    return softColors[index];
-  };
-
   return (
     <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3" footerVariant="dark">
+      <HomepageViewTracker />
       <div className="max-w-4xl mx-auto">
         <div className="space-y-6">
         {/* V4: Community-Focused Hero with Large Desktop Heading */}
@@ -153,31 +107,39 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* How It Works Section */}
+        {/* Maps Section */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900">HOW IT WORKS</h2>
-          <p className="text-xs text-gray-600">
-            Drop pins on the map to archive special places, memories, and moments across Minnesota. Each mention becomes part of your personal collection and the community archive.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+          <h2 className="text-sm font-semibold text-gray-900">MAPS</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
               <div className="flex items-start gap-2">
-                <MapPinIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                <GlobeAltIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
                 <div className="space-y-0.5 flex-1">
-                  <p className="text-xs font-medium text-gray-900">Create Mentions</p>
+                  <p className="text-xs font-medium text-gray-900">Community Maps</p>
                   <p className="text-xs text-gray-600">
-                    Click anywhere on the Minnesota map to drop a pin. Add descriptions, photos, dates, and choose visibility.
+                    Explore maps created and shared by the Minnesota community. Discover local insights, stories, and perspectives from residents across the state.
                   </p>
                 </div>
               </div>
             </div>
             <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
               <div className="flex items-start gap-2">
-                <HeartIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                <BuildingLibraryIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
                 <div className="space-y-0.5 flex-1">
-                  <p className="text-xs font-medium text-gray-900">Organize Collections</p>
+                  <p className="text-xs font-medium text-gray-900">Professional Maps</p>
                   <p className="text-xs text-gray-600">
-                    Group your mentions into themed collections. Build unique sets that tell your Minnesota story.
+                    Community maps designed for professionals. Requires pro feature access. Create and share maps with advanced tools and features for professional use.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
+              <div className="flex items-start gap-2">
+                <MapPinIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5 flex-1">
+                  <p className="text-xs font-medium text-gray-900">User Generated Maps</p>
+                  <p className="text-xs text-gray-600">
+                    Create and customize your own maps. Drop pins, add memories, and build personal collections that tell your unique Minnesota story.
                   </p>
                 </div>
               </div>
@@ -187,7 +149,7 @@ export default async function Home() {
 
         {/* Atlas Tables Grid */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900">ATLAS</h2>
+          <h2 className="text-sm font-semibold text-gray-900">EXPLORE</h2>
           <p className="text-xs text-gray-600">
             Complete directory of all Minnesota atlas layers. Explore comprehensive geographic and demographic datasets covering cities, neighborhoods, schools, parks, lakes, hospitals, churches, and more.
           </p>
@@ -196,20 +158,20 @@ export default async function Home() {
               const count = countMap[type.slug] || 0;
               const isComingSoon = type.status === 'coming_soon';
               const content = (
-                <div className="flex items-start gap-2">
-                  {type.icon_path && (
-                    <Image
-                      src={type.icon_path}
-                      alt={type.name}
-                      width={16}
-                      height={16}
-                      className="w-4 h-4 flex-shrink-0 mt-0.5"
-                      unoptimized
-                    />
-                  )}
-                  <div className="flex-1 space-y-0.5">
+                  <div className="flex items-start gap-2">
+                    {type.icon_path && (
+                      <Image
+                        src={type.icon_path}
+                        alt={type.name}
+                        width={16}
+                        height={16}
+                        className="w-4 h-4 flex-shrink-0 mt-0.5"
+                        unoptimized
+                      />
+                    )}
+                    <div className="flex-1 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
+                        <h3 className="text-xs font-semibold text-gray-900">{type.name}</h3>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {isComingSoon && (
                           <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
@@ -220,12 +182,12 @@ export default async function Home() {
                           <span className="text-[10px] text-gray-500">({count.toLocaleString()})</span>
                         )}
                       </div>
+                      </div>
+                      {type.description && (
+                        <p className="text-xs text-gray-600">{type.description}</p>
+                      )}
                     </div>
-                    {type.description && (
-                      <p className="text-xs text-gray-600">{type.description}</p>
-                    )}
                   </div>
-                </div>
               );
 
               if (isComingSoon) {
@@ -252,66 +214,60 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* Government Section */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-gray-900">GOVERNMENT</h2>
+          <p className="text-xs text-gray-600">
+            Understand how Minnesota government works, who holds power, and where citizens can engage effectively.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Link
+              href="/gov"
+              className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors space-y-2"
+            >
+              <div className="flex items-start gap-2">
+                <UserGroupIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5 flex-1">
+                  <p className="text-xs font-medium text-gray-900">Power of Citizens</p>
+                  <p className="text-xs text-gray-600">
+                    Minnesota citizens hold ultimate power through voting, public participation, and direct engagement with government.
+                  </p>
+                </div>
+              </div>
+            </Link>
+            <Link
+              href="/gov"
+              className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors space-y-2"
+            >
+              <div className="flex items-start gap-2">
+                <ScaleIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5 flex-1">
+                  <p className="text-xs font-medium text-gray-900">Gov Officials in Three Branches</p>
+                  <p className="text-xs text-gray-600">
+                    Explore Minnesota's legislative, executive, and judicial branches. Understand who makes decisions and where authority lives.
+                  </p>
+                </div>
+              </div>
+            </Link>
+            <Link
+              href="/gov/checkbook"
+              className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors space-y-2"
+            >
+              <div className="flex items-start gap-2">
+                <CurrencyDollarIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5 flex-1">
+                  <p className="text-xs font-medium text-gray-900">Checkbook</p>
+                  <p className="text-xs text-gray-600">
+                    Access government financial data including contracts, payments, budgets, and state payroll for transparency and accountability.
+                  </p>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </section>
+
         {/* Calendar Section */}
         <HomepageCalendarAccordion />
-
-        {/* News Section */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-900">NEWS</h2>
-          {newsArticles.length > 0 ? (
-            <>
-              <div className="space-y-2">
-                {newsArticles.slice(0, 5).map((article) => {
-                  const sourceInitials = getSourceInitials(article.source?.name);
-                  const sourceColor = getSourceColor(article.source?.name);
-                  
-                  return (
-                    <Link
-                      key={article.id}
-                      href={article.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex gap-2">
-                        {/* Source Avatar */}
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full ${sourceColor.bg} flex items-center justify-center border border-gray-200`}>
-                          <span className={`text-[10px] font-semibold ${sourceColor.text} leading-none`}>
-                            {sourceInitials}
-                          </span>
-                        </div>
-                        
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <h3 className="text-xs font-semibold text-gray-900 line-clamp-2">{article.title}</h3>
-                          {article.snippet && (
-                            <p className="text-xs text-gray-600 line-clamp-2">{article.snippet}</p>
-                          )}
-                          {article.publishedAt && (
-                            <div className="flex items-center gap-1 pt-0.5">
-                              <span className="text-[10px] text-gray-500">
-                                {new Date(article.publishedAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-              <Link
-                href="/news"
-                className="inline-flex items-center gap-1 text-xs font-medium text-gray-900 hover:underline transition-colors"
-              >
-                <span>See More News</span>
-                <ArrowRightIcon className="w-3 h-3" />
-              </Link>
-            </>
-          ) : (
-            <p className="text-xs text-gray-600">No news articles available.</p>
-          )}
-        </section>
         </div>
       </div>
     </SimplePageLayout>

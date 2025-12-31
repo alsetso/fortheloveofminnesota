@@ -7,44 +7,10 @@ import { getServerAuth } from '@/lib/authServer';
 import AtlasTableSearch from '@/features/atlas/components/AtlasTableSearch';
 import { getAtlasTypeBySlug } from '@/features/atlas/services/atlasTypesService';
 import AtlasComingSoonModal from '@/features/atlas/components/AtlasComingSoonModal';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
 
 export const revalidate = 3600;
-
-// Valid atlas table names
-const VALID_TABLES = [
-  'cities',
-  'neighborhoods',
-  'parks',
-  'schools',
-  'lakes',
-  'churches',
-  'hospitals',
-  'golf_courses',
-  'municipals',
-  'watertowers',
-  'cemeteries',
-  'airports',
-  'roads',
-  'radio_and_news',
-];
-
-// Table configuration
-const TABLE_CONFIG: Record<string, { label: string; icon: string | null; description: string }> = {
-  cities: { label: 'Cities', icon: '/city.png', description: 'Complete directory of all Minnesota cities' },
-  neighborhoods: { label: 'Neighborhoods', icon: '/neighborhood.png', description: 'Neighborhoods and districts across Minnesota' },
-  parks: { label: 'Parks', icon: '/park_like.png', description: 'Parks and recreational areas' },
-  schools: { label: 'Schools', icon: '/education.png', description: 'K-12 schools, universities, and colleges' },
-  lakes: { label: 'Lakes', icon: '/lakes.png', description: 'Lakes and water bodies' },
-  churches: { label: 'Churches', icon: '/churches.png', description: 'Churches and places of worship' },
-  hospitals: { label: 'Hospitals', icon: '/hospital.png', description: 'Hospitals and medical facilities' },
-  golf_courses: { label: 'Golf Courses', icon: '/golf courses.png', description: 'Golf courses and clubs' },
-  municipals: { label: 'Municipals', icon: '/municiples.png', description: 'Municipal buildings and facilities' },
-  watertowers: { label: 'Watertowers', icon: null, description: 'Water towers across Minnesota' },
-  cemeteries: { label: 'Cemeteries', icon: null, description: 'Cemeteries and memorial sites' },
-  airports: { label: 'Airports', icon: null, description: 'Airports and aviation facilities' },
-  roads: { label: 'Roads', icon: null, description: 'Roads, highways, and transportation routes' },
-  radio_and_news: { label: 'Radio & News', icon: null, description: 'Radio stations and news outlets' },
-};
 
 type Props = {
   params: Promise<{ table_name: string }>;
@@ -53,7 +19,10 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { table_name } = await params;
   
-  if (!VALID_TABLES.includes(table_name)) {
+  // Fetch atlas type configuration from database
+  const atlasType = await getAtlasTypeBySlug(table_name);
+  
+  if (!atlasType) {
     return {
       title: 'Atlas Table Not Found',
       robots: {
@@ -63,17 +32,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const config = TABLE_CONFIG[table_name];
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   const url = `${baseUrl}/explore/atlas/${table_name}`;
   
   return {
-    title: `Minnesota ${config.label} Directory | Complete List`,
-    description: `${config.description}. Browse the complete directory of ${config.label.toLowerCase()} in Minnesota.`,
-    keywords: [`Minnesota ${config.label.toLowerCase()}`, `MN ${config.label.toLowerCase()}`, `${config.label.toLowerCase()} directory`, 'Minnesota locations', 'Minnesota geographic data'],
+    title: `Minnesota ${atlasType.name} Directory | Complete List`,
+    description: `${atlasType.description || `Complete directory of ${atlasType.name.toLowerCase()} in Minnesota`}. Browse the complete directory of ${atlasType.name.toLowerCase()} in Minnesota.`,
+    keywords: [`Minnesota ${atlasType.name.toLowerCase()}`, `MN ${atlasType.name.toLowerCase()}`, `${atlasType.name.toLowerCase()} directory`, 'Minnesota locations', 'Minnesota geographic data'],
     openGraph: {
-      title: `Minnesota ${config.label} Directory | Complete List`,
-      description: `${config.description}. Browse the complete directory of ${config.label.toLowerCase()} in Minnesota.`,
+      title: `Minnesota ${atlasType.name} Directory | Complete List`,
+      description: `${atlasType.description || `Complete directory of ${atlasType.name.toLowerCase()} in Minnesota`}. Browse the complete directory of ${atlasType.name.toLowerCase()} in Minnesota.`,
       url,
       siteName: 'For the Love of Minnesota',
       images: [
@@ -82,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           width: 1200,
           height: 630,
           type: 'image/png',
-          alt: `Minnesota ${config.label} Directory`,
+          alt: `Minnesota ${atlasType.name} Directory`,
         },
       ],
       locale: 'en_US',
@@ -97,23 +65,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function AtlasTablePage({ params }: Props) {
   const { table_name } = await params;
 
-  if (!VALID_TABLES.includes(table_name)) {
-    notFound();
-  }
-
-  // Fetch atlas type configuration
+  // Fetch atlas type configuration from database
   const atlasType = await getAtlasTypeBySlug(table_name);
   
-  // Use atlas type config if available, otherwise fallback to hardcoded config
-  const config = atlasType ? {
-    label: atlasType.name,
-    icon: atlasType.icon_path,
-    description: atlasType.description || TABLE_CONFIG[table_name]?.description || '',
-  } : TABLE_CONFIG[table_name];
-
-  if (!config) {
+  if (!atlasType) {
     notFound();
   }
+
+  const config = {
+    label: atlasType.name,
+    icon: atlasType.icon_path,
+    description: atlasType.description || '',
+  };
 
   // Check status and control access
   if (atlasType?.status === 'coming_soon') {
@@ -134,11 +97,11 @@ export default async function AtlasTablePage({ params }: Props) {
   const records = result.data;
   const error = result.error;
 
-  if (error) {
-    console.error(`[AtlasTablePage] Error fetching ${table_name}:`, error);
-  }
-
-  const allRecords = (records || []) as Record<string, any>[];
+  const allRecords = handleQueryError(
+    error,
+    `AtlasTablePage: ${table_name}`,
+    (records || []) as Record<string, any>[]
+  );
 
   // Fetch city names for records with city_id
   const cityIds = [...new Set(allRecords.map(r => r.city_id).filter(Boolean))] as string[];
@@ -166,35 +129,20 @@ export default async function AtlasTablePage({ params }: Props) {
 
   return (
     <>
+      <PageViewTracker page_url={`/explore/atlas/${table_name}`} />
       {atlasType?.status === 'coming_soon' && (
         <AtlasComingSoonModal typeName={atlasType.name} />
       )}
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
         <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb Navigation */}
-        <nav className="mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2 text-xs text-gray-600">
-            <li>
-              <Link href="/" className="hover:text-gray-900 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                Explore
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore/atlas" className="hover:text-gray-900 transition-colors">
-                Atlas
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="text-gray-900 font-medium" aria-current="page">{config.label}</li>
-          </ol>
-        </nav>
+        <ExploreBreadcrumbs
+          items={[
+            { name: 'Home', href: '/' },
+            { name: 'Explore', href: '/explore' },
+            { name: 'Atlas', href: '/explore/atlas' },
+            { name: config.label, href: `/explore/atlas/${table_name}`, isCurrentPage: true },
+          ]}
+        />
 
         {/* Admin Label */}
         {isAdmin && (

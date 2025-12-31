@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { StarIcon } from '@heroicons/react/24/solid';
 import React from 'react';
 import { usePageView } from '@/hooks/usePageView';
+import { formatNumber } from '@/lib/utils/formatting';
+import { highlightMatch } from '@/lib/utils/textHighlight';
 
 type City = {
   id: string;
@@ -21,32 +23,6 @@ interface CitiesListViewProps {
 }
 
 type SortOption = 'name' | 'population' | 'county';
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
-
-function highlightMatch(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  
-  const lowerText = text.toLowerCase();
-  const lowerQuery = query.toLowerCase().trim();
-  const index = lowerText.indexOf(lowerQuery);
-  
-  if (index === -1) return text;
-  
-  const before = text.substring(0, index);
-  const match = text.substring(index, index + query.length);
-  const after = text.substring(index + query.length);
-  
-  return (
-    <>
-      {before}
-      <span className="bg-yellow-200 font-semibold">{match}</span>
-      {after}
-    </>
-  );
-}
 
 export function CitiesListView({ cities }: CitiesListViewProps) {
   usePageView(); // Track page view

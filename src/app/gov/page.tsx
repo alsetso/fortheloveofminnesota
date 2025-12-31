@@ -1,8 +1,10 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
-import Link from 'next/link';
 import GovOrgChart from './GovOrgChart';
-import GovPageClient from './GovPageClient';
+import GovContent from './GovContent';
+import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import GovPageViewTracker from './components/GovPageViewTracker';
+import { getCivicOrgTree } from '@/features/civic/services/civicService';
 
 export const revalidate = 3600;
 
@@ -36,37 +38,35 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function GovPage() {
+export default async function GovPage() {
+  const branches = await getCivicOrgTree();
+
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
-        <nav className="mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2 text-xs text-gray-600">
-            <li>
-              <Link href="/" className="hover:text-gray-900 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="text-gray-900 font-medium" aria-current="page">Government</li>
-          </ol>
-        </nav>
+        <Breadcrumbs items={[
+          { label: 'Home', href: '/' },
+          { label: 'Government', href: null },
+        ]} />
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
           <h1 className="text-sm font-semibold text-gray-900">
-            Minnesota Government Leadership
+            Minnesota Government Explained
           </h1>
           <p className="text-xs text-gray-600">
-            Visual organizational chart of Minnesota government structure showing the three branches and their key departments.
+            How power works, who decides, and where participation matters.
           </p>
         </div>
 
         {/* Organizational Chart */}
-        <GovOrgChart />
+        <GovOrgChart branches={branches} />
+
+        {/* Content Sections */}
+        <GovContent />
       </div>
-      <GovPageClient />
+      <GovPageViewTracker />
     </SimplePageLayout>
   );
 }

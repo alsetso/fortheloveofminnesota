@@ -12,6 +12,7 @@ import {
   NewspaperIcon,
   BuildingOfficeIcon,
   CalendarIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline';
 import { Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -23,6 +24,7 @@ import FAQsSecondaryContent from './FAQsSecondaryContent';
 import NewsSecondaryContent from './NewsSecondaryContent';
 import GovSecondaryContent from './GovSecondaryContent';
 import LocationSecondaryContent from './LocationSecondaryContent';
+import ProfileAccountsSecondaryContent from './ProfileAccountsSecondaryContent';
 import { useSidebarTabState, type SidebarTab } from '../hooks/useSidebarTabState';
 
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -70,10 +72,11 @@ const hrefToTab: Record<string, SidebarTab> = {
   '/map': null as any,
   '/location': null as any,
   '/explore': 'explore' as SidebarTab,
-  '/news': 'news' as SidebarTab,
+  '/calendar/news': 'news' as SidebarTab,
   '/calendar': null as any,
   '/faqs': 'faqs' as SidebarTab,
   '/gov': null as any,
+  '#profile': 'profile' as SidebarTab,
   '#controls': 'controls' as SidebarTab,
 };
 
@@ -92,7 +95,7 @@ const mainNavItems: NavItem[] = [
     secondaryContent: <ExploreSecondaryContent />,
   },
   { 
-    href: '/news', 
+    href: '/calendar/news', 
     label: 'News', 
     icon: NewspaperIcon,
     secondaryContent: <NewsSecondaryContent />,
@@ -141,7 +144,9 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
       } else if (tab === 'faqs') {
         setClickedNavItem('/faqs');
       } else if (tab === 'news') {
-        setClickedNavItem('/news');
+        setClickedNavItem('/calendar/news');
+      } else if (tab === 'profile') {
+        setClickedNavItem('#profile');
       }
     },
   });
@@ -204,11 +209,18 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
     if (!isHomepage) return;
     
     const tabFromUrl = urlTab;
-    const expectedHref = tabFromUrl ? `/${tabFromUrl}` : null;
+    // Hash-based tabs use # prefix, route-based use /
+    const expectedHref = tabFromUrl 
+      ? (tabFromUrl === 'controls' || tabFromUrl === 'profile' 
+          ? `#${tabFromUrl}` 
+          : tabFromUrl === 'news'
+          ? '/calendar/news'
+          : `/${tabFromUrl}`)
+      : null;
     
     if (tabFromUrl && clickedNavItem !== expectedHref) {
       setClickedNavItem(expectedHref);
-    } else if (!tabFromUrl && clickedNavItem && (clickedNavItem.startsWith('/explore') || clickedNavItem.startsWith('/news') || clickedNavItem.startsWith('/faqs'))) {
+    } else if (!tabFromUrl && clickedNavItem && (clickedNavItem.startsWith('/explore') || clickedNavItem.startsWith('/calendar/news') || clickedNavItem.startsWith('/faqs') || clickedNavItem === '#controls' || clickedNavItem === '#profile')) {
       // URL param was removed, close tab
       setClickedNavItem(null);
     }
@@ -276,8 +288,23 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
           })}
         </nav>
 
-        {/* Bottom Section - Controls & Account */}
+        {/* Bottom Section - Profile & Controls */}
         <div className="border-t border-gray-200 py-2 space-y-1">
+          {/* Profile Button */}
+          <button
+            onClick={() => handleNavItemClick('#profile')}
+            className={`w-full flex flex-col items-center justify-center gap-1 py-2 px-2 transition-colors ${
+              clickedNavItem === '#profile'
+                ? 'text-gray-900 bg-gray-100'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+            title="Profile"
+            aria-label="Profile"
+          >
+            <UserIcon className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Profile</span>
+          </button>
+
           {/* Controls Button */}
           <button
             onClick={() => handleNavItemClick('#controls')}
@@ -292,13 +319,31 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
             <AdjustmentsHorizontalIcon className="w-5 h-5" />
             <span className="text-[10px] font-medium">Controls</span>
           </button>
-
-
         </div>
       </aside>
 
       {/* Secondary Sidebar - Full screen overlay for all screens */}
       {clickedNavItem && (() => {
+        // Handle profile separately
+        if (clickedNavItem === '#profile') {
+          return (
+            <SecondarySidebar
+              isOpen={true}
+              label="Profile"
+              onClose={() => {
+                const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
+                setClickedNavItem(null);
+                // Remove URL param when closing tab on homepage
+                if (isHomepage && tab) {
+                  updateUrl(null);
+                }
+              }}
+            >
+              <ProfileAccountsSecondaryContent />
+            </SecondarySidebar>
+          );
+        }
+
         // Handle controls separately
         if (clickedNavItem === '#controls') {
           return (

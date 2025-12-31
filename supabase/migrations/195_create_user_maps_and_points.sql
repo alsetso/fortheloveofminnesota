@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS public.maps (
   account_id UUID NOT NULL REFERENCES public.accounts(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   description TEXT,
+  map_type TEXT NOT NULL DEFAULT 'user',
+  visibility TEXT NOT NULL DEFAULT 'private',
+  intent TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -59,6 +62,9 @@ CREATE TABLE IF NOT EXISTS public.map_shares (
 -- Maps indexes
 CREATE INDEX idx_maps_account_id ON public.maps(account_id);
 CREATE INDEX idx_maps_created_at ON public.maps(created_at DESC);
+CREATE INDEX idx_maps_map_type ON public.maps(map_type);
+CREATE INDEX idx_maps_visibility ON public.maps(visibility);
+CREATE INDEX idx_maps_type_visibility ON public.maps(map_type, visibility);
 
 -- Points indexes
 CREATE INDEX idx_points_map_id ON public.points(map_id);
@@ -330,6 +336,9 @@ COMMENT ON TABLE public.maps IS 'User-created maps. Private by default, shareabl
 COMMENT ON COLUMN public.maps.account_id IS 'Account that owns this map (required)';
 COMMENT ON COLUMN public.maps.title IS 'Map title (required)';
 COMMENT ON COLUMN public.maps.description IS 'Optional map description';
+COMMENT ON COLUMN public.maps.map_type IS 'Type of map: user (user-generated), community, professional, etc.';
+COMMENT ON COLUMN public.maps.visibility IS 'Visibility level: private (owner only), public (everyone), shared (via map_shares)';
+COMMENT ON COLUMN public.maps.intent IS 'Optional intent or purpose of the map (e.g., mentions, fraud, realestate, skip-tracing)';
 
 COMMENT ON TABLE public.points IS 'Points/markers placed on user maps. Points can only be added/edited by map owners or accounts with edit permission.';
 COMMENT ON COLUMN public.points.map_id IS 'Map this point belongs to';

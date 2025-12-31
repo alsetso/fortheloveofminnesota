@@ -8,44 +8,11 @@ import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import AtlasRecordDetailClient from '@/features/atlas/components/AtlasRecordDetailClient';
 import AtlasRecordMap from '@/features/atlas/components/AtlasRecordMap';
 import { getAtlasTypeBySlug } from '@/features/atlas/services/atlasTypesService';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
+import { formatNumber } from '@/lib/utils/formatting';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
 
 export const revalidate = 3600;
-
-// Valid atlas table names
-const VALID_TABLES = [
-  'cities',
-  'neighborhoods',
-  'parks',
-  'schools',
-  'lakes',
-  'churches',
-  'hospitals',
-  'golf_courses',
-  'municipals',
-  'watertowers',
-  'cemeteries',
-  'airports',
-  'roads',
-  'radio_and_news',
-];
-
-// Table configuration
-const TABLE_CONFIG: Record<string, { label: string; icon: string | null; description: string }> = {
-  cities: { label: 'Cities', icon: '/city.png', description: 'Complete directory of all Minnesota cities' },
-  neighborhoods: { label: 'Neighborhoods', icon: '/neighborhood.png', description: 'Neighborhoods and districts across Minnesota' },
-  parks: { label: 'Parks', icon: '/park_like.png', description: 'Parks and recreational areas' },
-  schools: { label: 'Schools', icon: '/education.png', description: 'K-12 schools, universities, and colleges' },
-  lakes: { label: 'Lakes', icon: '/lakes.png', description: 'Lakes and water bodies' },
-  churches: { label: 'Churches', icon: '/churches.png', description: 'Churches and places of worship' },
-  hospitals: { label: 'Hospitals', icon: '/hospital.png', description: 'Hospitals and medical facilities' },
-  golf_courses: { label: 'Golf Courses', icon: '/golf courses.png', description: 'Golf courses and clubs' },
-  municipals: { label: 'Municipals', icon: '/municiples.png', description: 'Municipal buildings and facilities' },
-  watertowers: { label: 'Watertowers', icon: null, description: 'Water towers across Minnesota' },
-  cemeteries: { label: 'Cemeteries', icon: null, description: 'Cemeteries and memorial sites' },
-  airports: { label: 'Airports', icon: null, description: 'Airports and aviation facilities' },
-  roads: { label: 'Roads', icon: null, description: 'Roads, highways, and transportation routes' },
-  radio_and_news: { label: 'Radio & News', icon: null, description: 'Radio stations and news outlets' },
-};
 
 type Props = {
   params: Promise<{ table_name: string; id: string }>;
@@ -54,24 +21,10 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { table_name, id } = await params;
   
-  if (!VALID_TABLES.includes(table_name)) {
-    return {
-      title: 'Atlas Record Not Found',
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
-  }
-
+  // Fetch atlas type configuration from database
   const atlasType = await getAtlasTypeBySlug(table_name);
-  const config = atlasType ? {
-    label: atlasType.name,
-    icon: atlasType.icon_path,
-    description: atlasType.description || TABLE_CONFIG[table_name]?.description || '',
-  } : TABLE_CONFIG[table_name];
   
-  if (!config) {
+  if (!atlasType) {
     return {
       title: 'Atlas Record Not Found',
       robots: {
@@ -134,11 +87,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-function formatNumber(num: number | null | undefined): string {
-  if (num === null || num === undefined) return 'N/A';
-  return num.toLocaleString('en-US');
-}
-
 function formatDate(date: string | null | undefined): string {
   if (!date) return 'N/A';
   return new Date(date).toLocaleDateString('en-US', {
@@ -151,20 +99,18 @@ function formatDate(date: string | null | undefined): string {
 export default async function AtlasRecordPage({ params }: Props) {
   const { table_name, id } = await params;
 
-  if (!VALID_TABLES.includes(table_name)) {
+  // Fetch atlas type configuration from database
+  const atlasType = await getAtlasTypeBySlug(table_name);
+  
+  if (!atlasType) {
     notFound();
   }
 
-  const atlasType = await getAtlasTypeBySlug(table_name);
-  const config = atlasType ? {
+  const config = {
     label: atlasType.name,
     icon: atlasType.icon_path,
-    description: atlasType.description || TABLE_CONFIG[table_name]?.description || '',
-  } : TABLE_CONFIG[table_name];
-  
-  if (!config) {
-    notFound();
-  }
+    description: atlasType.description || '',
+  };
   
   const supabase = createServerClient();
   const auth = await getServerAuth();
@@ -201,41 +147,19 @@ export default async function AtlasRecordPage({ params }: Props) {
 
   return (
     <>
+      <PageViewTracker page_url={`/explore/atlas/${table_name}/${id}`} />
       <AtlasRecordDetailClient recordId={id} tableName={table_name} />
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
         <div className="max-w-4xl mx-auto">
-          {/* Breadcrumb Navigation */}
-          <nav className="mb-3" aria-label="Breadcrumb">
-            <ol className="flex items-center gap-2 text-xs text-gray-600">
-              <li>
-                <Link href="/" className="hover:text-gray-900 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li>
-                <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                  Explore
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li>
-                <Link href="/explore/atlas" className="hover:text-gray-900 transition-colors">
-                  Atlas
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li>
-                <Link href={`/explore/atlas/${table_name}`} className="hover:text-gray-900 transition-colors">
-                  {config.label}
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li className="text-gray-900 font-medium" aria-current="page">
-                {recordData.name || 'Record'}
-              </li>
-            </ol>
-          </nav>
+          <ExploreBreadcrumbs
+            items={[
+              { name: 'Home', href: '/' },
+              { name: 'Explore', href: '/explore' },
+              { name: 'Atlas', href: '/explore/atlas' },
+              { name: config.label, href: `/explore/atlas/${table_name}` },
+              { name: recordData.name || 'Record', href: `/explore/atlas/${table_name}/${id}`, isCurrentPage: true },
+            ]}
+          />
 
           {/* Admin Label */}
           {isAdmin && (

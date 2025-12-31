@@ -214,10 +214,10 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             id: pointLayerId,
             type: 'symbol',
             source: sourceId,
-            layout: {
+          layout: {
               ...iconLayout,
-              'icon-image': mentionImageId,
-            },
+            'icon-image': mentionImageId,
+          },
           });
         } catch (e) {
           console.error('[MentionsLayer] Error adding point layer:', e);

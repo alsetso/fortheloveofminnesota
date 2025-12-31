@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ClockIcon, MapPinIcon } from '@heroicons/react/24/outline';
-import { format, addDays, subDays, isToday, isSameDay, startOfDay, differenceInDays } from 'date-fns';
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ClockIcon, MapPinIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { format, addDays, subDays, isToday, isSameDay, startOfDay, differenceInDays, parse } from 'date-fns';
 import { EventService } from '@/features/events/services/eventService';
 import type { Event } from '@/types/event';
 import Link from 'next/link';
-import { getStartOfDayCentral, isSameDayCentral } from '@/lib/timezone';
+import Image from 'next/image';
+import { getStartOfDayCentral, isSameDayCentral, getDateStringCentral } from '@/lib/timezone';
+import { getSourceInitials, getSourceColor } from '@/features/news/utils/newsHelpers';
 
 interface NewsArticle {
   id: string;
@@ -20,11 +22,32 @@ interface NewsArticle {
 }
 
 export default function CalendarPageClient() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  // Initialize date from URL parameter if present
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const dateParam = params.get('date');
+      if (dateParam) {
+        try {
+          const parsed = parse(dateParam, 'yyyy-MM-dd', new Date());
+          if (!isNaN(parsed.getTime())) {
+            return startOfDay(parsed);
+          }
+        } catch {
+          // Invalid date, use today
+        }
+      }
+    }
+    return new Date();
+  });
+  
   const [events, setEvents] = useState<Event[]>([]);
   const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
+  const [datesWithNews, setDatesWithNews] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerValue, setDatePickerValue] = useState('');
 
   // Calculate date range: 365 days from today
   const today = startOfDay(new Date());
@@ -47,12 +70,25 @@ export default function CalendarPageClient() {
 
   // Track which date ranges have been fetched using a ref to avoid re-renders
   const fetchedRangesRef = useRef<Set<string>>(new Set());
+  const newsSectionRef = useRef<HTMLDivElement>(null);
   
   // Calculate the date range key for the current view
   const currentRangeKey = useMemo(() => {
     const start = subDays(currentDate, 3);
     const end = addDays(currentDate, 3);
     return `${start.toISOString()}-${end.toISOString()}`;
+  }, [currentDate]);
+
+  // Handle URL hash for scrolling to news section
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      if (hash === '#news' && newsSectionRef.current) {
+        setTimeout(() => {
+          newsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
   }, [currentDate]);
 
   // Fetch events and news for the visible date range (only once per range)
@@ -85,18 +121,33 @@ export default function CalendarPageClient() {
           return [...prev, ...newEvents];
         });
 
-        // Fetch news (only once on initial load)
-        if (newsArticles.length === 0) {
+        // Fetch news for the date range
           try {
-            const newsResponse = await fetch('/api/news/latest');
+          const startDateStr = getDateStringCentral(subDays(currentDate, 3));
+          const endDateStr = getDateStringCentral(addDays(currentDate, 3));
+          
+          const newsResponse = await fetch(`/api/news/by-date?startDate=${startDateStr}&endDate=${endDateStr}`);
             const newsData = await newsResponse.json();
             if (newsData.success && newsData.data?.articles) {
               setNewsArticles(newsData.data.articles as NewsArticle[]);
             }
           } catch (newsErr) {
-            // Non-blocking: if news fails, continue without it
             console.warn('Failed to fetch news:', newsErr);
           }
+
+        // Fetch dates with news for highlighting (wider range)
+        try {
+          const todayStr = getDateStringCentral(today);
+          const rangeStart = getDateStringCentral(subDays(today, 30));
+          const rangeEnd = getDateStringCentral(addDays(today, 30));
+          
+          const datesResponse = await fetch(`/api/news/dates-with-news?startDate=${rangeStart}&endDate=${rangeEnd}`);
+          const datesData = await datesResponse.json();
+          if (datesData.success && datesData.data?.dates) {
+            setDatesWithNews(datesData.data.dates);
+          }
+        } catch (datesErr) {
+          console.warn('Failed to fetch dates with news:', datesErr);
         }
         
         // Mark this range as fetched
@@ -147,48 +198,45 @@ export default function CalendarPageClient() {
     });
   };
 
-  // Get news articles for a specific day (using Central Time)
+  // Get news articles for a specific day (using published_date from API)
   const getNewsForDay = (date: Date) => {
+    const dateStr = getDateStringCentral(date);
     return newsArticles.filter(article => {
       try {
-        // Compare dates in Central Time to align with Minnesota timezone
-        return isSameDayCentral(article.publishedAt, date);
+        // Use published_date if available, otherwise fall back to publishedAt
+        const articleDate = (article as any).published_date || article.publishedAt;
+        if ((article as any).published_date) {
+          return (article as any).published_date === dateStr;
+        }
+        return isSameDayCentral(articleDate, date);
       } catch {
         return false;
       }
     });
   };
 
-  // Helper functions for source display
-  const getSourceInitials = (sourceName: string): string => {
-    if (!sourceName) return 'NEW';
-    const cleaned = sourceName.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-    return cleaned.slice(0, 3) || 'NEW';
+  // Get news count for a specific day
+  const getNewsCountForDay = (date: Date): number => {
+    const dateStr = getDateStringCentral(date);
+    return datesWithNews[dateStr] || 0;
   };
 
-  const getSourceColor = (sourceName: string): { bg: string; text: string } => {
-    const softColors = [
-      { bg: 'bg-blue-100', text: 'text-blue-700' },
-      { bg: 'bg-green-100', text: 'text-green-700' },
-      { bg: 'bg-purple-100', text: 'text-purple-700' },
-      { bg: 'bg-pink-100', text: 'text-pink-700' },
-      { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-      { bg: 'bg-indigo-100', text: 'text-indigo-700' },
-      { bg: 'bg-teal-100', text: 'text-teal-700' },
-      { bg: 'bg-orange-100', text: 'text-orange-700' },
-      { bg: 'bg-cyan-100', text: 'text-cyan-700' },
-      { bg: 'bg-rose-100', text: 'text-rose-700' },
-      { bg: 'bg-amber-100', text: 'text-amber-700' },
-      { bg: 'bg-violet-100', text: 'text-violet-700' },
-    ];
-
-    let hash = 0;
-    for (let i = 0; i < sourceName.length; i++) {
-      hash = sourceName.charCodeAt(i) + ((hash << 5) - hash);
+  // Handle date picker jump
+  const handleDateJump = () => {
+    if (!datePickerValue) return;
+    
+    try {
+      const parsedDate = parse(datePickerValue, 'yyyy-MM-dd', new Date());
+      if (!isNaN(parsedDate.getTime())) {
+        setCurrentDate(startOfDay(parsedDate));
+        setShowDatePicker(false);
+        setDatePickerValue('');
+      }
+    } catch {
+      // Invalid date, ignore
     }
-    const index = Math.abs(hash) % softColors.length;
-    return softColors[index];
   };
+
 
   // Check if can navigate
   const canGoBack = currentDate > minDate;
@@ -235,6 +283,43 @@ export default function CalendarPageClient() {
             >
               <ChevronRightIcon className="w-4 h-4" />
             </button>
+
+            {/* Date Picker / Jump to Date */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                className="px-2 py-1.5 text-xs font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors flex items-center gap-1"
+                title="Jump to date"
+              >
+                <MagnifyingGlassIcon className="w-3 h-3" />
+                <span>Jump</span>
+              </button>
+              
+              {showDatePicker && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 z-10">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={datePickerValue}
+                      onChange={(e) => setDatePickerValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleDateJump();
+                        }
+                      }}
+                      className="px-2 py-1 text-xs text-gray-900 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
+                      placeholder="YYYY-MM-DD"
+                    />
+                    <button
+                      onClick={handleDateJump}
+                      className="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                    >
+                      Go
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -302,15 +387,27 @@ export default function CalendarPageClient() {
               </div>
 
               {/* Event and News Count */}
-              {(dayEvents.length > 0 || getNewsForDay(date).length > 0) && (
-                <div className="text-[9px] text-gray-500 mt-1">
+              {(dayEvents.length > 0 || getNewsForDay(date).length > 0 || getNewsCountForDay(date) > 0) && (
+                <div className="text-[9px] text-gray-500 mt-1 space-y-0.5">
                   {dayEvents.length > 0 && (
-                    <span>{dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''}</span>
+                    <div>{dayEvents.length} event{dayEvents.length !== 1 ? 's' : ''}</div>
                   )}
-                  {dayEvents.length > 0 && getNewsForDay(date).length > 0 && <span> • </span>}
-                  {getNewsForDay(date).length > 0 && (
-                    <span>{getNewsForDay(date).length} news</span>
+                  {(getNewsForDay(date).length > 0 || getNewsCountForDay(date) > 0) && (
+                    <div className="flex items-center gap-1">
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-blue-100 text-blue-700 text-[8px] font-semibold">
+                        {getNewsForDay(date).length || getNewsCountForDay(date)}
+                      </span>
+                      <span>news</span>
+                    </div>
                   )}
+                </div>
+              )}
+              
+              {/* Visual indicator for days with news (if not loaded yet) */}
+              {getNewsForDay(date).length === 0 && getNewsCountForDay(date) > 0 && (
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                  <span className="text-[9px] text-gray-500">{getNewsCountForDay(date)} news</span>
                 </div>
               )}
             </button>
@@ -328,92 +425,120 @@ export default function CalendarPageClient() {
           <p className="text-xs text-red-600">{error}</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {/* Events */}
+        <div className="space-y-3">
+          {/* Events Section */}
           {getEventsForDay(currentDate).length > 0 && (
-            <>
-              <h3 className="text-xs font-semibold text-gray-900">
-                Events ({getEventsForDay(currentDate).length})
-              </h3>
-              {getEventsForDay(currentDate).map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/calendar/events#event-${event.id}`}
-                  className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
-                >
-                  <div className="space-y-1.5">
-                    <h4 className="text-xs font-semibold text-gray-900 line-clamp-2">{event.title}</h4>
-                    {event.description && (
-                      <p className="text-[10px] text-gray-600 line-clamp-2">
-                        {event.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                      <div className="flex items-center gap-0.5">
-                        <ClockIcon className="w-3 h-3" />
-                        <span>
-                          {format(new Date(event.start_date), 'h:mm a')}
-                          {event.end_date && ` - ${format(new Date(event.end_date), 'h:mm a')}`}
-                        </span>
-                      </div>
-                      {event.location_name && (
-                        <>
-                          <span>•</span>
-                          <div className="flex items-center gap-0.5">
-                            <MapPinIcon className="w-3 h-3" />
-                            <span className="truncate">{event.location_name}</span>
-                          </div>
-                        </>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-3 h-3 text-gray-700" />
+                <h3 className="text-xs font-semibold text-gray-900">
+                  Events ({getEventsForDay(currentDate).length})
+                </h3>
+              </div>
+              <div className="space-y-1.5">
+                {getEventsForDay(currentDate).map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/calendar/events#event-${event.id}`}
+                    className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="space-y-1.5">
+                      <h4 className="text-xs font-semibold text-gray-900 line-clamp-2">{event.title}</h4>
+                      {event.description && (
+                        <p className="text-[10px] text-gray-600 line-clamp-2">
+                          {event.description}
+                        </p>
                       )}
+                      <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                        <div className="flex items-center gap-0.5">
+                          <ClockIcon className="w-3 h-3" />
+                          <span>
+                            {format(new Date(event.start_date), 'h:mm a')}
+                            {event.end_date && ` - ${format(new Date(event.end_date), 'h:mm a')}`}
+                          </span>
+                        </div>
+                        {event.location_name && (
+                          <>
+                            <span>•</span>
+                            <div className="flex items-center gap-0.5">
+                              <MapPinIcon className="w-3 h-3" />
+                              <span className="truncate">{event.location_name}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-            </>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
 
-          {/* News */}
+          {/* News Section */}
           {getNewsForDay(currentDate).length > 0 && (
-            <>
-              {getEventsForDay(currentDate).length > 0 && <div className="pt-2" />}
-              <h3 className="text-xs font-semibold text-gray-900">
-                News ({getNewsForDay(currentDate).length})
-              </h3>
+            <div ref={newsSectionRef} id="news" className="space-y-2">
+              {getEventsForDay(currentDate).length > 0 && (
+                <div className="border-t border-gray-200 pt-3" />
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-gray-900">
+                  News ({getNewsForDay(currentDate).length})
+                </span>
+              </div>
               <div className="space-y-1.5">
                 {getNewsForDay(currentDate).map((article) => {
                   const sourceInitials = getSourceInitials(article.source.name);
                   const sourceColor = getSourceColor(article.source.name);
                   
                   return (
-                    <a
+                    <Link
                       key={article.id}
-                      href={article.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
+                      href={`/news/${article.id}`}
+                      className="flex items-start gap-2 bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
                     >
-                      {/* Source Circle */}
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full ${sourceColor.bg} flex items-center justify-center border border-gray-200`}>
-                        <span className={`text-[9px] font-semibold ${sourceColor.text} leading-none`}>
+                      {/* Photo Image */}
+                      {article.photoUrl ? (
+                        <div className="relative flex-shrink-0 w-16 h-16 rounded border border-gray-200 overflow-hidden bg-gray-100">
+                          <Image
+                            src={article.photoUrl}
+                            alt={article.title}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                            unoptimized
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className={`flex-shrink-0 w-16 h-16 rounded border border-gray-200 ${sourceColor.bg} flex items-center justify-center`}>
+                          <span className={`text-[10px] font-semibold ${sourceColor.text} leading-none`}>
                           {sourceInitials}
                         </span>
                       </div>
+                      )}
                       
-                      {/* Title */}
-                      <span className="flex-1 text-xs font-medium text-gray-900 line-clamp-1 truncate">
-                        {article.title}
-                      </span>
-                      
-                      {/* Time */}
-                      <div className="flex items-center gap-1 flex-shrink-0 text-[10px] text-gray-500">
-                        <ClockIcon className="w-3 h-3" />
-                        <span>{format(new Date(article.publishedAt), 'h:mm a')}</span>
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <h4 className="text-xs font-semibold text-gray-900 line-clamp-2">
+                          {article.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                          <span>{article.source.name}</span>
+                          <span>•</span>
+                          <div className="flex items-center gap-0.5">
+                            <ClockIcon className="w-3 h-3" />
+                            <span>{format(new Date(article.publishedAt), 'h:mm a')}</span>
+                          </div>
+                        </div>
                       </div>
-                    </a>
+                    </Link>
                   );
                 })}
               </div>
-            </>
+            </div>
           )}
 
           {/* Empty State */}

@@ -1,12 +1,14 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
-import ExplorePageClient from '@/features/atlas/components/ExplorePageClient';
 import InlineAtlasMap from '@/features/atlas/components/InlineAtlasMap';
 import { BuildingOffice2Icon, RectangleGroupIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { createServerClient } from '@/lib/supabaseServer';
 import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
+import { generateExploreStructuredData, generateBreadcrumbStructuredData } from '@/lib/utils/structuredData';
+import ExploreBreadcrumbs from '@/components/navigation/ExploreBreadcrumbs';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 // ISR: Revalidate every hour for fresh data, but serve cached instantly
 export const revalidate = 3600; // 1 hour
@@ -20,233 +22,78 @@ export async function generateMetadata(): Promise<Metadata> {
     .from('counties')
     .select('*', { count: 'exact', head: true });
   
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  
-  return {
-    title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | For the Love of Minnesota',
-    description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities. Discover population data, geographic information, demographics, official county websites, and detailed profiles for every location in Minnesota. Your complete guide to the Land of 10,000 Lakes.`,
-    keywords: [
-      'Minnesota cities',
-      'Minnesota counties',
-      'MN cities directory',
-      'MN counties directory',
-      'Minnesota demographics',
-      'Minnesota population',
-      'Minnesota geography',
-      'Twin Cities',
-      'Minneapolis',
-      'St. Paul',
-      'Hennepin County',
-      'Ramsey County',
-      'Minnesota locations',
-      'MN city data',
-      'MN county data',
-    ],
-    openGraph: {
-      title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | For the Love of Minnesota',
-      description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities. Discover population data, geographic information, and detailed profiles for every location in Minnesota.`,
-      url: `${baseUrl}/explore`,
-      siteName: 'For the Love of Minnesota',
-      images: [
-        {
-          url: '/logo.png',
-          width: 1200,
-          height: 630,
-          type: 'image/png',
-          alt: 'Explore Minnesota - Complete Cities and Counties Directory',
-        },
-      ],
-      locale: 'en_US',
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN',
-      description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities.`,
-      images: ['/logo.png'],
-    },
-    alternates: {
-      canonical: `${baseUrl}/explore`,
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-  };
+  return generateExploreMetadata(cityCount || 0, countyCount || 87);
 }
 
-function generateStructuredData(cityCount: number, countyCount: number, favoriteCounties: Array<{ name: string; slug: string | null; website_url: string | null }>) {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: 'Explore Minnesota - Cities and Counties Directory',
-    description: `Comprehensive directory of ${countyCount} Minnesota counties and ${cityCount} cities with population data, geographic information, official websites, and detailed location profiles.`,
-    url: `${baseUrl}/explore`,
-    mainEntity: {
-      '@type': 'ItemList',
-      numberOfItems: 2,
-      itemListElement: [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          item: {
-            '@type': 'CollectionPage',
-            name: 'Minnesota Cities Directory',
-            url: `${baseUrl}/explore/cities`,
-            description: `Complete directory of all ${cityCount} cities in Minnesota`,
-          },
-        },
-        {
-          '@type': 'ListItem',
-          position: 2,
-          item: {
-            '@type': 'CollectionPage',
-            name: 'Minnesota Counties Directory',
-            url: `${baseUrl}/explore/counties`,
-            description: `Complete directory of all ${countyCount} counties in Minnesota`,
-          },
-        },
-      ],
-    },
-    about: {
-      '@type': 'State',
-      name: 'Minnesota',
-      '@id': 'https://www.wikidata.org/wiki/Q1527',
-      sameAs: 'https://en.wikipedia.org/wiki/Minnesota',
-    },
-    hasPart: favoriteCounties
-      .filter(c => c.slug !== null)
-      .slice(0, 10)
-      .map((county, index) => ({
-        '@type': 'County',
-        name: county.name,
-        url: `${baseUrl}/explore/county/${county.slug}`,
-        ...(county.website_url && { sameAs: county.website_url }),
-      })),
-  };
-}
-
-function generateBreadcrumbStructuredData() {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: 'Home',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: 'Explore',
-        item: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'}/explore`,
-      },
-    ],
-  };
-}
 
 export default async function ExplorePage() {
   const supabase = createServerClient();
   
-  // Fetch visible atlas types for map legend
-  const visibleTypes = await getVisibleAtlasTypes();
-  
-  // Fetch quick stats for preview
-  const { count: cityCount } = await supabase
-    .from('cities')
-    .select('*', { count: 'exact', head: true });
-  
-  const { count: countyCount } = await supabase
-    .from('counties')
-    .select('*', { count: 'exact', head: true });
+  // Parallelize all independent queries for better performance
+  const [
+    visibleTypes,
+    cityCountResult,
+    countyCountResult,
+    favoriteCountiesResult,
+    topCitiesResult,
+    topCountiesResult,
+    largestCountiesResult,
+    totalPopulationResult,
+  ] = await Promise.all([
+    getVisibleAtlasTypes(),
+    supabase.from('cities').select('*', { count: 'exact', head: true }),
+    supabase.from('counties').select('*', { count: 'exact', head: true }),
+    supabase
+      .from('counties')
+      .select('name, slug, website_url, population, area_sq_mi')
+      .eq('favorite', true)
+      .order('population', { ascending: false })
+      .limit(21),
+    supabase
+      .from('cities')
+      .select('name, slug, population, favorite, website_url')
+      .not('population', 'is', null)
+      .order('population', { ascending: false })
+      .limit(10),
+    supabase
+      .from('counties')
+      .select('name, slug, population, area_sq_mi')
+      .order('population', { ascending: false })
+      .limit(10),
+    supabase
+      .from('counties')
+      .select('name, slug, area_sq_mi, population')
+      .order('area_sq_mi', { ascending: false })
+      .limit(5),
+    // Fetch only population column for aggregation (more efficient than fetching all data)
+    supabase.from('counties').select('population'),
+  ]);
 
-  // Fetch favorite counties with website URLs
-  const { data: favoriteCounties } = await supabase
-    .from('counties')
-    .select('name, slug, website_url, population, area_sq_mi')
-    .eq('favorite', true)
-    .order('population', { ascending: false })
-    .limit(21);
+  const cityCount = cityCountResult.count || 0;
+  const countyCount = countyCountResult.count || 87;
 
-  const favoriteCountiesData = (favoriteCounties || []) as Array<{
-    name: string;
-    slug: string | null;
-    website_url: string | null;
-    population: number;
-    area_sq_mi: number | null;
-  }>;
+  const favoriteCountiesData: FavoriteCounty[] = (favoriteCountiesResult.data || []) as FavoriteCounty[];
+  const topCitiesData: TopCity[] = (topCitiesResult.data || []) as TopCity[];
+  const topCountiesData: TopCounty[] = (topCountiesResult.data || []) as TopCounty[];
+  const largestCountiesData: LargestCounty[] = (largestCountiesResult.data || []) as LargestCounty[];
 
-  // Fetch top cities by population for quick links
-  const { data: topCities } = await supabase
-    .from('cities')
-    .select('name, slug, population, favorite, website_url')
-    .not('population', 'is', null)
-    .order('population', { ascending: false })
-    .limit(10);
+  // Calculate total population from fetched data
+  const totalPopulation = (totalPopulationResult.data || [] as Array<{ population: number }>).reduce((sum, c) => sum + c.population, 0);
 
-  const topCitiesData = (topCities || []) as Array<{
-    name: string;
-    slug: string | null;
-    population: number;
-    favorite: boolean | null;
-    website_url: string | null;
-  }>;
-
-  // Fetch top counties by population
-  const { data: topCounties } = await supabase
-    .from('counties')
-    .select('name, slug, population, area_sq_mi')
-    .order('population', { ascending: false })
-    .limit(10);
-
-  const topCountiesData = (topCounties || []) as Array<{
-    name: string;
-    slug: string | null;
-    population: number;
-    area_sq_mi: number | null;
-  }>;
-
-  // Fetch largest counties by area
-  const { data: largestCounties } = await supabase
-    .from('counties')
-    .select('name, slug, area_sq_mi, population')
-    .order('area_sq_mi', { ascending: false })
-    .limit(5);
-
-  const largestCountiesData = (largestCounties || []) as Array<{
-    name: string;
-    slug: string | null;
-    area_sq_mi: number | null;
-    population: number;
-  }>;
-
-  // Calculate total population
-  const { data: allCounties } = await supabase
-    .from('counties')
-    .select('population');
-  const totalPopulation = (allCounties || [] as Array<{ population: number }>).reduce((sum, c) => sum + c.population, 0);
-
-  const structuredData = generateStructuredData(
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
+  const structuredData = generateExploreStructuredData(
     cityCount || 0,
     countyCount || 87,
     favoriteCountiesData
   );
-  const breadcrumbData = generateBreadcrumbStructuredData();
+  const breadcrumbData = generateBreadcrumbStructuredData([
+    { name: 'Home', url: `${baseUrl}/` },
+    { name: 'Explore', url: `${baseUrl}/explore` },
+  ]);
 
   return (
     <>
-      <ExplorePageClient />
+      <PageViewTracker />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
@@ -257,18 +104,12 @@ export default async function ExplorePage() {
       />
       <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
         <div className="max-w-4xl mx-auto">
-          {/* Breadcrumb Navigation */}
-          <nav className="mb-3" aria-label="Breadcrumb">
-            <ol className="flex items-center gap-2 text-xs text-gray-600">
-              <li>
-                <Link href="/" className="hover:text-gray-900 transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li className="text-gray-900 font-medium" aria-current="page">Explore</li>
-            </ol>
-          </nav>
+          <ExploreBreadcrumbs
+            items={[
+              { name: 'Home', href: '/' },
+              { name: 'Explore', href: '/explore', isCurrentPage: true },
+            ]}
+          />
 
           {/* Header */}
           <div className="mb-3">

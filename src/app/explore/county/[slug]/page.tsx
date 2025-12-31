@@ -10,6 +10,8 @@ import CountyEditButton from '@/features/atlas/components/CountyEditButton';
 import { StarIcon } from '@heroicons/react/24/solid';
 import { County } from '@/features/admin/services/countyAdminService';
 import Views from '@/components/ui/Views';
+import { sanitizeCountyNameForQuery } from '@/lib/utils/querySanitization';
+import { formatNumber, formatArea } from '@/lib/utils/formatting';
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -43,78 +45,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .single();
 
   if (!county) {
-    return {
-      title: 'County Not Found',
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    return generateNotFoundMetadata();
   }
 
-  const countyMeta = county as {
-    name: string;
-    population: number;
-    area_sq_mi: number;
-    meta_title: string | null;
-    meta_description: string | null;
-  };
-
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  const url = `${baseUrl}/explore/county/${slug}`;
-  const title = countyMeta.meta_title || `${countyMeta.name}, Minnesota | County Information`;
-  const description = countyMeta.meta_description || `${countyMeta.name}, Minnesota. Population: ${countyMeta.population.toLocaleString()}, Area: ${countyMeta.area_sq_mi.toLocaleString()} sq mi. Information about ${countyMeta.name} County including cities, demographics, and resources.`;
-  const countyNameShort = countyMeta.name.replace(/\s+County$/, '');
-
-  return {
-    title,
-    description,
-    keywords: [
-      `${countyMeta.name}`,
-      `${countyNameShort} County`,
-      'Minnesota county',
-      'MN county',
-      'county information',
-      'county demographics',
-      'county population',
-      'Minnesota geography',
-    ],
-    openGraph: {
-      title,
-      description,
-      url,
-      siteName: 'For the Love of Minnesota',
-      locale: 'en_US',
-      type: 'website',
+  return generateCountyMetadata(
+    county as {
+      name: string;
+      population: number;
+      area_sq_mi: number;
+      meta_title: string | null;
+      meta_description: string | null;
     },
-    twitter: {
-      card: 'summary',
-      title,
-      description,
-    },
-    alternates: {
-      canonical: url,
-    },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
-  };
-}
-
-function formatNumber(num: number): string {
-  return num.toLocaleString('en-US');
-}
-
-function formatArea(area: number): string {
-  return `${formatNumber(area)} sq mi`;
+    slug
+  );
 }
 
 export default async function CountyPage({ params }: Props) {
@@ -142,30 +85,22 @@ export default async function CountyPage({ params }: Props) {
     view_count?: number;
   };
 
-  // Extract county name without "County" suffix for matching cities
-  const countyNameBase = countyData.name.replace(/\s+County$/, '');
+  // Sanitize county name for safe use in queries
+  const { base: countyNameBase, full: countyNameFull } = sanitizeCountyNameForQuery(countyData.name);
 
   // Fetch cities in this county (cities.county is a text field that may contain the county name)
   const { data: cities, error: citiesError } = await supabase
     .from('cities')
     .select('id, name, slug, population, favorite, website_url')
-    .or(`county.ilike.%${countyNameBase}%,county.ilike.%${countyData.name}%`)
+    .or(`county.ilike.%${countyNameBase}%,county.ilike.%${countyNameFull}%`)
     .order('population', { ascending: false })
     .limit(50);
 
-  if (citiesError) {
-    // Log error but continue with empty array
-    console.error('[CountyPage] Error fetching cities:', citiesError);
-  }
-
-  const citiesData = (cities || []) as Array<{
-    id: string;
-    name: string;
-    slug: string | null;
-    population: number | null;
-    favorite: boolean | null;
-    website_url: string | null;
-  }>;
+  const citiesData: CityListItem[] = handleQueryError(
+    citiesError,
+    'CountyPage: cities',
+    (cities || []) as CityListItem[]
+  );
 
   // Fetch all other counties for navigation
   const { data: otherCounties, error: otherCountiesError } = await supabase
@@ -174,45 +109,32 @@ export default async function CountyPage({ params }: Props) {
     .neq('id', countyData.id)
     .order('name', { ascending: true });
 
-  if (otherCountiesError) {
-    // Log error but continue with empty array
-    console.error('[CountyPage] Error fetching other counties:', otherCountiesError);
-  }
-
-  const otherCountiesData = (otherCounties || []) as Array<{
+  const otherCountiesData: Array<{
     id: string;
     name: string;
     slug: string | null;
-  }>;
+  }> = handleQueryError(
+    otherCountiesError,
+    'CountyPage: other counties',
+    (otherCounties || []) as Array<{
+      id: string;
+      name: string;
+      slug: string | null;
+    }>
+  );
 
   return (
     <SimplePageLayout contentPadding="px-[10px] py-3" hideFooter={false}>
       <CountyPageClient countyId={countyData.id} countySlug={countyData.slug || slug} />
       <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb Navigation */}
-        <nav className="mb-3" aria-label="Breadcrumb">
-          <ol className="flex items-center gap-2 text-xs text-gray-600">
-            <li>
-              <Link href="/" className="hover:text-gray-900 transition-colors">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore" className="hover:text-gray-900 transition-colors">
-                Explore
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/explore/counties" className="hover:text-gray-900 transition-colors">
-                Counties
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="text-gray-900 font-medium" aria-current="page">{countyData.name}</li>
-          </ol>
-        </nav>
+        <ExploreBreadcrumbs
+          items={[
+            { name: 'Home', href: '/' },
+            { name: 'Explore', href: '/explore' },
+            { name: 'Counties', href: '/explore/counties' },
+            { name: countyData.name, href: `/explore/county/${countyData.slug || slug}`, isCurrentPage: true },
+          ]}
+        />
 
         {/* Government-style header */}
         <div className="mb-3 pb-3 border-b border-gray-200">

@@ -2,6 +2,11 @@
  * Event types for the events calendar system
  */
 
+export interface EventTag {
+  emoji: string;
+  text: string;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -15,6 +20,7 @@ export interface Event {
   account_id: string;
   visibility: 'public' | 'only_me';
   archived: boolean;
+  tags: EventTag[] | null;
   created_at: string;
   updated_at: string;
   // Joined data
@@ -36,6 +42,7 @@ export interface CreateEventData {
   lat?: number | null;
   lng?: number | null;
   visibility?: 'public' | 'only_me';
+  tags?: EventTag[];
   account_id?: string; // Optional, will use current user's account if not provided
 }
 
@@ -49,6 +56,7 @@ export interface UpdateEventData {
   lat?: number | null;
   lng?: number | null;
   visibility?: 'public' | 'only_me';
+  tags?: EventTag[];
   archived?: boolean;
 }
 

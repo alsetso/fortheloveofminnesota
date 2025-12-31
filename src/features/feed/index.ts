@@ -26,7 +26,6 @@ export type { PostMapData } from './components/PostMapModal';
 export { default as PostMapRenderer } from './components/PostMapRenderer';
 export { default as PostPublisherModal } from './components/PostPublisherModal';
 export { default as MediaUploadEditor } from './components/MediaUploadEditor';
-export { default as PageLoadingOverlay } from './components/PageLoadingOverlay';
 
 // Utils
 export {

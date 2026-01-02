@@ -69,14 +69,15 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
         const personIds = new Set<string>();
         const accountIds = new Set<string>();
 
-        editEvents.forEach((event) => {
-          if (event.table_name === 'orgs') {
-            orgIds.add(event.record_id);
-          } else if (event.table_name === 'people') {
-            personIds.add(event.record_id);
+        editEvents.forEach((event: any) => {
+          const eventTyped = event as { table_name: string; record_id: string; account_id?: string };
+          if (eventTyped.table_name === 'orgs') {
+            orgIds.add(eventTyped.record_id);
+          } else if (eventTyped.table_name === 'people') {
+            personIds.add(eventTyped.record_id);
           }
-          if (event.account_id) {
-            accountIds.add(event.account_id);
+          if (eventTyped.account_id) {
+            accountIds.add(eventTyped.account_id);
           }
         });
 
@@ -126,15 +127,16 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
             account_image_url: account?.image_url || null,
           };
 
-          if (event.table_name === 'orgs') {
-            const org = orgsMap.get(event.record_id);
+          const eventTyped = event as { table_name: string; record_id: string; account_id?: string; entity_slug?: string };
+          if (eventTyped.table_name === 'orgs') {
+            const org = orgsMap.get(eventTyped.record_id);
             return {
               ...baseEvent,
               entity_slug: org?.slug || null,
               entity_name: org?.name || null,
             };
-          } else if (event.table_name === 'people') {
-            const person = peopleMap.get(event.record_id);
+          } else if (eventTyped.table_name === 'people') {
+            const person = peopleMap.get(eventTyped.record_id);
             return {
               ...baseEvent,
               entity_slug: person?.slug || null,
@@ -397,7 +399,7 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
                       {getEntityLabel(event)}
                     </Link>
                     <span className="text-[10px] text-gray-500">
-                      ({getTableLabel(event.table_name)})
+                      ({getTableLabel((event as { table_name: string }).table_name)})
                     </span>
                   </div>
                   {expanded && (

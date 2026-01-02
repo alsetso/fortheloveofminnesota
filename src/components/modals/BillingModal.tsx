@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { XMarkIcon, CheckIcon, SparklesIcon, ExclamationCircleIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface BillingModalProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export default function BillingModal({
   overlay = 'center',
 }: BillingModalProps) {
   const router = useRouter();
+  const { openWelcome, closeModal } = useAppModalContextSafe();
   const [mounted, setMounted] = useState(false);
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +62,14 @@ export default function BillingModal({
         const response = await fetch('/api/billing/data');
         
         if (!response.ok) {
+          // If unauthorized (401), switch to login modal instead of showing error
+          if (response.status === 401) {
+            console.log('[BillingModal] User not authenticated, switching to login modal');
+            closeModal();
+            openWelcome();
+            return;
+          }
+          
           // Try to get error message from response
           let errorMessage = 'Failed to fetch billing data';
           try {
@@ -67,9 +77,7 @@ export default function BillingModal({
             errorMessage = errorData.error || errorMessage;
           } catch {
             // If response isn't JSON, use status text
-            errorMessage = response.status === 401 
-              ? 'Please sign in to view billing information'
-              : response.status === 500
+            errorMessage = response.status === 500
               ? 'Server error. Please try again later.'
               : `Failed to fetch billing data (${response.status})`;
           }

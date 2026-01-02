@@ -119,7 +119,7 @@ export default function MapPinForm({ isOpen, lat, lng, mapId, onClose, onSubmit,
                     setEmoji(selectedEmoji);
                     setShowEmojiPicker(false);
                   }}
-                  triggerRef={emojiInputRef}
+                  triggerRef={emojiInputRef as React.RefObject<HTMLElement>}
                 />
               )}
             </div>

@@ -97,9 +97,9 @@ export async function getCivicRoles(): Promise<CivicRole[]> {
     return [];
   }
 
-  const roles = rolesResult.data || [];
-  const people = new Map((peopleResult.data || []).map(p => [p.id, p]));
-  const orgs = new Map((orgsResult.data || []).map(o => [o.id, o]));
+  const roles = (rolesResult.data || []) as any[];
+  const people = new Map(((peopleResult.data || []) as CivicPerson[]).map(p => [p.id, p]));
+  const orgs = new Map(((orgsResult.data || []) as CivicOrg[]).map(o => [o.id, o]));
 
   return roles.map(role => ({
     ...role,

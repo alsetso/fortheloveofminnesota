@@ -104,12 +104,12 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
         ]);
 
         const orgsMap = new Map(
-          (orgsResult.data || []).map((org) => [org.id, { slug: org.slug, name: org.name }])
+          (orgsResult.data || []).map((org: any) => [(org as { id: string; slug: string; name: string }).id, { slug: (org as { id: string; slug: string; name: string }).slug, name: (org as { id: string; slug: string; name: string }).name }])
         );
         const peopleMap = new Map(
-          (peopleResult.data || []).map((person) => [
-            person.id,
-            { slug: person.slug, name: person.name },
+          (peopleResult.data || []).map((person: any) => [
+            (person as { id: string; slug: string; name: string }).id,
+            { slug: (person as { id: string; slug: string; name: string }).slug, name: (person as { id: string; slug: string; name: string }).name },
           ])
         );
         const accountsMap = new Map(

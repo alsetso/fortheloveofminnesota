@@ -260,21 +260,23 @@ export default function AccountDropdown({
                     </div>
                   )}
                   
-                  {/* Create New Account Button */}
-                  <div className="border-t border-gray-200">
-                    <button
-                      onClick={() => {
-                        setIsOpen(false);
-                        openCreateAccount();
-                      }}
-                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700 font-medium"
-                    >
-                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Create New Account
-                    </button>
-                  </div>
+                  {/* Create New Account Button - Only for admins or pro plan users */}
+                  {(account.role === 'admin' || account.plan === 'pro') && (
+                    <div className="border-t border-gray-200">
+                      <button
+                        onClick={() => {
+                          setIsOpen(false);
+                          openCreateAccount();
+                        }}
+                        className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700 font-medium"
+                      >
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create New Account
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

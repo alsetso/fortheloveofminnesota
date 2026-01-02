@@ -120,8 +120,9 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
         );
 
         // Enrich events with slugs, names, and image_urls
-        const enrichedEvents: EditEventWithSlug[] = editEvents.map((event) => {
-          const account = accountsMap.get(event.account_id);
+        const enrichedEvents: EditEventWithSlug[] = editEvents.map((event: any) => {
+          const eventTyped = event as { table_name: string; record_id: string; account_id?: string; entity_slug?: string };
+          const account = accountsMap.get(eventTyped.account_id);
           const baseEvent = {
             ...event,
             account_image_url: account?.image_url || null,

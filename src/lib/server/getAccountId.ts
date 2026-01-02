@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
-import { Auth } from '@/lib/authServer';
+import type { ServerAuthUser } from '@/lib/authServer';
 
 /**
  * Gets the account ID for the current user
@@ -12,7 +12,7 @@ import { Auth } from '@/lib/authServer';
  * @throws Error if no account found
  */
 export async function getAccountIdForUser(
-  auth: Auth,
+  auth: ServerAuthUser,
   supabase: Awaited<ReturnType<typeof createServerClientWithAuth>>
 ): Promise<string> {
   const cookieStore = await cookies();
@@ -29,7 +29,7 @@ export async function getAccountIdForUser(
       .single();
 
     if (!accountError && account) {
-      return account.id;
+      return (account as { id: string }).id;
     }
     // Active account ID in cookie is invalid, fall back to first account
   }
@@ -46,6 +46,6 @@ export async function getAccountIdForUser(
     throw new Error('Account not found. Please complete your profile setup.');
   }
 
-  return account.id;
+  return (account as { id: string }).id;
 }
 

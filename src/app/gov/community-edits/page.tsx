@@ -42,7 +42,7 @@ export default async function CommunityEditsPage() {
   if (auth) {
     try {
       const supabase = await createServerClientWithAuth();
-      accountId = await getAccountIdForUser(auth as { id: string }, supabase);
+      accountId = await getAccountIdForUser(auth, supabase);
     } catch (error) {
       // If account not found, continue without accountId (user can still view all edits)
       console.error('Error getting account ID:', error);

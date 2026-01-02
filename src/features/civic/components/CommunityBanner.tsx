@@ -5,7 +5,7 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAuthStateSafe } from '@/features/auth';
 
 export default function CommunityBanner() {
-  const { openModal } = useAppModalContextSafe();
+  const { openAccount } = useAppModalContextSafe();
   const { account } = useAuthStateSafe();
   const isAuthenticated = !!account;
 
@@ -22,7 +22,7 @@ export default function CommunityBanner() {
           </p>
           {!isAuthenticated && (
             <button
-              onClick={() => openModal('account')}
+              onClick={() => openAccount()}
               className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium text-gray-900 hover:text-gray-700 transition-colors"
             >
               <PencilSquareIcon className="w-3 h-3" />

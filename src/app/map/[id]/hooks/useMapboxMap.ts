@@ -10,6 +10,8 @@ interface UseMapboxMapOptions {
     buildingsEnabled?: boolean;
     pitch?: number;
     terrainEnabled?: boolean;
+    center?: [number, number];
+    zoom?: number;
   } | null;
   onMapLoad?: (map: MapboxMapInstance) => void;
 }

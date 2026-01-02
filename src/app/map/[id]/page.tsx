@@ -26,6 +26,8 @@ interface MapData {
     buildingsEnabled?: boolean;
     pitch?: number;
     terrainEnabled?: boolean;
+    center?: [number, number];
+    zoom?: number;
   } | null;
   created_at: string;
   updated_at: string;

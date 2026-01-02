@@ -17,6 +17,7 @@ interface NewsArticle {
   link: string;
   snippet: string;
   publishedAt: string;
+  photoUrl?: string | null;
   source: {
     name: string;
   };

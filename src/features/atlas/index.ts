@@ -5,7 +5,6 @@ export { default as MapLayersPanel, useAtlasLayers } from './components/MapLayer
 export type { AtlasLayer } from './components/MapLayersPanel';
 
 // Explore/Cities/Counties Components
-export { default as ExplorePageClient } from './components/ExplorePageClient';
 export { CitiesListView } from './components/CitiesListView';
 export { CountiesListView } from './components/CountiesListView';
 export { default as CityPageClient } from './components/CityPageClient';

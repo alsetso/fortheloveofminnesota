@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useMapboxMap } from '@/app/map/[id]/hooks/useMapboxMap';
@@ -21,7 +22,7 @@ export default function AtlasMapBox({ tableName, mapStyle = 'street', iconPath, 
   const mapContainer = useRef<HTMLDivElement>(null);
   const { mapInstance, mapLoaded } = useMapboxMap({
     mapStyle,
-    containerRef: mapContainer,
+    containerRef: mapContainer as React.RefObject<HTMLDivElement>,
     meta: null,
   });
   const [entities, setEntities] = useState<AtlasEntity[]>([]);
@@ -123,12 +124,13 @@ export default function AtlasMapBox({ tableName, mapStyle = 'street', iconPath, 
 
   // Listen for search query changes and update entities
   useEffect(() => {
-    const handleSearch = async (e: CustomEvent<{ query: string }>) => {
+    const handleSearch = async (e: Event) => {
+      const customEvent = e as CustomEvent<{ query: string }>;
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        if (e.detail.query.trim()) {
-          params.set('search', e.detail.query.trim());
+        if (customEvent.detail?.query?.trim()) {
+          params.set('search', customEvent.detail.query.trim());
         }
         const response = await fetch(`/api/atlas/${tableName}/entities?${params.toString()}`);
         if (response.ok) {
@@ -142,9 +144,9 @@ export default function AtlasMapBox({ tableName, mapStyle = 'street', iconPath, 
       }
     };
 
-    window.addEventListener('atlas-search', handleSearch as EventListener);
+    window.addEventListener('atlas-search', handleSearch);
     return () => {
-      window.removeEventListener('atlas-search', handleSearch as EventListener);
+      window.removeEventListener('atlas-search', handleSearch);
     };
   }, [tableName]);
 

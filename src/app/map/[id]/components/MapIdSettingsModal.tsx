@@ -16,6 +16,8 @@ interface MapIdSettingsModalProps {
       buildingsEnabled?: boolean;
       pitch?: number;
       terrainEnabled?: boolean;
+      center?: [number, number];
+      zoom?: number;
     } | null;
   };
   onUpdate?: (updatedData: any) => void;

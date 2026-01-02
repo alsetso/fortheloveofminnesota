@@ -25,6 +25,8 @@ interface MapIDBoxProps {
     buildingsEnabled?: boolean;
     pitch?: number;
     terrainEnabled?: boolean;
+    center?: [number, number];
+    zoom?: number;
   } | null;
   title?: string;
   description?: string | null;

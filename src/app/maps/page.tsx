@@ -25,7 +25,7 @@ export default function MapsPage() {
     COMMUNITY_MAPS.map(m => ({ ...m, view_count: 0 }))
   );
   // Track which tabs have been fetched
-  const fetchedTabsRef = useRef<Set<TabType>>(new Set());
+  const fetchedTabsRef = useRef<Set<TabType | 'user-generated'>>(new Set());
   const hasFetchedAccountMapsRef = useRef<string | null>(null);
   
   // Get initial tab from URL or default

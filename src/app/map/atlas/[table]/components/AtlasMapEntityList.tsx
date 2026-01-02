@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStateSafe } from '@/features/auth';
 
 interface AtlasMapEntityListProps {

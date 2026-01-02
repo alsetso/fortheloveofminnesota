@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   const supabase = createServiceClient();
   
   // Get article by article_id
-  const { data } = await supabase.rpc('get_news_by_date_range', {
+  const { data } = await (supabase.rpc as any)('get_news_by_date_range', {
     p_start_date: '2000-01-01',
     p_end_date: '2100-01-01',
   });

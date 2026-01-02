@@ -117,7 +117,7 @@ export default function BranchCard({ branch, icon, description, keyInfo, href }:
             <span>Sub-Entities ({branch.children?.length || 0})</span>
           </button>
           
-          {(isExpanded ? branch.children : keyEntities).map((entity, idx) => {
+          {(isExpanded ? branch.children || [] : keyEntities).map((entity, idx) => {
             const person = getPrimaryPerson(entity);
             return (
               <Link

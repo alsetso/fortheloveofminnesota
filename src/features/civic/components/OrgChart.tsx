@@ -122,22 +122,22 @@ function OrgCard({ node, level = 0 }: { node: OrgNode; level?: number }) {
                 });
 
                 return Array.from(rolesByTitle.entries()).map(([title, roles]) => {
-                  const rolePartyColor = roles[0]?.person?.party === 'DFL' ? 'text-blue-600' : 
-                                         roles[0]?.person?.party === 'Republican' ? 'text-red-600' : 
-                                         roles[0]?.person?.party ? 'text-gray-600' : '';
+                  const rolePartyColor = roles?.[0]?.person?.party === 'DFL' ? 'text-blue-600' : 
+                                         roles?.[0]?.person?.party === 'Republican' ? 'text-red-600' : 
+                                         roles?.[0]?.person?.party ? 'text-gray-600' : '';
                   
                   return (
                     <div key={title} className="bg-gray-50 rounded border border-gray-100 p-1.5">
                       <div className="text-[10px] font-medium text-gray-700 mb-1">
                         {title}
-                        {roles.length > 1 && (
+                        {roles && roles.length > 1 && (
                           <span className="text-[9px] text-gray-500 ml-1 font-normal">
                             ({roles.length})
                           </span>
                         )}
                       </div>
                       <div className="space-y-1">
-                        {roles.map((role, idx) => {
+                        {roles?.map((role, idx) => {
                           if (!role.person) return null;
                           return (
                             <div key={idx} className="flex items-center gap-1.5">

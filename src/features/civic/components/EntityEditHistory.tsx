@@ -83,7 +83,7 @@ export default function EntityEditHistory({
 
         if (eventsError) throw eventsError;
         
-        const newEvents = eventsData || [];
+        const newEvents = (eventsData || []) as EditEvent[];
         setEvents(newEvents);
         setHasMore(newEvents.length === EVENTS_PER_PAGE);
         
@@ -284,7 +284,7 @@ export default function EntityEditHistory({
           <div className="flex items-center justify-between mb-1.5">
             <h3 className="text-xs font-semibold text-gray-900">Edit History</h3>
             <div className="flex items-center gap-2 text-[10px] text-gray-600">
-              <span>{totalEdits} edit{totalEdits !== 1 ? 's' : ''}</span>
+              <span>{totalEdits} edit{(typeof totalEdits === 'string' || totalEdits !== 1) ? 's' : ''}</span>
               <span>•</span>
               <span>{uniqueContributors} contributor{uniqueContributors !== 1 ? 's' : ''}</span>
             </div>

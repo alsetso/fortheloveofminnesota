@@ -26,7 +26,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const latestPrompt = await getLatestPrompt();
+    let latestPrompt: Awaited<ReturnType<typeof getLatestPrompt>>;
+    try {
+      latestPrompt = await getLatestPrompt();
+    } catch (error) {
+      console.error('[News Latest] Error fetching latest prompt:', error);
+      return NextResponse.json(
+        { 
+          error: 'Failed to fetch news prompt',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+        { status: 500 }
+      );
+    }
 
     if (!latestPrompt) {
       return NextResponse.json(
@@ -36,15 +48,37 @@ export async function GET(request: NextRequest) {
     }
 
     // Get articles from generated table - query directly by prompt_id (most reliable)
-    const supabase = createServiceClient();
+    let supabase;
+    try {
+      supabase = createServiceClient();
+    } catch (error) {
+      console.error('[News Latest] Error creating service client:', error);
+      return NextResponse.json(
+        { 
+          error: 'Failed to connect to database',
+          details: error instanceof Error ? error.message : 'Unknown error',
+        },
+        { status: 500 }
+      );
+    }
     
     // First, try direct query by prompt_id (most reliable, bypasses date filtering issues)
-    const { data: directArticles, error: directError } = await (supabase as any)
-      .schema('news')
-      .from('generated')
-      .select('*')
-      .eq('prompt_id', latestPrompt.id)
-      .order('published_at', { ascending: false });
+    let directArticles: any[] | null = null;
+    let directError: any = null;
+    
+    try {
+      const result = await (supabase as any)
+        .schema('news')
+        .from('generated')
+        .select('*')
+        .eq('prompt_id', latestPrompt.id)
+        .order('published_at', { ascending: false });
+      directArticles = result.data;
+      directError = result.error;
+    } catch (error) {
+      console.error('[News Latest] Error in direct query:', error);
+      directError = error;
+    }
     
     if (!directError && directArticles && directArticles.length > 0) {
       console.log(`[News Latest] Found ${directArticles.length} articles via direct query for prompt ${latestPrompt.id}`);
@@ -105,14 +139,24 @@ export async function GET(request: NextRequest) {
     // Fallback: Try RPC function with wide date range (if direct query failed)
     if (!directArticles || directArticles.length === 0) {
       console.log('[News Latest] Trying RPC fallback...');
-      const today = new Date();
-      const startDate = new Date(today);
-      startDate.setDate(startDate.getDate() - 30); // Expand to 30 days to catch all articles
+      let articlesData: any[] | null = null;
+      let articlesError: any = null;
       
-      const { data: articlesData, error: articlesError } = await (supabase.rpc as any)('get_news_by_date_range', {
-        p_start_date: startDate.toISOString().split('T')[0],
-        p_end_date: today.toISOString().split('T')[0],
-      });
+      try {
+        const today = new Date();
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - 30); // Expand to 30 days to catch all articles
+        
+        const result = await (supabase.rpc as any)('get_news_by_date_range', {
+          p_start_date: startDate.toISOString().split('T')[0],
+          p_end_date: today.toISOString().split('T')[0],
+        });
+        articlesData = result.data;
+        articlesError = result.error;
+      } catch (error) {
+        console.error('[News Latest] Error in RPC call:', error);
+        articlesError = error;
+      }
       
       if (articlesError) {
         console.error('[News Latest] RPC error:', articlesError);

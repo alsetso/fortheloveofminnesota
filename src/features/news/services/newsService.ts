@@ -22,20 +22,47 @@ export async function getLatestPrompt(): Promise<NewsPrompt | null> {
   try {
     supabase = createServiceClient();
   } catch (error) {
-    const { createServerClient } = require('@/lib/supabaseServer');
-    supabase = createServerClient();
+    console.error('[getLatestPrompt] Error creating service client:', error);
+    try {
+      const { createServerClient } = require('@/lib/supabaseServer');
+      supabase = createServerClient();
+    } catch (fallbackError) {
+      console.error('[getLatestPrompt] Error creating fallback client:', fallbackError);
+      return null;
+    }
+  }
+
+  if (!supabase) {
+    console.error('[getLatestPrompt] No Supabase client available');
+    return null;
   }
 
   // Use RPC function to query news.prompt
-  const { data, error } = await supabase.rpc('get_latest_prompt');
+  let data: any = null;
+  let error: any = null;
+  
+  try {
+    const result = await supabase.rpc('get_latest_prompt');
+    data = result.data;
+    error = result.error;
+  } catch (rpcError) {
+    console.error('[getLatestPrompt] RPC call failed:', rpcError);
+    error = rpcError;
+  }
 
   if (error) {
-    console.error('Error fetching latest prompt:', error);
+    console.error('[getLatestPrompt] Error fetching latest prompt:', {
+      error,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
     return null;
   }
 
   // RPC returns array, get first result
-  return (data && data.length > 0) ? data[0] : null;
+  return (data && Array.isArray(data) && data.length > 0) ? (data[0] as NewsPrompt) : null;
 }
 
 /**

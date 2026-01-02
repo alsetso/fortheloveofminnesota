@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CheckbookPage() {
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+    <SimplePageLayout contentPadding="px-[10px] py-3">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[

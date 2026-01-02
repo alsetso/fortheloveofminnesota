@@ -93,7 +93,7 @@ export default function CheckbookTable() {
         if (agencyError) throw agencyError;
         if (cancelled) return;
 
-        const uniqueAgencies = [...new Set(agencyData?.map(d => d.agency).filter(Boolean) || [])].sort();
+        const uniqueAgencies = [...new Set(agencyData?.map((d: any) => (d as { agency: string }).agency).filter(Boolean) || [])].sort();
         setAgencies(uniqueAgencies as string[]);
       } catch (err) {
         if (!cancelled) {
@@ -131,7 +131,7 @@ export default function CheckbookTable() {
 
         if (fetchError) throw fetchError;
 
-        const unique = [...new Set(data?.map(d => d.agency).filter(Boolean) || [])].sort();
+        const unique = [...new Set(data?.map((d: any) => (d as { agency: string }).agency).filter(Boolean) || [])].sort();
         setAgencySuggestions(unique as string[]);
       } catch (err) {
         console.error('[CheckbookTable] Error fetching agency suggestions:', err);
@@ -166,7 +166,7 @@ export default function CheckbookTable() {
 
         if (fetchError) throw fetchError;
 
-        const unique = [...new Set(data?.map(d => d.payee) || [])].sort();
+        const unique = [...new Set(data?.map((d: any) => (d as { payee: string }).payee) || [])].sort();
         setPayeeSuggestions(unique);
       } catch (err) {
         console.error('[CheckbookTable] Error fetching payee suggestions:', err);

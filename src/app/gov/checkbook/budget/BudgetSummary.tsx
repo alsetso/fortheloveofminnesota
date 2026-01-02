@@ -45,7 +45,7 @@ export default function BudgetSummary() {
         // Use RPC function for efficient database aggregation
         const period = selectedYear === 'all' ? null : parseInt(selectedYear, 10);
         
-        const { data, error: fetchError } = await supabase.rpc('get_budget_stats', {
+        const { data, error: fetchError } = await (supabase.rpc as any)('get_budget_stats', {
           p_period: period && !isNaN(period) && period >= 2000 && period <= 2100 ? period : null
         });
 

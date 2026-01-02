@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - 7); // Last 7 days to catch all articles
     
-    const { data: articlesData, error: articlesError } = await supabase.rpc('get_news_by_date_range', {
+    const { data: articlesData, error: articlesError } = await (supabase.rpc as any)('get_news_by_date_range', {
       p_start_date: startDate.toISOString().split('T')[0],
       p_end_date: today.toISOString().split('T')[0],
     });

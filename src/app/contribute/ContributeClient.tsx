@@ -61,10 +61,11 @@ export default function ContributeClient({ auth }: ContributeClientProps) {
         }
 
         // Get contribution stats
-        const accountId = accountData?.id;
+        const accountDataTyped = accountData as { id: string } | null;
+        const accountId = accountDataTyped?.id;
         if (accountId) {
           const [editsResult] = await Promise.all([
-            supabase
+            (supabase as any)
               .from('civic_events')
               .select('id', { count: 'exact', head: true })
               .eq('account_id', accountId),

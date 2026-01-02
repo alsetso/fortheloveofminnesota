@@ -15,7 +15,7 @@ export async function GET(
     const supabase = createServiceClient();
 
     // Use RPC function to query by article_id
-    const { data, error } = await supabase.rpc('get_news_by_date_range', {
+    const { data, error } = await (supabase.rpc as any)('get_news_by_date_range', {
       p_start_date: '2000-01-01',
       p_end_date: '2100-01-01',
     });

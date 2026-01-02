@@ -97,7 +97,7 @@ export default function BudgetTable() {
 
         if (fetchError) throw fetchError;
 
-        const unique = [...new Set(data?.map(d => d.agency).filter(Boolean) || [])].sort();
+        const unique = [...new Set(data?.map((d: any) => (d as { agency: string }).agency).filter(Boolean) || [])].sort();
         setAgencySuggestions(unique as string[]);
       } catch (err) {
         console.error('[BudgetTable] Error fetching agency suggestions:', err);
@@ -131,7 +131,7 @@ export default function BudgetTable() {
 
         if (fetchError) throw fetchError;
 
-        const unique = [...new Set(data?.map(d => d.fund).filter(Boolean) || [])].sort();
+        const unique = [...new Set(data?.map((d: any) => (d as { fund: string }).fund).filter(Boolean) || [])].sort();
         setFundSuggestions(unique as string[]);
       } catch (err) {
         console.error('[BudgetTable] Error fetching fund suggestions:', err);
@@ -165,7 +165,7 @@ export default function BudgetTable() {
 
         if (fetchError) throw fetchError;
 
-        const unique = [...new Set(data?.map(d => d.program).filter(Boolean) || [])].sort();
+        const unique = [...new Set(data?.map((d: any) => (d as { program: string }).program).filter(Boolean) || [])].sort();
         setProgramSuggestions(unique as string[]);
       } catch (err) {
         console.error('[BudgetTable] Error fetching program suggestions:', err);

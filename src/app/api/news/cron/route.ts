@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const accountId = adminAccounts[0].id;
+    const accountId = (adminAccounts[0] as { id: string }).id;
 
     // Default query: "Minnesota, MN" with 24 hours
     const query = 'Minnesota, MN';

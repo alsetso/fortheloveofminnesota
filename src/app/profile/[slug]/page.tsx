@@ -168,7 +168,7 @@ export default async function ProfilePage({ params }: Props) {
   };
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+    <SimplePageLayout contentPadding="px-[10px] py-3">
       <PageViewTracker page_url={`/profile/${slug}`} />
       <OwnershipToast isOwnProfile={isOwnProfile} />
       <div className="max-w-7xl mx-auto">

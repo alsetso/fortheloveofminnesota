@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // Use RPC function to query news schema
     // Note: Function must be created via migration 328 first
-    const { data, error } = await supabase.rpc('get_news_by_date_range', {
+    const { data, error } = await (supabase.rpc as any)('get_news_by_date_range', {
       p_start_date: startDate,
       p_end_date: endDate || startDate,
     });

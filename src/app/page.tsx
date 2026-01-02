@@ -79,7 +79,7 @@ export default async function Home() {
   }, {} as Record<string, number>);
 
   return (
-    <SimplePageLayout containerMaxWidth="full" backgroundColor="bg-[#f4f2ef]" contentPadding="py-3" footerVariant="dark">
+    <SimplePageLayout containerMaxWidth="full" backgroundColor="bg-[#f4f2ef]" contentPadding="py-3">
       <HomepageViewTracker />
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 px-[10px]">
         {/* First Column: Profile Card */}

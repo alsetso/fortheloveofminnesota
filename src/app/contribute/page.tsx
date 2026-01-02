@@ -31,7 +31,7 @@ export default async function ContributePage() {
   const auth = await getServerAuth();
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+    <SimplePageLayout contentPadding="px-[10px] py-3">
       <div className="max-w-4xl mx-auto">
         <ContributeClient auth={auth} />
       </div>

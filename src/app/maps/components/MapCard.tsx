@@ -247,10 +247,10 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
   const containerClass = fullWidth
     ? 'w-full'
     : isFeatured 
-    ? 'w-full sm:w-[320px] sm:flex-shrink-0' 
+    ? 'w-full' 
     : isSmall
-    ? 'w-full sm:w-[120px] sm:flex-shrink-0'
-    : 'w-full sm:w-[150px] sm:flex-shrink-0';
+    ? 'w-full'
+    : 'w-full';
 
   if (map.href && canAccess && map.map_type !== 'atlas') {
     return (

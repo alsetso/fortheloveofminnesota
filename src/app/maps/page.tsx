@@ -436,9 +436,9 @@ export default function MapsPage() {
             </div>
 
             {/* Two Column Layout */}
-            <div className="flex gap-3">
+            <div className="flex flex-col md:flex-row gap-3">
               {/* Left Sidebar - Tabs */}
-              <div className="w-48 flex-shrink-0">
+              <div className="w-full md:w-48 flex-shrink-0">
                 <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1">
                   {account && (
                     <button
@@ -488,7 +488,7 @@ export default function MapsPage() {
               {/* Right Content - Maps Grid */}
               <div className="flex-1 space-y-2">
                 {/* Heading and Search */}
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <h2 className="text-sm font-semibold text-gray-900">
                     {activeTab === 'my-maps' && 'My Maps'}
                     {activeTab === 'community' && 'Community Maps'}
@@ -502,7 +502,7 @@ export default function MapsPage() {
                     }
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <div className="relative flex-1">
                     <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
                     <input
@@ -516,7 +516,7 @@ export default function MapsPage() {
                   {activeTab === 'my-maps' && (
                     <button
                       onClick={() => router.push('/maps/new')}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors sm:w-auto w-full"
                     >
                       <PlusIcon className="w-3 h-3" />
                       <span>Create</span>
@@ -529,7 +529,7 @@ export default function MapsPage() {
                   <div className="space-y-3">
                     {/* Featured Community Maps (Mentions) */}
                     {filteredCommunityMaps.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2">
                         {filteredCommunityMaps.map((map) => (
                           <MapCard 
                             key={map.id} 
@@ -573,7 +573,7 @@ export default function MapsPage() {
                         ) : filteredUserMaps.length === 0 ? (
                           <div className="text-xs text-gray-500">No user-generated maps yet</div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
                             {filteredUserMaps.map((map) => (
                               <MapCard 
                                 key={map.id} 
@@ -592,7 +592,7 @@ export default function MapsPage() {
                 ) : currentTabData.maps.length === 0 ? (
                   <div className="text-xs text-gray-500">{currentTabData.emptyMessage}</div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap gap-2">
                     {currentTabData.maps.map((map) => (
                       <MapCard 
                         key={map.id} 

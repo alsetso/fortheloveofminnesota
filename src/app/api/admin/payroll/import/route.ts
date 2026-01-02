@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
       try {
         const { data, error } = await supabase
           .from('payroll')
-          .insert(batch)
+          .insert(batch as any)
           .select('id');
 
         if (error) {

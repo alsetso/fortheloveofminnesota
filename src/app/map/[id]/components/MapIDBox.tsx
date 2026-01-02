@@ -288,11 +288,17 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
 
     // Add hover cursor
     const handleMouseEnter = () => {
-      mapboxMap.getCanvas().style.cursor = 'pointer';
+      const canvas = mapboxMap.getCanvas();
+      if (canvas) {
+        canvas.style.cursor = 'pointer';
+      }
     };
     const handleMouseLeave = () => {
       if (!pinMode) {
-        mapboxMap.getCanvas().style.cursor = '';
+        const canvas = mapboxMap.getCanvas();
+        if (canvas) {
+          canvas.style.cursor = '';
+        }
       }
     };
 
@@ -452,11 +458,17 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
 
     // Add hover cursor
     const handleMouseEnter = () => {
-      mapboxMap.getCanvas().style.cursor = 'pointer';
+      const canvas = mapboxMap.getCanvas();
+      if (canvas) {
+        canvas.style.cursor = 'pointer';
+      }
     };
     const handleMouseLeave = () => {
       if (!pinMode) {
-        mapboxMap.getCanvas().style.cursor = '';
+        const canvas = mapboxMap.getCanvas();
+        if (canvas) {
+          canvas.style.cursor = '';
+        }
       }
     };
 

@@ -479,7 +479,10 @@ export default function PostMapModal({
         e.preventDefault();
       }
       isDraggingPinRef.current = true;
-      (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = 'grabbing';
+      const canvas = mapInstance.getCanvas() as HTMLCanvasElement | null;
+      if (canvas) {
+        canvas.style.cursor = 'grabbing';
+      }
     };
 
     const mousemoveHandler = (e: MapboxMouseEvent) => {
@@ -501,19 +504,28 @@ export default function PostMapModal({
     const mouseupHandler = async (e: MapboxMouseEvent) => {
       if (!isDraggingPinRef.current) return;
       isDraggingPinRef.current = false;
-      (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
+      const canvas = mapInstance.getCanvas() as HTMLCanvasElement | null;
+      if (canvas) {
+        canvas.style.cursor = '';
+      }
       await onDragEnd(e.lngLat.lng, e.lngLat.lat);
     };
 
     const mouseenterHandler = () => {
       if (!isDraggingPinRef.current) {
-        (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = 'pointer';
+        const canvas = mapInstance.getCanvas() as HTMLCanvasElement | null;
+        if (canvas) {
+          canvas.style.cursor = 'pointer';
+        }
       }
     };
 
     const mouseleaveHandler = () => {
       if (!isDraggingPinRef.current) {
-        (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
+        const canvas = mapInstance.getCanvas() as HTMLCanvasElement | null;
+        if (canvas) {
+          canvas.style.cursor = '';
+        }
       }
     };
 
@@ -1060,7 +1072,10 @@ export default function PostMapModal({
                   
                   // Reset cursor to default
                   if (mapInstance) {
-                    (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
+                    const canvas = mapInstance.getCanvas() as HTMLCanvasElement | null;
+                    if (canvas) {
+                      canvas.style.cursor = '';
+                    }
                   }
                 }
               }
@@ -1158,7 +1173,10 @@ export default function PostMapModal({
               
               // Reset cursor to default
               if (mapInstance) {
-                (mapInstance.getCanvas() as HTMLCanvasElement).style.cursor = '';
+                const canvas = mapInstance.getCanvas() as HTMLCanvasElement | null;
+                if (canvas) {
+                  canvas.style.cursor = '';
+                }
               }
             });
 
@@ -1558,7 +1576,10 @@ export default function PostMapModal({
     
     // Change cursor to crosshair for drawing
     if (map.current) {
-      (map.current.getCanvas() as HTMLCanvasElement).style.cursor = 'crosshair';
+      const canvas = map.current.getCanvas() as HTMLCanvasElement | null;
+      if (canvas) {
+        canvas.style.cursor = 'crosshair';
+      }
     }
   }, [state.mapData]);
 

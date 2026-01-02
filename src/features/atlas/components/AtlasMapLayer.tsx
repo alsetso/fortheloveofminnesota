@@ -352,14 +352,20 @@ export default function AtlasMapLayer({
     };
 
     mapboxMap.on('click', pointLayerId, handleClick);
-    mapboxMap.getCanvas().style.cursor = 'pointer';
+    const canvas = mapboxMap.getCanvas();
+    if (canvas) {
+      canvas.style.cursor = 'pointer';
+    }
 
     clickHandlerAddedRef.current = true;
 
     return () => {
       if (mapboxMap && !mapboxMap.removed) {
         mapboxMap.off('click', pointLayerId, handleClick);
-        mapboxMap.getCanvas().style.cursor = '';
+        const cleanupCanvas = mapboxMap.getCanvas();
+        if (cleanupCanvas) {
+          cleanupCanvas.style.cursor = '';
+        }
       }
       clickHandlerAddedRef.current = false;
     };

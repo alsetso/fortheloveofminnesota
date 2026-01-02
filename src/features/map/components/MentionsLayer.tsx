@@ -916,7 +916,10 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                   window.dispatchEvent(new CustomEvent('mention-hover-start', {
                     detail: { mentionId, mention }
                   }));
-                  (mapboxMap as any).getCanvas().style.cursor = 'pointer';
+                  const canvas = (mapboxMap as any).getCanvas();
+                  if (canvas) {
+                    canvas.style.cursor = 'pointer';
+                  }
                 }
               }
             }
@@ -925,7 +928,10 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           const handleMentionHoverEnd = () => {
             // Dispatch event to allow mention creation when not hovering
             window.dispatchEvent(new CustomEvent('mention-hover-end'));
-            (mapboxMap as any).getCanvas().style.cursor = '';
+            const canvas = (mapboxMap as any).getCanvas();
+            if (canvas) {
+              canvas.style.cursor = '';
+            }
           };
           
           // Add hover handlers for both point and label layers

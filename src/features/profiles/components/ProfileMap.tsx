@@ -629,16 +629,28 @@ export default function ProfileMap({
           
           // Add cursor styles
           mapboxMap.on('mouseenter', LAYER_IDS.points, () => {
-            mapboxMap.getCanvas().style.cursor = 'pointer';
+            const canvas = mapboxMap.getCanvas();
+            if (canvas) {
+              canvas.style.cursor = 'pointer';
+            }
           });
           mapboxMap.on('mouseleave', LAYER_IDS.points, () => {
-            mapboxMap.getCanvas().style.cursor = '';
+            const canvas = mapboxMap.getCanvas();
+            if (canvas) {
+              canvas.style.cursor = '';
+            }
           });
           mapboxMap.on('mouseenter', LAYER_IDS.labels, () => {
-            mapboxMap.getCanvas().style.cursor = 'pointer';
+            const canvas = mapboxMap.getCanvas();
+            if (canvas) {
+              canvas.style.cursor = 'pointer';
+            }
           });
           mapboxMap.on('mouseleave', LAYER_IDS.labels, () => {
-            mapboxMap.getCanvas().style.cursor = '';
+            const canvas = mapboxMap.getCanvas();
+            if (canvas) {
+              canvas.style.cursor = '';
+            }
           });
 
           clickHandlersAddedRef.current = true;

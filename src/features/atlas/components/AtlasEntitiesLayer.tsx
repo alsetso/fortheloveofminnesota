@@ -307,11 +307,17 @@ export default function AtlasEntitiesLayer({
 
           // Change cursor on hover
           mapboxMap.on('mouseenter', pointLayerId, () => {
-            mapboxMap.getCanvas().style.cursor = 'pointer';
+            const canvas = mapboxMap.getCanvas();
+            if (canvas) {
+              canvas.style.cursor = 'pointer';
+            }
           });
 
           mapboxMap.on('mouseleave', pointLayerId, () => {
-            mapboxMap.getCanvas().style.cursor = '';
+            const canvas = mapboxMap.getCanvas();
+            if (canvas) {
+              canvas.style.cursor = '';
+            }
           });
 
           clickHandlersAddedRef.current = true;

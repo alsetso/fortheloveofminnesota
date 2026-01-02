@@ -550,7 +550,7 @@ export default function MapsPage() {
                         ) : filteredUserMaps.length === 0 ? (
                           <div className="text-xs text-gray-500">No user-generated maps yet</div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
                             {filteredUserMaps.map((map) => (
                               <MapCard 
                                 key={map.id} 

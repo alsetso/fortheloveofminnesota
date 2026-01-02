@@ -191,7 +191,7 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
   const isImageUrl = (value: string | null): boolean => {
     if (!value) return false;
     return value.includes('.supabase.co/storage') && 
-           (value.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || value.includes('/storage/'));
+           (!!value.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || value.includes('/storage/'));
   };
 
   const renderValue = (value: string | null, isOld: boolean = false) => {

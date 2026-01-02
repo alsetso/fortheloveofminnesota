@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { ClockIcon, NewspaperIcon } from '@heroicons/react/24/outline';
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { NewsArticle } from '@/types/news';
 import { getSourceInitials, getSourceColor, formatDate, formatFullDateTime } from '@/features/news/utils/newsHelpers';
 import { useAuthStateSafe } from '@/features/auth';
@@ -31,7 +31,7 @@ export default function HomepageNewsSection() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [query, setQuery] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const displayedCount = 8; // Show 8 articles on homepage
+  const [displayedCount, setDisplayedCount] = useState(10); // Start with 10 articles
 
   useEffect(() => {
     fetchLatestNews();
@@ -53,6 +53,8 @@ export default function HomepageNewsSection() {
         setArticles(data.data.articles || []);
         setGeneratedAt(data.data.generatedAt || data.data.createdAt || null);
         setQuery(data.data.query || null);
+        // Reset displayed count when fetching new articles
+        setDisplayedCount(10);
       } else {
         setArticles([]);
         setError('No news data available');
@@ -199,12 +201,12 @@ export default function HomepageNewsSection() {
           
           {articles.length > displayedCount && (
             <div className="text-center pt-2">
-              <Link
-                href="/news"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 rounded transition-colors border border-gray-200"
+              <button
+                onClick={() => setDisplayedCount(prev => Math.min(prev + 10, articles.length))}
+                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 rounded transition-colors border border-gray-200"
               >
-                <span>View All News ({articles.length})</span>
-              </Link>
+                Load More ({articles.length - displayedCount} remaining)
+              </button>
             </div>
           )}
         </div>

@@ -16,7 +16,7 @@ export async function getGeneratedIdFromArticleId(articleId: string): Promise<st
     return null;
   }
 
-  const { data: generatedArticle, error } = await supabase
+  const { data: generatedArticle, error } = await (supabase as any)
     .schema('news')
     .from('generated')
     .select('id')

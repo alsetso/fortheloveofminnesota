@@ -171,7 +171,7 @@ export default function EventsPageClient() {
       }
 
       // Different days
-      return `${formatDate(start)} - ${formatDate(end)}`;
+      return `${formatDate(start)} - ${end ? formatDate(end) : ''}`;
     } catch {
       return `${start}${end ? ` - ${end}` : ''}`;
     }

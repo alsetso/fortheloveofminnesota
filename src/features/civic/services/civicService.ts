@@ -191,11 +191,13 @@ export async function getCivicPersonBySlug(slug: string): Promise<{ person: Civi
     return null;
   }
 
+  const typedPerson = person as CivicPerson;
+
   // Get all roles for this person
   const { data: roles, error: rolesError } = await supabase
     .from('roles')
     .select('*')
-    .eq('person_id', person.id)
+    .eq('person_id', typedPerson.id)
     .eq('is_current', true)
     .order('title');
 
@@ -204,17 +206,18 @@ export async function getCivicPersonBySlug(slug: string): Promise<{ person: Civi
   }
 
   // Get orgs for these roles
-  const orgIds = [...new Set((roles || []).map(r => r.org_id))];
+  const typedRoles = (roles || []) as CivicRole[];
+  const orgIds = [...new Set(typedRoles.map(r => r.org_id))];
   const { data: orgs } = await supabase
     .from('orgs')
     .select('*')
     .in('id', orgIds);
 
-  const orgsMap = new Map((orgs || []).map(o => [o.id, o]));
+  const orgsMap = new Map(((orgs || []) as CivicOrg[]).map(o => [o.id, o]));
 
   return {
-    person: person as CivicPerson,
-    roles: (roles || []).map(role => ({
+    person: typedPerson,
+    roles: typedRoles.map(role => ({
       ...role,
       org: orgsMap.get(role.org_id) || undefined,
     })) as (CivicRole & { org?: CivicOrg })[],
@@ -237,11 +240,13 @@ export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | nu
     return null;
   }
 
+  const typedOrg = org as CivicOrg;
+
   // Get roles and people for this org
   const [rolesResult, peopleResult, childrenResult] = await Promise.all([
-    supabase.from('roles').select('*').eq('org_id', org.id).eq('is_current', true).order('title'),
+    supabase.from('roles').select('*').eq('org_id', typedOrg.id).eq('is_current', true).order('title'),
     supabase.from('people').select('*'),
-    supabase.from('orgs').select('*').eq('parent_id', org.id).order('name'),
+    supabase.from('orgs').select('*').eq('parent_id', typedOrg.id).order('name'),
   ]);
 
   if (rolesResult.error) {
@@ -251,8 +256,8 @@ export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | nu
     console.error('[civicService] Error fetching child orgs:', childrenResult.error);
   }
 
-  const roles = rolesResult.data || [];
-  const people = new Map((peopleResult.data || []).map(p => [p.id, p]));
+  const roles = (rolesResult.data || []) as CivicRole[];
+  const people = new Map(((peopleResult.data || []) as CivicPerson[]).map(p => [p.id, p]));
   const rolesWithPeople = roles.map(role => ({
     ...role,
     person: people.get(role.person_id) || undefined,
@@ -260,14 +265,14 @@ export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | nu
 
   // Recursively get roles for children
   const childrenWithRoles: OrgWithRoles[] = await Promise.all(
-    (childrenResult.data || []).map(async (child) => {
+    ((childrenResult.data || []) as CivicOrg[]).map(async (child) => {
       const { data: childRoles } = await supabase
         .from('roles')
         .select('*')
         .eq('org_id', child.id)
         .eq('is_current', true);
 
-      const childPeople = new Map((peopleResult.data || []).map(p => [p.id, p]));
+      const childPeople = new Map(((peopleResult.data || []) as CivicPerson[]).map(p => [p.id, p]));
       return {
         ...child,
         roles: (childRoles || []).map((r: any) => ({
@@ -280,7 +285,7 @@ export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | nu
   );
 
   return {
-    ...org,
+    ...typedOrg,
     roles: rolesWithPeople,
     children: childrenWithRoles,
   };

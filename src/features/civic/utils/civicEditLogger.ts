@@ -43,7 +43,8 @@ export async function updateCivicFieldWithLogging(
       return { error: fetchError };
     }
 
-    const oldValue = current?.[field] ?? null;
+    const typedCurrent = current as Record<string, any> | null;
+    const oldValue = typedCurrent?.[field] ?? null;
 
     // Skip logging if value hasn't changed
     if (oldValue === newValue) {

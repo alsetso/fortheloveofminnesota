@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import PersonAvatar from './PersonAvatar';

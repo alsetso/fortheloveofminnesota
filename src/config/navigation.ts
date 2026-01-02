@@ -3,7 +3,6 @@ import {
   MapIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
-  GlobeAltIcon,
   UserIcon,
   BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
@@ -20,16 +19,14 @@ export interface NavItem {
 // Main navigation items for app sidebar
 export const appNavItems: NavItem[] = [
   { href: '/', label: 'Home', icon: HomeIcon },
-  { href: '/map', label: 'Map', icon: MapIcon },
-  { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
+  { href: '/maps', label: 'Maps', icon: MapIcon },
   { href: '/account/settings', label: 'Settings', icon: Cog6ToothIcon },
 ];
 
 // Public navigation items for SimpleNav
 export const publicNavItems: NavItem[] = [
   { href: '/', label: 'Home', icon: HomeIcon },
-  { href: '/map', label: 'Map', icon: MapIcon },
-  { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
+  { href: '/maps', label: 'Maps', icon: MapIcon },
 ];
 
 // Legacy navItems for backward compatibility
@@ -42,10 +39,10 @@ export const navItems: NavItem[] = [
     category: 'Main',
   },
   {
-    name: 'Map',
-    href: '/map',
+    name: 'Maps',
+    href: '/maps',
     icon: MapIcon,
-    description: 'Interactive map of Minnesota showing development opportunities and property acquisitions',
+    description: 'Interactive maps of Minnesota showing development opportunities and property acquisitions',
     category: 'Map',
   },
   {

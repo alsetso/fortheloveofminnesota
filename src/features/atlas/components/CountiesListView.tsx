@@ -143,8 +143,7 @@ export function CountiesListView({ counties }: CountiesListViewProps) {
             {sortedCounties.map((county) => (
               <tr
                 key={county.id}
-                onClick={() => county.slug && router.push(`/explore/county/${county.slug}`)}
-                className={county.slug ? "hover:bg-gray-50 transition-colors cursor-pointer" : ""}
+                className=""
               >
                 <td className="px-[10px] py-[10px]">
                   <div className="flex items-center gap-1.5">

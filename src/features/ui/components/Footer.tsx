@@ -45,34 +45,18 @@ export default function Footer({ fixed = false }: FooterProps) {
                 </li>
                 <li>
                   <Link 
-                    href="/map" 
+                    href="/maps" 
                     className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
-                    Map
+                    Maps
                   </Link>
                 </li>
                 <li>
                   <Link 
-                    href="/explore" 
+                    href="/gov" 
                     className="text-xs transition-colors text-gray-400 hover:text-white"
                   >
-                    Explore
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    href="/calendar/news" 
-                    className="text-xs transition-colors text-gray-400 hover:text-white"
-                  >
-                    News
-                  </Link>
-                </li>
-                <li>
-                  <Link 
-                    href="/faqs" 
-                    className="text-xs transition-colors text-gray-400 hover:text-white"
-                  >
-                    FAQs
+                    Government
                   </Link>
                 </li>
                 <li>

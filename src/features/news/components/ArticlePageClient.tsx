@@ -119,8 +119,8 @@ export default function ArticlePageClient({ articleId }: ArticlePageClientProps)
     return (
       <div className="bg-white border border-red-200 rounded-md p-[10px]">
         <p className="text-xs text-red-600">{error || 'Article not found'}</p>
-        <Link href="/calendar/news" className="text-xs text-gray-600 hover:text-gray-900 mt-2 inline-block">
-          ← Back to News
+        <Link href="/" className="text-xs text-gray-600 hover:text-gray-900 mt-2 inline-block">
+          ← Back to Home
         </Link>
       </div>
     );
@@ -139,7 +139,7 @@ export default function ArticlePageClient({ articleId }: ArticlePageClientProps)
           <nav className="text-xs text-gray-600">
             <Link href="/" className="hover:text-gray-900">Home</Link>
             <span> / </span>
-            <Link href="/calendar/news" className="hover:text-gray-900">News</Link>
+            <Link href="/" className="hover:text-gray-900">Home</Link>
             <span> / </span>
             <span className="text-gray-900">Article</span>
           </nav>

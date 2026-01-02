@@ -5,7 +5,8 @@
 -- STEP 1: Function to directly generate news (recommended approach)
 -- ============================================================================
 
--- This function directly calls RapidAPI and saves to news_gen table
+-- This function directly calls RapidAPI and saves to news.prompt table
+-- Trigger automatically extracts articles to news.generated
 -- Requires: http extension enabled, RapidAPI key configured, at least one admin account
 CREATE OR REPLACE FUNCTION public.auto_generate_news()
 RETURNS JSONB AS $$
@@ -16,6 +17,7 @@ DECLARE
   v_response JSONB;
   v_articles JSONB;
   v_result JSONB;
+  v_prompt_id UUID;
 BEGIN
   -- Get a system account ID (you may need to create a system account)
   -- For now, we'll use the first admin account
@@ -65,12 +67,12 @@ BEGIN
       NULL
     )::http_request);
     
-    -- Parse response and save to news_gen
+    -- Parse response and save to news.prompt (trigger auto-extracts to news.generated)
     IF v_response->>'status' = 'OK' THEN
       v_articles := v_response->'data';
       
-      -- Save to database
-      INSERT INTO public.news_gen (account_id, user_input, api_response)
+      -- Save to database using news.prompt (trigger will extract articles to news.generated)
+      INSERT INTO news.prompt (account_id, user_input, api_response)
       VALUES (
         v_account_id,
         'Minnesota, MN',
@@ -85,9 +87,9 @@ BEGIN
           'generatedAt', NOW()::TEXT
         )
       )
-      RETURNING jsonb_build_object('id', id, 'success', true) INTO v_result;
+      RETURNING id INTO v_prompt_id;
       
-      RETURN v_result;
+      RETURN jsonb_build_object('id', v_prompt_id, 'success', true);
     ELSE
       RETURN jsonb_build_object(
         'success', false,
@@ -107,7 +109,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION public.auto_generate_news IS 
-  'Directly generates news by calling RapidAPI and saving to database. Runs automatically every 24 hours.';
+  'Directly generates news by calling RapidAPI and saving to news.prompt. Trigger automatically extracts articles to news.generated. Runs automatically every 24 hours.';
 
 -- ============================================================================
 -- STEP 2: Schedule with pg_cron (if extension is available)

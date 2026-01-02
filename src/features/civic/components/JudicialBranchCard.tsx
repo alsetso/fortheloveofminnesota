@@ -18,7 +18,7 @@ export default function JudicialBranchCard({ branch }: JudicialBranchCardProps) 
         'District Courts handle most trials and initial case proceedings',
         'Ensures laws are applied consistently and constitutionally'
       ]}
-      href="/gov/judicial"
+      href={`/gov/org/${branch.slug}`}
     />
   );
 }

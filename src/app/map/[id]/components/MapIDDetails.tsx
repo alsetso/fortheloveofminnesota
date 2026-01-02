@@ -7,7 +7,7 @@ import { AccountService } from '@/features/auth';
 interface MapIDDetailsProps {
   title: string;
   description: string | null;
-  map_style: 'street' | 'satellite';
+  map_style: 'street' | 'satellite' | 'light' | 'dark';
   visibility: 'public' | 'private' | 'shared';
   viewCount: number | null;
   account: {

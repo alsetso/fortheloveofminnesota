@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
+import { useAuthStateSafe } from '@/features/auth';
 import { useFormState } from '@/hooks/useFormState';
+import { updateCivicFieldsWithLogging } from '@/features/civic/utils/civicEditLogger';
 import type { CivicOrg } from '@/features/civic/services/civicService';
 import FormInput from '@/features/civic/components/FormInput';
 import FormTextarea from '@/features/civic/components/FormTextarea';
@@ -14,10 +16,12 @@ interface OrgEditModalProps {
   org: CivicOrg;
   onClose: () => void;
   onSave: () => void;
+  isAdmin?: boolean;
 }
 
-export default function OrgEditModal({ isOpen, org, onClose, onSave }: OrgEditModalProps) {
+export default function OrgEditModal({ isOpen, org, onClose, onSave, isAdmin = false }: OrgEditModalProps) {
   const supabase = useSupabaseClient();
+  const { account } = useAuthStateSafe();
   const { formData, updateField } = useFormState({
     name: org.name,
     slug: org.slug,
@@ -30,22 +34,46 @@ export default function OrgEditModal({ isOpen, org, onClose, onSave }: OrgEditMo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!account?.id) {
+      setError('You must be signed in to edit');
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     try {
-      const { error: updateError } = await supabase
-        .from('orgs')
-        .update({
-          name: formData.name,
-          slug: formData.slug,
-          org_type: formData.org_type,
+      if (isAdmin) {
+        // Admin can edit all fields - direct update
+        const { error: updateError } = await supabase
+          .from('orgs')
+          .update({
+            name: formData.name,
+            slug: formData.slug,
+            org_type: formData.org_type,
+            description: formData.description || null,
+            website: formData.website || null,
+          })
+          .eq('id', org.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Community users can only edit description and website - use logging
+        const updates: Record<string, string | null> = {
           description: formData.description || null,
           website: formData.website || null,
-        })
-        .eq('id', org.id);
+        };
 
-      if (updateError) throw updateError;
+        const { error: updateError } = await updateCivicFieldsWithLogging(
+          'orgs',
+          org.id,
+          updates,
+          account.id,
+          supabase
+        );
+
+        if (updateError) throw updateError;
+      }
 
       onSave();
       onClose();
@@ -78,30 +106,34 @@ export default function OrgEditModal({ isOpen, org, onClose, onSave }: OrgEditMo
         )}
 
         <form onSubmit={handleSubmit} className="space-y-2">
-          <FormInput
-            label="Name"
-            value={formData.name}
-            onChange={(value) => updateField('name', value)}
-            required
-          />
-          <FormInput
-            label="Slug"
-            value={formData.slug}
-            onChange={(value) => updateField('slug', value)}
-            required
-          />
-          <FormSelect
-            label="Type"
-            value={formData.org_type}
-            onChange={(value) => updateField('org_type', value as any)}
-            options={[
-              { value: 'branch', label: 'branch' },
-              { value: 'agency', label: 'agency' },
-              { value: 'department', label: 'department' },
-              { value: 'court', label: 'court' },
-            ]}
-            required
-          />
+          {isAdmin && (
+            <>
+              <FormInput
+                label="Name"
+                value={formData.name}
+                onChange={(value) => updateField('name', value)}
+                required
+              />
+              <FormInput
+                label="Slug"
+                value={formData.slug}
+                onChange={(value) => updateField('slug', value)}
+                required
+              />
+              <FormSelect
+                label="Type"
+                value={formData.org_type}
+                onChange={(value) => updateField('org_type', value as any)}
+                options={[
+                  { value: 'branch', label: 'branch' },
+                  { value: 'agency', label: 'agency' },
+                  { value: 'department', label: 'department' },
+                  { value: 'court', label: 'court' },
+                ]}
+                required
+              />
+            </>
+          )}
           <FormTextarea
             label="Description"
             value={formData.description}

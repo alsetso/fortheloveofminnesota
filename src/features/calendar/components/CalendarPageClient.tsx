@@ -9,6 +9,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getStartOfDayCentral, isSameDayCentral, getDateStringCentral } from '@/lib/timezone';
 import { getSourceInitials, getSourceColor } from '@/features/news/utils/newsHelpers';
+import { useAuthStateSafe } from '@/features/auth';
 
 interface NewsArticle {
   id: string;
@@ -48,6 +49,25 @@ export default function CalendarPageClient() {
   const [error, setError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [datePickerValue, setDatePickerValue] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  
+  const { account } = useAuthStateSafe();
+  const isAdmin = account?.role === 'admin';
+
+  // Check if news was generated in the last 24 hours
+  const isRecent = useMemo(() => {
+    if (!generatedAt) return false;
+    try {
+      const genDate = new Date(generatedAt);
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      return genDate >= twentyFourHoursAgo;
+    } catch {
+      return false;
+    }
+  }, [generatedAt]);
 
   // Calculate date range: 365 days from today
   const today = startOfDay(new Date());
@@ -90,6 +110,24 @@ export default function CalendarPageClient() {
       }
     }
   }, [currentDate]);
+
+  // Fetch generatedAt date for admin generate button
+  useEffect(() => {
+    if (isAdmin) {
+      const fetchGeneratedAt = async () => {
+        try {
+          const response = await fetch('/api/news/latest');
+          const data = await response.json();
+          if (data.success && data.data) {
+            setGeneratedAt(data.data.generatedAt || data.data.createdAt || null);
+          }
+        } catch (err) {
+          console.warn('Failed to fetch generatedAt:', err);
+        }
+      };
+      fetchGeneratedAt();
+    }
+  }, [isAdmin]);
 
   // Fetch events and news for the visible date range (only once per range)
   useEffect(() => {
@@ -237,6 +275,57 @@ export default function CalendarPageClient() {
     }
   };
 
+  // Handle news generation
+  const handleGenerateNews = async () => {
+    setGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const response = await fetch('/api/news/generate', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate news');
+      }
+
+      // Refresh news after generation
+      const newsResponse = await fetch('/api/news/latest');
+      const newsData = await newsResponse.json();
+      if (newsData.success && newsData.data) {
+        if (newsData.data.articles) {
+          setNewsArticles(newsData.data.articles as NewsArticle[]);
+        }
+        setGeneratedAt(newsData.data.generatedAt || newsData.data.createdAt || null);
+      }
+
+      // Refresh dates with news
+      try {
+        const todayStr = getDateStringCentral(today);
+        const rangeStart = getDateStringCentral(subDays(today, 30));
+        const rangeEnd = getDateStringCentral(addDays(today, 30));
+        
+        const datesResponse = await fetch(`/api/news/dates-with-news?startDate=${rangeStart}&endDate=${rangeEnd}`);
+        const datesData = await datesResponse.json();
+        if (datesData.success && datesData.data?.dates) {
+          const datesMap: Record<string, number> = {};
+          datesData.data.dates.forEach((d: { date: string; article_count: number }) => {
+            datesMap[d.date] = d.article_count;
+          });
+          setDatesWithNews(datesMap);
+        }
+      } catch (datesErr) {
+        console.warn('Failed to refresh dates with news:', datesErr);
+      }
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate news');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
 
   // Check if can navigate
   const canGoBack = currentDate > minDate;
@@ -246,13 +335,30 @@ export default function CalendarPageClient() {
     <div className="space-y-3">
       {/* CALENDAR Section Header */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="w-4 h-4 text-gray-700" />
-          <h2 className="text-sm font-semibold text-gray-900">CALENDAR</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarIcon className="w-4 h-4 text-gray-700" />
+            <h2 className="text-sm font-semibold text-gray-900">CALENDAR</h2>
+          </div>
+          {/* Admin Generate News Button */}
+          {isAdmin && (
+            <button
+              onClick={handleGenerateNews}
+              disabled={generating || isRecent}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? 'Generating...' : isRecent ? 'Generated Recently' : 'Generate News'}
+            </button>
+          )}
         </div>
         <p className="text-xs text-gray-600">
-          View community events on a daily calendar. Navigate forward and back up to 365 days.
+          View community events and news on a daily calendar. Navigate forward and back up to 365 days.
         </p>
+        {isAdmin && generateError && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-[10px]">
+            <p className="text-xs text-red-600">{generateError}</p>
+          </div>
+        )}
       </div>
 
       {/* Navigation Controls */}

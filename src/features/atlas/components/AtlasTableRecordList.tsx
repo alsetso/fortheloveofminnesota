@@ -65,16 +65,15 @@ export default function AtlasTableRecordList({
         const recordId = record.id || `record-${index}`;
         const fieldElements: React.ReactElement[] = [];
         
-        // Add name (as link to detail page)
+        // Add name (as text, no link)
         if (record.name) {
           fieldElements.push(
-            <Link
+            <span
               key={`${recordId}-name`}
-              href={`/explore/atlas/${tableName}/${record.id}`}
-              className="text-xs font-semibold text-gray-900 truncate hover:text-gray-700 underline"
+              className="text-xs font-semibold text-gray-900 truncate"
             >
               {record.name}
-            </Link>
+            </span>
           );
         }
 

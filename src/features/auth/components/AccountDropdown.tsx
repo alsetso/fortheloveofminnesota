@@ -37,7 +37,7 @@ export default function AccountDropdown({
     setActiveAccountId,
   } = useAuthStateSafe();
 
-  const { openWelcome, openAccount } = useAppModalContextSafe();
+  const { openWelcome, openAccount, openCreateAccount } = useAppModalContextSafe();
 
   // Fetch all user accounts when dropdown opens
   useEffect(() => {
@@ -61,6 +61,35 @@ export default function AccountDropdown({
       fetchAccounts();
     }
   }, [isOpen, account, activeAccountId]); // Refresh when active account changes
+
+  // Listen for account creation events to refresh the list
+  useEffect(() => {
+    if (!account) return;
+
+    const handleAccountCreated = async () => {
+      if (isOpen) {
+        setLoadingAccounts(true);
+        try {
+          const response = await fetch('/api/accounts?limit=50', {
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setAllAccounts(data.accounts || []);
+          }
+        } catch (error) {
+          console.error('Error fetching accounts:', error);
+        } finally {
+          setLoadingAccounts(false);
+        }
+      }
+    };
+
+    window.addEventListener('account-created', handleAccountCreated);
+    return () => {
+      window.removeEventListener('account-created', handleAccountCreated);
+    };
+  }, [isOpen, account]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -230,6 +259,22 @@ export default function AccountDropdown({
                       })}
                     </div>
                   )}
+                  
+                  {/* Create New Account Button */}
+                  <div className="border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        openCreateAccount();
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700 font-medium"
+                    >
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Create New Account
+                    </button>
+                  </div>
                 </div>
               )}
 

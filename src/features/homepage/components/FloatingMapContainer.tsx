@@ -2184,14 +2184,6 @@ export default function LocationSidebar({
                                locationData.localityType === 'suburb' ? 'Sub' : 'Loc'}
                             </span>
                             <span className="text-xs text-gray-700 truncate">{locationData.locality}</span>
-                            {locationData.cityId && !locationData.parentCity && locationData.citySlug && (
-                              <button
-                                onClick={() => window.open(`/explore/city/${locationData.citySlug}`, '_blank')}
-                                className="text-[9px] text-gray-400 hover:text-gray-900 underline ml-auto"
-                              >
-                                Explore
-                              </button>
-                            )}
                           </div>
                         )}
                         
@@ -2200,14 +2192,6 @@ export default function LocationSidebar({
                           <div className="flex items-center gap-1">
                             <span className="px-1 py-0.5 text-[9px] font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded">City</span>
                             <span className="text-xs text-gray-700 truncate">{locationData.city}</span>
-                            {locationData.citySlug && (
-                              <button
-                                onClick={() => router.push(`/explore/city/${locationData.citySlug}`)}
-                                className="text-[9px] text-gray-400 hover:text-gray-900 underline ml-auto"
-                              >
-                                Explore
-                              </button>
-                            )}
                             {locationData.cityId && (
                               <span className="text-[9px] text-green-600 ml-auto" title="In database">✓</span>
                             )}
@@ -2241,14 +2225,6 @@ export default function LocationSidebar({
                           <div className="flex items-center gap-1 pl-2 border-l border-gray-200">
                             <span className="text-[9px] text-gray-400">in</span>
                             <span className="text-xs text-gray-600 truncate">{locationData.parentCity}</span>
-                            {locationData.parentCitySlug && (
-                              <button
-                                onClick={() => window.open(`/explore/city/${locationData.parentCitySlug}`, '_blank')}
-                                className="text-[9px] text-gray-400 hover:text-gray-900 underline ml-auto"
-                              >
-                                Explore
-                              </button>
-                            )}
                           </div>
                         )}
 
@@ -2257,14 +2233,6 @@ export default function LocationSidebar({
                           <div className="flex items-center gap-1">
                             <span className="px-1 py-0.5 text-[9px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded">Co</span>
                             <span className="text-xs text-gray-700 truncate">{locationData.county}</span>
-                            {locationData.countySlug && (
-                              <button
-                                onClick={() => window.open(`/explore/county/${locationData.countySlug}`, '_blank')}
-                                className="text-[9px] text-gray-400 hover:text-gray-900 underline ml-auto"
-                              >
-                                Explore
-                              </button>
-                            )}
                             {locationData.countyId && (
                               <span className="text-[9px] text-green-600 ml-auto" title="In database">✓</span>
                             )}

@@ -15,6 +15,7 @@ interface ProfileMapProps {
   accountImageUrl?: string | null;
   selectedCollectionId?: string | null;
   collections?: Collection[];
+  onPinSelect?: (pinId: string | null) => void;
 }
 
 const SOURCE_ID = 'profile-mentions';
@@ -31,6 +32,7 @@ export default function ProfileMap({
   accountImageUrl,
   selectedCollectionId = null,
   collections = [],
+  onPinSelect,
 }: ProfileMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -40,6 +42,7 @@ export default function ProfileMap({
   const popupRef = useRef<any>(null);
   const clickHandlersAddedRef = useRef<boolean>(false);
   const pinsRef = useRef<ProfilePin[]>(pins);
+  const mapClickHandlerRef = useRef<((e: any) => void) | null>(null);
 
   // Convert pins to GeoJSON
   const pinsToGeoJSON = (pins: ProfilePin[]) => {
@@ -418,6 +421,11 @@ export default function ProfileMap({
             const pin = pinsRef.current.find(p => p.id === mentionId);
             if (!pin) return;
 
+            // Notify parent of pin selection (for collection assignment)
+            if (onPinSelect) {
+              onPinSelect(mentionId);
+            }
+
             // Helper functions
             const escapeHtml = (text: string | null): string => {
               if (!text) return '';
@@ -604,6 +612,21 @@ export default function ProfileMap({
           mapboxMap.on('click', LAYER_IDS.points, handleMentionClick);
           mapboxMap.on('click', LAYER_IDS.labels, handleMentionClick);
           
+          // Clear pin selection when clicking on map (not on a pin)
+          if (onPinSelect) {
+            const handleMapClick = (e: any) => {
+              const features = mapboxMap.queryRenderedFeatures(e.point, {
+                layers: [LAYER_IDS.points, LAYER_IDS.labels],
+              });
+              // If no features clicked, clear selection
+              if (features.length === 0) {
+                onPinSelect(null);
+              }
+            };
+            mapClickHandlerRef.current = handleMapClick;
+            mapboxMap.on('click', handleMapClick);
+          }
+          
           // Add cursor styles
           mapboxMap.on('mouseenter', LAYER_IDS.points, () => {
             mapboxMap.getCanvas().style.cursor = 'pointer';
@@ -634,6 +657,10 @@ export default function ProfileMap({
         try {
           mapboxMap.off('click', LAYER_IDS.points);
           mapboxMap.off('click', LAYER_IDS.labels);
+          if (mapClickHandlerRef.current) {
+            mapboxMap.off('click', mapClickHandlerRef.current);
+            mapClickHandlerRef.current = null;
+          }
           mapboxMap.off('mouseenter', LAYER_IDS.points);
           mapboxMap.off('mouseleave', LAYER_IDS.points);
           mapboxMap.off('mouseenter', LAYER_IDS.labels);
@@ -652,7 +679,7 @@ export default function ProfileMap({
         popupRef.current = null;
       }
     };
-  }, [mapLoaded, pins, accountId, isOwnProfile, accountUsername, accountImageUrl]);
+  }, [mapLoaded, pins, accountId, isOwnProfile, accountUsername, accountImageUrl, onPinSelect]);
 
   // Show toast when a collection is selected (not on initial load)
   useEffect(() => {

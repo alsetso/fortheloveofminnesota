@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
         description,
         visibility,
         map_style,
+        type,
+        custom_slug,
+        tags,
         meta,
         created_at,
         updated_at,
@@ -118,6 +121,9 @@ export async function POST(request: NextRequest) {
       description,
       visibility = 'private',
       map_style = 'street',
+      type = null,
+      custom_slug = null,
+      tags = [],
       meta = {},
     } = body;
 
@@ -136,7 +142,15 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invalid map_style. Must be street, satellite, light, or dark', 400);
     }
 
-    // Get account_id for current user
+    // Validate type
+    if (type !== null) {
+      const validTypes = ['user', 'community', 'gov', 'professional', 'atlas', 'user-generated'];
+      if (!validTypes.includes(type)) {
+        return createErrorResponse('Invalid type. Must be one of: user, community, gov, professional, atlas, user-generated', 400);
+      }
+    }
+
+    // Get account_id for current user (needed for custom_slug validation)
     let accountId: string;
     try {
       accountId = await getAccountIdForUser(auth, supabase);
@@ -147,12 +161,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate custom_slug if provided
+    if (custom_slug) {
+      // Check if user has pro account
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('plan')
+        .eq('id', accountId)
+        .single();
+
+      if (account?.plan !== 'pro' && account?.plan !== 'plus') {
+        return createErrorResponse('Custom slugs are only available for pro accounts', 403);
+      }
+
+      // Validate slug format
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(custom_slug) || custom_slug.length < 3 || custom_slug.length > 100) {
+        return createErrorResponse('Invalid custom_slug format. Must be 3-100 characters, lowercase alphanumeric and hyphens only', 400);
+      }
+
+      // Check if slug is already taken
+      const { data: existingMap } = await supabase
+        .from('map')
+        .select('id')
+        .eq('custom_slug', custom_slug)
+        .single();
+
+      if (existingMap) {
+        return createErrorResponse('Custom slug is already taken', 409);
+      }
+    }
+
+    // Validate tags structure
+    if (!Array.isArray(tags)) {
+      return createErrorResponse('Tags must be an array', 400);
+    }
+
+    for (const tag of tags) {
+      if (typeof tag !== 'object' || !tag.emoji || !tag.text) {
+        return createErrorResponse('Each tag must have emoji and text properties', 400);
+      }
+      if (typeof tag.emoji !== 'string' || typeof tag.text !== 'string') {
+        return createErrorResponse('Tag emoji and text must be strings', 400);
+      }
+    }
+
     const insertData: Database['public']['Tables']['map']['Insert'] = {
       account_id: accountId,
       title: title.trim(),
       description: description?.trim() || null,
       visibility,
       map_style: map_style as 'street' | 'satellite',
+      type: type || null,
+      custom_slug: custom_slug?.trim() || null,
+      tags: tags || [],
       meta: meta || {},
     };
 
@@ -166,6 +228,9 @@ export async function POST(request: NextRequest) {
         description,
         visibility,
         map_style,
+        type,
+        custom_slug,
+        tags,
         meta,
         created_at,
         updated_at

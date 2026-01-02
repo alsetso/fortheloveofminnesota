@@ -4,10 +4,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
-import MapIDSidebar from './components/MapIDSidebar';
 import MapIDBox from './components/MapIDBox';
-import MapIDDetails from './components/MapIDDetails';
 import { generateUUID } from '@/lib/utils/uuid';
+
+export interface MapTag {
+  emoji: string;
+  text: string;
+}
 
 interface MapData {
   id: string;
@@ -16,6 +19,9 @@ interface MapData {
   description: string | null;
   visibility: 'public' | 'private' | 'shared';
   map_style: 'street' | 'satellite' | 'light' | 'dark';
+  type?: 'user' | 'community' | 'gov' | 'professional' | 'atlas' | 'user-generated' | null;
+  custom_slug?: string | null;
+  tags?: MapTag[] | null;
   meta?: {
     buildingsEnabled?: boolean;
     pitch?: number;
@@ -160,66 +166,54 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   return (
     <>
       <PageViewTracker />
-      <div className="flex flex-col h-screen w-screen overflow-hidden">
-        <div className="relative flex-1 w-full overflow-hidden flex" style={{ height: '100vh' }}>
-          {/* Sidebar */}
-          <MapIDSidebar 
-            account={account}
-            detailsContent={
-              mapData ? (
-                <MapIDDetails
-                  title={mapData.title}
-                  description={mapData.description}
-                  map_style={mapData.map_style}
-                  visibility={mapData.visibility}
-                  viewCount={viewCount}
-                  account={mapData.account}
-                  map_account_id={mapData.account_id}
-                  current_account_id={account?.id || null}
-                  created_at={mapData.created_at}
-                  updated_at={mapData.updated_at}
-                />
-              ) : undefined
-            }
-          />
-
-          {/* Main Content Area */}
-          <div className="flex-1 flex flex-col overflow-y-auto ml-16 bg-gray-50">
-            {loading && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-6 h-6 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-xs text-gray-600">Loading map...</p>
-                </div>
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        {/* Map Section - Full Height */}
+        <div className="relative" style={{ height: '100vh' }}>
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <div className="w-6 h-6 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-xs text-gray-600">Loading map...</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {error && !loading && (
-              <div className="flex-1 flex items-center justify-center p-[10px]">
-                <div className="bg-white border border-red-200 rounded-md p-[10px] max-w-md w-full">
-                  <h2 className="text-sm font-semibold text-gray-900 mb-2">Access Denied</h2>
-                  <p className="text-xs text-gray-600 mb-3">{error}</p>
-                  <button
-                    onClick={() => router.push('/maps')}
-                    className="text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md py-1.5 px-3 transition-colors"
-                  >
-                    Back to Maps
-                  </button>
-                </div>
+          {error && !loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 p-[10px]">
+              <div className="bg-white border border-red-200 rounded-md p-[10px] max-w-md w-full">
+                <h2 className="text-sm font-semibold text-gray-900 mb-2">Access Denied</h2>
+                <p className="text-xs text-gray-600 mb-3">{error}</p>
+                <button
+                  onClick={() => router.push('/maps')}
+                  className="text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md py-1.5 px-3 transition-colors"
+                >
+                  Back to Maps
+                </button>
               </div>
-            )}
+            </div>
+          )}
 
-            {mapData && !loading && (
-              <div className="flex-1 flex flex-col">
-                <MapIDBox 
-                  mapStyle={mapData.map_style}
-                  mapId={mapData.id}
-                  isOwner={isOwner}
-                  meta={mapData.meta}
-                />
-              </div>
-            )}
-          </div>
+          {mapData && !loading && (
+            <MapIDBox 
+              mapStyle={mapData.map_style}
+              mapId={mapData.id}
+              isOwner={isOwner}
+              meta={mapData.meta}
+              title={mapData.title}
+              description={mapData.description}
+              visibility={mapData.visibility}
+              account={mapData.account}
+              viewCount={viewCount}
+              map_account_id={mapData.account_id}
+              current_account_id={account?.id || null}
+              created_at={mapData.created_at}
+              updated_at={mapData.updated_at}
+              onMapUpdate={(updatedData) => {
+                // Update local state with new data
+                setMapData(prev => prev ? { ...prev, ...updatedData } : null);
+              }}
+            />
+          )}
         </div>
       </div>
     </>

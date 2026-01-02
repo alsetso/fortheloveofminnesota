@@ -6,9 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  GlobeAltIcon,
   AdjustmentsHorizontalIcon,
-  QuestionMarkCircleIcon,
   NewspaperIcon,
   BuildingOfficeIcon,
   CalendarIcon,
@@ -17,10 +15,8 @@ import {
 import { Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SecondarySidebar from './SecondarySidebar';
-import ExploreSecondaryContent from './ExploreSecondaryContent';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
 import MapToolsSecondaryContent from './MapToolsSecondaryContent';
-import FAQsSecondaryContent from './FAQsSecondaryContent';
 import NewsSecondaryContent from './NewsSecondaryContent';
 import GovSecondaryContent from './GovSecondaryContent';
 import LocationSecondaryContent from './LocationSecondaryContent';
@@ -71,13 +67,10 @@ const hrefToTab: Record<string, SidebarTab> = {
   '/': null as any,
   '/map': null as any,
   '/location': null as any,
-  '/explore': 'explore' as SidebarTab,
-  '/calendar/news': 'news' as SidebarTab,
-  '/calendar': null as any,
-  '/faqs': 'faqs' as SidebarTab,
   '/gov': null as any,
   '#profile': 'profile' as SidebarTab,
   '#controls': 'controls' as SidebarTab,
+  '#news': 'news' as SidebarTab,
 };
 
 // Main navigation items (route-based)
@@ -89,33 +82,16 @@ const mainNavItems: NavItem[] = [
     secondaryContent: <LocationSecondaryContent />,
   },
   { 
-    href: '/explore', 
-    label: 'Explore', 
-    icon: GlobeAltIcon,
-    secondaryContent: <ExploreSecondaryContent />,
-  },
-  { 
-    href: '/calendar/news', 
+    href: '#news', 
     label: 'News', 
     icon: NewspaperIcon,
     secondaryContent: <NewsSecondaryContent />,
-  },
-  { 
-    href: '/calendar', 
-    label: 'Calendar', 
-    icon: CalendarIcon,
   },
   { 
     href: '/gov', 
     label: 'Gov', 
     icon: BuildingOfficeIcon,
     secondaryContent: <GovSecondaryContent />,
-  },
-  { 
-    href: '/faqs', 
-    label: 'FAQs', 
-    icon: QuestionMarkCircleIcon,
-    secondaryContent: <FAQsSecondaryContent />,
   },
 ];
 
@@ -137,14 +113,10 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
     syncToUrl: isHomepage,
     onTabChange: (tab) => {
       // Open tab when URL param is present
-      if (tab === 'explore') {
-        setClickedNavItem('/explore');
-      } else if (tab === 'controls') {
+      if (tab === 'controls') {
         setClickedNavItem('#controls');
-      } else if (tab === 'faqs') {
-        setClickedNavItem('/faqs');
       } else if (tab === 'news') {
-        setClickedNavItem('/calendar/news');
+        setClickedNavItem('#news');
       } else if (tab === 'profile') {
         setClickedNavItem('#profile');
       }
@@ -211,16 +183,14 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
     const tabFromUrl = urlTab;
     // Hash-based tabs use # prefix, route-based use /
     const expectedHref = tabFromUrl 
-      ? (tabFromUrl === 'controls' || tabFromUrl === 'profile' 
+      ? (tabFromUrl === 'controls' || tabFromUrl === 'profile' || tabFromUrl === 'news'
           ? `#${tabFromUrl}` 
-          : tabFromUrl === 'news'
-          ? '/calendar/news'
           : `/${tabFromUrl}`)
       : null;
     
     if (tabFromUrl && clickedNavItem !== expectedHref) {
       setClickedNavItem(expectedHref);
-    } else if (!tabFromUrl && clickedNavItem && (clickedNavItem.startsWith('/explore') || clickedNavItem.startsWith('/calendar/news') || clickedNavItem.startsWith('/faqs') || clickedNavItem === '#controls' || clickedNavItem === '#profile')) {
+    } else if (!tabFromUrl && clickedNavItem && (clickedNavItem.startsWith('#') || clickedNavItem === '#controls' || clickedNavItem === '#profile' || clickedNavItem === '#news')) {
       // URL param was removed, close tab
       setClickedNavItem(null);
     }

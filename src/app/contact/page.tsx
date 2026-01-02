@@ -6,7 +6,7 @@ import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export const metadata: Metadata = {
   title: 'Contact Us | For the Love of Minnesota',
-  description: 'Get in touch with For the Love of Minnesota for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities. Contact our team at hi@fortheloveofminnesota.com.',
+  description: 'Get in touch with For the Love of Minnesota for support, questions, or inquiries about Minnesota real estate development, property acquisition, and networking opportunities. Contact our team at loveofminnesota@gmail.com.',
   keywords: [
     'For the Love of Minnesota contact',
     'Minnesota real estate support',
@@ -74,9 +74,16 @@ export default function ContactPage() {
         {/* Contact Information Card */}
         <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-3">
           <div className="space-y-1.5">
-            <h2 className="text-sm font-medium text-gray-900">Get in Touch</h2>
+            <h2 className="text-sm font-medium text-gray-900">Direct Email</h2>
             <p className="text-xs text-gray-600">
-              For support, questions, or general inquiries, please reach out to our team via email.
+              You can contact us directly via email for the following:
+            </p>
+          </div>
+
+          {/* Reasons for Inquiry */}
+          <div className="space-y-1">
+            <p className="text-xs text-gray-600">
+              <span className="font-medium text-gray-900">Reasons for inquiry:</span> Press, Tips, Support, Donations, Collaboration
             </p>
           </div>
 
@@ -86,7 +93,7 @@ export default function ContactPage() {
             <div className="flex-1 space-y-0.5">
               <p className="text-xs font-medium text-gray-900">Email Support</p>
               <a
-                href="mailto:hi@fortheloveofminnesota.com"
+                href="mailto:loveofminnesota@gmail.com"
                 className="text-xs text-gray-600 hover:text-gray-900 transition-colors break-all"
               >
                 loveofminnesota@gmail.com

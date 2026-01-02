@@ -18,3 +18,4 @@ export function formatArea(area: number | null | undefined): string {
   return `${formatNumber(area)} sq mi`;
 }
 
+

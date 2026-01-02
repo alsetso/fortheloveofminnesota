@@ -161,8 +161,7 @@ export function CitiesListView({ cities }: CitiesListViewProps) {
             {sortedCities.map((city) => (
               <tr
                 key={city.id}
-                onClick={() => router.push(`/explore/city/${city.slug}`)}
-                className="hover:bg-gray-50 transition-colors cursor-pointer"
+                className=""
               >
                 <td className="px-[10px] py-[10px]">
                   <div className="flex items-center gap-1.5">

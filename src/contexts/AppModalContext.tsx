@@ -39,6 +39,7 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openWelcome: () => {},
       openOnboarding: () => {},
       openAccount: () => {},
+      openCreateAccount: () => {},
       openUpgrade: () => {},
       openIntelligence: () => {},
       openAnalytics: () => {},

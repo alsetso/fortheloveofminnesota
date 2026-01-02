@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { XMarkIcon, ArrowRightIcon, CheckIcon, ExclamationCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CheckIcon, ExclamationCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { cleanAuthParams } from '@/lib/urlParams';
 
@@ -12,25 +12,7 @@ interface WelcomeModalProps {
   onClose: () => void;
 }
 
-interface HomepageStats {
-  last24Hours: {
-    unique_visitors: number;
-    total_views: number;
-    accounts_viewed: number;
-  };
-  last7Days: {
-    unique_visitors: number;
-    total_views: number;
-    accounts_viewed: number;
-  };
-  last30Days: {
-    unique_visitors: number;
-    total_views: number;
-    accounts_viewed: number;
-  };
-}
-
-type WelcomeStep = 'intro' | 'choose' | 'signin';
+type AuthState = 'email' | 'code-sent' | 'verifying' | 'success' | 'error';
 
 function isValidEmail(email: string): boolean {
   if (!email || !email.includes('@')) return false;
@@ -38,68 +20,55 @@ function isValidEmail(email: string): boolean {
   return emailRegex.test(email);
 }
 
+
 export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const router = useRouter();
   const { user, signInWithOtp, verifyOtp, isLoading: authLoading } = useAuthStateSafe();
   
-  // Step state
-  const [step, setStep] = useState<WelcomeStep>('choose');
+  // Auth state
+  const [authState, setAuthState] = useState<AuthState>('email');
   
-  // Sign in state
+  // Form state
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info' | null>(null);
+  const [messageType, setMessageType] = useState<'success' | 'error' | null>(null);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isEmailValid, setIsEmailValid] = useState(false);
   
-  // Stats state
-  const [stats, setStats] = useState<HomepageStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-
-  // Fetch stats when modal opens
-  useEffect(() => {
-    if (isOpen && !stats) {
-      const fetchStats = async () => {
-        setStatsLoading(true);
-        try {
-          const response = await fetch('/api/analytics/homepage-stats');
-          if (response.ok) {
-            const data = await response.json();
-            setStats(data);
-          }
-        } catch {
-          // Silent fail - stats are optional
-        } finally {
-          setStatsLoading(false);
-        }
-      };
-      fetchStats();
-    }
-  }, [isOpen, stats]);
+  // Refs for auto-focus
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Reset state when modal opens/closes
   useEffect(() => {
     if (isOpen) {
-      setStep('intro');
+      setAuthState('email');
       setEmail('');
       setOtp('');
-      setOtpSent(false);
       setMessage('');
       setMessageType(null);
       setEmailError('');
       setIsEmailValid(false);
+      // Auto-focus email input
+      setTimeout(() => emailInputRef.current?.focus(), 100);
     }
   }, [isOpen]);
 
-  // Close modal and redirect if user is authenticated
+  // Close modal when user is authenticated
   useEffect(() => {
     if (!authLoading && user && isOpen) {
-      onClose();
+      // Small delay to show success state
+      if (authState === 'success') {
+        setTimeout(() => {
+          onClose();
+        }, 500);
+      } else {
+        onClose();
+      }
     }
-  }, [authLoading, user, isOpen, onClose]);
+  }, [authLoading, user, isOpen, onClose, authState]);
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -132,41 +101,165 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     setLoading(true);
     setMessage('');
     setEmailError('');
+    setAuthState('email');
 
     try {
       await signInWithOtp(email.trim().toLowerCase());
-      setOtpSent(true);
-      setMessage('Check your email for the 6-digit code!');
-      setMessageType('success');
+      setAuthState('code-sent');
+      setMessage('');
+      setMessageType(null);
+      // Auto-focus first code input
+      setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
     } catch (error: unknown) {
       console.error('OTP error:', error);
-      setMessage(`Error: ${error instanceof Error ? error.message : 'Failed to send code'}`);
+      setAuthState('error');
+      setMessage(error instanceof Error ? error.message : 'Failed to send code. Please try again.');
       setMessageType('error');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  const handleCodeInput = (index: number, value: string) => {
+    // Only allow digits
+    const digit = value.replace(/\D/g, '').slice(0, 1);
+    if (!digit) return;
+
+    // Update OTP string
+    const newOtp = otp.split('');
+    newOtp[index] = digit;
+    const updatedOtp = newOtp.join('').slice(0, 6);
+    setOtp(updatedOtp);
+    setMessage('');
+    setMessageType(null);
+
+    // Auto-advance to next input
+    if (index < 5 && digit) {
+      codeInputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit when 6 digits entered - use updatedOtp directly
+    if (updatedOtp.length === 6) {
+      setTimeout(() => {
+        handleVerifyOtpWithCode(updatedOtp);
+      }, 100);
+    }
+  };
+
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle backspace
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      codeInputRefs.current[index - 1]?.focus();
+    }
+    
+    // Handle arrow keys
+    if (e.key === 'ArrowLeft' && index > 0) {
+      e.preventDefault();
+      codeInputRefs.current[index - 1]?.focus();
+    }
+    if (e.key === 'ArrowRight' && index < 5) {
+      e.preventDefault();
+      codeInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleCodePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    
+    if (pastedData.length > 0) {
+      // Set the OTP state - this will fill all individual inputs via controlled components
+      setOtp(pastedData);
+      setMessage('');
+      setMessageType(null);
+      
+      // Focus the last filled input or the last input if all 6 digits pasted
+      const focusIndex = Math.min(pastedData.length - 1, 5);
+      setTimeout(() => {
+        codeInputRefs.current[focusIndex]?.focus();
+        // Auto-submit if 6 digits - pass the code directly to avoid state timing issues
+        if (pastedData.length === 6) {
+          setTimeout(() => {
+            handleVerifyOtpWithCode(pastedData);
+          }, 100);
+        }
+      }, 0);
+    }
+  };
+
+  const handleVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
     if (otp.length !== 6) {
       setMessage('Please enter the complete 6-digit code');
+      setMessageType('error');
+      return;
+    }
+
+    await handleVerifyOtpWithCode(otp);
+  };
+
+  const handleVerifyOtpWithCode = async (code: string) => {
+    if (code.length !== 6) {
+      setMessage('Please enter the complete 6-digit code');
+      setMessageType('error');
       return;
     }
 
     setLoading(true);
     setMessage('');
+    setAuthState('verifying');
 
     try {
-      await verifyOtp(email.trim().toLowerCase(), otp, 'email');
-      setMessage('Login successful! Redirecting...');
+      await verifyOtp(email.trim().toLowerCase(), code, 'email');
+      setAuthState('success');
+      setMessage('Verification successful');
       setMessageType('success');
       cleanAuthParams(router);
+      // Auto-close handled by useEffect
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'Invalid code');
+      setAuthState('code-sent');
+      setMessage(error instanceof Error ? error.message : 'Invalid code. Please try again.');
       setMessageType('error');
       setLoading(false);
     }
+  };
+
+  const handleResendCode = async () => {
+    setOtp('');
+    setMessage('');
+    setMessageType(null);
+    
+    setLoading(true);
+    setEmailError('');
+    setAuthState('email');
+
+    try {
+      await signInWithOtp(email.trim().toLowerCase());
+      setAuthState('code-sent');
+      setMessage('');
+      setMessageType(null);
+      // Auto-focus first code input
+      setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
+    } catch (error: unknown) {
+      console.error('OTP error:', error);
+      setAuthState('error');
+      setMessage(error instanceof Error ? error.message : 'Failed to send code. Please try again.');
+      setMessageType('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeEmail = () => {
+    setAuthState('email');
+    setOtp('');
+    setMessage('');
+    setMessageType(null);
+    setEmailError('');
+    setTimeout(() => emailInputRef.current?.focus(), 100);
   };
 
 
@@ -176,6 +269,10 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
     onClose();
   };
+
+  const otpSent = authState === 'code-sent' || authState === 'verifying' || authState === 'success';
+  const isVerifying = authState === 'verifying';
+  const isSuccess = authState === 'success';
 
   if (!isOpen) return null;
 
@@ -226,334 +323,195 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
             </div>
           </div>
 
-          {/* Step: Intro */}
-          {step === 'intro' && (
-            <>
-              <div className="text-center mb-3 space-y-2">
-                <h1 className="text-sm font-semibold text-gray-900">Welcome to Minnesota</h1>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  A living map of Minnesota—pin what's happening, what matters, and what should be remembered. 
-                </p>
-              </div>
+          {/* Title & Subtitle */}
+          <div className="text-center mb-3">
+            <h1 className="text-sm font-semibold text-gray-900 mb-1">
+              {otpSent ? 'Verify Code' : 'Sign In'}
+            </h1>
+            <p className="text-xs text-gray-600">
+              {otpSent 
+                ? `Enter the 6-digit code sent to ${email}`
+                : 'Two-factor authentication via email'
+              }
+            </p>
+          </div>
 
-              <div className="space-y-2 mb-3">
-                <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
-                  <div className="flex-shrink-0 w-4 h-4 mt-0.5">
-                    <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-900">Drop Pins on the Map</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">Archive special places and moments across Minnesota</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
-                  <div className="flex-shrink-0 w-4 h-4 mt-0.5">
-                    <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-900">Build Collections</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">Organize your mentions into themed collections</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
-                  <div className="flex-shrink-0 w-4 h-4 mt-0.5">
-                    <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-gray-900">Join the Community</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">Connect with neighbors and explore Minnesota together</p>
-                  </div>
-                </div>
+          {/* Success Message */}
+          {isSuccess && (
+            <div className="mb-3 px-[10px] py-[10px] bg-green-50 border border-green-200 rounded-md text-xs text-green-800 flex items-start gap-2">
+              <CheckIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium">Verification successful</div>
+                <div className="text-[10px] mt-0.5">Signing you in...</div>
               </div>
-
-              <div className="space-y-2">
-                <button
-                  onClick={() => setStep('choose')}
-                  className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors"
-                >
-                  Get Started
-                  <ArrowRightIcon className="w-3 h-3" />
-                </button>
-              </div>
-            </>
+            </div>
           )}
 
-          {/* Step: Choose */}
-          {step === 'choose' && (
-            <>
-              <div className="text-center mb-3">
-                <h1 className="text-sm font-semibold text-gray-900 mb-1">Sign In or Sign Up</h1>
-                <p className="text-xs text-gray-600">Enter your email to get started</p>
-              </div>
-
-              {/* Community Stats */}
-              {statsLoading ? (
-                <div className="mb-3 p-2.5 bg-gray-50 rounded-md border border-gray-200">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="space-y-1">
-                        <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                        <div className="h-2.5 bg-gray-200 rounded animate-pulse" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-1.5 h-2.5 bg-gray-200 rounded animate-pulse w-3/4 mx-auto" />
-                </div>
-              ) : stats && (
-                <div className="mb-3 p-2.5 bg-gradient-to-br from-gray-50 to-gray-100 rounded-md border border-gray-200">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {stats.last24Hours.unique_visitors.toLocaleString()}
-                      </div>
-                      <div className="text-[10px] text-gray-500">Today</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {stats.last7Days.unique_visitors.toLocaleString()}
-                      </div>
-                      <div className="text-[10px] text-gray-500">This Week</div>
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">
-                        {stats.last30Days.unique_visitors.toLocaleString()}
-                      </div>
-                      <div className="text-[10px] text-gray-500">This Month</div>
-                    </div>
-                  </div>
-                  <div className="mt-1.5 text-[10px] text-gray-500 text-center">
-                    Minnesotans exploring the map
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <button
-                  onClick={() => setStep('signin')}
-                  className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors"
-                >
-                  Continue with Email
-                  <ArrowRightIcon className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep('intro')}
-                  className="w-full text-xs text-gray-600 hover:text-gray-900 transition-colors pt-2"
-                >
-                  ← Back
-                </button>
-              </div>
-            </>
+          {/* Error Message */}
+          {message && messageType === 'error' && (
+            <div className="mb-3 px-[10px] py-[10px] bg-red-50 border border-red-200 rounded-md text-xs text-red-800 flex items-start gap-2">
+              <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>{message}</span>
+            </div>
           )}
 
-          {/* Step: Sign In */}
-          {step === 'signin' && (
-            <>
-              {/* Progress Indicator */}
-              <div className="mb-3 flex items-center justify-center gap-2">
-                <div className={`flex items-center gap-1 ${!otpSent ? 'text-gray-900' : 'text-gray-400'}`}>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
-                    !otpSent ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {!otpSent ? '1' : <CheckIcon className="w-3 h-3" />}
-                  </div>
-                  <span className="text-[10px] font-medium">Email</span>
+          {/* Email Input */}
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="email" className="block text-xs font-medium text-gray-900 mb-1.5">
+                Email Address
+              </label>
+              <div className="relative">
+                <div className="absolute left-[10px] top-1/2 -translate-y-1/2 text-gray-400">
+                  <EnvelopeIcon className="w-3.5 h-3.5" />
                 </div>
-                <div className="w-6 h-0.5 bg-gray-200" />
-                <div className={`flex items-center gap-1 ${otpSent ? 'text-gray-900' : 'text-gray-400'}`}>
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium ${
-                    otpSent ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    2
-                  </div>
-                  <span className="text-[10px] font-medium">Code</span>
-                </div>
-              </div>
-
-              <div className="text-center mb-3">
-                <h1 className="text-sm font-semibold text-gray-900 mb-1">
-                  {!otpSent ? 'Sign In' : 'Verify Code'}
-                </h1>
-                <p className="text-xs text-gray-600">
-                  {!otpSent ? 'Enter your email to receive a code' : 'Enter the 6-digit code'}
-                </p>
-              </div>
-
-              {!otpSent ? (
-                <form className="space-y-3" onSubmit={handleSendOtp}>
-                  {message && (
-                    <div className={`px-[10px] py-[10px] rounded-md text-xs border flex items-start gap-2 ${
-                      messageType === 'success' 
-                        ? 'bg-green-50 border-green-200 text-green-800'
-                        : messageType === 'error'
-                        ? 'bg-red-50 border-red-200 text-red-800'
-                        : 'bg-gray-50 border-gray-200 text-gray-700'
-                    }`}>
-                      {messageType === 'success' && <CheckIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
-                      {messageType === 'error' && <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
-                      <span>{message}</span>
-                    </div>
-                  )}
-
-                  <div>
-                    <label htmlFor="email" className="block text-xs font-medium text-gray-900 mb-1.5">
-                      Email Address
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-[10px] top-1/2 -translate-y-1/2 text-gray-400">
-                        <EnvelopeIcon className="w-3.5 h-3.5" />
-                      </div>
-                      <input
-                        id="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        value={email}
-                        onChange={handleEmailChange}
-                        onBlur={handleEmailBlur}
-                        className={`w-full pl-8 pr-[10px] py-[10px] border rounded-md text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 transition-colors ${
-                          emailError 
-                            ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-                            : isEmailValid
-                            ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
-                            : 'border-gray-200 focus:ring-gray-500 focus:border-gray-500'
-                        }`}
-                        placeholder="your.email@example.com"
-                      />
-                      {isEmailValid && !emailError && (
-                        <div className="absolute right-[10px] top-1/2 -translate-y-1/2 text-green-600">
-                          <CheckIcon className="w-3.5 h-3.5" />
-                        </div>
-                      )}
-                    </div>
-                    {emailError && (
-                      <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
-                        <ExclamationCircleIcon className="w-3 h-3" />
-                        {emailError}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading || !isEmailValid}
-                    className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        Send Code
-                        <ArrowRightIcon className="w-3 h-3" />
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setStep('choose')}
-                    className="w-full text-xs text-gray-600 hover:text-gray-900 transition-colors pt-2"
-                  >
-                    ← Back
-                  </button>
-                </form>
-              ) : (
-                <form className="space-y-3" onSubmit={handleVerifyOtp}>
-                  {message && (
-                    <div className={`px-[10px] py-[10px] rounded-md text-xs border flex items-start gap-2 ${
-                      messageType === 'success' 
-                        ? 'bg-green-50 border-green-200 text-green-800'
-                        : messageType === 'error'
-                        ? 'bg-red-50 border-red-200 text-red-800'
-                        : 'bg-gray-50 border-gray-200 text-gray-700'
-                    }`}>
-                      {messageType === 'success' && <CheckIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
-                      {messageType === 'error' && <ExclamationCircleIcon className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />}
-                      <span>{message}</span>
-                    </div>
-                  )}
-
-                  <div>
-                    <label htmlFor="otp" className="block text-xs font-medium text-gray-900 mb-1.5">
-                      Verification Code
-                    </label>
+                {otpSent ? (
+                  <>
                     <input
-                      id="otp"
-                      type="text"
-                      maxLength={6}
+                      id="email"
+                      type="email"
+                      readOnly
+                      value={email}
+                      className="w-full pl-8 pr-20 py-[10px] border border-gray-200 rounded-md text-xs text-gray-600 bg-gray-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleChangeEmail}
+                      className="absolute right-[10px] top-1/2 -translate-y-1/2 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                    >
+                      Change
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <input
+                      ref={emailInputRef}
+                      id="email"
+                      type="email"
+                      autoComplete="email"
                       required
-                      autoFocus
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                      className={`w-full px-[10px] py-[10px] border rounded-md placeholder-gray-400 focus:outline-none focus:ring-1 text-center text-xs tracking-widest font-mono text-gray-900 transition-colors ${
-                        messageType === 'error'
+                      value={email}
+                      onChange={handleEmailChange}
+                      onBlur={handleEmailBlur}
+                      className={`w-full pl-8 pr-[10px] py-[10px] border rounded-md text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 transition-colors ${
+                        emailError 
+                          ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                          : isEmailValid
+                          ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
+                          : 'border-gray-200 focus:ring-gray-500 focus:border-gray-500'
+                      }`}
+                      placeholder="your.email@example.com"
+                    />
+                    {isEmailValid && !emailError && (
+                      <div className="absolute right-[10px] top-1/2 -translate-y-1/2 text-green-600">
+                        <CheckIcon className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {emailError && !otpSent && (
+                <p className="mt-1.5 text-xs text-red-600 flex items-center gap-1">
+                  <ExclamationCircleIcon className="w-3 h-3" />
+                  {emailError}
+                </p>
+              )}
+            </div>
+
+            {/* Code Input - 6 Separate Inputs */}
+            {otpSent && (
+              <div>
+                <label className="block text-xs font-medium text-gray-900 mb-1.5">
+                  Verification Code
+                </label>
+                <div className="flex items-center gap-2">
+                  {[0, 1, 2, 3, 4, 5].map((index) => (
+                    <input
+                      key={index}
+                      ref={(el) => {
+                        codeInputRefs.current[index] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      required
+                      value={otp[index] || ''}
+                      onChange={(e) => handleCodeInput(index, e.target.value)}
+                      onKeyDown={(e) => handleCodeKeyDown(index, e)}
+                      onPaste={handleCodePaste}
+                      disabled={isVerifying || isSuccess}
+                      className={`w-[30px] max-w-[30px] h-10 px-0 border rounded-md text-center text-sm font-mono font-semibold text-gray-900 focus:outline-none focus:ring-1 transition-colors ${
+                        isSuccess
+                          ? 'border-green-300 bg-green-50'
+                          : messageType === 'error'
                           ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
                           : otp.length === 6
                           ? 'border-green-300 focus:ring-green-500 focus:border-green-500'
                           : 'border-gray-200 focus:ring-gray-500 focus:border-gray-500'
-                      }`}
-                      placeholder="000000"
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      aria-label={`Code digit ${index + 1}`}
                     />
-                    <p className="mt-1.5 text-xs text-gray-600 flex items-center gap-1">
-                      <EnvelopeIcon className="w-3 h-3" />
-                      Sent to <span className="font-medium text-gray-900">{email}</span>
-                    </p>
-                    {otp.length > 0 && otp.length < 6 && (
-                      <p className="mt-1 text-[10px] text-gray-500">
-                        {6 - otp.length} digit{6 - otp.length !== 1 ? 's' : ''} remaining
-                      </p>
-                    )}
-                  </div>
+                  ))}
+                  {isSuccess && otp.length === 6 && (
+                    <div className="flex-shrink-0 text-green-600 ml-1">
+                      <CheckIcon className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs text-gray-600 flex items-center gap-1">
+                  <EnvelopeIcon className="w-3 h-3" />
+                  Code sent to <span className="font-medium text-gray-900">{email}</span>
+                </p>
+              </div>
+            )}
 
-                  <button
-                    type="submit"
-                    disabled={loading || otp.length !== 6}
-                    className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        Verify
-                        <CheckIcon className="w-3 h-3" />
-                      </>
-                    )}
-                  </button>
+            {/* Primary Action Button */}
+            <form onSubmit={otpSent ? handleVerifyOtp : handleSendOtp}>
+              <button
+                type="submit"
+                disabled={
+                  loading || 
+                  isSuccess ||
+                  (otpSent ? otp.length !== 6 : !isEmailValid)
+                }
+                className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {loading || isVerifying ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    {otpSent ? 'Verifying...' : 'Sending...'}
+                  </>
+                ) : isSuccess ? (
+                  <>
+                    <CheckIcon className="w-3 h-3" />
+                    Signed In
+                  </>
+                ) : otpSent ? (
+                  <>
+                    Verify & Sign In
+                    <CheckIcon className="w-3 h-3" />
+                  </>
+                ) : (
+                  'Send Verification Code'
+                )}
+              </button>
+            </form>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpSent(false);
-                      setOtp('');
-                      setMessage('');
-                    }}
-                    className="w-full text-xs text-gray-600 hover:text-gray-900 transition-colors pt-2"
-                  >
-                    Use different email
-                  </button>
-                </form>
-              )}
-            </>
-          )}
+            {/* Resend Code Link */}
+            {otpSent && !isSuccess && (
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={loading}
+                className="w-full text-xs text-gray-600 hover:text-gray-900 transition-colors pt-2 disabled:opacity-50"
+              >
+                Resend Code
+              </button>
+            )}
+          </div>
 
         </div>
       </div>

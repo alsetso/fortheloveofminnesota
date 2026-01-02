@@ -6,7 +6,7 @@ export default async function AtlasTypesAdminPage() {
   await requireAdminAccess();
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
+    <SimplePageLayout contentPadding="px-[10px] py-3">
       <div className="max-w-7xl mx-auto">
         <div className="mb-3">
           <h1 className="text-sm font-semibold text-gray-900">Atlas Types</h1>

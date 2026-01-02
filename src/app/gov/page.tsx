@@ -1,10 +1,10 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
-import GovOrgChart from './GovOrgChart';
-import GovContent from './GovContent';
-import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import GovTablesClient from './GovTablesClient';
 import GovPageViewTracker from './components/GovPageViewTracker';
-import { getCivicOrgTree } from '@/features/civic/services/civicService';
+import CommunityBanner from '@/features/civic/components/CommunityBanner';
+import RecentEditsFeed from '@/features/civic/components/RecentEditsFeed';
+import { GovTabProvider } from './contexts/GovTabContext';
 
 export const revalidate = 3600;
 
@@ -12,12 +12,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
   
   return {
-    title: 'Minnesota Government Leadership | For the Love of Minnesota',
-    description: 'Visual tree of Minnesota government leadership from Governor Tim Walz down through executive, legislative, and judicial branches.',
-    keywords: ['Minnesota government', 'Minnesota leadership', 'Tim Walz', 'Minnesota officials', 'Minnesota elected officials'],
+    title: 'Minnesota Government Data | For the Love of Minnesota',
+    description: 'View all Minnesota government organizations, people, and roles in organized tables.',
+    keywords: ['Minnesota government', 'Minnesota leadership', 'Minnesota officials', 'Minnesota elected officials', 'government data'],
     openGraph: {
-      title: 'Minnesota Government Leadership | For the Love of Minnesota',
-      description: 'Visual tree of Minnesota government leadership from Governor Tim Walz down through executive, legislative, and judicial branches.',
+      title: 'Minnesota Government Data | For the Love of Minnesota',
+      description: 'View all Minnesota government organizations, people, and roles in organized tables.',
       url: `${baseUrl}/gov`,
       siteName: 'For the Love of Minnesota',
       images: [
@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
           width: 1200,
           height: 630,
           type: 'image/png',
-          alt: 'Minnesota Government Leadership',
+          alt: 'Minnesota Government Data',
         },
       ],
       locale: 'en_US',
@@ -39,34 +39,45 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GovPage() {
-  const branches = await getCivicOrgTree();
-
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3" footerVariant="light">
-      <div className="max-w-4xl mx-auto">
-        {/* Breadcrumb Navigation */}
-        <Breadcrumbs items={[
-          { label: 'Home', href: '/' },
-          { label: 'Government', href: null },
-        ]} />
-
-        {/* Header */}
-        <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            Minnesota Government Explained
-          </h1>
-          <p className="text-xs text-gray-600">
-            How power works, who decides, and where participation matters.
-          </p>
-        </div>
-
-        {/* Organizational Chart */}
-        <GovOrgChart branches={branches} />
-
-        {/* Content Sections */}
-        <GovContent />
-      </div>
+    <SimplePageLayout containerMaxWidth="full" contentPadding="px-[10px] py-3" hideNav={false} hideFooter={false}>
       <GovPageViewTracker />
+      <GovTabProvider>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          {/* Left Column: Tabs */}
+          <div className="lg:col-span-3">
+            <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
+              {/* Header */}
+              <div className="mb-3 space-y-1.5">
+                <h1 className="text-sm font-semibold text-gray-900">
+                  Minnesota Government Directory
+                </h1>
+                <p className="text-xs text-gray-600">
+                  A community-maintained directory of Minnesota state government organizations, officials, and their roles.
+                </p>
+              </div>
+
+              {/* Community Banner */}
+              <CommunityBanner />
+
+              {/* Tabs */}
+              <GovTablesClient showTabsOnly={true} />
+            </div>
+          </div>
+
+          {/* Middle Column: Tables */}
+          <div className="lg:col-span-6">
+            <GovTablesClient showTablesOnly={true} />
+          </div>
+
+          {/* Right Column: Recent Edits Feed */}
+          <div className="lg:col-span-3">
+            <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
+              <RecentEditsFeed limit={20} />
+            </div>
+          </div>
+        </div>
+      </GovTabProvider>
     </SimplePageLayout>
   );
 }

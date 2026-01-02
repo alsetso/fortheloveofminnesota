@@ -23,7 +23,7 @@ export async function GET(
     }
 
     // Fetch comments using generated_id
-    const { data: comments, error } = await supabase
+    const { data: comments, error } = await (supabase as any)
       .schema('news')
       .from('comments')
       .select('*')
@@ -39,10 +39,10 @@ export async function GET(
     }
 
     // Fetch all unique account IDs
-    const accountIds = [...new Set((comments || []).map(c => c.account_id))];
+    const accountIds = [...new Set((comments || []).map((c: any) => c.account_id))];
     
     // Use RPC function to fetch accounts (bypasses RLS via SECURITY DEFINER)
-    const { data: allAccounts, error: accountsError } = await supabase
+    const { data: allAccounts, error: accountsError } = await (supabase as any)
       .rpc('get_accounts_for_comments', { p_account_ids: accountIds });
     
     if (accountsError) {
@@ -50,10 +50,10 @@ export async function GET(
     }
     
     // Create a map for quick lookup
-    const accountMap = new Map((allAccounts || []).map(acc => [acc.id, acc]));
+    const accountMap = new Map((allAccounts || []).map((acc: any) => [acc.id, acc]));
     
     // Attach account data to each comment
-    const commentsWithAccounts = (comments || []).map(comment => ({
+    const commentsWithAccounts = (comments || []).map((comment: any) => ({
       ...comment,
       accounts: accountMap.get(comment.account_id) || null,
     }));
@@ -97,7 +97,7 @@ export async function POST(
       );
     }
 
-    const accountId = accounts[0].id;
+    const accountId = (accounts[0] as { id: string }).id;
     const body = await request.json();
     const { content, parent_comment_id } = body;
 
@@ -126,7 +126,7 @@ export async function POST(
     }
 
     // Insert comment into news.comments using generated_id
-    const { data: comment, error } = await supabase
+    const { data: comment, error } = await (supabase as any)
       .schema('news')
       .from('comments')
       .insert({
@@ -147,14 +147,14 @@ export async function POST(
     }
 
     // Fetch account info using RPC function (bypasses RLS)
-    const { data: accounts, error: accountsError } = await supabase
+    const { data: accountData, error: accountsError } = await (supabase as any)
       .rpc('get_accounts_for_comments', { p_account_ids: [accountId] });
 
     if (accountsError) {
       console.error('Error fetching account:', accountsError);
     }
 
-    const account = accounts && accounts.length > 0 ? accounts[0] : null;
+    const account = accountData && accountData.length > 0 ? accountData[0] : null;
 
     const data = {
       ...comment,

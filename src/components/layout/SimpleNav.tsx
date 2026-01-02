@@ -1,19 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStateSafe, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { isAccountComplete } from '@/lib/accountCompleteness';
 import {
   HomeIcon,
   MapIcon,
-  GlobeAltIcon,
   UserIcon,
-  QuestionMarkCircleIcon,
-  BuildingOfficeIcon,
-  CalendarIcon,
-  NewspaperIcon,
+  EnvelopeIcon,
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import AppSearch from '@/features/search/components/AppSearch';
@@ -33,9 +30,24 @@ export default function SimpleNav() {
     displayAccount,
     displayName,
     signOut,
+    isLoading,
   } = useAuthStateSafe();
   
-  const { openWelcome } = useAppModalContextSafe();
+  const { openWelcome, openOnboarding, modal } = useAppModalContextSafe();
+  
+  // Check if user is authenticated but missing username - show onboarding overlay
+  useEffect(() => {
+    // Only check when auth is loaded and user is authenticated
+    if (isLoading) return;
+    
+    // If user is authenticated and account exists but username is missing
+    if (user && account && !isAccountComplete(account)) {
+      // Only open onboarding if it's not already open
+      if (modal.type !== 'onboarding') {
+        openOnboarding();
+      }
+    }
+  }, [user, account, isLoading, modal.type, openOnboarding]);
   
   // Local modal state
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -53,11 +65,7 @@ export default function SimpleNav() {
   const navLinks = [
     { href: '/', label: 'Home', icon: HomeIcon },
     { href: '/maps', label: 'Map', icon: MapIcon },
-    { href: '/explore', label: 'Explore', icon: GlobeAltIcon },
-    { href: '/calendar', label: 'Calendar', icon: CalendarIcon },
-    { href: '/calendar/news', label: 'News', icon: NewspaperIcon },
-    { href: '/gov', label: 'Gov', icon: BuildingOfficeIcon },
-    { href: '/faqs', label: 'FAQs', icon: QuestionMarkCircleIcon },
+    { href: '/contact', label: 'Contact', icon: EnvelopeIcon },
   ];
 
   // Profile link

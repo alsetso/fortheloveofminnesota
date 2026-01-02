@@ -13,6 +13,7 @@ export type AppModalType =
   | 'welcome'
   | 'onboarding'
   | 'account'
+  | 'createAccount'
   | 'upgrade'
   // Map/Feature modals
   | 'intelligence'
@@ -68,6 +69,7 @@ export interface UseAppModalsReturn {
   openWelcome: () => void;
   openOnboarding: () => void;
   openAccount: (tab?: string) => void;
+  openCreateAccount: () => void;
   openUpgrade: (feature?: string) => void;
   
   // Feature modals
@@ -105,6 +107,10 @@ export function useAppModals(): UseAppModalsReturn {
       type: 'account',
       tab: tab || 'settings',
     });
+  }, []);
+
+  const openCreateAccount = useCallback(() => {
+    setModal({ type: 'createAccount' });
   }, []);
 
   const openUpgrade = useCallback((feature?: string) => {
@@ -190,6 +196,7 @@ export function useAppModals(): UseAppModalsReturn {
     openWelcome,
     openOnboarding,
     openAccount,
+    openCreateAccount,
     openUpgrade,
     openIntelligence,
     openAnalytics,

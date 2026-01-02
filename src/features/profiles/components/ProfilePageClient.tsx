@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import ProfileCard from './ProfileCard';
-import ProfileMentionsSection from './ProfileMentionsSection';
-import ProfileCollectionsList from './ProfileCollectionsList';
-import ProfileMap from './ProfileMap';
+import ProfileSidebarNav from './ProfileSidebarNav';
+import ProfileMapsContainer from './ProfileMapsContainer';
+import ProfileMentionsContainer from './ProfileMentionsContainer';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
 
@@ -21,55 +21,48 @@ export default function ProfilePageClient({
   collections,
   isOwnProfile,
 }: ProfilePageClientProps) {
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
-
-  const handleCollectionClick = (collectionId: string | null) => {
-    setSelectedCollectionId(collectionId === selectedCollectionId ? null : collectionId);
-  };
-
-  const handleCollectionUpdated = () => {
-    // Collections list will reload its own data
-    // This callback can be used to refresh pins if needed
-  };
-
-  // Filter to only public pins for the profile map, optionally by collection
-  const publicPins = useMemo(() => {
-    let filtered = pins.filter((pin) => pin.visibility === 'public');
-    
-    // Apply collection filter if one is selected
-    if (selectedCollectionId) {
-      filtered = filtered.filter((pin) => pin.collection_id === selectedCollectionId);
-    }
-    
-    return filtered;
-  }, [pins, selectedCollectionId]);
+  const [activeTab, setActiveTab] = useState<'maps' | 'mentions'>('maps');
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-      {/* Left Column: Profile Card and Collections */}
-      <div className="lg:col-span-3 space-y-3">
+    <div className="space-y-3">
+      {/* Profile Card - Expanded to use full width */}
+      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
         <ProfileCard account={account} isOwnProfile={isOwnProfile} />
-        <ProfileCollectionsList
-          accountId={account.id}
-          isOwnProfile={isOwnProfile}
-          onCollectionUpdated={handleCollectionUpdated}
-          selectedCollectionId={selectedCollectionId}
-          onCollectionClick={handleCollectionClick}
-        />
       </div>
 
-      {/* Right Column: Mentions Section */}
-      <div className="lg:col-span-9">
-        <ProfileMentionsSection
-          pins={pins}
-          collections={collections}
-          isOwnProfile={isOwnProfile}
-          selectedCollectionId={selectedCollectionId}
-          publicPins={publicPins}
-          accountId={account.id}
-          accountUsername={account.username}
-          accountImageUrl={account.image_url}
-        />
+      {/* Coming Soon Message */}
+      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+        <p className="text-xs text-gray-600 text-center">
+          Many additional profile features coming soon–with your support so share our platform
+        </p>
+      </div>
+
+      {/* Left Nav and Content Container */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        {/* Left Sidebar Navigation */}
+        <div className="lg:col-span-3">
+          <ProfileSidebarNav 
+            accountUsername={account.username} 
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+        </div>
+
+        {/* Right Content: Maps or Mentions */}
+        <div className="lg:col-span-9">
+          {activeTab === 'maps' ? (
+            <ProfileMapsContainer accountId={account.id} isOwnProfile={isOwnProfile} />
+          ) : (
+            <ProfileMentionsContainer
+              pins={pins}
+              accountId={account.id}
+              isOwnProfile={isOwnProfile}
+              accountUsername={account.username}
+              accountImageUrl={account.image_url}
+              collections={collections}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

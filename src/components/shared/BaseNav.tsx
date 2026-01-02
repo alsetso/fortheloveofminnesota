@@ -98,7 +98,7 @@ export default function BaseNav({
 
   return (
     <nav className={`${bgColor} ${stickyClass} border-b ${borderColor} transition-all duration-200 h-14 flex-shrink-0`}>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 h-full">
+      <div className="w-full px-3 sm:px-4 lg:px-6 h-full">
         <div className="grid grid-cols-3 items-center h-full gap-2">
           {/* Left Column: Navigation Links (Desktop) / Hamburger (Mobile) */}
           <div className="flex items-center gap-0 min-w-0 h-full">

@@ -8,23 +8,13 @@ export interface BreadcrumbItem {
 
 /**
  * Build breadcrumb trail for an organization
- * Returns: Home > Government > [Branch] > [Parent Orgs] > [Current Org]
+ * Returns: Home > Government > [Parent Orgs] > [Current Org]
  */
 export async function buildOrgBreadcrumbs(org: { id: string; parent_id: string | null; name: string; slug: string; org_type: string }): Promise<BreadcrumbItem[]> {
   const breadcrumbs: BreadcrumbItem[] = [
     { label: 'Home', href: '/' },
     { label: 'Government', href: '/gov' },
   ];
-
-  // If it's a branch, add it
-  if (org.org_type === 'branch') {
-    const branchSlug = org.slug.replace('-branch', '');
-    breadcrumbs.push({
-      label: org.name.replace(' Branch', ''),
-      href: `/gov/${branchSlug}`,
-    });
-    return breadcrumbs;
-  }
 
   // Build parent chain
   const supabase = createServerClient();
@@ -41,31 +31,8 @@ export async function buildOrgBreadcrumbs(org: { id: string; parent_id: string |
   const orgsMap = new Map(allOrgs.map((o: any) => [o.id, o]));
   const parentChain: Array<{ name: string; slug: string; org_type: string }> = [];
 
-  // Find root branch first
-  let current: any = orgsMap.get(org.id);
-  let rootBranch: { name: string; slug: string } | null = null;
-
-  while (current) {
-    if (current.org_type === 'branch') {
-      rootBranch = {
-        name: current.name.replace(' Branch', ''),
-        slug: current.slug.replace('-branch', ''),
-      };
-      break;
-    }
-    current = current.parent_id ? orgsMap.get(current.parent_id) : null;
-  }
-
-  // Add root branch to breadcrumbs
-  if (rootBranch) {
-    breadcrumbs.push({
-      label: rootBranch.name,
-      href: `/gov/${rootBranch.slug}`,
-    });
-  }
-
-  // Build parent chain (excluding the org itself and root branch)
-  current = org.parent_id ? orgsMap.get(org.parent_id) : null;
+  // Build parent chain (excluding the org itself and branches)
+  let current = org.parent_id ? orgsMap.get(org.parent_id) : null;
   while (current) {
     if (current.org_type !== 'branch' && current.id !== org.id) {
       parentChain.unshift({

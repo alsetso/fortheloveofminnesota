@@ -1,6 +1,5 @@
 import { createServerClient } from '@/lib/supabaseServer';
-import HomepageMap from '@/features/homepage/components/HomepageMap';
-import SpecialMapViewTracker from '@/components/analytics/SpecialMapViewTracker';
+import FraudMapClient from './FraudMapClient';
 import { cache } from 'react';
 
 // Configure route segment for optimal caching
@@ -88,10 +87,7 @@ export default async function FraudMapPage() {
     }));
 
   return (
-    <>
-      <SpecialMapViewTracker mapIdentifier="fraud" />
-      <HomepageMap cities={cities} counties={counties} />
-    </>
+    <FraudMapClient cities={cities} counties={counties} />
   );
 }
 

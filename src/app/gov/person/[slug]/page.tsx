@@ -6,6 +6,8 @@ import { getCivicPersonBySlug } from '@/features/civic/services/civicService';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonPageClient from './PersonPageClient';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
+import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
+import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
 
 export const revalidate = 3600;
@@ -126,6 +128,8 @@ export default async function PersonPage({ params }: Props) {
             <PersonPageClient person={person} isAdmin={isAdmin} />
           </div>
           
+          <LastEditedIndicator tableName="people" recordId={person.id} />
+          
           {/* Contact Information */}
           <div className="bg-white rounded-md border border-gray-200 p-[10px] space-y-1.5">
             {person.phone && (
@@ -221,6 +225,17 @@ export default async function PersonPage({ params }: Props) {
             <p className="text-xs text-gray-600">No current roles.</p>
           </div>
         )}
+
+        {/* Page Break */}
+        <div className="mt-6 pt-6 border-t border-gray-300">
+          {/* Edit History */}
+          <EntityEditHistory 
+            tableName="people" 
+            recordId={person.id} 
+            recordName={person.name}
+            showHeader={true}
+          />
+        </div>
       </div>
     </SimplePageLayout>
   );

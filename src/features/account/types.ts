@@ -22,6 +22,7 @@ export interface OnboardingClientProps {
   initialAccount: Account | null;
   redirectTo?: string;
   onComplete?: () => void | Promise<void>;
+  onWelcomeShown?: () => void;
 }
 
 export interface AccountData {

@@ -18,7 +18,7 @@ export default function ExecutiveBranchCard({ branch }: ExecutiveBranchCardProps
         'Public participation is most effective during formal comment periods',
         'Many significant impacts occur during agency rulemaking, not initial legislation'
       ]}
-      href="/gov/executive"
+      href={`/gov/org/${branch.slug}`}
     />
   );
 }

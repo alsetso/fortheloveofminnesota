@@ -262,12 +262,6 @@ export default function MapsSidebarContent() {
       <div className="bg-white border border-gray-200 rounded-md p-[10px]">
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs font-semibold text-gray-900">Events</div>
-          <Link
-            href="/calendar"
-            className="text-[10px] text-gray-500 hover:text-gray-900 transition-colors"
-          >
-            See All
-          </Link>
         </div>
 
         {loading && (
@@ -311,12 +305,9 @@ export default function MapsSidebarContent() {
               </Link>
             ))}
             {selectedDayEvents.length > 5 && (
-              <Link
-                href="/calendar"
-                className="block text-[10px] text-gray-500 hover:text-gray-900 text-center pt-1 transition-colors"
-              >
+              <div className="text-[10px] text-gray-500 text-center pt-1">
                 +{selectedDayEvents.length - 5} more
-              </Link>
+              </div>
             )}
           </div>
         )}

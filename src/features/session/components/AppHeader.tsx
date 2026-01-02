@@ -66,14 +66,14 @@ export default function AppHeader({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Determine page types
-  const isMapPage = pathname === '/map';
+  const isMapPage = pathname === '/maps' || pathname?.startsWith('/map/');
   const _needsSessionManagement = isMapPage;
   const _isDashboardPage = pathname === '/';
 
   // Navigation links
   const navLinks = [
     { href: '/', label: 'Home' },
-    { href: '/map', label: 'Map' },
+    { href: '/maps', label: 'Maps' },
   ];
 
   const isActive = (href: string) => {

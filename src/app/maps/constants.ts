@@ -14,15 +14,6 @@ export const COMMUNITY_MAPS: Omit<MapItem, 'view_count'>[] = [
     map_type: 'community',
     href: '/map/mention',
   },
-  {
-    id: 'fraud',
-    title: 'Fraud',
-    description: 'Community fraud map',
-    visibility: 'public',
-    map_style: 'street',
-    map_type: 'community',
-    href: '/map/fraud',
-  },
 ];
 
 /**
@@ -30,6 +21,16 @@ export const COMMUNITY_MAPS: Omit<MapItem, 'view_count'>[] = [
  * These require Pro plan access
  */
 export const PROFESSIONAL_MAPS: Omit<MapItem, 'view_count'>[] = [
+  {
+    id: 'fraud',
+    title: 'Fraud',
+    description: 'Professional fraud map',
+    visibility: 'public',
+    map_style: 'street',
+    map_type: 'professional',
+    href: '/map/fraud',
+    requiresPro: true,
+  },
   {
     id: 'realestate',
     title: 'Real Estate',

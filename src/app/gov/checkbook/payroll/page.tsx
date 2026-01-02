@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import PayrollTable from './PayrollTable';
 
 export const revalidate = 3600;
 
@@ -39,23 +40,20 @@ export default async function PayrollPage() {
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            Payroll
-          </h1>
-          <p className="text-xs text-gray-600">
-            Government payroll data in Minnesota
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h1 className="text-sm font-semibold text-gray-900">
+                Payroll
+              </h1>
+              <p className="text-xs text-gray-600">
+                Government employee payroll and compensation data in Minnesota
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Coming Soon */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <h2 className="text-xs font-semibold text-gray-900">
-            Coming Soon
-          </h2>
-          <p className="text-xs text-gray-600">
-            Payroll data will be available here soon. This section will include government employee compensation information, salary data, and related payroll transactions.
-          </p>
-        </div>
+        {/* Payroll Table */}
+        <PayrollTable />
       </div>
     </SimplePageLayout>
   );

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
-export type SidebarTab = 'explore' | 'mentions' | 'controls' | 'faqs' | 'news' | 'profile' | null;
+export type SidebarTab = 'mentions' | 'controls' | 'news' | 'profile' | null;
 
 interface UseSidebarTabStateOptions {
   /** Whether to sync tab state to URL */
@@ -15,7 +15,7 @@ interface UseSidebarTabStateOptions {
 /**
  * Hook for managing sidebar tab state with URL synchronization.
  * 
- * URL parameter: `?tab=explore|controls|faqs|news`
+ * URL parameter: `?tab=controls|news`
  * 
  * - When tab is active, URL shows `?tab=tabname`
  * - When URL has `?tab=tabname`, tab opens automatically
@@ -37,8 +37,8 @@ export function useSidebarTabState(options: UseSidebarTabStateOptions = {}) {
     const tabParam = searchParams.get('tab');
     if (!tabParam) return null;
 
-    // Allow all tabs in URL (explore, mentions, controls, faqs, news, profile)
-    if (tabParam === 'explore' || tabParam === 'mentions' || tabParam === 'controls' || tabParam === 'faqs' || tabParam === 'news' || tabParam === 'profile') {
+    // Allow all tabs in URL (mentions, controls, news, profile)
+    if (tabParam === 'mentions' || tabParam === 'controls' || tabParam === 'news' || tabParam === 'profile') {
       return tabParam;
     }
     
@@ -53,7 +53,7 @@ export function useSidebarTabState(options: UseSidebarTabStateOptions = {}) {
     const url = new URL(window.location.href);
     
     // Set URL param for all tabs
-    if (tab === 'explore' || tab === 'controls' || tab === 'faqs' || tab === 'news' || tab === 'profile') {
+    if (tab === 'controls' || tab === 'news' || tab === 'profile') {
       url.searchParams.set('tab', tab);
     } else {
       // Remove tab param when closing

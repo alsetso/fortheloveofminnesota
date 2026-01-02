@@ -31,6 +31,9 @@ export async function GET(
         description,
         visibility,
         map_style,
+        type,
+        custom_slug,
+        tags,
         meta,
         created_at,
         updated_at,
@@ -142,6 +145,66 @@ export async function PUT(
       updateData.meta = body.meta;
     }
 
+    if (body.type !== undefined) {
+      const validTypes = ['user', 'community', 'gov', 'professional', 'atlas', 'user-generated'];
+      if (body.type !== null && !validTypes.includes(body.type)) {
+        return createErrorResponse('Invalid type. Must be one of: user, community, gov, professional, atlas, user-generated', 400);
+      }
+      updateData.type = body.type || null;
+    }
+
+    if (body.custom_slug !== undefined) {
+      // Check if user has pro account for custom_slug
+      const { data: account } = await supabase
+        .from('accounts')
+        .select('plan')
+        .eq('id', accountId)
+        .single();
+
+      if (body.custom_slug && account?.plan !== 'pro' && account?.plan !== 'plus') {
+        return createErrorResponse('Custom slugs are only available for pro accounts', 403);
+      }
+
+      if (body.custom_slug) {
+        // Validate slug format
+        const slugRegex = /^[a-z0-9-]+$/;
+        if (!slugRegex.test(body.custom_slug) || body.custom_slug.length < 3 || body.custom_slug.length > 100) {
+          return createErrorResponse('Invalid custom_slug format. Must be 3-100 characters, lowercase alphanumeric and hyphens only', 400);
+        }
+
+        // Check if slug is already taken
+        const { data: existingMap } = await supabase
+          .from('map')
+          .select('id')
+          .eq('custom_slug', body.custom_slug)
+          .neq('id', id)
+          .single();
+
+        if (existingMap) {
+          return createErrorResponse('Custom slug is already taken', 409);
+        }
+      }
+      updateData.custom_slug = body.custom_slug?.trim() || null;
+    }
+
+    if (body.tags !== undefined) {
+      // Validate tags structure - must be an array of objects with emoji and text
+      if (!Array.isArray(body.tags)) {
+        return createErrorResponse('Tags must be an array', 400);
+      }
+
+      for (const tag of body.tags) {
+        if (typeof tag !== 'object' || !tag.emoji || !tag.text) {
+          return createErrorResponse('Each tag must have emoji and text properties', 400);
+        }
+        if (typeof tag.emoji !== 'string' || typeof tag.text !== 'string') {
+          return createErrorResponse('Tag emoji and text must be strings', 400);
+        }
+      }
+
+      updateData.tags = body.tags;
+    }
+
     const { data: updatedMap, error: updateError } = await supabase
       .from('map')
       .update(updateData as any)
@@ -153,6 +216,9 @@ export async function PUT(
         description,
         visibility,
         map_style,
+        type,
+        custom_slug,
+        tags,
         meta,
         created_at,
         updated_at

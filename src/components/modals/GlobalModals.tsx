@@ -3,8 +3,10 @@
 import { useAppModalContext } from '@/contexts/AppModalContext';
 import WelcomeModal from '@/features/account/components/WelcomeModal';
 import OnboardingModal from '@/features/account/components/OnboardingModal';
+import CreateAccountModal from '@/features/account/components/CreateAccountModal';
 import AccountModal from '@/features/account/components/AccountModal';
 import BillingModal from '@/components/modals/BillingModal';
+import ComingSoonModal from '@/components/modals/ComingSoonModal';
 
 /**
  * GlobalModals - Renders all URL-controlled modals at the app level
@@ -29,6 +31,12 @@ export default function GlobalModals() {
         onClose={closeModal}
       />
 
+      {/* Create Account Modal - for creating new accounts */}
+      <CreateAccountModal
+        isOpen={modal.type === 'createAccount'}
+        onClose={closeModal}
+      />
+
       {/* Account Settings Modal - only for authenticated users */}
       <AccountModal
         isOpen={modal.type === 'account'}
@@ -44,6 +52,13 @@ export default function GlobalModals() {
         isOpen={modal.type === 'upgrade'}
         onClose={closeModal}
         feature={modal.feature}
+      />
+
+      {/* Coming Soon Modal */}
+      <ComingSoonModal
+        isOpen={modal.type === 'coming-soon'}
+        onClose={closeModal}
+        feature={modal.comingSoonFeature || 'This feature'}
       />
 
     </>

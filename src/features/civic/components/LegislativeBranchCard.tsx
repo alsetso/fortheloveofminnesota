@@ -18,7 +18,7 @@ export default function LegislativeBranchCard({ branch }: LegislativeBranchCardP
         'Bills that don\'t advance out of committee effectively end',
         'Final votes take place on House and Senate floors'
       ]}
-      href="/gov/legislative"
+      href={`/gov/org/${branch.slug}`}
     />
   );
 }

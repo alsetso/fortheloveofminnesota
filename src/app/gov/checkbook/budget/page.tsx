@@ -1,6 +1,8 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import BudgetSummary from './BudgetSummary';
+import BudgetTable from './BudgetTable';
 
 export const revalidate = 3600;
 
@@ -39,23 +41,25 @@ export default async function BudgetPage() {
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            Budget
-          </h1>
-          <p className="text-xs text-gray-600">
-            Government budget information in Minnesota
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h1 className="text-sm font-semibold text-gray-900">
+                Budget
+              </h1>
+              <p className="text-xs text-gray-600">
+                Government budget allocations and spending in Minnesota
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Coming Soon */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <h2 className="text-xs font-semibold text-gray-900">
-            Coming Soon
-          </h2>
-          <p className="text-xs text-gray-600">
-            Budget information will be available here soon. This section will include government budget data, financial planning information, and related fiscal records.
-          </p>
+        {/* Budget Summary */}
+        <div className="mb-3">
+          <BudgetSummary />
         </div>
+
+        {/* Budget Table */}
+        <BudgetTable />
       </div>
     </SimplePageLayout>
   );

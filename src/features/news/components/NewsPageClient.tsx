@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ClockIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { ClockIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -13,7 +13,15 @@ interface LatestNewsResponse {
   success: boolean;
   data: {
     articles: NewsArticle[];
-    count: number;
+    count?: number; // Legacy support
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
     requestId?: string;
     query?: string;
     generatedAt?: string;
@@ -105,34 +113,10 @@ export default function NewsPageClient() {
     }
   })() : false;
 
-  // Get today's date string for calendar link
-  const todayDateStr = format(startOfDay(new Date()), 'yyyy-MM-dd');
-  const calendarLink = `/calendar?date=${todayDateStr}#news`;
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
       {/* Left Column - Primary Content (Large) */}
       <div className="lg:col-span-8 space-y-3">
-        {/* Prominent Calendar Banner */}
-        <div className="bg-gray-900 border border-gray-900 rounded-md p-[10px]">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="w-4 h-4 text-white flex-shrink-0" />
-              <div>
-                <p className="text-xs font-semibold text-white">View Today's News on the Calendar</p>
-                <p className="text-[10px] text-gray-300 mt-0.5">
-                  See news organized by day and browse past dates
-                </p>
-              </div>
-            </div>
-            <Link
-              href={calendarLink}
-              className="px-3 py-1.5 text-xs font-medium text-gray-900 bg-white hover:bg-gray-100 rounded transition-colors whitespace-nowrap"
-            >
-              Go to Calendar
-            </Link>
-          </div>
-        </div>
 
         {/* Admin Generate Button */}
         {isAdmin && (
@@ -246,17 +230,6 @@ export default function NewsPageClient() {
               })}
             </div>
             
-            {/* See All Button */}
-            {articles.length > displayedCount && (
-              <div className="flex justify-center pt-2">
-            <Link
-              href="/calendar/news"
-                  className="px-4 py-2 text-xs font-medium text-gray-900 bg-white hover:bg-gray-50 border border-gray-200 rounded-md transition-colors"
-            >
-                  See All ({articles.length} articles)
-            </Link>
-              </div>
-            )}
           </div>
         )}
 

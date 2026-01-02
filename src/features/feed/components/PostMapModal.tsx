@@ -1933,8 +1933,9 @@ export default function PostMapModal({
           </div>
         )}
 
-        <div className="absolute bottom-2 right-2 z-30 flex items-center gap-2">
-          {!state.isDrawing && (
+        {/* Start Drawing button - centered at bottom */}
+        {!state.isDrawing && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30">
             <button
               type="button"
               onClick={handleStartDrawing}
@@ -1943,8 +1944,11 @@ export default function PostMapModal({
               <PencilIcon className="w-4 h-4" />
               Start Drawing
             </button>
-          )}
+          </div>
+        )}
 
+        {/* Other action buttons - right aligned */}
+        <div className="absolute bottom-2 right-2 z-30 flex items-center gap-2">
           {state.isDrawing && (
             <button
               type="button"

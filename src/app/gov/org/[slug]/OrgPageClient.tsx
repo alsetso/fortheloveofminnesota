@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePageView } from '@/hooks/usePageView';
+import { useAuthStateSafe } from '@/features/auth';
 import OrgEditModal from './OrgEditModal';
 import EditButton from '@/features/civic/components/EditButton';
 import type { CivicOrg } from '@/features/civic/services/civicService';
@@ -21,7 +22,10 @@ export default function OrgPageClient({ org, isAdmin }: OrgPageClientProps) {
     router.refresh();
   };
 
-  if (!isAdmin) return null;
+  const { account } = useAuthStateSafe();
+  const isAuthenticated = !!account;
+  
+  if (!isAuthenticated && !isAdmin) return null;
 
   return (
     <>
@@ -31,6 +35,7 @@ export default function OrgPageClient({ org, isAdmin }: OrgPageClientProps) {
         org={org}
         onClose={() => setIsEditModalOpen(false)}
         onSave={handleSave}
+        isAdmin={isAdmin}
       />
     </>
   );

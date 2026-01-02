@@ -20,8 +20,16 @@ interface NewsArticle {
 interface LatestNewsResponse {
   success: boolean;
   data?: {
-  articles: NewsArticle[];
-  count: number;
+    articles: NewsArticle[];
+    count?: number; // Legacy support
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
     generatedAt: string;
     createdAt: string;
   };
@@ -163,15 +171,6 @@ export default function NewsSecondaryContent() {
         )}
         </div>
 
-      {/* See More Button */}
-      <div className="border-t border-gray-200 pt-3">
-        <Link
-          href="/calendar/news"
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-        >
-          See More
-        </Link>
-        </div>
     </div>
   );
 }

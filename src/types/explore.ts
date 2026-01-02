@@ -104,3 +104,4 @@ export interface MunicipalEntity extends AtlasEntity {
   municipal_type: string | null;
 }
 
+

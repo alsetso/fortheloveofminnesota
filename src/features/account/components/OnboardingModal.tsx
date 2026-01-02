@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { useAuth, AccountService, Account } from '@/features/auth';
+import { useAuth, AccountService, Account, useAuthStateSafe } from '@/features/auth';
 import { isAccountComplete } from '@/lib/accountCompleteness';
 import { checkOnboardingStatus } from '@/lib/onboardingCheck';
 import OnboardingClient from './OnboardingClient';
@@ -15,9 +15,11 @@ interface OnboardingModalProps {
 
 export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProps) {
   const { user } = useAuth();
+  const { refreshAccount } = useAuthStateSafe();
   const [account, setAccount] = useState<Account | null>(null);
   const [loading, setLoading] = useState(true);
   const [accountComplete, setAccountComplete] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   // Fetch account data when modal opens - use centralized check
   useEffect(() => {
@@ -56,16 +58,17 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-[10px]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-[10px]">
       {/* Backdrop - No click to close if incomplete */}
       <div 
-        className="absolute inset-0 bg-black/40"
+        className={`absolute inset-0 bg-black/40 ${!accountComplete ? 'pointer-events-auto' : ''}`}
         onClick={accountComplete ? handleClose : undefined}
       />
 
       {/* Modal */}
       <div className="relative w-full max-w-2xl max-h-[90vh] bg-white rounded-md border border-gray-200 flex flex-col">
-        {/* Header */}
+        {/* Header - Hide when welcome screen is shown */}
+        {!showWelcome && (
         <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-gray-200">
           <div className="flex items-center gap-2">
             <div className="relative w-6 h-6 flex-shrink-0">
@@ -99,6 +102,7 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
             <XMarkIcon className="w-4 h-4" />
           </button>
         </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-[10px]">
@@ -110,23 +114,38 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
             <OnboardingClient 
               initialAccount={account} 
               redirectTo={undefined}
+              onWelcomeShown={() => setShowWelcome(true)}
               onComplete={async () => {
                 // Refresh account data after completion
                 try {
+                  // Refresh auth state first to ensure account is updated
+                  if (refreshAccount) {
+                    await refreshAccount();
+                  }
+
+                  // Also fetch account directly
                   const accountData = await AccountService.getCurrentAccount();
                   setAccount(accountData);
                   const complete = isAccountComplete(accountData);
                   setAccountComplete(complete);
                   
-                  // If now complete, allow closing
+                  // If now complete, close the modal after a brief delay
                   if (complete) {
-                    // Small delay to show success state
+                    // Small delay to ensure state is fully updated
                     setTimeout(() => {
                       onClose();
                     }, 500);
                   }
                 } catch (error) {
                   console.error('Error refreshing account after completion:', error);
+                  // Even if refresh fails, check if we can close
+                  const accountData = await AccountService.getCurrentAccount();
+                  if (accountData && isAccountComplete(accountData)) {
+                    setAccountComplete(true);
+                    setTimeout(() => {
+                      onClose();
+                    }, 500);
+                  }
                 }
               }}
             />

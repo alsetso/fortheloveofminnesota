@@ -38,7 +38,7 @@ export default function AppSearch({
   onLocationSelect,
 }: AppSearchProps) {
   const pathname = usePathname();
-  const isMapPage = pathname === '/map';
+  const isMapPage = pathname === '/maps' || pathname?.startsWith('/map/');
   
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);

@@ -2,6 +2,10 @@
  * Type definitions for Mapbox-related data
  */
 
+import type { Map as MapboxMap } from 'mapbox-gl';
+
+export type MapboxMapInstance = MapboxMap;
+
 export interface MapboxMetadata {
   [key: string]: unknown;
 }

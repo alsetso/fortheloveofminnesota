@@ -15,6 +15,7 @@ import MapIDDetails from './MapIDDetails';
 import MapEntitySlideUp from './MapEntitySlideUp';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface MapIDBoxProps {
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
@@ -38,6 +39,10 @@ interface MapIDBoxProps {
   viewCount?: number | null;
   onMapLoad?: (map: MapboxMapInstance) => void;
   onMapUpdate?: (updatedData: any) => void;
+  map_account_id?: string | null;
+  current_account_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface MapPin {
@@ -83,7 +88,7 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
   const [loadingEntity, setLoadingEntity] = useState(false);
   const { mapInstance, mapLoaded } = useMapboxMap({
     mapStyle,
-    containerRef: mapContainer,
+    containerRef: mapContainer as React.RefObject<HTMLDivElement>,
     meta,
     onMapLoad,
   });
@@ -730,7 +735,7 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
                     <Link
                       href={`/profile/${account.username}`}
                       className="hidden sm:inline text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors truncate max-w-[100px] sm:max-w-[120px] group-hover:max-w-[150px]"
-                      title={account.username}
+                      title={account.username || undefined}
                     >
                       @{truncatedUsername}
                     </Link>

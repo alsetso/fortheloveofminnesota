@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import type { MapboxMapInstance } from '@/types/mapbox';
+import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface MapAreaDrawModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface MapAreaDrawModalProps {
   mapLoaded: boolean;
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
   onAreaCreated?: () => void;
+  autoSave?: boolean;
 }
 
 type DrawingState = 'idle' | 'drawing' | 'completed';
@@ -70,6 +71,8 @@ export default function MapAreaDrawModal({
   // Initialize Mapbox Draw when modal opens
   useEffect(() => {
     if (!isOpen || !mapInstance || !mapLoaded) return;
+
+    let cleanup: (() => void) | null = null;
 
     const initDraw = async () => {
       try {
@@ -134,7 +137,7 @@ export default function MapAreaDrawModal({
         mapboxMap.on('draw.delete', handleDrawDelete);
         mapboxMap.on('draw.modechange', handleModeChange);
 
-        return () => {
+        cleanup = () => {
           if (mapboxMap && !mapboxMap.removed) {
             mapboxMap.off('draw.create', handleDrawCreate);
             mapboxMap.off('draw.update', handleDrawUpdate);
@@ -149,6 +152,10 @@ export default function MapAreaDrawModal({
     };
 
     initDraw();
+
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, [isOpen, mapInstance, mapLoaded, polygon, ensureClosedPolygon]);
 
   // Cleanup when modal closes

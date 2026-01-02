@@ -48,8 +48,8 @@ export default function PersonEditModal({ isOpen, person, onClose, onSave, isAdm
     try {
       if (isAdmin) {
         // Admin can edit all fields - direct update
-        const { error: updateError } = await supabase
-          .from('people')
+        const { error: updateError } = await (supabase
+          .from('people') as any)
           .update({
             name: formData.name,
             slug: formData.slug || null,

@@ -382,7 +382,7 @@ export default function MapEntitySlideUp({
                               setEditData(prev => ({ ...prev, emoji }));
                               setShowEmojiPicker(false);
                             }}
-                            triggerRef={emojiButtonRef}
+                            triggerRef={emojiButtonRef as React.RefObject<HTMLElement>}
                           />
                         </div>
                       )}

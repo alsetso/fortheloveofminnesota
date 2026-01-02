@@ -45,8 +45,8 @@ export default function OrgEditModal({ isOpen, org, onClose, onSave, isAdmin = f
     try {
       if (isAdmin) {
         // Admin can edit all fields - direct update
-        const { error: updateError } = await supabase
-          .from('orgs')
+        const { error: updateError } = await (supabase
+          .from('orgs') as any)
           .update({
             name: formData.name,
             slug: formData.slug,

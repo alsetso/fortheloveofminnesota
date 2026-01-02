@@ -66,7 +66,7 @@ export async function savePrompt(
   accountId: string,
   userInput: string,
   apiResponse: unknown
-): Promise<NewsPrompt | null> {
+): Promise<{ prompt: NewsPrompt | null; error: string | null }> {
   const supabase = await createServerClientWithAuth(cookies());
 
   console.log('[savePrompt] Inserting into news.prompt:', {
@@ -82,14 +82,27 @@ export async function savePrompt(
   });
 
   if (error) {
-    console.error('[savePrompt] Error saving to news.prompt:', error);
-    return null;
+    console.error('[savePrompt] Error saving to news.prompt:', {
+      error,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    return {
+      prompt: null,
+      error: error.message || 'Failed to save prompt to database',
+    };
   }
 
   // RPC returns array, get first result
   const result = (data && Array.isArray(data) && data.length > 0) ? (data[0] as NewsPrompt) : null;
-  console.log('[savePrompt] Successfully saved:', result?.id);
-  return result;
+  if (result) {
+    console.log('[savePrompt] Successfully saved:', result.id);
+  } else {
+    console.warn('[savePrompt] RPC returned no data');
+  }
+  return { prompt: result, error: null };
 }
 
 /**
@@ -100,8 +113,13 @@ export async function savePromptWithService(
   accountId: string,
   userInput: string,
   apiResponse: unknown
-): Promise<NewsPrompt | null> {
+): Promise<{ prompt: NewsPrompt | null; error: string | null }> {
   const supabase = createServiceClient();
+
+  console.log('[savePromptWithService] Inserting into news.prompt:', {
+    account_id: accountId,
+    user_input: userInput,
+  });
 
   // Use RPC function to insert into news.prompt
   const { data, error } = await (supabase.rpc as any)('insert_prompt', {
@@ -111,12 +129,27 @@ export async function savePromptWithService(
   });
 
   if (error) {
-    console.error('[savePromptWithService] Error:', error);
-    return null;
+    console.error('[savePromptWithService] Error:', {
+      error,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+    return {
+      prompt: null,
+      error: error.message || 'Failed to save prompt to database',
+    };
   }
 
   // RPC returns array, get first result
-  return (data && Array.isArray(data) && data.length > 0) ? (data[0] as NewsPrompt) : null;
+  const result = (data && Array.isArray(data) && data.length > 0) ? (data[0] as NewsPrompt) : null;
+  if (result) {
+    console.log('[savePromptWithService] Successfully saved:', result.id);
+  } else {
+    console.warn('[savePromptWithService] RPC returned no data');
+  }
+  return { prompt: result, error: null };
 }
 
 

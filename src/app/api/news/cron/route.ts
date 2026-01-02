@@ -112,11 +112,15 @@ export async function GET(request: NextRequest) {
     };
 
     // Save to database using service client (uses news.prompt, trigger auto-extracts to news.generated)
-    const savedPrompt = await savePromptWithService(accountId, query, apiResponse);
+    const { prompt: savedPrompt, error: saveError } = await savePromptWithService(accountId, query, apiResponse);
 
     if (!savedPrompt) {
+      console.error('[News Cron] Failed to save prompt:', saveError);
       return NextResponse.json(
-        { error: 'Failed to save news to database' },
+        { 
+          error: 'Failed to save news to database',
+          details: saveError || 'Unknown error occurred while saving',
+        },
         { status: 500 }
       );
     }

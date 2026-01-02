@@ -128,7 +128,6 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
             account_image_url: account?.image_url || null,
           };
 
-          const eventTyped = event as { table_name: string; record_id: string; account_id?: string; entity_slug?: string };
           if (eventTyped.table_name === 'orgs') {
             const org = orgsMap.get(eventTyped.record_id);
             return {

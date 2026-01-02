@@ -109,7 +109,8 @@ export async function PUT(
       );
     }
 
-    if (accountId !== map.account_id) {
+    const mapData = map as { id: string; account_id: string };
+    if (accountId !== mapData.account_id) {
       return createErrorResponse('Forbidden - you do not own this map', 403);
     }
 
@@ -161,7 +162,8 @@ export async function PUT(
         .eq('id', accountId)
         .single();
 
-      if (body.custom_slug && account?.plan !== 'pro' && account?.plan !== 'plus') {
+      const accountData = account as { plan: string } | null;
+      if (body.custom_slug && accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
         return createErrorResponse('Custom slugs are only available for pro accounts', 403);
       }
 
@@ -205,9 +207,9 @@ export async function PUT(
       updateData.tags = body.tags;
     }
 
-    const { data: updatedMap, error: updateError } = await supabase
-      .from('map')
-      .update(updateData as any)
+    const { data: updatedMap, error: updateError } = await (supabase
+      .from('map') as any)
+      .update(updateData)
       .eq('id', id)
       .select(`
         id,
@@ -281,7 +283,8 @@ export async function DELETE(
       );
     }
 
-    if (accountId !== map.account_id) {
+    const mapDataDelete = map as { id: string; account_id: string };
+    if (accountId !== mapDataDelete.account_id) {
       return createErrorResponse('Forbidden - you do not own this map', 403);
     }
 

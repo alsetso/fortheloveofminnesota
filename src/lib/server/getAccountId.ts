@@ -13,7 +13,7 @@ import { Auth } from '@/lib/authServer';
  */
 export async function getAccountIdForUser(
   auth: Auth,
-  supabase: ReturnType<typeof createServerClientWithAuth>
+  supabase: Awaited<ReturnType<typeof createServerClientWithAuth>>
 ): Promise<string> {
   const cookieStore = await cookies();
   const activeAccountIdCookie = cookieStore.get('active_account_id');

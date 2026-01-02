@@ -170,7 +170,8 @@ export async function POST(request: NextRequest) {
         .eq('id', accountId)
         .single();
 
-      if (account?.plan !== 'pro' && account?.plan !== 'plus') {
+      const accountData = account as { plan: string } | null;
+      if (accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
         return createErrorResponse('Custom slugs are only available for pro accounts', 403);
       }
 

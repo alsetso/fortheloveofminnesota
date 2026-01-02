@@ -49,7 +49,9 @@ export async function GET(
       return createErrorResponse('Map not found', 404);
     }
 
-    if (mapData.account_id !== accountData.id) {
+    const mapDataTyped = mapData as { id: string; account_id: string };
+    const accountDataTyped = accountData as { id: string };
+    if (mapDataTyped.account_id !== accountDataTyped.id) {
       return createErrorResponse('Forbidden', 403);
     }
 

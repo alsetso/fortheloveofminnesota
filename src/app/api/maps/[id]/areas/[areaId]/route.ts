@@ -101,7 +101,8 @@ export async function DELETE(
     }
 
     // Verify user owns the map
-    if (map.account_id !== accountId) {
+    const mapData = map as { id: string; account_id: string };
+    if (mapData.account_id !== accountId) {
       return createErrorResponse('Forbidden - only the map owner can delete areas', 403);
     }
 

@@ -103,7 +103,8 @@ export async function PUT(
     }
 
     // Verify user owns the map
-    if (map.account_id !== accountId) {
+    const mapData = map as { id: string; account_id: string };
+    if (mapData.account_id !== accountId) {
       return createErrorResponse('Forbidden - only the map owner can update pins', 403);
     }
 
@@ -148,9 +149,9 @@ export async function PUT(
     }
 
     // Update pin
-    const { data: updatedPin, error: updateError } = await supabase
-      .from('map_pins')
-      .update(updateData as any)
+    const { data: updatedPin, error: updateError } = await (supabase
+      .from('map_pins') as any)
+      .update(updateData)
       .eq('id', pinId)
       .select('id, map_id, emoji, caption, image_url, video_url, lat, lng, created_at, updated_at')
       .single();
@@ -212,7 +213,8 @@ export async function DELETE(
     }
 
     // Verify user owns the map
-    if (map.account_id !== accountId) {
+    const mapData = map as { id: string; account_id: string };
+    if (mapData.account_id !== accountId) {
       return createErrorResponse('Forbidden - only the map owner can delete pins', 403);
     }
 

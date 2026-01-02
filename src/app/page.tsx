@@ -20,6 +20,7 @@ import HomepageViewTracker from '@/components/analytics/HomepageViewTracker';
 import HomepageMaps from '@/features/homepage/components/HomepageMaps';
 import HomepageProfileColumn from '@/features/homepage/components/HomepageProfileColumn';
 import HomepageNewsCalendarColumn from '@/features/homepage/components/HomepageNewsCalendarColumn';
+import HomepageNewsSection from '@/features/homepage/components/HomepageNewsSection';
 
 export const metadata: Metadata = {
   title: 'For the Love of Minnesota',
@@ -255,6 +256,9 @@ export default async function Home() {
                 </Link>
               </div>
             </section>
+
+            {/* News Section */}
+            <HomepageNewsSection />
           </div>
         </div>
 

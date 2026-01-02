@@ -113,9 +113,9 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
           ])
         );
         const accountsMap = new Map(
-          (accountsResult.data || []).map((account) => [
-            account.id,
-            { image_url: account.image_url },
+          (accountsResult.data || []).map((account: any) => [
+            (account as { id: string; image_url: string | null }).id,
+            { image_url: (account as { id: string; image_url: string | null }).image_url },
           ])
         );
 

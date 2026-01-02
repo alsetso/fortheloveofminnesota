@@ -185,7 +185,7 @@ export default function HomepageNewsCalendarColumn() {
           </div>
           {selectedDayEvents.length > 0 && (
             <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-500">
-              <span>{selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}</span>
+                <span>{selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}</span>
             </div>
           )}
         </div>

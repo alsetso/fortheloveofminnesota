@@ -1,4 +1,4 @@
-import { createServerClientWithAuth, createServiceClient } from '@/lib/supabaseServer';
+import { createServerClientWithAuth, createServiceClient, createServerClient } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
 
 // Types for news schema
@@ -17,15 +17,17 @@ export interface NewsPrompt {
  * Uses service client to bypass RLS since this is public data
  */
 export async function getLatestPrompt(): Promise<NewsPrompt | null> {
+  // Use anon client - RPC function is SECURITY DEFINER and granted to anon
+  // This works in production without requiring service role key
   let supabase;
   
   try {
-    supabase = createServiceClient();
+    supabase = createServerClient();
   } catch (error) {
-    console.error('[getLatestPrompt] Error creating service client:', error);
+    console.error('[getLatestPrompt] Error creating server client:', error);
+    // Fallback to service client if available (for admin operations)
     try {
-      const { createServerClient } = require('@/lib/supabaseServer');
-      supabase = createServerClient();
+      supabase = createServiceClient();
     } catch (fallbackError) {
       console.error('[getLatestPrompt] Error creating fallback client:', fallbackError);
       return null;
@@ -153,7 +155,7 @@ export async function savePromptWithService(
     p_account_id: accountId,
     p_user_input: userInput,
     p_api_response: apiResponse as Record<string, unknown>,
-  });
+    });
 
   if (error) {
     console.error('[savePromptWithService] Error:', {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type KeyboardEvent, type RefObject } from 'react';
 import { PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { useToast } from '@/features/ui/hooks/useToast';
@@ -121,7 +121,7 @@ export default function InlineEditField({
         <div className="flex items-start gap-1.5">
           {type === 'textarea' ? (
             <textarea
-              ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+              ref={inputRef as RefObject<HTMLTextAreaElement>}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -132,7 +132,7 @@ export default function InlineEditField({
             />
           ) : (
             <input
-              ref={inputRef as React.RefObject<HTMLInputElement>}
+              ref={inputRef as RefObject<HTMLInputElement>}
               type={type}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}

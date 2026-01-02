@@ -17,8 +17,6 @@ type PartialAccount = Partial<Account> & {
 
 interface PostCreationCardProps {
   onPostCreated?: () => void;
-  cityId?: string;
-  countyId?: string;
   account?: PartialAccount | Account | null;
   showActions?: boolean;
   className?: string;
@@ -26,8 +24,6 @@ interface PostCreationCardProps {
 
 export default function PostCreationCard({ 
   onPostCreated, 
-  cityId, 
-  countyId,
   account: providedAccount,
   showActions = true,
   className = '',

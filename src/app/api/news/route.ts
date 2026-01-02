@@ -47,8 +47,6 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    const encodedQuery = encodeURIComponent(query);
     
     // Build URL with optional parameters
     const baseUrl = 'https://real-time-news-data.p.rapidapi.com/search';

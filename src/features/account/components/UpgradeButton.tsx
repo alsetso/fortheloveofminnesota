@@ -1,11 +1,12 @@
 'use client';
 
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import type { ReactNode } from 'react';
 
 interface UpgradeButtonProps {
   feature?: string;
   className?: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export default function UpgradeButton({ feature, className, children }: UpgradeButtonProps) {

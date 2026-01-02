@@ -7,7 +7,7 @@ import { EventService } from '@/features/events/services/eventService';
 import type { Event } from '@/types/event';
 import Link from 'next/link';
 import Image from 'next/image';
-import { getStartOfDayCentral, isSameDayCentral, getDateStringCentral } from '@/lib/timezone';
+import { isSameDayCentral, getDateStringCentral } from '@/lib/timezone';
 import { getSourceInitials, getSourceColor } from '@/features/news/utils/newsHelpers';
 import { useAuthStateSafe } from '@/features/auth';
 

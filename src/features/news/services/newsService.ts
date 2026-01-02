@@ -11,12 +11,6 @@ export interface NewsPrompt {
   updated_at: string;
 }
 
-export interface NewsPromptInsert {
-  account_id: string;
-  user_input: string;
-  api_response: Record<string, unknown>;
-}
-
 /**
  * Get the latest news prompt from the database
  * Returns the most recent prompt record
@@ -75,19 +69,13 @@ export async function savePrompt(
 ): Promise<NewsPrompt | null> {
   const supabase = await createServerClientWithAuth(cookies());
 
-  const insertData: NewsPromptInsert = {
-    account_id: accountId,
-    user_input: userInput,
-    api_response: apiResponse as Record<string, unknown>,
-  };
-
   console.log('[savePrompt] Inserting into news.prompt:', {
     account_id: accountId,
     user_input: userInput,
   });
 
   // Use RPC function to insert into news.prompt
-  const { data, error } = await supabase.rpc('insert_prompt', {
+  const { data, error } = await (supabase.rpc as any)('insert_prompt', {
     p_account_id: accountId,
     p_user_input: userInput,
     p_api_response: apiResponse as Record<string, unknown>,
@@ -99,7 +87,7 @@ export async function savePrompt(
   }
 
   // RPC returns array, get first result
-  const result = (data && data.length > 0) ? data[0] : null;
+  const result = (data && Array.isArray(data) && data.length > 0) ? (data[0] as NewsPrompt) : null;
   console.log('[savePrompt] Successfully saved:', result?.id);
   return result;
 }
@@ -115,18 +103,12 @@ export async function savePromptWithService(
 ): Promise<NewsPrompt | null> {
   const supabase = createServiceClient();
 
-  const insertData: NewsPromptInsert = {
-    account_id: accountId,
-    user_input: userInput,
-    api_response: apiResponse as Record<string, unknown>,
-  };
-
   // Use RPC function to insert into news.prompt
-  const { data, error } = await supabase.rpc('insert_prompt', {
+  const { data, error } = await (supabase.rpc as any)('insert_prompt', {
     p_account_id: accountId,
     p_user_input: userInput,
     p_api_response: apiResponse as Record<string, unknown>,
-    });
+  });
 
   if (error) {
     console.error('[savePromptWithService] Error:', error);
@@ -134,7 +116,7 @@ export async function savePromptWithService(
   }
 
   // RPC returns array, get first result
-  return (data && data.length > 0) ? data[0] : null;
+  return (data && Array.isArray(data) && data.length > 0) ? (data[0] as NewsPrompt) : null;
 }
 
 

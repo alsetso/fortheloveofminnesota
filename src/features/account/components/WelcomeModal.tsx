@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type FormEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { XMarkIcon, CheckIcon, ExclamationCircleIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
@@ -70,7 +70,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   }, [authLoading, user, isOpen, onClose, authState]);
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEmailChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setEmail(value);
     setEmailError('');
@@ -85,7 +85,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   };
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: FormEvent) => {
     e.preventDefault();
     
     if (!email) {
@@ -146,7 +146,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   };
 
-  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleCodeKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
     // Handle backspace
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
       codeInputRefs.current[index - 1]?.focus();
@@ -163,7 +163,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   };
 
-  const handleCodePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handleCodePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
     
@@ -187,7 +187,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   };
 
-  const handleVerifyOtp = async (e?: React.FormEvent) => {
+  const handleVerifyOtp = async (e?: FormEvent) => {
     if (e) {
       e.preventDefault();
     }

@@ -8,7 +8,7 @@ import type { OrgWithRoles } from '@/features/civic/services/civicService';
 
 interface BranchCardProps {
   branch: OrgWithRoles;
-  icon: React.ReactNode;
+  icon: ReactNode;
   description: string;
   keyInfo: string[];
   href: string;

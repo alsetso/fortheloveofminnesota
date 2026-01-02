@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import React from 'react';
+import { useState, useEffect, type ComponentType, type ReactNode, type ReactElement, type MouseEvent, isValidElement, cloneElement } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -46,8 +45,8 @@ interface SidebarProps {
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }> | React.ReactElement;
-  secondaryContent?: React.ReactNode;
+  icon: ComponentType<{ className?: string }> | ReactElement;
+  secondaryContent?: ReactNode;
 }
 
 // Heart Icon Component
@@ -135,7 +134,7 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
     return pathname.startsWith(href);
   };
 
-  const handleNavItemClick = (href: string, e?: React.MouseEvent) => {
+  const handleNavItemClick = (href: string, e?: MouseEvent) => {
     // If it's a route-based link, navigate normally
     if (href.startsWith('/') && !href.startsWith('/#')) {
       // Check if it has secondary content - if so, open sidebar instead of navigating
@@ -231,8 +230,8 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
         <nav className="flex-1 flex flex-col py-2" aria-label="Main navigation">
           {mainNavItems.map((item) => {
             const active = isActive(item.href);
-            const isReactNode = React.isValidElement(item.icon);
-            const IconComponent = isReactNode ? null : item.icon as React.ComponentType<{ className?: string }>;
+            const isReactNode = isValidElement(item.icon);
+            const IconComponent = isReactNode ? null : item.icon as ComponentType<{ className?: string }>;
             
             return (
               <Link
@@ -248,7 +247,7 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
                 aria-label={item.label}
               >
                 {isReactNode ? (
-                  item.icon as React.ReactElement
+                  item.icon as ReactElement
                 ) : IconComponent ? (
                   <IconComponent className="w-5 h-5" />
                 ) : null}
@@ -371,8 +370,8 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
               }
             }}
           >
-            {React.isValidElement(content)
-              ? React.cloneElement(content as React.ReactElement<any>, { 
+            {isValidElement(content)
+              ? cloneElement(content as ReactElement<any>, { 
                   map, 
                   mapLoaded: !!map,
                   onLocationSelect: clickedNavItem === '/location' ? onLocationSelect : undefined,

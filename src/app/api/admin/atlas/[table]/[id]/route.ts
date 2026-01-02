@@ -25,7 +25,7 @@ export async function DELETE(
   { params }: { params: Promise<{ table: string; id: string }> }
 ) {
   try {
-    const auth = await requireAdmin();
+    await requireAdmin();
     const { table, id } = await params;
 
     if (!table || !id) {

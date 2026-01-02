@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, type KeyboardEvent } from 'react';
 import { MagnifyingGlassIcon, PencilIcon, CheckIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
 import type { ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
@@ -151,7 +151,7 @@ export default function ProfilePinsList({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, pinId: string) => {
+  const handleKeyDown = (e: KeyboardEvent, pinId: string) => {
     if (e.key === 'Escape') {
       cancelEditing();
     } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {

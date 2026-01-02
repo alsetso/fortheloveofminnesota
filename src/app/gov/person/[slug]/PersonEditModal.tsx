@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { useAuthStateSafe } from '@/features/auth';
@@ -35,7 +35,7 @@ export default function PersonEditModal({ isOpen, person, onClose, onSave, isAdm
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!account?.id) {
       setError('You must be signed in to edit');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 
 interface EditableCellProps {
   id: string;
@@ -11,7 +11,7 @@ interface EditableCellProps {
   tempValue: string;
   onFocus: (id: string, field: string, currentValue: string | null) => void;
   onBlur: (id: string, field: string) => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>, id: string, field: string) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLInputElement>, id: string, field: string) => void;
   onTempValueChange: (value: string) => void;
   className?: string;
   placeholder?: string;

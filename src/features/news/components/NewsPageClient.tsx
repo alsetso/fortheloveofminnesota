@@ -5,7 +5,7 @@ import { ClockIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import Link from 'next/link';
 import Image from 'next/image';
-import { format, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import type { NewsArticle } from '@/types/news';
 import { getSourceInitials, getSourceColor, formatDate, formatFullDateTime } from '@/features/news/utils/newsHelpers';
 
@@ -31,7 +31,7 @@ interface LatestNewsResponse {
 }
 
 export default function NewsPageClient() {
-  const { account, user } = useAuthStateSafe();
+  const { account } = useAuthStateSafe();
   const isAdmin = account?.role === 'admin';
 
   const [articles, setArticles] = useState<NewsArticle[]>([]);

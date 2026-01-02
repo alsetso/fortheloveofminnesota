@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -603,7 +603,7 @@ export default function LocationSidebar({
   }, []);
 
   // Debounced search
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
 
@@ -896,7 +896,7 @@ export default function LocationSidebar({
     resetPinForm();
   }, [clearSelection, removeTemporaryPin, resetPinForm]);
 
-  const handlePinFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePinFileSelect = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     // Require signed-in user to upload media
     // Check ref to get current auth state (avoids stale closure issues)
     if (authLoadingRef.current || !userRef.current) {

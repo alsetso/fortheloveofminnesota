@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode, type MouseEvent } from 'react';
 import Link from 'next/link';
 import { ChevronDownIcon, ChevronRightIcon, BuildingOfficeIcon, UserIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
 import type { OrgWithRoles } from '../services/civicService';
@@ -11,7 +11,7 @@ interface OrgNode {
   title: string;
   subtitle?: string;
   href?: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   children?: OrgNode[];
   party?: string;
   orgType?: string;
@@ -26,14 +26,14 @@ function OrgCard({ node, level = 0 }: { node: OrgNode; level?: number }) {
                      node.party === 'Republican' ? 'text-red-600' : 
                      node.party ? 'text-gray-600' : '';
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = (e: MouseEvent) => {
     e.stopPropagation();
     if (hasChildren || hasRoles) {
       setIsExpanded(!isExpanded);
     }
   };
 
-  const handleLinkClick = (e: React.MouseEvent) => {
+  const handleLinkClick = (e: MouseEvent) => {
     e.stopPropagation();
   };
 
@@ -191,7 +191,7 @@ function OrgCard({ node, level = 0 }: { node: OrgNode; level?: number }) {
   );
 }
 
-function convertOrgToNode(org: OrgWithRoles, icon?: React.ReactNode): OrgNode {
+function convertOrgToNode(org: OrgWithRoles, icon?: ReactNode): OrgNode {
   const roles = org.roles || [];
   const currentRoles = roles.filter(r => r.is_current);
   
@@ -218,7 +218,7 @@ function convertOrgToNode(org: OrgWithRoles, icon?: React.ReactNode): OrgNode {
 
 interface OrgChartProps {
   org: OrgWithRoles | null;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
 }
 
 export default function OrgChart({ org, icon }: OrgChartProps) {

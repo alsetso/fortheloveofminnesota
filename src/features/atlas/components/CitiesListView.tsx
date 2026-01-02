@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { StarIcon } from '@heroicons/react/24/solid';
-import React from 'react';
 import { usePageView } from '@/hooks/usePageView';
 import { formatNumber } from '@/lib/utils/formatting';
 import { highlightMatch } from '@/lib/utils/textHighlight';

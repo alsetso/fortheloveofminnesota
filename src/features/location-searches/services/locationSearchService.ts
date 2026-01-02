@@ -38,5 +38,3 @@ export async function saveLocationSearch(data: LocationSearchData): Promise<void
     console.debug('Location search save error:', error);
   }
 }
-
-

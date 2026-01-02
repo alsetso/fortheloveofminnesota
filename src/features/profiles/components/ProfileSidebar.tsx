@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, type ChangeEvent } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
@@ -215,7 +215,7 @@ export default function ProfileSidebar({
   };
 
   // Handle profile photo upload
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 

@@ -93,11 +93,7 @@ export default function AtlasTypesAdminClient() {
       </div>
 
       {/* Card Grid */}
-      {loading ? (
-        <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-          <p className="text-xs text-gray-600">Loading...</p>
-        </div>
-      ) : types.length === 0 ? (
+      {types.length === 0 ? (
         <div className="bg-white rounded-md border border-gray-200 p-[10px]">
           <p className="text-xs text-gray-600">No atlas types found. Create one to get started.</p>
         </div>

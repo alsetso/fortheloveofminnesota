@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlusIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
@@ -81,7 +81,7 @@ export default function ProfilesClient() {
     fetchAccounts();
   }, [offset]);
 
-  const handleCreateAccount = async (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: FormEvent) => {
     e.preventDefault();
     setCreating(true);
     setCreateError(null);

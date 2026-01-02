@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
@@ -14,15 +14,15 @@ export type MobileNavItemId = 'controls';
 export interface MobileNavItemConfig {
   id: MobileNavItemId;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconSolid: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
+  iconSolid: ComponentType<{ className?: string }>;
   requiresAdmin?: boolean;
   getContent: (props: { 
     map?: MapboxMapInstance | null; 
     account?: Account | null;
     pointsOfInterestVisible?: boolean;
     onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
-  }) => React.ReactNode;
+  }) => ReactNode;
 }
 
 export const mobileNavConfig: MobileNavItemConfig[] = [

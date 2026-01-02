@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type FormEvent, type ChangeEvent } from 'react';
 import { PhotoIcon, MapPinIcon, XMarkIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { Account } from '@/features/auth';
@@ -77,7 +77,7 @@ export default function PostPublisherModal({
     }
   }, [isOpen, initialMedia, initialFiles, initialMapData]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
     // Simple posts - just use content as-is
@@ -240,7 +240,7 @@ export default function PostPublisherModal({
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) {
       // Reset input value to allow re-selecting the same file

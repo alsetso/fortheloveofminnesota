@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { usePathname } from 'next/navigation';
 import { MagnifyingGlassIcon, ClockIcon, XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import { saveLocationSearch } from '@/features/location-searches/services/locationSearchService';
@@ -277,7 +277,7 @@ export default function AppSearch({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (selectedSuggestionIndex >= 0) {
       if (activeTab === 'address' && locationSuggestions.length > 0) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback, useReducer } from 'react';
+import { useRef, useEffect, useState, useCallback, useReducer, type ChangeEvent } from 'react';
 import { loadMapboxGL, loadMapboxDraw } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
@@ -371,7 +371,7 @@ export default function PostMapModal({
   }, []);
 
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
 

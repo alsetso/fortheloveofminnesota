@@ -25,7 +25,7 @@ export async function POST(
   { params }: { params: Promise<{ table: string }> }
 ) {
   try {
-    const auth = await requireAdmin();
+    await requireAdmin();
     const { table } = await params;
 
     if (!table || !(table in TABLE_MAP)) {

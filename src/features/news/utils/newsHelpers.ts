@@ -3,6 +3,8 @@
  * Consolidates duplicate helper functions across the codebase
  */
 
+import { format } from 'date-fns';
+
 /**
  * Get source initials from source name (first 3 letters, uppercase)
  */
@@ -70,8 +72,6 @@ export function formatDate(dateString: string): string {
     return dateString;
   }
 }
-
-import { format } from 'date-fns';
 
 /**
  * Format full date and time with CST timezone

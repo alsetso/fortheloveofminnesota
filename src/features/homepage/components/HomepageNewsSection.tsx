@@ -149,7 +149,7 @@ export default function HomepageNewsSection() {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className="space-y-2">
             {articles.slice(0, displayedCount).map((article) => {
               const sourceInitials = getSourceInitials(article.source.name);
               const sourceColor = getSourceColor(article.source.name);
@@ -158,17 +158,17 @@ export default function HomepageNewsSection() {
                 <Link
                   key={article.id}
                   href={`/news/${article.id}`}
-                  className="bg-white border border-gray-200 rounded-md overflow-hidden hover:bg-gray-50 transition-colors"
+                  className="bg-white border border-gray-200 rounded-md overflow-hidden hover:bg-gray-50 hover:border-gray-300 transition-all flex gap-2"
                 >
-                  {/* Photo Image */}
+                  {/* Thumbnail */}
                   {article.photoUrl ? (
-                    <div className="relative w-full aspect-video overflow-hidden bg-gray-100">
+                    <div className="relative w-20 h-20 flex-shrink-0 overflow-hidden bg-gray-100">
                       <Image
                         src={article.photoUrl}
                         alt={article.title}
                         fill
                         className="object-cover"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        sizes="80px"
                         unoptimized
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -177,7 +177,7 @@ export default function HomepageNewsSection() {
                       />
                     </div>
                   ) : (
-                    <div className={`w-full aspect-video ${sourceColor.bg} flex items-center justify-center border-b border-gray-200`}>
+                    <div className={`w-20 h-20 flex-shrink-0 ${sourceColor.bg} flex items-center justify-center border-r border-gray-200`}>
                       <span className={`text-xs font-semibold ${sourceColor.text} leading-none`}>
                         {sourceInitials}
                       </span>
@@ -185,7 +185,7 @@ export default function HomepageNewsSection() {
                   )}
                     
                   {/* Content */}
-                  <div className="p-[10px] space-y-1.5">
+                  <div className="p-[10px] flex-1 min-w-0 space-y-1">
                     <h3 className="text-xs font-semibold text-gray-900 line-clamp-2 leading-snug">
                       {article.title}
                     </h3>

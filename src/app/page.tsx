@@ -19,7 +19,6 @@ import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesServic
 import HomepageViewTracker from '@/components/analytics/HomepageViewTracker';
 import HomepageMaps from '@/features/homepage/components/HomepageMaps';
 import HomepageProfileColumn from '@/features/homepage/components/HomepageProfileColumn';
-import HomepageNewsCalendarColumn from '@/features/homepage/components/HomepageNewsCalendarColumn';
 import HomepageNewsSection from '@/features/homepage/components/HomepageNewsSection';
 
 export const metadata: Metadata = {
@@ -262,16 +261,13 @@ export default async function Home() {
                 </Link>
               </div>
             </section>
-
-            {/* News Section */}
-            <HomepageNewsSection />
           </div>
         </div>
 
-        {/* Third Column: News & Calendar */}
+        {/* Third Column: News */}
         <div className="lg:col-span-3">
           <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
-            <HomepageNewsCalendarColumn />
+            <HomepageNewsSection />
           </div>
         </div>
       </div>

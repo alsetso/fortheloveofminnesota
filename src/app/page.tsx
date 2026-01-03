@@ -19,7 +19,6 @@ import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesServic
 import HomepageViewTracker from '@/components/analytics/HomepageViewTracker';
 import HomepageMaps from '@/features/homepage/components/HomepageMaps';
 import HomepageProfileColumn from '@/features/homepage/components/HomepageProfileColumn';
-import HomepageNewsCalendarColumn from '@/features/homepage/components/HomepageNewsCalendarColumn';
 import HomepageNewsSection from '@/features/homepage/components/HomepageNewsSection';
 
 export const metadata: Metadata = {
@@ -82,7 +81,7 @@ export default async function Home() {
   return (
     <SimplePageLayout containerMaxWidth="full" backgroundColor="bg-[#f4f2ef]" contentPadding="py-3">
       <HomepageViewTracker />
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 px-[10px]">
+      <div className="grid grid-cols-1 lg:grid-cols-9 gap-3 px-[10px]">
         {/* First Column: Profile Card */}
         <div className="lg:col-span-3">
           <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:max-w-[25rem]">
@@ -259,13 +258,6 @@ export default async function Home() {
 
             {/* News Section */}
             <HomepageNewsSection />
-          </div>
-        </div>
-
-        {/* Third Column: News & Calendar */}
-        <div className="lg:col-span-3">
-          <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
-            <HomepageNewsCalendarColumn />
           </div>
         </div>
       </div>

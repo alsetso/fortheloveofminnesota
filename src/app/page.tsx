@@ -19,6 +19,7 @@ import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesServic
 import HomepageViewTracker from '@/components/analytics/HomepageViewTracker';
 import HomepageMaps from '@/features/homepage/components/HomepageMaps';
 import HomepageProfileColumn from '@/features/homepage/components/HomepageProfileColumn';
+import HomepageNewsCalendarColumn from '@/features/homepage/components/HomepageNewsCalendarColumn';
 import HomepageNewsSection from '@/features/homepage/components/HomepageNewsSection';
 
 export const metadata: Metadata = {
@@ -81,7 +82,7 @@ export default async function Home() {
   return (
     <SimplePageLayout containerMaxWidth="full" backgroundColor="bg-[#f4f2ef]" contentPadding="py-3">
       <HomepageViewTracker />
-      <div className="grid grid-cols-1 lg:grid-cols-9 gap-3 px-[10px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 px-[10px]">
         {/* First Column: Profile Card */}
         <div className="lg:col-span-3">
           <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto lg:max-w-[25rem]">
@@ -92,8 +93,8 @@ export default async function Home() {
         {/* Middle Column: Main Content */}
         <div className="lg:col-span-6">
           <div className="space-y-6">
-            {/* V4: Community-Focused Hero with Large Desktop Heading */}
-            <section className="space-y-3 text-center py-8">
+            {/* Hero Section */}
+            <section className="space-y-4 text-center py-8 border-b border-gray-200">
               <div className="flex justify-center">
                 <Image
                   src="/mid_text For the love of mn.png"
@@ -105,31 +106,31 @@ export default async function Home() {
                   unoptimized
                 />
               </div>
-              <p className="text-xs text-gray-600 leading-relaxed max-w-2xl mx-auto">
+              <p className="text-xs text-gray-600 leading-relaxed max-w-2xl mx-auto px-4">
                 Create and explore interactive maps of Minnesota. Drop pins to mark places, build custom maps for your community or business, and discover locations across the state through our comprehensive atlas layers.
               </p>
-              <div className="flex flex-wrap justify-center gap-2 pt-3">
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
                 <Link
                   href="/maps"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-gray-900 rounded-md hover:bg-gray-800 transition-all shadow-sm hover:shadow"
                 >
-                  <MapIcon className="w-3 h-3" />
+                  <MapIcon className="w-3.5 h-3.5" />
                   <span>View Maps</span>
-                  <ArrowRightIcon className="w-3 h-3" />
+                  <ArrowRightIcon className="w-3.5 h-3.5" />
                 </Link>
                 <Link
                   href="/maps/new"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-900 bg-white rounded hover:bg-gray-50 transition-colors border border-gray-200"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-900 bg-white rounded-md hover:bg-gray-50 transition-all border border-gray-300 shadow-sm hover:shadow"
                 >
-                  <MapPinIcon className="w-3 h-3" />
+                  <MapPinIcon className="w-3.5 h-3.5" />
                   <span>Create Map</span>
                 </Link>
                 <Link
-                  href="/maps"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white rounded hover:bg-gray-50 transition-colors border border-gray-200"
+                  href="/maps?tab=atlas"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-700 bg-white rounded-md hover:bg-gray-50 transition-all border border-gray-200"
                 >
-                  <GlobeAltIcon className="w-3 h-3" />
-                  <span>Browse Maps</span>
+                  <GlobeAltIcon className="w-3.5 h-3.5" />
+                  <span>Explore Atlas</span>
                 </Link>
               </div>
             </section>
@@ -138,8 +139,11 @@ export default async function Home() {
             <HomepageMaps />
 
             {/* Atlas Tables Grid */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-900">EXPLORE</h2>
+            <section className="space-y-3 pt-6 border-t border-gray-200">
+              <div className="flex items-center gap-2">
+                <GlobeAltIcon className="w-4 h-4 text-gray-700" />
+                <h2 className="text-sm font-semibold text-gray-900">EXPLORE</h2>
+              </div>
               <p className="text-xs text-gray-600">
                 Complete directory of all Minnesota atlas layers. Explore comprehensive geographic and demographic datasets covering cities, neighborhoods, schools, parks, lakes, hospitals, churches, and more.
               </p>
@@ -195,7 +199,7 @@ export default async function Home() {
                     <Link
                       key={type.slug}
                       href={`/map/atlas/${type.slug}`}
-                      className="bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors"
+                      className="bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 hover:border-gray-300 transition-all group"
                     >
                       {content}
                     </Link>
@@ -205,20 +209,23 @@ export default async function Home() {
             </section>
 
             {/* Government Section */}
-            <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-gray-900">GOVERNMENT</h2>
+            <section className="space-y-3 pt-6 border-t border-gray-200">
+              <div className="flex items-center gap-2">
+                <BuildingLibraryIcon className="w-4 h-4 text-gray-700" />
+                <h2 className="text-sm font-semibold text-gray-900">GOVERNMENT</h2>
+              </div>
               <p className="text-xs text-gray-600">
                 Understand how Minnesota government works, who holds power, and where citizens can engage effectively.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 <Link
                   href="/gov"
-                  className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors space-y-2"
+                  className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 hover:border-gray-300 transition-all space-y-2 group"
                 >
                   <div className="flex items-start gap-2">
-                    <UserGroupIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                    <UserGroupIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5 group-hover:text-gray-900 transition-colors" />
                     <div className="space-y-0.5 flex-1">
-                      <p className="text-xs font-medium text-gray-900">Power of Citizens</p>
+                      <p className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">Power of Citizens</p>
                       <p className="text-xs text-gray-600">
                         Minnesota citizens hold ultimate power through voting, public participation, and direct engagement with government.
                       </p>
@@ -227,12 +234,12 @@ export default async function Home() {
                 </Link>
                 <Link
                   href="/gov"
-                  className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors space-y-2"
+                  className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 hover:border-gray-300 transition-all space-y-2 group"
                 >
                   <div className="flex items-start gap-2">
-                    <ScaleIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                    <ScaleIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5 group-hover:text-gray-900 transition-colors" />
                     <div className="space-y-0.5 flex-1">
-                      <p className="text-xs font-medium text-gray-900">Gov Officials in Three Branches</p>
+                      <p className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">Gov Officials in Three Branches</p>
                       <p className="text-xs text-gray-600">
                         Explore Minnesota's legislative, executive, and judicial branches. Understand who makes decisions and where authority lives.
                       </p>
@@ -241,12 +248,12 @@ export default async function Home() {
                 </Link>
                 <Link
                   href="/gov/checkbook"
-                  className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors space-y-2"
+                  className="bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 hover:border-gray-300 transition-all space-y-2 group"
                 >
                   <div className="flex items-start gap-2">
-                    <CurrencyDollarIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5" />
+                    <CurrencyDollarIcon className="w-4 h-4 text-gray-700 flex-shrink-0 mt-0.5 group-hover:text-gray-900 transition-colors" />
                     <div className="space-y-0.5 flex-1">
-                      <p className="text-xs font-medium text-gray-900">Checkbook</p>
+                      <p className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">Checkbook</p>
                       <p className="text-xs text-gray-600">
                         Access government financial data including contracts, payments, budgets, and state payroll for transparency and accountability.
                       </p>
@@ -258,6 +265,13 @@ export default async function Home() {
 
             {/* News Section */}
             <HomepageNewsSection />
+          </div>
+        </div>
+
+        {/* Third Column: News & Calendar */}
+        <div className="lg:col-span-3">
+          <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto">
+            <HomepageNewsCalendarColumn />
           </div>
         </div>
       </div>

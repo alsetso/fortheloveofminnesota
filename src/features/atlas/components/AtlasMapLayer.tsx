@@ -260,29 +260,29 @@ export default function AtlasMapLayer({
 
       // Add point layer - use icon if available, otherwise use circle
       if (hasImage) {
-        mapboxMap.addLayer({
-          id: pointLayerId,
-          type: 'symbol',
-          source: sourceId,
-          layout: {
-            'icon-image': imageId,
-            'icon-size': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              0, 0.15,
-              5, 0.25,
-              10, 0.4,
-              12, 0.5,
-              14, 0.65,
-              16, 0.8,
-              18, 1.0,
-              20, 1.2,
-            ],
-            'icon-anchor': 'center',
-            'icon-allow-overlap': true,
-          },
-        });
+      mapboxMap.addLayer({
+        id: pointLayerId,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          'icon-image': imageId,
+          'icon-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 0.15,
+            5, 0.25,
+            10, 0.4,
+            12, 0.5,
+            14, 0.65,
+            16, 0.8,
+            18, 1.0,
+            20, 1.2,
+          ],
+          'icon-anchor': 'center',
+          'icon-allow-overlap': true,
+        },
+      });
       } else {
         // Fallback to circle if icon not available
         mapboxMap.addLayer({

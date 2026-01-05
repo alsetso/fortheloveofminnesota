@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface MobileSecondarySheetProps {
   isOpen: boolean;
@@ -98,4 +97,3 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
     </>
   );
 }
-

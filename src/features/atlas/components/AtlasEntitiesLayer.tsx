@@ -8,6 +8,7 @@ import {
   buildAtlasIconLayout,
   buildAtlasCirclePaint,
   buildAtlasLabelLayout,
+  buildAtlasLabelPaint,
 } from '@/features/map/config/layerStyles';
 
 interface AtlasEntity {
@@ -111,21 +112,49 @@ export default function AtlasEntitiesLayer({
         }
 
         // Try atlas_entities first (has lat/lng/table_name), fallback to all_entities if needed
+        // Supabase has a default 1000 row limit, so we need to paginate to get all entities
+        let allEntities: AtlasEntity[] = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
         const { data, error } = await supabase
           .from('atlas_entities')
           .select('id, name, city_id, emoji, lat, lng, table_name')
           .in('table_name', visibleTables)
           .not('lat', 'is', null)
-          .not('lng', 'is', null);
+            .not('lng', 'is', null)
+            .range(page * pageSize, (page + 1) * pageSize - 1);
 
         if (error) {
           console.error('[AtlasEntitiesLayer] Error fetching entities:', error);
-          return;
+            break;
+          }
+
+          if (!data || data.length === 0) {
+            hasMore = false;
+          } else {
+            allEntities = [...allEntities, ...(data as AtlasEntity[])];
+            // If we got fewer than pageSize, we've reached the end
+            hasMore = data.length === pageSize;
+            page++;
+          }
         }
 
         if (!mounted) return;
 
-        entitiesRef.current = (data || []) as AtlasEntity[];
+        entitiesRef.current = allEntities;
+        
+        // Debug logging for lakes
+        if (process.env.NODE_ENV === 'development') {
+          const lakesEntities = entitiesRef.current.filter(e => e.table_name === 'lakes');
+          console.log('[AtlasEntitiesLayer] Total entities loaded:', entitiesRef.current.length);
+          console.log('[AtlasEntitiesLayer] Lakes entities:', lakesEntities.length);
+          if (visibleTables.includes('lakes') && lakesEntities.length === 0) {
+            console.warn('[AtlasEntitiesLayer] Lakes is in visibleTables but no lakes entities found');
+          }
+        }
 
         // Convert to GeoJSON
         const geoJSON = {
@@ -276,7 +305,8 @@ export default function AtlasEntitiesLayer({
         // Build text-color expression based on table_name
         const textColorExpression = buildAtlasTextColorExpression(uniqueTables);
 
-        // Add label layer
+        // Add label layer with zoom-based visibility
+        const labelPaint = buildAtlasLabelPaint();
         mapboxMap.addLayer({
           id: pointLabelLayerId,
           type: 'symbol',
@@ -284,6 +314,10 @@ export default function AtlasEntitiesLayer({
           layout: buildAtlasLabelLayout(),
           paint: {
             'text-color': textColorExpression,
+            'text-opacity': labelPaint['text-opacity'],
+            'text-halo-color': labelPaint['text-halo-color'],
+            'text-halo-width': labelPaint['text-halo-width'],
+            'text-halo-blur': labelPaint['text-halo-blur'],
           },
         });
 

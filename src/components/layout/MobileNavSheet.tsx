@@ -3,24 +3,31 @@
 import { useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
-interface MobileSecondarySheetProps {
+interface MobileNavSheetProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
 }
 
-export default function MobileSecondarySheet({ isOpen, onClose, title, children }: MobileSecondarySheetProps) {
+/**
+ * iOS-style slide-up sheet that appears behind the mobile nav (z-[50])
+ * but in front of the map top container (z-[45]). Uses smooth spring-like animations.
+ */
+export default function MobileNavSheet({ isOpen, onClose, title, children }: MobileNavSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       // Prevent body scroll when sheet is open
       document.body.style.overflow = 'hidden';
-      // Set to visible immediately (no animation)
-      if (sheetRef.current) {
-        sheetRef.current.style.transform = 'translateY(0)';
-      }
+      
+      // Trigger animation on next frame
+      requestAnimationFrame(() => {
+        if (sheetRef.current) {
+          sheetRef.current.style.transform = 'translateY(0)';
+        }
+      });
     } else {
       // Restore body scroll
       document.body.style.overflow = '';
@@ -45,27 +52,27 @@ export default function MobileSecondarySheet({ isOpen, onClose, title, children 
 
   return (
     <>
-      {/* Sheet */}
+      {/* Sheet - behind nav, in front of map top container */}
       <div
         ref={sheetRef}
-        className="fixed bottom-0 left-0 lg:left-16 right-0 z-50 bg-white rounded-t-2xl transition-transform duration-300 ease-out flex flex-col"
+        className="fixed bottom-16 left-0 right-0 z-[46] bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out flex flex-col"
         style={{
-          transform: 'translateY(0)',
-          height: '80vh',
+          transform: 'translateY(100%)',
+          maxHeight: 'calc(100vh - 4rem - env(safe-area-inset-bottom))',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Handle bar - Top only */}
-        <div className="flex items-center justify-center pt-3 pb-2">
+        {/* Handle bar */}
+        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0">
           <div className="w-12 h-1 bg-gray-300 rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pb-3 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
           <button
             onClick={handleClose}
-            className="p-1.5 -mr-1.5 text-gray-500 hover:text-gray-900 transition-colors"
+            className="p-1 -mr-1 text-gray-500 hover:text-gray-900 transition-colors"
             aria-label="Close"
           >
             <XMarkIcon className="w-5 h-5" />

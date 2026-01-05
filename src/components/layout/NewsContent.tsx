@@ -1,0 +1,158 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { ClockIcon } from '@heroicons/react/24/outline';
+import { getSourceInitials, getSourceColor, formatDate } from '@/features/news/utils/newsHelpers';
+import type { NewsArticle } from '@/types/news';
+
+interface NewsResponse {
+  success: boolean;
+  data?: {
+    articles: NewsArticle[];
+    pagination: {
+      offset: number;
+      limit: number;
+      total: number;
+      hasMore: boolean;
+    };
+  };
+  error?: string;
+}
+
+export default function NewsContent() {
+  const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+
+  const fetchNews = async (currentOffset: number, append: boolean = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/news/all?offset=${currentOffset}&limit=10`);
+      const data: NewsResponse = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch news');
+      }
+
+      if (data.success && data.data) {
+        if (append) {
+          setArticles((prev) => [...prev, ...data.data!.articles]);
+        } else {
+          setArticles(data.data.articles);
+        }
+        setHasMore(data.data.pagination.hasMore);
+        setOffset(currentOffset + data.data.articles.length);
+      } else {
+        if (!append) {
+          setArticles([]);
+        }
+        setHasMore(false);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load news');
+      if (!append) {
+        setArticles([]);
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNews(0, false);
+  }, []);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchNews(offset, true);
+    }
+  };
+
+  return (
+    <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-120px)]">
+      {/* Loading State */}
+      {loading && (
+        <div className="px-2 py-1.5">
+          <p className="text-xs text-gray-600">Loading news...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {!loading && error && (
+        <div className="px-2 py-1.5">
+          <p className="text-xs text-gray-600">{error}</p>
+        </div>
+      )}
+
+      {/* No News */}
+      {!loading && !error && articles.length === 0 && (
+        <div className="px-2 py-1.5">
+          <p className="text-xs text-gray-600">No news available.</p>
+        </div>
+      )}
+
+      {/* Articles */}
+      {!loading && articles.length > 0 && (
+        <div className="space-y-0.5">
+          {articles.map((article) => {
+            const sourceColor = getSourceColor(article.source?.name);
+            const sourceInitials = getSourceInitials(article.source?.name);
+
+            return (
+              <Link
+                key={article.id}
+                href={`/news/${article.id}`}
+                className="flex items-start gap-2 px-2 py-1.5 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              >
+                {/* Source Circle */}
+                <div
+                  className={`w-5 h-5 rounded-full ${sourceColor.bg} ${sourceColor.text} flex items-center justify-center flex-shrink-0 text-[10px] font-medium mt-0.5`}
+                >
+                  {sourceInitials}
+                </div>
+
+                {/* Title and Date */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium break-words">{article.title}</div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
+                    <span className="truncate">{article.source?.name}</span>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <ClockIcon className="w-3 h-3" />
+                      <span>{formatDate(article.publishedAt)}</span>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {!loading && !error && hasMore && (
+        <div className="px-2 py-1.5">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingMore ? 'Loading...' : 'Load More'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+

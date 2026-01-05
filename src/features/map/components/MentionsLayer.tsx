@@ -319,6 +319,11 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
               essential: true, // Animation is essential for accessibility
             });
 
+            // Dispatch mention-click event for popup
+            window.dispatchEvent(new CustomEvent('mention-click', {
+              detail: { mention }
+            }));
+
             // Helper functions
             const escapeHtml = (text: string | null): string => {
               if (!text) return '';

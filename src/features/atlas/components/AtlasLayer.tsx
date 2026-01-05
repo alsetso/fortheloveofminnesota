@@ -44,6 +44,15 @@ export default function AtlasLayer({ map, mapLoaded, visible = true, onEntityCli
 
         if (types && types.length > 0) {
           const activeSlugs = types.map((type: { slug: string }) => type.slug);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[AtlasLayer] Active atlas types:', activeSlugs);
+            const lakesType = types.find((t: { slug: string }) => t.slug === 'lakes');
+            if (lakesType) {
+              console.log('[AtlasLayer] Lakes type found:', lakesType);
+            } else {
+              console.warn('[AtlasLayer] Lakes type NOT found in active types');
+            }
+          }
           setVisibleTables(activeSlugs);
         }
       } catch (error) {

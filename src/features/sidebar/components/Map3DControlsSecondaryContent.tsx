@@ -5,19 +5,10 @@ import {
   CubeIcon,
   EyeIcon,
   EyeSlashIcon,
-  ArrowUturnLeftIcon,
-  ArrowRightIcon,
-  TagIcon,
-  BeakerIcon,
-  Squares2X2Icon,
-  LockClosedIcon,
-  MapPinIcon,
 } from '@heroicons/react/24/outline';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import { MAP_CONFIG } from '@/features/map/config';
-import { useAuthStateSafe } from '@/features/auth';
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface Map3DControlsSecondaryContentProps {
   map?: MapboxMapInstance | null;
@@ -32,11 +23,6 @@ export default function Map3DControlsSecondaryContent({
   onPointsOfInterestVisibilityChange,
   pointsOfInterestVisible = false,
 }: Map3DControlsSecondaryContentProps = {}) {
-  const { account } = useAuthStateSafe();
-  const { openUpgrade } = useAppModalContextSafe();
-  
-  // Check if user has pro plan
-  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
   
   // Building controls
   const [buildingsEnabled, setBuildingsEnabled] = useState(false);
@@ -48,13 +34,6 @@ export default function Map3DControlsSecondaryContent({
 
   // 3D view controls
   const [pitch, setPitch] = useState(0);
-  const [bearing, setBearing] = useState(0);
-
-  // Layer visibility
-  const [roadsVisible, setRoadsVisible] = useState(true);
-  const [labelsVisible, setLabelsVisible] = useState(true);
-  const [waterVisible, setWaterVisible] = useState(true);
-  const [landcoverVisible, setLandcoverVisible] = useState(true);
 
 
   // Initialize state from map
@@ -64,11 +43,9 @@ export default function Map3DControlsSecondaryContent({
     const mapboxMap = map as any;
     const updateState = () => {
       try {
-        // Get current pitch and bearing
+        // Get current pitch
         const currentPitch = mapboxMap.getPitch?.() || 0;
-        const currentBearing = mapboxMap.getBearing?.() || 0;
         setPitch(currentPitch);
-        setBearing(currentBearing);
 
         // Check buildings
         const layer = mapboxMap.getLayer('3d-buildings');
@@ -113,20 +90,15 @@ export default function Map3DControlsSecondaryContent({
       mapboxMap.once('load', updateState);
     }
 
-    // Listen for pitch/bearing changes
-    const handleMove = () => {
+    // Listen for pitch changes
+    const handlePitch = () => {
       if (mapboxMap.getPitch) setPitch(mapboxMap.getPitch());
-      if (mapboxMap.getBearing) setBearing(mapboxMap.getBearing());
     };
 
-    mapboxMap.on('move', handleMove);
-    mapboxMap.on('pitch', handleMove);
-    mapboxMap.on('rotate', handleMove);
+    mapboxMap.on('pitch', handlePitch);
 
     return () => {
-      mapboxMap.off('move', handleMove);
-      mapboxMap.off('pitch', handleMove);
-      mapboxMap.off('rotate', handleMove);
+      mapboxMap.off('pitch', handlePitch);
     };
   }, [map]);
 
@@ -204,73 +176,12 @@ export default function Map3DControlsSecondaryContent({
     mapboxMap.setStyle(MAP_CONFIG.STRATEGIC_STYLES[style]);
   };
 
-  // 3D view controls
-  const updatePitch = (newPitch: number) => {
+  // 3D view controls - fixed pitch options
+  const setPitchValue = (newPitch: number) => {
     if (!map) return;
     setPitch(newPitch);
     const mapboxMap = map as any;
-    mapboxMap.easeTo({ pitch: newPitch, duration: 200 });
-  };
-
-  const updateBearing = (newBearing: number) => {
-    if (!map) return;
-    setBearing(newBearing);
-    const mapboxMap = map as any;
-    mapboxMap.easeTo({ bearing: newBearing, duration: 200 });
-  };
-
-  const resetView = () => {
-    if (!map) return;
-    const mapboxMap = map as any;
-    mapboxMap.easeTo({ 
-      pitch: 0, 
-      bearing: 0, 
-      duration: 500 
-    });
-    setPitch(0);
-    setBearing(0);
-  };
-
-  // Layer visibility controls
-  const toggleLayerVisibility = (layerType: 'road' | 'label' | 'water' | 'landcover', visible: boolean) => {
-    if (!map) return;
-    const mapboxMap = map as any;
-    
-    try {
-      const style = mapboxMap.getStyle();
-      if (!style?.layers) return;
-
-      const patterns: Record<string, string[]> = {
-        road: ['road', 'bridge', 'tunnel', 'highway', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'street', 'link', 'path'],
-        label: ['label', 'text', 'place-label', 'poi-label'],
-        water: ['water', 'waterway'],
-        landcover: ['landcover', 'landuse', 'park', 'forest'],
-      };
-
-      style.layers.forEach((layer: any) => {
-        const layerId = layer.id.toLowerCase();
-        const sourceLayer = layer['source-layer']?.toLowerCase() || '';
-        const matches = patterns[layerType].some(pattern => 
-          layerId.includes(pattern) || sourceLayer.includes(pattern)
-        );
-
-        if (matches) {
-          try {
-            mapboxMap.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
-          } catch (e) {
-            // Layer might not support visibility
-          }
-        }
-      });
-
-      // Update state
-      if (layerType === 'road') setRoadsVisible(visible);
-      else if (layerType === 'label') setLabelsVisible(visible);
-      else if (layerType === 'water') setWaterVisible(visible);
-      else if (layerType === 'landcover') setLandcoverVisible(visible);
-    } catch (e) {
-      console.warn('[Map3DControls] Error toggling layer:', e);
-    }
+    mapboxMap.easeTo({ pitch: newPitch, duration: 300 });
   };
 
 
@@ -280,49 +191,40 @@ export default function Map3DControlsSecondaryContent({
       {/* 3D View Controls */}
       <div>
         <div className="text-xs text-gray-600 font-medium mb-2">3D View</div>
-        <div className="space-y-2">
-          {/* Pitch Control */}
-          <div className="px-2 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">Pitch</span>
-              <span className="text-xs text-gray-500 font-mono">{Math.round(pitch)}°</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="60"
-              step="1"
-              value={pitch}
-              onChange={(e) => updatePitch(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
-            />
+        <div className="space-y-1">
+          {/* Fixed Pitch Options */}
+          <div className="flex gap-1">
+            <button
+              onClick={() => setPitchValue(0)}
+              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                pitch === 0
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              0°
+            </button>
+            <button
+              onClick={() => setPitchValue(30)}
+              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                Math.round(pitch) === 30
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              30°
+            </button>
+            <button
+              onClick={() => setPitchValue(60)}
+              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
+                Math.round(pitch) === 60
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              60°
+            </button>
           </div>
-
-          {/* Bearing Control */}
-          <div className="px-2 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">Rotation</span>
-              <span className="text-xs text-gray-500 font-mono">{Math.round(bearing)}°</span>
-            </div>
-            <input
-              type="range"
-              min="-180"
-              max="180"
-              step="1"
-              value={bearing}
-              onChange={(e) => updateBearing(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
-            />
-          </div>
-
-          {/* Reset View */}
-          <button
-            onClick={resetView}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
-            <ArrowUturnLeftIcon className="w-4 h-4" />
-            <span>Reset View</span>
-          </button>
         </div>
       </div>
 
@@ -398,158 +300,6 @@ export default function Map3DControlsSecondaryContent({
         </div>
       </div>
 
-      {/* Layer Visibility */}
-      <div className="relative">
-        {!isPro && (
-          <div 
-            className="absolute inset-0 z-10 bg-white/80 backdrop-blur-sm rounded flex flex-col items-center justify-center gap-2 p-4"
-            onClick={() => openUpgrade('map-layers')}
-          >
-            <LockClosedIcon className="w-5 h-5 text-gray-400" />
-            <p className="text-xs font-medium text-gray-700">Layers</p>
-            <p className="text-[10px] text-gray-500 text-center">Unlock layer controls (Roads, Labels, Water, Landcover) with Pro</p>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openUpgrade('map-layers');
-              }}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded transition-colors"
-            >
-              Upgrade to Pro
-            </button>
-          </div>
-        )}
-        <div className="text-xs text-gray-600 font-medium mb-2">Layers</div>
-        <div className="space-y-1">
-          {/* Roads */}
-          <button
-            onClick={() => isPro && toggleLayerVisibility('road', !roadsVisible)}
-            disabled={!isPro}
-            className={`
-              w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
-              ${roadsVisible
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }
-              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <ArrowRightIcon className="w-4 h-4" />
-              <span>Roads</span>
-            </div>
-            {roadsVisible ? (
-              <EyeIcon className="w-4 h-4" />
-            ) : (
-              <EyeSlashIcon className="w-4 h-4" />
-            )}
-          </button>
-
-          {/* Labels */}
-          <button
-            onClick={() => isPro && toggleLayerVisibility('label', !labelsVisible)}
-            disabled={!isPro}
-            className={`
-              w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
-              ${labelsVisible
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }
-              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <TagIcon className="w-4 h-4" />
-              <span>Labels</span>
-            </div>
-            {labelsVisible ? (
-              <EyeIcon className="w-4 h-4" />
-            ) : (
-              <EyeSlashIcon className="w-4 h-4" />
-            )}
-          </button>
-
-          {/* Water */}
-          <button
-            onClick={() => isPro && toggleLayerVisibility('water', !waterVisible)}
-            disabled={!isPro}
-            className={`
-              w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
-              ${waterVisible
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }
-              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <BeakerIcon className="w-4 h-4" />
-              <span>Water</span>
-            </div>
-            {waterVisible ? (
-              <EyeIcon className="w-4 h-4" />
-            ) : (
-              <EyeSlashIcon className="w-4 h-4" />
-            )}
-          </button>
-
-          {/* Landcover */}
-          <button
-            onClick={() => isPro && toggleLayerVisibility('landcover', !landcoverVisible)}
-            disabled={!isPro}
-            className={`
-              w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
-              ${landcoverVisible
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }
-              ${!isPro ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <Squares2X2Icon className="w-4 h-4" />
-              <span>Landcover</span>
-            </div>
-            {landcoverVisible ? (
-              <EyeIcon className="w-4 h-4" />
-            ) : (
-              <EyeSlashIcon className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Points of Interest */}
-      <div>
-        <div className="text-xs text-gray-600 font-medium mb-2">Points of Interest</div>
-        <div className="space-y-1">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onPointsOfInterestVisibilityChange?.(!pointsOfInterestVisible);
-            }}
-            className={`
-              w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors
-              ${pointsOfInterestVisible
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <MapPinIcon className="w-4 h-4" />
-              <span>Show POIs</span>
-            </div>
-            {pointsOfInterestVisible ? (
-              <EyeIcon className="w-4 h-4" />
-            ) : (
-              <EyeSlashIcon className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

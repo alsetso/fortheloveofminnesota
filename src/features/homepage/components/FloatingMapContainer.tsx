@@ -227,6 +227,16 @@ export default function LocationSidebar({
   const [atlasEntityLoading, setAtlasEntityLoading] = useState(false);
   const [atlasEntityError, setAtlasEntityError] = useState<string | null>(null);
   
+  // Visible atlas entities in viewport (for "Near me" section)
+  const [visibleAtlasEntities, setVisibleAtlasEntities] = useState<Array<{
+    id: string;
+    name: string;
+    table_name: string;
+    lat: number;
+    lng: number;
+  }>>([]);
+  const [isLoadingVisibleAtlas, setIsLoadingVisibleAtlas] = useState(false);
+  
   // Inline pin creation form state
   const [isDropHeartExpanded, setIsDropHeartExpanded] = useState(false);
   const [pinDescription, setPinDescription] = useState('');
@@ -1393,6 +1403,82 @@ export default function LocationSidebar({
     };
   }, [removeTemporaryPin, clearSelection]);
 
+  // Fetch visible atlas entities in viewport
+  const fetchVisibleAtlasEntities = useCallback(async () => {
+    if (!map || !mapLoaded || !isDropHeartExpanded) return;
+    
+    try {
+      setIsLoadingVisibleAtlas(true);
+      const mapboxMap = map as any;
+      const bounds = mapboxMap.getBounds();
+      
+      if (!bounds) {
+        setIsLoadingVisibleAtlas(false);
+        return;
+      }
+      
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      
+      // Query atlas entities within viewport bounds
+      const { data, error } = await supabase
+        .from('atlas_entities')
+        .select('id, name, table_name, lat, lng')
+        .gte('lat', sw.lat)
+        .lte('lat', ne.lat)
+        .gte('lng', sw.lng)
+        .lte('lng', ne.lng)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null)
+        .limit(20); // Limit to 20 for performance
+      
+      if (error) {
+        console.error('[FloatingMapContainer] Error fetching visible atlas entities:', error);
+        setVisibleAtlasEntities([]);
+      } else {
+        setVisibleAtlasEntities((data || []) as Array<{
+          id: string;
+          name: string;
+          table_name: string;
+          lat: number;
+          lng: number;
+        }>);
+      }
+    } catch (error) {
+      console.error('[FloatingMapContainer] Error fetching visible atlas entities:', error);
+      setVisibleAtlasEntities([]);
+    } finally {
+      setIsLoadingVisibleAtlas(false);
+    }
+  }, [map, mapLoaded, isDropHeartExpanded]);
+
+  // Fetch visible atlas entities when form expands or map moves
+  useEffect(() => {
+    if (!map || !mapLoaded || !isDropHeartExpanded) {
+      setVisibleAtlasEntities([]);
+      return;
+    }
+    
+    // Fetch immediately when form expands
+    fetchVisibleAtlasEntities();
+    
+    // Also fetch when map moves (debounced)
+    let timeoutId: NodeJS.Timeout;
+    const handleMapMove = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        fetchVisibleAtlasEntities();
+      }, 500); // Debounce by 500ms
+    };
+    
+    const mapboxMap = map as any;
+    mapboxMap.on('moveend', handleMapMove);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      mapboxMap.off('moveend', handleMapMove);
+    };
+  }, [map, mapLoaded, isDropHeartExpanded, fetchVisibleAtlasEntities]);
 
   // Listen for double-click on map to show location and expand pin form
   useEffect(() => {
@@ -1943,6 +2029,28 @@ export default function LocationSidebar({
                           </div>
                         )}
                       </div>
+                      
+                      {/* Near Me - Visible Atlas Entities */}
+                      {visibleAtlasEntities.length > 0 && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                          <div className="text-[10px] font-medium text-gray-700 mb-1.5">
+                            Near me ({visibleAtlasEntities.length})
+                          </div>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                            {visibleAtlasEntities.map((entity) => (
+                              <div
+                                key={entity.id}
+                                className="flex items-center gap-1.5 text-[10px] text-gray-600"
+                              >
+                                <span className="text-[9px]">
+                                  {ATLAS_ENTITY_LABELS[entity.table_name] || entity.table_name}
+                                </span>
+                                <span className="truncate">{entity.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Caption */}
                       <div>

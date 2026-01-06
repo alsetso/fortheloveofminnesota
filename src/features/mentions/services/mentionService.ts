@@ -52,9 +52,32 @@ export class MentionService {
       query = query.eq('city_id', filters.city_id);
     }
 
+    // Atlas entity filter - filter by atlas_meta->>'id'
+    if (filters?.atlas_entity_id) {
+      query = query.eq('atlas_meta->>id', filters.atlas_entity_id);
+    }
+
+    // Time filter - filter by created_at (last 24 hours or 7 days)
+    if (filters?.timeFilter) {
+      const now = new Date();
+      let cutoffDate: Date;
+      
+      if (filters.timeFilter === '24h') {
+        cutoffDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (filters.timeFilter === '7d') {
+        cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else {
+        cutoffDate = now; // Fallback (shouldn't happen)
+      }
+      
+      const cutoffISO = cutoffDate.toISOString();
+      query = query.gte('created_at', cutoffISO);
+    }
+
     // Year filter - filter by post_date year (or created_at if post_date is null)
     // Using 01-02 instead of 01-01 to avoid timezone issues
-    if (filters?.year) {
+    // Note: Year filter and time filter are mutually exclusive - time filter takes precedence
+    if (filters?.year && !filters?.timeFilter) {
       const yearStart = `${filters.year}-01-02T00:00:00.000Z`;
       const yearEnd = `${filters.year + 1}-01-02T00:00:00.000Z`;
       
@@ -167,6 +190,7 @@ export class MentionService {
         account_id: account_id,
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
+        icon_url: null, // Not used - we use account.image_url instead
         map_meta: data.map_meta || null,
         atlas_meta: data.atlas_meta || null,
         collection_id: data.collection_id || null,
@@ -235,6 +259,7 @@ export class MentionService {
         description: mention.description,
         account_id: mention.account_id,
         collection_emoji: (mention as any).collections?.emoji || null,
+        account_image_url: (mention as any).accounts?.image_url || null,
       },
     }));
 

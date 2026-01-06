@@ -3,99 +3,136 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { MobileNavTab } from '@/components/layout/MobileNavTabs';
 
-export type PopupType = 'pin' | 'atlas' | 'location' | null;
+export type PopupType = 'pin' | 'atlas' | 'location';
 
-export interface PopupData {
-  type: PopupType;
-  data: any;
-}
+export type OverlayType = 
+  | MobileNavTab  // 'news' | 'explore' | 'controls' | 'contribute'
+  | 'create'      // Create sheet (special, opened via "Add Label")
+  | `popup-${PopupType}`  // 'popup-pin' | 'popup-atlas' | 'popup-location'
+  | null;
 
-export interface MapOverlayState {
-  activeTab: MobileNavTab | null;
-  popup: PopupData;
+export interface OverlayData {
+  type: OverlayType;
+  data?: any;  // Data for popups (mention, atlas entity, location)
 }
 
 /**
- * Unified state management for map overlays (mobile nav sheets and entity popups)
+ * Unified state management for map overlays
+ * 
+ * Priority (highest to lowest):
+ * 1. Entity popups (popup-pin, popup-atlas, popup-location) - highest priority
+ * 2. Create sheet (create) - medium priority
+ * 3. Mobile nav tabs (news, explore, controls, contribute) - lowest priority
  * 
  * Rules:
  * - Only one overlay can be open at a time
- * - Popup has priority over mobile nav (popup can cover nav)
- * - Opening mobile nav closes popup
- * - Opening popup closes mobile nav
+ * - Opening higher priority overlay closes lower priority ones
+ * - Opening same overlay type toggles it closed
  * - Clicking outside closes everything
  */
 export function useMapOverlayState() {
-  const [state, setState] = useState<MapOverlayState>({
-    activeTab: null,
-    popup: { type: null, data: null },
+  const [overlay, setOverlay] = useState<OverlayData>({
+    type: null,
+    data: null,
   });
 
-  const stateRef = useRef(state);
+  const overlayRef = useRef(overlay);
   useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
+    overlayRef.current = overlay;
+  }, [overlay]);
 
-  // Open mobile nav tab (closes popup)
+  // Open mobile nav tab (closes popups and create sheet)
   const openTab = useCallback((tab: MobileNavTab) => {
-    setState(prev => {
+    setOverlay(prev => {
       // If clicking the same tab, close it
-      if (prev.activeTab === tab) {
-        return {
-          activeTab: null,
-          popup: prev.popup,
-        };
+      if (prev.type === tab) {
+        return { type: null, data: null };
       }
-      // Open tab and close popup
-      return {
-        activeTab: tab,
-        popup: { type: null, data: null },
-      };
+      // Open tab and close everything else
+      return { type: tab, data: null };
     });
   }, []);
 
   // Close mobile nav tab
   const closeTab = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      activeTab: null,
-    }));
+    setOverlay(prev => {
+      if (prev.type === 'news' || prev.type === 'explore' || prev.type === 'controls' || prev.type === 'contribute') {
+        return { type: null, data: null };
+      }
+      return prev;
+    });
   }, []);
 
-  // Open popup (closes mobile nav)
+  // Open create sheet (closes tabs and popups)
+  const openCreate = useCallback((data?: any) => {
+    setOverlay({ type: 'create', data });
+  }, []);
+
+  // Close create sheet
+  const closeCreate = useCallback(() => {
+    setOverlay(prev => {
+      if (prev.type === 'create') {
+        return { type: null, data: null };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Open entity popup (closes everything - highest priority)
   const openPopup = useCallback((type: PopupType, data: any) => {
-    setState(prev => ({
-      activeTab: null, // Close mobile nav when popup opens
-      popup: { type, data },
-    }));
+    setOverlay({ type: `popup-${type}`, data });
   }, []);
 
-  // Close popup
+  // Close entity popup
   const closePopup = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      popup: { type: null, data: null },
-    }));
+    setOverlay(prev => {
+      if (prev.type?.startsWith('popup-')) {
+        return { type: null, data: null };
+      }
+      return prev;
+    });
   }, []);
 
   // Close all overlays
   const closeAll = useCallback(() => {
-    setState({
-      activeTab: null,
-      popup: { type: null, data: null },
-    });
+    setOverlay({ type: null, data: null });
   }, []);
 
-  // Check if any overlay is open
-  const isAnyOverlayOpen = state.activeTab !== null || state.popup.type !== null;
+  // Helper: Check if specific overlay is open
+  const isOverlayOpen = useCallback((type: OverlayType) => {
+    return overlay.type === type;
+  }, [overlay.type]);
+
+  // Helper: Check if any overlay is open
+  const isAnyOverlayOpen = overlay.type !== null;
+
+  // Helper: Get current active tab (if a tab is open)
+  const activeTab: MobileNavTab | null = 
+    overlay.type === 'news' || overlay.type === 'explore' || 
+    overlay.type === 'controls' || overlay.type === 'contribute'
+      ? overlay.type
+      : null;
+
+  // Helper: Get current popup data (if a popup is open)
+  const popupData = overlay.type?.startsWith('popup-')
+    ? {
+        type: overlay.type.replace('popup-', '') as PopupType,
+        data: overlay.data,
+      }
+    : { type: null, data: null };
 
   return {
-    state,
+    overlay,
+    activeTab,
+    popupData,
     openTab,
     closeTab,
+    openCreate,
+    closeCreate,
     openPopup,
     closePopup,
     closeAll,
+    isOverlayOpen,
     isAnyOverlayOpen,
   };
 }

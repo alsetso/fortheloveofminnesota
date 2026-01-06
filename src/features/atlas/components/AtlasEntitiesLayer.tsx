@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { supabase } from '@/lib/supabase';
 import {
-  buildAtlasTextColorExpression,
   buildAtlasIconLayout,
   buildAtlasCirclePaint,
   buildAtlasLabelLayout,
@@ -223,16 +222,15 @@ export default function AtlasEntitiesLayer({
           if (!iconPath) return;
 
           const imageId = `atlas-icon-${tableName}`;
-          // Always check if image exists in Mapbox (may have been removed on style change)
+          
+          // Remove existing image if it exists (allows icon updates from admin)
+          // This ensures we always load the latest icon_path from atlas_types
           if (mapboxMap.hasImage(imageId)) {
-            iconsLoadedRef.current.add(tableName);
-            return;
+            mapboxMap.removeImage(imageId);
           }
           
-          // Skip if we've already loaded this icon in this session (unless cleared)
-          if (iconsLoadedRef.current.has(tableName)) {
-            return;
-          }
+          // Clear from loaded set to force reload
+          iconsLoadedRef.current.delete(tableName);
 
           try {
             const img = new Image();
@@ -302,9 +300,6 @@ export default function AtlasEntitiesLayer({
           ...(tablesWithIcons.length > 0 ? { layout: iconImageLayout } : { paint: iconImageLayout }),
         });
 
-        // Build text-color expression based on table_name
-        const textColorExpression = buildAtlasTextColorExpression(uniqueTables);
-
         // Add label layer with zoom-based visibility
         const labelPaint = buildAtlasLabelPaint();
         mapboxMap.addLayer({
@@ -313,7 +308,7 @@ export default function AtlasEntitiesLayer({
           source: sourceId,
           layout: buildAtlasLabelLayout(),
           paint: {
-            'text-color': textColorExpression,
+            'text-color': labelPaint['text-color'],
             'text-opacity': labelPaint['text-opacity'],
             'text-halo-color': labelPaint['text-halo-color'],
             'text-halo-width': labelPaint['text-halo-width'],

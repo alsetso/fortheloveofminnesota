@@ -18,10 +18,32 @@ import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
 import NearbyPlacesContainer from '@/components/layout/NearbyPlacesContainer';
 import Map3DControlsSecondaryContent from '@/features/sidebar/components/Map3DControlsSecondaryContent';
-import ProfileAccountsSecondaryContent from '@/features/sidebar/components/ProfileAccountsSecondaryContent';
+import ContributeContent from '@/components/layout/ContributeContent';
 import NewsContent from '@/components/layout/NewsContent';
+import CreateMentionContent from '@/components/layout/CreateMentionContent';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useMapOverlayState } from '../hooks/useMapOverlayState';
+
+// Helper to format last generation timestamp
+function formatLastGeneration(timestamp: string): string {
+  try {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return '1d ago';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+}
 
 interface LiveMapProps {
   cities: Array<{
@@ -55,6 +77,8 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
   const temporaryMarkerRef = useRef<any>(null);
+  const [createTabSelectedLocation, setCreateTabSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [createTabAtlasMeta, setCreateTabAtlasMeta] = useState<Record<string, any> | null>(null);
   
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
@@ -64,16 +88,24 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   
   // Unified overlay state management
   const {
-    state: overlayState,
+    activeTab,
+    popupData,
     openTab,
     closeTab,
+    openCreate,
+    closeCreate,
     openPopup,
     closePopup,
     closeAll,
+    isOverlayOpen,
   } = useMapOverlayState();
   
-  const activeTab = overlayState.activeTab;
-  const popupData = overlayState.popup;
+  const activeTabRef = useRef<MobileNavTab | null>(null);
+  
+  // Keep ref in sync with activeTab for use in map click handler
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
   
   // Atlas entity state (managed at parent level)
   const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<{
@@ -93,11 +125,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   // Auth state from unified context - use isLoading to ensure auth is initialized
   const {
     user,
+    account,
     isLoading: authLoading,
   } = useAuthStateSafe();
 
-  // Use active account from context
-  const { account } = useAuthStateSafe();
+  const isAdmin = account?.role === 'admin';
+  const [lastNewsGeneration, setLastNewsGeneration] = useState<string | null>(null);
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -110,6 +143,20 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     authLoadingRef.current = authLoading;
     openWelcomeRef.current = openWelcome;
   }, [user, authLoading, openWelcome]);
+
+  // Fetch last news generation timestamp when News tab opens
+  useEffect(() => {
+    if (activeTab === 'news' && isAdmin) {
+      fetch('/api/news/latest')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            setLastNewsGeneration(data.data.generatedAt || data.data.createdAt || null);
+          }
+        })
+        .catch(err => console.error('Failed to fetch last generation:', err));
+    }
+  }, [activeTab, isAdmin]);
 
   // Initialize component (one-time setup)
   useEffect(() => {
@@ -173,29 +220,26 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       openPopup('atlas', {
         ...entity,
         icon_path: data?.icon_path || null,
+        coordinates: { lat: entity.lat, lng: entity.lng },
       });
     } catch (error) {
       console.error('Error fetching atlas type:', error);
-      openPopup('atlas', entity);
+      openPopup('atlas', {
+        ...entity,
+        coordinates: { lat: entity.lat, lng: entity.lng },
+      });
     }
   }, [mapLoaded, openPopup]);
 
   // Handle tab click - toggle sheet
   const handleTabClick = useCallback((tab: MobileNavTab) => {
-    const wasOpen = activeTab === tab;
-    openTab(tab);
-    
-    // If create tab opened (not closed), dispatch event for mention creation at map center
-    if (!wasOpen && tab === 'create' && mapInstanceRef.current && mapLoaded) {
-      const center = mapInstanceRef.current.getCenter();
-      const lat = center.lat;
-      const lng = center.lng;
-      
-      window.dispatchEvent(new CustomEvent('show-location-for-mention', {
-        detail: { lat, lng }
-      }));
+    if (activeTab === tab) {
+      closeTab();
+      // No need to clear Create sheet state here since it's managed separately
+    } else {
+      openTab(tab);
     }
-  }, [activeTab, mapLoaded, openTab]);
+  }, [activeTab, openTab, closeTab]);
 
   // Listen for mention click events to show popup
   useEffect(() => {
@@ -244,6 +288,30 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       window.removeEventListener('atlas-entity-click', handleAtlasEntityClickEvent);
     };
   }, [handleAtlasEntityClick]);
+
+  // Listen for show-location-for-mention event (from "Add Label" button in location/atlas popup)
+  useEffect(() => {
+    const handleShowLocationForMention = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        lat: number;
+        lng: number;
+        atlas_meta?: Record<string, any>;
+      }>;
+      const { lat, lng, atlas_meta } = customEvent.detail || {};
+      if (lat && lng) {
+        // Close any open popup and tabs, then open Create sheet
+        closeAll();
+        setCreateTabSelectedLocation({ lat, lng });
+        setCreateTabAtlasMeta(atlas_meta || null);
+        openCreate({ lat, lng, atlas_meta });
+      }
+    };
+
+    window.addEventListener('show-location-for-mention', handleShowLocationForMention);
+    return () => {
+      window.removeEventListener('show-location-for-mention', handleShowLocationForMention);
+    };
+  }, [closePopup, closeTab]);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -388,6 +456,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           if (!MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
             // Show error message or silently ignore clicks outside Minnesota
             console.warn('[LiveMap] Click outside Minnesota bounds:', { lat, lng });
+            return;
+          }
+          
+          // If Create sheet is open, update the selected location
+          if (isOverlayOpen('create')) {
+            setCreateTabSelectedLocation({ lat, lng });
             return;
           }
           
@@ -723,8 +797,38 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             });
           }
         }}
+        headerAction={
+          isAdmin ? (
+            <div className="flex items-center gap-2">
+              {lastNewsGeneration && (
+                <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                  {formatLastGeneration(lastNewsGeneration)}
+                </span>
+              )}
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('generate-news'));
+                }}
+                className="px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+                title="Generate News"
+              >
+                Generate
+              </button>
+            </div>
+          ) : undefined
+        }
       >
-        <NewsContent />
+        <NewsContent onGenerationComplete={() => {
+          // Fetch latest generation timestamp after generation
+          fetch('/api/news/latest')
+            .then(res => res.json())
+            .then(data => {
+              if (data.success && data.data) {
+                setLastNewsGeneration(data.data.generatedAt || data.data.createdAt || null);
+              }
+            })
+            .catch(err => console.error('Failed to fetch last generation:', err));
+        }} />
       </MobileNavSheet>
 
       {/* Explore Sheet */}
@@ -751,10 +855,14 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         />
       </MobileNavSheet>
 
-      {/* Create Sheet */}
+      {/* Create Sheet - Only opened via "Add Label" button */}
       <MobileNavSheet
-        isOpen={activeTab === 'create'}
-        onClose={closeTab}
+        isOpen={isOverlayOpen('create')}
+        onClose={() => {
+          closeCreate();
+          setCreateTabSelectedLocation(null);
+          setCreateTabAtlasMeta(null);
+        }}
         title="Create"
         showSearch={true}
         map={mapInstanceRef.current}
@@ -765,14 +873,32 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
               zoom: 15,
               duration: 1500,
             });
+            setCreateTabSelectedLocation({ lat: coordinates.lat, lng: coordinates.lng });
+            // Clear atlas meta when user selects a new location
+            setCreateTabAtlasMeta(null);
           }
         }}
       >
-        <div className="space-y-3 p-4">
-          <p className="text-xs text-gray-600">
-            Click on the map to select a location, then create a mention.
-          </p>
-        </div>
+        {createTabSelectedLocation ? (
+          <CreateMentionContent
+            map={mapInstanceRef.current}
+            mapLoaded={mapLoaded}
+            initialCoordinates={createTabSelectedLocation}
+            initialAtlasMeta={createTabAtlasMeta}
+            onMentionCreated={() => {
+              closeCreate();
+              setCreateTabSelectedLocation(null);
+              setCreateTabAtlasMeta(null);
+              setMentionsRefreshKey(prev => prev + 1);
+            }}
+          />
+        ) : (
+          <div className="space-y-3 p-4">
+            <p className="text-xs text-gray-600">
+              Click on the map to select a location, then create a mention.
+            </p>
+          </div>
+        )}
       </MobileNavSheet>
 
       {/* Controls Sheet */}
@@ -789,15 +915,13 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       </MobileNavSheet>
 
       {/* Contribute Sheet */}
-      {account && (
-        <MobileNavSheet
-          isOpen={activeTab === 'contribute'}
-          onClose={closeTab}
-          title="Contribute"
-        >
-          <ProfileAccountsSecondaryContent />
-        </MobileNavSheet>
-      )}
+      <MobileNavSheet
+        isOpen={activeTab === 'contribute'}
+        onClose={closeTab}
+        title="Contribute"
+      >
+        <ContributeContent map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+      </MobileNavSheet>
 
       {/* Map Entity Popup - Above mobile nav */}
       <MapEntityPopup

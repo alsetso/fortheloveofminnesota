@@ -39,15 +39,15 @@ export function Toast({ toast }: ToastProps) {
   const getToastStyles = () => {
     switch (toast.type) {
       case 'success':
-        return 'bg-emerald-500 text-white border-emerald-400';
+        return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
       case 'error':
-        return 'bg-red-500 text-white border-red-400';
+        return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
       case 'loading':
-        return 'bg-gold-500 text-white border-gold-400';
+        return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
       case 'info':
-        return 'bg-slate-500 text-white border-slate-400';
+        return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
       default:
-        return 'bg-slate-500 text-white border-slate-400';
+        return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
     }
   };
 
@@ -125,9 +125,11 @@ export function ToastContainer() {
   const displayToasts = toasts.slice(-3);
 
   return (
-    <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 space-y-2 max-w-xs">
+    <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 space-y-2 max-w-xs">
       {displayToasts.map((toast) => (
-        <Toast key={toast.id} toast={toast} />
+        <div key={toast.id} className="pointer-events-auto">
+          <Toast toast={toast} />
+        </div>
       ))}
     </div>
   );

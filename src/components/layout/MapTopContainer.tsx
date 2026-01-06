@@ -5,6 +5,7 @@ import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon } from '
 import Image from 'next/image';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useToast } from '@/features/ui/hooks/useToast';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMetadata } from '@/types/mapbox';
 
@@ -120,6 +121,7 @@ interface AtlasType {
 export default function MapTopContainer({ map, onLocationSelect }: MapTopContainerProps) {
   const { account } = useAuthStateSafe();
   const { openAccount } = useAppModalContextSafe();
+  const { info } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -129,6 +131,7 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -469,14 +472,15 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     }
   };
 
-  const handleAtlasTypeClick = (atlasType: AtlasType) => {
+  const handleAtlasTypeClick = async (atlasType: AtlasType) => {
     // Only allow toggling active types
     if (atlasType.status !== 'active') {
       return;
     }
 
+    const wasVisible = visibleAtlasTypes.has(atlasType.slug);
     const newVisible = new Set(visibleAtlasTypes);
-    if (newVisible.has(atlasType.slug)) {
+    if (wasVisible) {
       newVisible.delete(atlasType.slug);
     } else {
       newVisible.add(atlasType.slug);
@@ -512,6 +516,30 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
       } catch (e) {
         console.warn('[MapTopContainer] Error updating map filters:', e);
       }
+    }
+
+    // Count entities and show toast
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { count, error } = await supabase
+        .from('atlas_entities')
+        .select('*', { count: 'exact', head: true })
+        .eq('table_name', atlasType.slug)
+        .not('lat', 'is', null)
+        .not('lng', 'is', null);
+
+      if (!error && count !== null) {
+        const action = wasVisible ? 'hidden' : 'shown';
+        const typeName = atlasType.name || atlasType.slug;
+        const countText = count.toLocaleString();
+        info(
+          `${countText} ${typeName} ${count === 1 ? 'is' : 'are'} being ${action}`,
+          ''
+        );
+      }
+    } catch (error) {
+      // Silently fail - toast is not critical
+      console.warn('[MapTopContainer] Error fetching entity count:', error);
     }
   };
 
@@ -725,6 +753,55 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             })}
           </div>
         )}
+
+        {/* Time Filter Selector */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1 py-0.5 flex items-center gap-0.5 w-fit">
+          <button
+            onClick={() => {
+              setTimeFilter(null);
+              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                detail: { timeFilter: null }
+              }));
+            }}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
+              timeFilter === null
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            All time
+          </button>
+          <button
+            onClick={() => {
+              setTimeFilter('24h');
+              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                detail: { timeFilter: '24h' }
+              }));
+            }}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
+              timeFilter === '24h'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            24h
+          </button>
+          <button
+            onClick={() => {
+              setTimeFilter('7d');
+              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                detail: { timeFilter: '7d' }
+              }));
+            }}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
+              timeFilter === '7d'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            7d
+          </button>
+        </div>
       </div>
     </div>
   );

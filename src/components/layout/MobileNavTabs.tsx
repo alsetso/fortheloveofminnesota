@@ -1,12 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { UserIcon, PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import { PlusIcon as PlusIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, MagnifyingGlassIcon as MagnifyingGlassIconSolid, NewspaperIcon as NewspaperIconSolid } from '@heroicons/react/24/solid';
 import { useAuthStateSafe } from '@/features/auth';
 
-export type MobileNavTab = 'news' | 'explore' | 'create' | 'controls' | 'contribute';
+export type MobileNavTab = 'news' | 'explore' | 'controls' | 'contribute';
 
 interface MobileNavTabsProps {
   activeTab: MobileNavTab | null;
@@ -58,27 +57,6 @@ export default function MobileNavTabs({ activeTab, onTabClick }: MobileNavTabsPr
           )}
           <span className={`text-[10px] font-medium ${activeTab === 'explore' ? 'text-gray-900' : 'text-gray-500'}`}>
             Explore
-          </span>
-        </button>
-
-        {/* Create Tab */}
-        <button
-          onClick={() => onTabClick('create')}
-          className={baseClasses}
-          aria-label="Create"
-        >
-          <div className={`w-5 h-5 flex items-center justify-center ${activeTab === 'create' ? 'opacity-100' : 'opacity-80'}`}>
-            <Image
-              src="/heart.png"
-              alt="Create"
-              width={20}
-              height={20}
-              className="w-5 h-5"
-              unoptimized
-            />
-          </div>
-          <span className={`text-[10px] font-medium ${activeTab === 'create' ? 'text-gray-900' : 'text-gray-500'}`}>
-            Create
           </span>
         </button>
 

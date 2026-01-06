@@ -15,6 +15,7 @@ export interface Mention {
   visibility: MentionVisibility;
   archived?: boolean;
   post_date?: string | null; // Date when the event/memory happened (for year filtering)
+  icon_url?: string | null; // URL to the icon image for this mention pin
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
   atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details (parks, schools, cities, etc.) when mention is created on an atlas pin
   created_at: string;
@@ -39,6 +40,7 @@ export interface CreateMentionData {
   collection_id?: string | null; // Optional collection ID for categorizing mentions
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
+  icon_url?: string | null; // URL to the icon image for this mention pin
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
   atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details when mention is created on an atlas pin
 }
@@ -48,6 +50,8 @@ export interface MentionFilters {
   city_id?: string; // Filter by city ID
   collection_id?: string; // Filter by collection ID
   year?: number; // Filter by year of post_date
+  atlas_entity_id?: string; // Filter by atlas entity ID (from atlas_meta->>'id')
+  timeFilter?: '24h' | '7d'; // Filter by time: last 24 hours or 7 days
   bbox?: {
     minLat: number;
     maxLat: number;
@@ -70,6 +74,7 @@ export interface MentionGeoJSONFeature {
     description: string | null;
     account_id: string | null;
     collection_emoji: string | null;
+    account_image_url: string | null;
   };
 }
 

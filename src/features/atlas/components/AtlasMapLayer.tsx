@@ -320,9 +320,9 @@ export default function AtlasMapLayer({
         },
         paint: {
           'text-color': '#ffffff',
-          'text-halo-color': '#4b5563',
+          'text-halo-color': '#000000',
           'text-halo-width': 2,
-          'text-halo-blur': 1,
+          'text-halo-blur': 0,
         },
       });
     } catch (err) {

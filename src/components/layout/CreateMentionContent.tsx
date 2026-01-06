@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -10,12 +11,16 @@ import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsS
 interface CreateMentionContentProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
+  initialCoordinates?: { lat: number; lng: number } | null;
+  initialAtlasMeta?: Record<string, any> | null;
   onMentionCreated?: () => void;
 }
 
 export default function CreateMentionContent({ 
   map, 
   mapLoaded,
+  initialCoordinates,
+  initialAtlasMeta,
   onMentionCreated 
 }: CreateMentionContentProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
@@ -24,11 +29,14 @@ export default function CreateMentionContent({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'public' | 'only_me'>('public');
-  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(initialCoordinates || null);
 
-  // Get map center coordinates when component mounts or map changes
+  // Use initialCoordinates if provided, otherwise get map center coordinates
   useEffect(() => {
-    if (map && mapLoaded) {
+    if (initialCoordinates) {
+      setCoordinates(initialCoordinates);
+      setError(null);
+    } else if (map && mapLoaded) {
       const mapboxMap = map as any;
       const center = mapboxMap.getCenter();
       if (center) {
@@ -44,11 +52,11 @@ export default function CreateMentionContent({
         }
       }
     }
-  }, [map, mapLoaded]);
+  }, [map, mapLoaded, initialCoordinates]);
 
-  // Listen for map movement to update coordinates
+  // Listen for map movement to update coordinates (only if no initialCoordinates provided)
   useEffect(() => {
-    if (!map || !mapLoaded) return;
+    if (!map || !mapLoaded || initialCoordinates) return;
 
     const mapboxMap = map as any;
     const updateCoordinates = () => {
@@ -72,7 +80,7 @@ export default function CreateMentionContent({
     return () => {
       mapboxMap.off('moveend', updateCoordinates);
     };
-  }, [map, mapLoaded]);
+  }, [map, mapLoaded, initialCoordinates]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +104,7 @@ export default function CreateMentionContent({
         lng: coordinates.lng,
         description: description.trim() || null,
         visibility,
+        atlas_meta: initialAtlasMeta || null,
       };
 
       await MentionService.createMention(mentionData, activeAccountId || undefined);
@@ -145,6 +154,32 @@ export default function CreateMentionContent({
           <p className="text-[10px] text-gray-500 mb-3">
             Location: {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
           </p>
+        )}
+        
+        {/* Atlas Entity Label */}
+        {initialAtlasMeta && (
+          <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md mb-3">
+            {initialAtlasMeta.icon_path && (
+              <Image
+                src={initialAtlasMeta.icon_path}
+                alt={initialAtlasMeta.name || 'Entity'}
+                width={20}
+                height={20}
+                className="w-5 h-5 object-contain flex-shrink-0"
+                unoptimized
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-gray-900">
+                {initialAtlasMeta.name || 'Atlas Entity'}
+              </div>
+              {initialAtlasMeta.table_name && (
+                <div className="text-[10px] text-gray-500 capitalize">
+                  {initialAtlasMeta.table_name.replace('_', ' ')}
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
 

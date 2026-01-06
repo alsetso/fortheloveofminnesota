@@ -74,14 +74,14 @@ export const mentionsLayerStyles = {
         'interpolate',
         ['linear'],
         ['zoom'],
-        0, 0.15,
-        5, 0.25,
-        10, 0.4,
-        12, 0.5,
-        14, 0.65,
-        16, 0.8,
-        18, 1.0,
-        20, 1.2,
+        0, 0.25,   // Larger than atlas (0.3 vs 0.25, but mentions start bigger)
+        5, 0.4,    // Larger than atlas
+        10, 0.65,  // Larger than atlas (0.5 vs 0.65)
+        12, 0.8,   // Larger than atlas (0.5 vs 0.8)
+        14, 1.1,   // Much larger than atlas (0.8 vs 1.1)
+        16, 1.3,   // Much larger than atlas
+        18, 1.5,   // Much larger than atlas (1.0 vs 1.5)
+        20, 1.8,   // Much larger than atlas (1.2 vs 1.8)
       ],
       anchor: 'center' as const,
       allowOverlap: true,
@@ -93,11 +93,11 @@ export const mentionsLayerStyles = {
     size: 12,
     offset: [0, 1.2] as [number, number],
     anchor: 'top' as const,
-    color: '#000000',
+    color: '#ffffff',
     halo: {
-      color: '#ffffff',
+      color: '#000000',
       width: 2,
-      blur: 1,
+      blur: 0,
     },
   },
 };
@@ -186,6 +186,7 @@ export const buildAtlasLabelLayout = () => {
 
 export const buildAtlasLabelPaint = () => {
   return {
+    'text-color': '#ffffff', // White text
     'text-opacity': [
       'interpolate',
       ['linear'],
@@ -194,9 +195,9 @@ export const buildAtlasLabelPaint = () => {
       14, 0.7,  // Fade in 12-14
       16, 1.0   // Full opacity at 16+
     ],
-    'text-halo-color': 'rgba(0, 0, 0, 0)',
-    'text-halo-width': 0,
-    'text-halo-blur': 0,
+    'text-halo-color': '#000000', // Black border
+    'text-halo-width': 2,
+    'text-halo-blur': 0, // No shadow
   };
 };
 

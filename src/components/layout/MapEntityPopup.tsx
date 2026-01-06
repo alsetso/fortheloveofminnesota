@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface MapEntityPopupProps {
   isOpen: boolean;
@@ -39,6 +41,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
+  const { user } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
 
   useEffect(() => {
     if (isOpen) {
@@ -160,6 +164,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
               <>
                 {data.account && (
                   <div className="flex items-center gap-2">
+                    {/* Profile image - always shown */}
                     {data.account.image_url ? (
                       <Image
                         src={data.account.image_url}
@@ -176,10 +181,21 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                         </span>
                       </div>
                     )}
-                    <div>
-                      <div className="text-xs font-medium text-gray-900">
-                        {data.account.username || `${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
-                      </div>
+                    <div className="flex-1">
+                      {user ? (
+                        // Authenticated: show username
+                        <div className="text-xs font-medium text-gray-900">
+                          {data.account.username || `${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
+                        </div>
+                      ) : (
+                        // Unauthorized: show sign in prompt
+                        <button
+                          onClick={openWelcome}
+                          className="text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors text-left"
+                        >
+                          Sign in to see who posted
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -221,6 +237,39 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     )}
                   </div>
                 </div>
+                
+                {/* Add Label Button for Atlas Entity */}
+                {data.coordinates && (
+                  <>
+                    {MinnesotaBoundsService.isWithinMinnesota(data.coordinates) ? (
+                      <button
+                        onClick={() => {
+                          // Dispatch event to show location for mention creation with atlas metadata
+                          window.dispatchEvent(new CustomEvent('show-location-for-mention', {
+                            detail: { 
+                              lat: data.coordinates!.lat, 
+                              lng: data.coordinates!.lng,
+                              atlas_meta: {
+                                id: data.id,
+                                name: data.name,
+                                table_name: data.table_name,
+                                icon_path: data.icon_path,
+                              }
+                            }
+                          }));
+                          handleClose();
+                        }}
+                        className="w-full mt-4 px-4 py-2.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span>Add Label</span>
+                      </button>
+                    ) : (
+                      <div className="w-full mt-4 px-4 py-2.5 text-xs text-gray-600 bg-gray-100 rounded-md text-center">
+                        Location outside Minnesota
+                      </div>
+                    )}
+                  </>
+                )}
               </>
             )}
 

@@ -20,7 +20,11 @@ interface NewsResponse {
   error?: string;
 }
 
-export default function NewsContent() {
+interface NewsContentProps {
+  onGenerationComplete?: () => void;
+}
+
+export default function NewsContent({ onGenerationComplete }: NewsContentProps = {}) {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -73,6 +77,38 @@ export default function NewsContent() {
     fetchNews(0, false);
   }, []);
 
+  // Listen for generate news event
+  useEffect(() => {
+    const handleGenerateNews = async () => {
+      try {
+        const response = await fetch('/api/news/generate', {
+          method: 'POST',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to generate news');
+        }
+
+        // Refresh the news list after generation
+        await fetchNews(0, false);
+        
+        // Notify parent that generation is complete
+        if (onGenerationComplete) {
+          onGenerationComplete();
+        }
+      } catch (err) {
+        console.error('Failed to generate news:', err);
+      }
+    };
+
+    window.addEventListener('generate-news', handleGenerateNews);
+    return () => {
+      window.removeEventListener('generate-news', handleGenerateNews);
+    };
+  }, [onGenerationComplete]);
+
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
       fetchNews(offset, true);
@@ -80,7 +116,7 @@ export default function NewsContent() {
   };
 
   return (
-    <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-120px)]">
+    <div className="space-y-3">
       {/* Loading State */}
       {loading && (
         <div className="px-2 py-1.5">

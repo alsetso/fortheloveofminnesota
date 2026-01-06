@@ -15,13 +15,21 @@ interface ProfilePageClientProps {
   isOwnProfile: boolean;
 }
 
+// Helper to check if plan is pro
+const isProPlan = (plan: string | null | undefined): boolean => {
+  return plan === 'pro' || plan === 'plus';
+};
+
 export default function ProfilePageClient({
   account,
   pins,
   collections,
   isOwnProfile,
 }: ProfilePageClientProps) {
-  const [activeTab, setActiveTab] = useState<'maps' | 'mentions'>('maps');
+  // Show maps tab to owner always, or to visitors if owner has pro plan
+  const profileOwnerIsPro = isProPlan(account.plan);
+  const shouldShowMapsTab = isOwnProfile || profileOwnerIsPro;
+  const [activeTab, setActiveTab] = useState<'maps' | 'mentions'>(shouldShowMapsTab ? 'maps' : 'mentions');
 
   return (
     <div className="space-y-3">
@@ -42,7 +50,9 @@ export default function ProfilePageClient({
         {/* Left Sidebar Navigation */}
         <div className="lg:col-span-3">
           <ProfileSidebarNav 
-            accountUsername={account.username} 
+            accountUsername={account.username}
+            accountPlan={account.plan}
+            isOwnProfile={isOwnProfile}
             activeTab={activeTab}
             onTabChange={setActiveTab}
           />
@@ -51,7 +61,11 @@ export default function ProfilePageClient({
         {/* Right Content: Maps or Mentions */}
         <div className="lg:col-span-9">
           {activeTab === 'maps' ? (
-            <ProfileMapsContainer accountId={account.id} isOwnProfile={isOwnProfile} />
+            <ProfileMapsContainer 
+              accountId={account.id} 
+              isOwnProfile={isOwnProfile}
+              accountPlan={account.plan}
+            />
           ) : (
             <ProfileMentionsContainer
               pins={pins}

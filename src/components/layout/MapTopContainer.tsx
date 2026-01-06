@@ -8,6 +8,7 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMetadata } from '@/types/mapbox';
+import LiveAccountModal from './LiveAccountModal';
 
 interface MapboxFeature {
   id: string;
@@ -120,8 +121,9 @@ interface AtlasType {
 
 export default function MapTopContainer({ map, onLocationSelect }: MapTopContainerProps) {
   const { account } = useAuthStateSafe();
-  const { openAccount } = useAppModalContextSafe();
+  const { openAccount, openUpgrade } = useAppModalContextSafe();
   const { info } = useToast();
+  const [showLiveAccountModal, setShowLiveAccountModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -131,11 +133,18 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>(null);
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Initialize time filter to 24h on mount
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+      detail: { timeFilter: '24h' }
+    }));
+  }, []);
 
   // Fetch visible atlas types
   useEffect(() => {
@@ -673,30 +682,36 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           {/* Profile Icon */}
           {account ? (
             <button
-              onClick={() => openAccount('settings')}
-              className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200 hover:border-gray-300 transition-colors"
+              onClick={() => setShowLiveAccountModal(true)}
+              className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden transition-colors ${
+                (account.plan === 'pro' || account.plan === 'plus')
+                  ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                  : 'border border-gray-200 hover:border-gray-300'
+              }`}
               aria-label="Account"
             >
-              {account.image_url ? (
-                <Image
-                  src={account.image_url}
-                  alt={account.username || 'Account'}
-                  width={32}
-                  height={32}
-                  className="w-full h-full object-cover"
-                  unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                  <span className="text-xs font-medium text-gray-600">
-                    {account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'A'}
-                  </span>
-                </div>
-              )}
+              <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                {account.image_url ? (
+                  <Image
+                    src={account.image_url}
+                    alt={account.username || 'Account'}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                    unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                    <span className="text-xs font-medium text-gray-600">
+                      {account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'A'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </button>
           ) : (
             <button
-              onClick={() => openAccount('settings')}
+              onClick={() => setShowLiveAccountModal(true)}
               className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 border-2 border-gray-200 hover:border-gray-300 transition-colors flex items-center justify-center"
               aria-label="Sign In"
             >
@@ -758,21 +773,6 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
         <div className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1 py-0.5 flex items-center gap-0.5 w-fit">
           <button
             onClick={() => {
-              setTimeFilter(null);
-              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                detail: { timeFilter: null }
-              }));
-            }}
-            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
-              timeFilter === null
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            All time
-          </button>
-          <button
-            onClick={() => {
               setTimeFilter('24h');
               window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
                 detail: { timeFilter: '24h' }
@@ -801,8 +801,34 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           >
             7d
           </button>
+          <button
+            onClick={() => {
+              const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+              if (!isPro) {
+                openUpgrade('All time filter');
+                return;
+              }
+              setTimeFilter('all');
+              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                detail: { timeFilter: 'all' }
+              }));
+            }}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
+              timeFilter === 'all'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            All time
+          </button>
         </div>
       </div>
+
+      {/* Live Account Modal */}
+      <LiveAccountModal
+        isOpen={showLiveAccountModal}
+        onClose={() => setShowLiveAccountModal(false)}
+      />
     </div>
   );
 }

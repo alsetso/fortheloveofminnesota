@@ -154,21 +154,27 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
 
         {/* Profile Photo - Overlapping Cover */}
         <div className="relative -mt-12">
-          <div className="relative w-14 h-14 rounded-full bg-gray-100 border border-gray-200 overflow-hidden group">
-            {account.image_url ? (
-              <Image
-                src={account.image_url}
-                alt={displayName}
-                width={56}
-                height={56}
-                className="w-full h-full object-cover"
-                unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-              />
-            ) : (
-              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                <UserIcon className="w-7 h-7 text-gray-400" />
-              </div>
-            )}
+          <div className={`relative w-14 h-14 rounded-full bg-gray-100 overflow-hidden group ${
+            (account.plan === 'pro' || account.plan === 'plus')
+              ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+              : 'border border-gray-200'
+          }`}>
+            <div className="w-full h-full rounded-full overflow-hidden bg-white">
+              {account.image_url ? (
+                <Image
+                  src={account.image_url}
+                  alt={displayName}
+                  width={56}
+                  height={56}
+                  className="w-full h-full object-cover rounded-full"
+                  unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-full">
+                  <UserIcon className="w-7 h-7 text-gray-400" />
+                </div>
+              )}
+            </div>
             {isOwnProfile && (
               <>
                 <input

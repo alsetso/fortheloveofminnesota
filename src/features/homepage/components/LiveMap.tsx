@@ -256,6 +256,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           id: mention.id,
           description: mention.description,
           account: mention.account,
+          account_id: mention.account_id,
           created_at: mention.created_at,
         });
       }
@@ -878,6 +879,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             setCreateTabAtlasMeta(null);
           }
         }}
+        contentPadding={false}
       >
         {createTabSelectedLocation ? (
           <CreateMentionContent

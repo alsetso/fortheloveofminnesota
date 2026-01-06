@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MapPinIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { MentionService } from '@/features/mentions/services/mentionService';
 
 interface MapEntityPopupProps {
   isOpen: boolean;
@@ -15,11 +16,13 @@ interface MapEntityPopupProps {
     // Pin/Mention data
     id?: string;
     description?: string;
+    account_id?: string | null;
     account?: {
       username?: string | null;
       first_name?: string | null;
       last_name?: string | null;
       image_url?: string | null;
+      plan?: string | null;
     } | null;
     created_at?: string;
     // Atlas entity data
@@ -41,7 +44,13 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
-  const { user } = useAuthStateSafe();
+  const [showMenu, setShowMenu] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDescription, setEditDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { user, account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
 
   useEffect(() => {
@@ -107,12 +116,142 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
     }, 300);
   };
 
+  // Check if current user owns this mention
+  const isOwner = type === 'pin' && user && account && data && data.account_id === account.id;
+
+  // Initialize edit description when editing starts
+  useEffect(() => {
+    if (isEditing && data && data.description) {
+      setEditDescription(data.description);
+    }
+  }, [isEditing, data]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!showMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setShowMenu(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!data || !data.id) return;
+    
+    setIsSaving(true);
+    try {
+      await MentionService.updateMention(data.id, {
+        description: editDescription.trim() || null,
+      });
+      
+      // Update local data
+      if (data) {
+        data.description = editDescription.trim() || undefined;
+      }
+      
+      // Dispatch event to refresh mentions
+      window.dispatchEvent(new CustomEvent('mention-archived'));
+      
+      setIsEditing(false);
+      setEditDescription('');
+    } catch (err) {
+      console.error('[MapEntityPopup] Error updating mention:', err);
+      alert('Failed to update mention. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditDescription('');
+  };
+
+  const handleDelete = async () => {
+    if (!data || !data.id) return;
+    
+    if (!confirm('Are you sure you want to delete this mention?')) {
+      setShowMenu(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await MentionService.updateMention(data.id, {
+        archived: true,
+      });
+      
+      // Dispatch event to refresh mentions
+      window.dispatchEvent(new CustomEvent('mention-archived'));
+      
+      // Close popup
+      handleClose();
+    } catch (err) {
+      console.error('[MapEntityPopup] Error deleting mention:', err);
+      alert('Failed to delete mention. Please try again.');
+    } finally {
+      setIsDeleting(false);
+      setShowMenu(false);
+    }
+  };
+
   if (!isOpen || !data) return null;
 
-  const formatDate = (dateString?: string) => {
+  const formatTimeAgo = (dateString?: string) => {
     if (!dateString) return '';
     try {
       const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffSeconds = Math.floor(diffMs / 1000);
+      const diffMinutes = Math.floor(diffMs / (1000 * 60));
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      
+      // Less than 1 minute
+      if (diffSeconds < 60) {
+        return 'just now';
+      }
+      
+      // Less than 1 hour - show minutes
+      if (diffMinutes < 60) {
+        return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
+      }
+      
+      // Less than 24 hours - show hours
+      if (diffHours < 24) {
+        return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+      }
+      
+      // 1 or more days - show days and hours
+      const remainingHours = diffHours % 24;
+      if (diffDays === 1) {
+        if (remainingHours === 0) {
+          return '1 day ago';
+        }
+        return `1 day and ${remainingHours} ${remainingHours === 1 ? 'hour' : 'hours'} ago`;
+      }
+      
+      if (diffDays < 7) {
+        if (remainingHours === 0) {
+          return `${diffDays} days ago`;
+        }
+        return `${diffDays} days and ${remainingHours} ${remainingHours === 1 ? 'hour' : 'hours'} ago`;
+      }
+      
+      // More than a week - show date
       return date.toLocaleDateString('en-US', { 
         year: 'numeric', 
         month: 'short', 
@@ -145,15 +284,50 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-sm font-semibold text-gray-900">
-            {type === 'pin' ? 'Mention' : type === 'atlas' ? data.name || 'Location' : 'Location'}
+            {type === 'pin' ? 'Mention' : type === 'atlas' ? (data?.name || 'Location') : 'Location'}
           </h2>
-          <button
-            onClick={handleClose}
-            className="p-1 -mr-1 text-gray-500 hover:text-gray-900 transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Three dots menu - only show for owner's mentions */}
+            {isOwner && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-1 text-gray-500 hover:text-gray-900 transition-colors"
+                  aria-label="More options"
+                  disabled={isDeleting}
+                >
+                  <EllipsisVerticalIcon className="w-5 h-5" />
+                </button>
+                {showMenu && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
+                    <button
+                      onClick={handleEdit}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      disabled={isEditing || isSaving}
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                      disabled={isDeleting}
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={handleClose}
+              className="p-1 -mr-1 text-gray-500 hover:text-gray-900 transition-colors"
+              aria-label="Close"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -165,22 +339,30 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                 {data.account && (
                   <div className="flex items-center gap-2">
                     {/* Profile image - always shown */}
-                    {data.account.image_url ? (
-                      <Image
-                        src={data.account.image_url}
-                        alt={data.account.username || 'User'}
-                        width={32}
-                        height={32}
-                        className="w-8 h-8 rounded-full object-cover"
-                        unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
-                      />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                        <span className="text-xs font-medium text-gray-600">
-                          {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
-                        </span>
+                    <div className={`w-8 h-8 rounded-full overflow-hidden ${
+                      (data.account.plan === 'pro' || data.account.plan === 'plus')
+                        ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                        : 'border border-gray-200'
+                    }`}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                        {data.account.image_url ? (
+                          <Image
+                            src={data.account.image_url}
+                            alt={data.account.username || 'User'}
+                            width={32}
+                            height={32}
+                            className="w-full h-full rounded-full object-cover"
+                            unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
+                          />
+                        ) : (
+                          <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center">
+                            <span className="text-xs font-medium text-gray-600">
+                              {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                     <div className="flex-1">
                       {user ? (
                         // Authenticated: show username
@@ -199,14 +381,44 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     </div>
                   </div>
                 )}
-                {data.description && (
-                  <div className="text-xs text-gray-700">
-                    {data.description}
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+                      rows={3}
+                      maxLength={240}
+                      disabled={isSaving}
+                      autoFocus
+                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                        disabled={isSaving}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSaveEdit}
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isSaving}
+                      >
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  data.description && (
+                    <div className="text-xs text-gray-700">
+                      {data.description}
+                    </div>
+                  )
                 )}
                 {data.created_at && (
                   <div className="text-xs text-gray-500">
-                    {formatDate(data.created_at)}
+                    {formatTimeAgo(data.created_at)}
                   </div>
                 )}
               </>
@@ -259,9 +471,9 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           }));
                           handleClose();
                         }}
-                        className="w-full mt-4 px-4 py-2.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors flex items-center justify-center gap-2"
+                        className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
                       >
-                        <span>Add Label</span>
+                        Add Mention
                       </button>
                     ) : (
                       <div className="w-full mt-4 px-4 py-2.5 text-xs text-gray-600 bg-gray-100 rounded-md text-center">
@@ -312,9 +524,9 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           }));
                           handleClose();
                         }}
-                        className="w-full mt-4 px-4 py-2.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors flex items-center justify-center gap-2"
+                        className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
                       >
-                        <span>Add Label</span>
+                        Add Mention
                       </button>
                     ) : (
                       <div className="w-full mt-4 px-4 py-2.5 text-xs text-gray-600 bg-gray-100 rounded-md text-center">

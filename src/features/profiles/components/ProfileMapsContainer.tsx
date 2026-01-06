@@ -4,17 +4,25 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlusIcon, MapIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import MapCard from '@/app/maps/components/MapCard';
 import type { MapItem } from '@/app/maps/types';
 
 interface ProfileMapsContainerProps {
   accountId: string;
   isOwnProfile: boolean;
+  accountPlan?: string | null;
 }
 
-export default function ProfileMapsContainer({ accountId, isOwnProfile }: ProfileMapsContainerProps) {
+// Helper to check if plan is pro
+const isProPlan = (plan: string | null | undefined): boolean => {
+  return plan === 'pro' || plan === 'plus';
+};
+
+export default function ProfileMapsContainer({ accountId, isOwnProfile, accountPlan }: ProfileMapsContainerProps) {
   const router = useRouter();
   const { account } = useAuthStateSafe();
+  const { openUpgrade } = useAppModalContextSafe();
   const [maps, setMaps] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -74,6 +82,15 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile }: Profil
   }, [accountId]);
 
   const handleCreateMap = () => {
+    // Check if current user (owner) has pro plan
+    const currentUserIsPro = isProPlan(account?.plan);
+    
+    if (!currentUserIsPro) {
+      // Open upgrade modal if not pro
+      openUpgrade('Maps creation');
+      return;
+    }
+    
     router.push('/maps/new');
   };
 
@@ -88,6 +105,8 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile }: Profil
   }
 
   if (maps.length === 0) {
+    const currentUserIsPro = isProPlan(account?.plan);
+    
     return (
       <div className="bg-white rounded-md border border-gray-200 p-[10px]">
         <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -97,17 +116,29 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile }: Profil
           <h3 className="text-sm font-semibold text-gray-900 mb-1">No Maps Yet</h3>
           <p className="text-xs text-gray-600 mb-3">
             {isOwnProfile 
-              ? 'Create your first map to get started'
+              ? (currentUserIsPro 
+                  ? 'Create your first map to get started'
+                  : 'Create custom maps to organize your highlights, collections, memories, and favorite locations. Set privacy controls and build your own communities. Upgrade to Pro to get started.')
               : 'This user hasn\'t created any maps yet'}
           </p>
           {isOwnProfile && (
-            <button
-              onClick={handleCreateMap}
-              className="flex items-center gap-1.5 px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors"
-            >
-              <PlusIcon className="w-3 h-3" />
-              Create Your First Map
-            </button>
+            currentUserIsPro ? (
+              <button
+                onClick={handleCreateMap}
+                className="flex items-center gap-1.5 px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 transition-colors"
+              >
+                <PlusIcon className="w-3 h-3" />
+                Create Your First Map
+              </button>
+            ) : (
+              <button
+                onClick={handleCreateMap}
+                className="flex items-center gap-1.5 px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+              >
+                <PlusIcon className="w-3 h-3" />
+                Upgrade to Pro to Create Maps
+              </button>
+            )
           )}
         </div>
       </div>

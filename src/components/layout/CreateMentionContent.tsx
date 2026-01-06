@@ -2,11 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
+import FirstMentionModal from '@/components/modals/FirstMentionModal';
+import { supabase } from '@/lib/supabase';
 
 interface CreateMentionContentProps {
   map: MapboxMapInstance | null;
@@ -30,6 +33,7 @@ export default function CreateMentionContent({
   const [error, setError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'public' | 'only_me'>('public');
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(initialCoordinates || null);
+  const [showFirstMentionModal, setShowFirstMentionModal] = useState(false);
 
   // Use initialCoordinates if provided, otherwise get map center coordinates
   useEffect(() => {
@@ -107,7 +111,26 @@ export default function CreateMentionContent({
         atlas_meta: initialAtlasMeta || null,
       };
 
-      await MentionService.createMention(mentionData, activeAccountId || undefined);
+      const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
+      
+      // Check if this is the user's first mention
+      if (activeAccountId) {
+        try {
+          const { count, error: countError } = await supabase
+            .from('mentions')
+            .select('*', { count: 'exact', head: true })
+            .eq('account_id', activeAccountId)
+            .eq('archived', false);
+
+          if (!countError && count === 1) {
+            // This is the first mention!
+            setShowFirstMentionModal(true);
+          }
+        } catch (err) {
+          console.error('[CreateMentionContent] Error checking mention count:', err);
+          // Continue even if check fails
+        }
+      }
       
       // Reset form
       setDescription('');
@@ -145,43 +168,33 @@ export default function CreateMentionContent({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 p-4">
-      <div>
-        <p className="text-xs text-gray-600 mb-2">
-          Create a mention at the map center location.
-        </p>
-        {coordinates && (
-          <p className="text-[10px] text-gray-500 mb-3">
-            Location: {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
-          </p>
-        )}
-        
-        {/* Atlas Entity Label */}
-        {initialAtlasMeta && (
-          <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md mb-3">
-            {initialAtlasMeta.icon_path && (
-              <Image
-                src={initialAtlasMeta.icon_path}
-                alt={initialAtlasMeta.name || 'Entity'}
-                width={20}
-                height={20}
-                className="w-5 h-5 object-contain flex-shrink-0"
-                unoptimized
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-semibold text-gray-900">
-                {initialAtlasMeta.name || 'Atlas Entity'}
-              </div>
-              {initialAtlasMeta.table_name && (
-                <div className="text-[10px] text-gray-500 capitalize">
-                  {initialAtlasMeta.table_name.replace('_', ' ')}
-                </div>
-              )}
+    <>
+      <form onSubmit={handleSubmit} className="space-y-3 px-4 py-4">
+      {/* Atlas Entity Label */}
+      {initialAtlasMeta && (
+        <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
+          {initialAtlasMeta.icon_path && (
+            <Image
+              src={initialAtlasMeta.icon_path}
+              alt={initialAtlasMeta.name || 'Entity'}
+              width={20}
+              height={20}
+              className="w-5 h-5 object-contain flex-shrink-0"
+              unoptimized
+            />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-gray-900">
+              {initialAtlasMeta.name || 'Atlas Entity'}
             </div>
+            {initialAtlasMeta.table_name && (
+              <div className="text-[10px] text-gray-500 capitalize">
+                {initialAtlasMeta.table_name.replace('_', ' ')}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Description */}
       <div>
@@ -194,42 +207,31 @@ export default function CreateMentionContent({
             }
           }}
           maxLength={240}
-          className="w-full px-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none border border-gray-200 rounded-md"
+          className="w-full px-0 py-0 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none bg-transparent"
           placeholder="What's going on here?"
           rows={4}
           disabled={isSubmitting || !coordinates}
         />
-        <div className="flex justify-end mt-1">
+        <div className="flex items-center justify-end gap-2 mt-1">
           <span className={`text-[10px] ${description.length >= 240 ? 'text-red-500' : 'text-gray-400'}`}>
             {description.length}/240
           </span>
+          {/* Submit Button - Only show if description has at least 1 character */}
+          {description.trim().length > 0 && (
+            <button
+              type="submit"
+              disabled={isSubmitting || !coordinates || !description.trim()}
+              className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Create Mention"
+            >
+              {isSubmitting ? (
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <PaperAirplaneIcon className="w-3 h-3" />
+              )}
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Visibility Toggle */}
-      <div className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-md">
-        <span className={`text-[10px] ${visibility === 'public' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-          Public
-        </span>
-        <button
-          type="button"
-          onClick={() => setVisibility(visibility === 'public' ? 'only_me' : 'public')}
-          disabled={isSubmitting}
-          className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
-            visibility === 'only_me' ? 'bg-gray-700' : 'bg-gray-300'
-          }`}
-          role="switch"
-          aria-checked={visibility === 'only_me'}
-        >
-          <span
-            className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-              visibility === 'only_me' ? 'translate-x-3' : 'translate-x-0'
-            }`}
-          />
-        </button>
-        <span className={`text-[10px] ${visibility === 'only_me' ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
-          Only Me
-        </span>
       </div>
 
       {/* Error */}
@@ -238,16 +240,12 @@ export default function CreateMentionContent({
           {error}
         </div>
       )}
-
-      {/* Submit Button */}
-      <button
-        type="submit"
-        disabled={isSubmitting || !coordinates || !description.trim()}
-        className="w-full px-4 py-2.5 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isSubmitting ? 'Posting...' : 'Create Mention'}
-      </button>
-    </form>
+      </form>
+      <FirstMentionModal
+        isOpen={showFirstMentionModal}
+        onClose={() => setShowFirstMentionModal(false)}
+      />
+    </>
   );
 }
 

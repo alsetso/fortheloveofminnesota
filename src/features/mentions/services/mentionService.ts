@@ -26,7 +26,8 @@ export class MentionService {
             id,
             username,
             first_name,
-            image_url
+            image_url,
+            plan
           ),
           collections(
             id,
@@ -274,6 +275,7 @@ export class MentionService {
         account_id: mention.account_id,
         collection_emoji: (mention as any).collections?.emoji || null,
         account_image_url: (mention as any).accounts?.image_url || null,
+        account_plan: (mention as any).accounts?.plan || null, // Include plan for gold border on map pins
       };
       
       // Only include description if it exists (authenticated users)

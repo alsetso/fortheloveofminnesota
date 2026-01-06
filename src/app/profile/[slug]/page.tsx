@@ -64,7 +64,8 @@ export default async function ProfilePage({ params }: Props) {
     city_id,
     view_count,
     traits,
-    user_id, 
+    user_id,
+    plan,
     created_at
   `;
 
@@ -93,6 +94,7 @@ export default async function ProfilePage({ params }: Props) {
     view_count: number | null;
     traits: any;
     user_id: string;
+    plan: string | null;
     created_at: string;
   };
 
@@ -164,6 +166,7 @@ export default async function ProfilePage({ params }: Props) {
     view_count: accountData.view_count || 0,
     traits: accountData.traits,
     user_id: accountData.user_id,
+    plan: accountData.plan,
     created_at: accountData.created_at,
   };
 

@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get account_id for current user (needed for custom_slug validation)
+    // Get account_id for current user (needed for custom_slug validation and pro plan check)
     let accountId: string;
     try {
       accountId = await getAccountIdForUser(auth, supabase);
@@ -161,19 +161,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if user has pro plan (required for map creation)
+    const { data: account } = await supabase
+      .from('accounts')
+      .select('plan')
+      .eq('id', accountId)
+      .single();
+
+    const accountData = account as { plan: string } | null;
+    if (accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
+      return createErrorResponse('Map creation is only available for Pro subscribers. Upgrade to Pro to create maps.', 403);
+    }
+
     // Validate custom_slug if provided
     if (custom_slug) {
-      // Check if user has pro account
-      const { data: account } = await supabase
-        .from('accounts')
-        .select('plan')
-        .eq('id', accountId)
-        .single();
-
-      const accountData = account as { plan: string } | null;
-      if (accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
-        return createErrorResponse('Custom slugs are only available for pro accounts', 403);
-      }
+      // Pro plan already verified above, so custom_slug is allowed
 
       // Validate slug format
       const slugRegex = /^[a-z0-9-]+$/;

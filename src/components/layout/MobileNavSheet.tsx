@@ -13,13 +13,14 @@ interface MobileNavSheetProps {
   map?: any;
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string) => void;
   headerAction?: React.ReactNode;
+  contentPadding?: boolean; // Control content padding
 }
 
 /**
  * iOS-style slide-up sheet that appears behind the mobile nav (z-[50])
  * but in front of the map top container (z-[45]). Uses smooth spring-like animations.
  */
-export default function MobileNavSheet({ isOpen, onClose, title, children, showSearch = false, map, onLocationSelect, headerAction }: MobileNavSheetProps) {
+export default function MobileNavSheet({ isOpen, onClose, title, children, showSearch = false, map, onLocationSelect, headerAction, contentPadding = true }: MobileNavSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
@@ -139,7 +140,7 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
 
         {/* Content */}
         <div ref={contentRef} className="flex-1 overflow-y-auto">
-          <div className="p-4">
+          <div className={contentPadding ? 'p-4' : ''}>
             {children}
           </div>
         </div>

@@ -24,6 +24,7 @@ export interface Mention {
     id: string;
     username: string | null;
     image_url: string | null;
+    plan?: string | null;
   } | null;
   collection?: {
     id: string;
@@ -75,6 +76,7 @@ export interface MentionGeoJSONFeature {
     account_id: string | null;
     collection_emoji: string | null;
     account_image_url: string | null;
+    account_plan?: string | null; // Account plan for gold border on map pins
   };
 }
 

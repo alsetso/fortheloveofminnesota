@@ -50,23 +50,33 @@ function ProfileAvatar({
   account, 
   isActive 
 }: { 
-  account: { image_url?: string | null; username?: string | null } | null; 
+  account: { image_url?: string | null; username?: string | null; plan?: string | null } | null; 
   isActive: boolean;
 }) {
+  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+  
   return (
-    <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border ${isActive ? 'border-gray-900' : 'border-gray-300'}`}>
-      {account?.image_url ? (
-        <Image
-          src={account.image_url}
-          alt={account.username || 'Profile'}
-          width={20}
-          height={20}
-          className="w-full h-full object-cover"
-          unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-        />
-      ) : (
-        <UserIcon className={`w-3 h-3 ${isActive ? 'text-gray-900' : 'text-gray-500'}`} />
-      )}
+    <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center ${
+      isPro
+        ? 'p-[1px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+        : `border ${isActive ? 'border-gray-900' : 'border-gray-300'}`
+    }`}>
+      <div className="w-full h-full rounded-full overflow-hidden bg-white">
+        {account?.image_url ? (
+          <Image
+            src={account.image_url}
+            alt={account.username || 'Profile'}
+            width={20}
+            height={20}
+            className="w-full h-full object-cover rounded-full"
+            unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <UserIcon className={`w-3 h-3 ${isActive ? 'text-gray-900' : 'text-gray-500'}`} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

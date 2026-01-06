@@ -126,23 +126,33 @@ export default function ProfilePhoto({
     }
   };
 
+  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+
   return (
     <div className={`relative ${className}`}>
       {/* Profile Photo */}
-      <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400 border-2 border-gray-300 relative`}>
-        {avatarUrl && !imageError ? (
-          <Image
-            src={avatarUrl}
-            alt={displayName || email}
-            fill
-            sizes="(max-width: 96px) 100vw, 96px"
-            className="object-cover rounded-full"
-            onError={() => setImageError(true)}
-            unoptimized={avatarUrl.startsWith('data:') || avatarUrl.includes('supabase.co')}
-          />
-        ) : (
-          <UserIcon className={iconSizes[size]} />
-        )}
+      <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400 relative ${
+        isPro 
+          ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+          : 'border border-gray-200'
+      }`}>
+        <div className="w-full h-full rounded-full overflow-hidden bg-white">
+          {avatarUrl && !imageError ? (
+            <Image
+              src={avatarUrl}
+              alt={displayName || email}
+              fill
+              sizes="(max-width: 96px) 100vw, 96px"
+              className="object-cover rounded-full"
+              onError={() => setImageError(true)}
+              unoptimized={avatarUrl.startsWith('data:') || avatarUrl.includes('supabase.co')}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <UserIcon className={iconSizes[size]} />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Upload Overlay */}

@@ -43,7 +43,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>(null);
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>('24h');
   const currentMentionRef = useRef<Mention | null>(null);
   const accountRef = useRef(account);
   const openWelcomeRef = useRef(openWelcome);
@@ -61,8 +61,10 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
   // Listen for time filter changes
   useEffect(() => {
     const handleTimeFilterChange = (event: Event) => {
-      const customEvent = event as CustomEvent<{ timeFilter: '24h' | '7d' | null }>;
-      setTimeFilter(customEvent.detail?.timeFilter || null);
+      const customEvent = event as CustomEvent<{ timeFilter: '24h' | '7d' | 'all' }>;
+      const filter = customEvent.detail?.timeFilter;
+      // Convert 'all' to null for the service (no filter)
+      setTimeFilter(filter === 'all' ? null : filter || '24h');
     };
 
     window.addEventListener('mention-time-filter-change', handleTimeFilterChange);
@@ -216,21 +218,27 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           }
         }
         
-        // Load unique account images
-        const uniqueAccountImages = new Set<string>();
+        // Load unique account images with plan info (pro vs non-pro need different borders)
+        const uniqueAccountImages = new Map<string, { imageUrl: string; isPro: boolean }>();
         geoJSON.features.forEach((feature: any) => {
           const accountImageUrl = feature.properties.account_image_url;
-          if (accountImageUrl && !uniqueAccountImages.has(accountImageUrl)) {
-            uniqueAccountImages.add(accountImageUrl);
+          const accountPlan = feature.properties.account_plan;
+          const isPro = accountPlan === 'pro' || accountPlan === 'plus';
+          
+          if (accountImageUrl) {
+            const key = `${accountImageUrl}|${isPro ? 'pro' : 'regular'}`;
+            if (!uniqueAccountImages.has(key)) {
+              uniqueAccountImages.set(key, { imageUrl: accountImageUrl, isPro });
+            }
           }
         });
         
-        // Load each unique account image
-        const imageLoadPromises = Array.from(uniqueAccountImages).map(async (imageUrl) => {
-          const imageId = `map-mention-account-${imageUrl.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        // Load each unique account image (separate for pro vs non-pro)
+        const imageLoadPromises = Array.from(uniqueAccountImages.entries()).map(async ([key, { imageUrl, isPro }]) => {
+          const imageId = `map-mention-account-${imageUrl.replace(/[^a-zA-Z0-9]/g, '_')}-${isPro ? 'pro' : 'regular'}`;
           
           if (mapboxMap.hasImage(imageId)) {
-            accountImageIds.set(imageUrl, imageId);
+            accountImageIds.set(key, imageId);
             return;
           }
           
@@ -242,7 +250,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
               img.onload = resolve;
               img.onerror = () => {
                 // If account image fails, use fallback
-                accountImageIds.set(imageUrl, fallbackImageId);
+                accountImageIds.set(key, fallbackImageId);
                 resolve(null);
               };
               img.src = imageUrl;
@@ -250,9 +258,11 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             
             if (img.complete && img.naturalWidth > 0) {
               const canvas = document.createElement('canvas');
+              const padding = 4; // Add padding to prevent square cropping
               const size = 64;
-              const borderWidth = 3; // White border width
-              const radius = (size - borderWidth * 2) / 2;
+              const borderWidth = 3; // Border width
+              const contentSize = size - (padding * 2); // Size of the actual circle content
+              const radius = (contentSize - borderWidth * 2) / 2;
               const centerX = size / 2;
               const centerY = size / 2;
               
@@ -270,11 +280,25 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                 ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 2;
                 
-                // Draw white border circle (with shadow)
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
-                ctx.fill();
+                // Draw border circle - gold gradient for pro, white for regular
+                if (isPro) {
+                  // Gold gradient border for pro accounts
+                  const gradient = ctx.createLinearGradient(0, 0, size, size);
+                  gradient.addColorStop(0, '#fbbf24'); // yellow-400
+                  gradient.addColorStop(0.5, '#f59e0b'); // yellow-500
+                  gradient.addColorStop(1, '#d97706'); // yellow-600
+                  
+                  ctx.beginPath();
+                  ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
+                  ctx.fillStyle = gradient;
+                  ctx.fill();
+                } else {
+                  // White border for regular accounts
+                  ctx.beginPath();
+                  ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fill();
+                }
                 
                 // Reset shadow for image
                 ctx.shadowColor = 'transparent';
@@ -290,35 +314,35 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                 
                 // Calculate image dimensions to fill circle (cover behavior)
                 const imgAspect = img.width / img.height;
-                let drawWidth = size;
-                let drawHeight = size;
-                let drawX = 0;
-                let drawY = 0;
+                let drawWidth = contentSize;
+                let drawHeight = contentSize;
+                let drawX = centerX - (drawWidth / 2);
+                let drawY = centerY - (drawHeight / 2);
                 
                 if (imgAspect > 1) {
                   // Image is wider - fit to height
-                  drawHeight = size;
-                  drawWidth = size * imgAspect;
-                  drawX = (size - drawWidth) / 2;
+                  drawHeight = contentSize;
+                  drawWidth = contentSize * imgAspect;
+                  drawX = centerX - (drawWidth / 2);
                 } else {
                   // Image is taller - fit to width
-                  drawWidth = size;
-                  drawHeight = size / imgAspect;
-                  drawY = (size - drawHeight) / 2;
+                  drawWidth = contentSize;
+                  drawHeight = contentSize / imgAspect;
+                  drawY = centerY - (drawHeight / 2);
                 }
                 
                 // Draw image centered and cropped to circle
                 ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
                 ctx.restore();
                 
-                // Draw white border outline with subtle shadow
+                // Draw border outline with subtle shadow
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
                 ctx.shadowBlur = 4;
                 ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 1;
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
-                ctx.strokeStyle = '#ffffff';
+                ctx.strokeStyle = isPro ? '#f59e0b' : '#ffffff'; // Gold for pro, white for regular
                 ctx.lineWidth = borderWidth;
                 ctx.stroke();
                 ctx.shadowColor = 'transparent';
@@ -328,22 +352,38 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                 
                 const imageData = ctx.getImageData(0, 0, size, size);
                 mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
-                accountImageIds.set(imageUrl, imageId);
+                accountImageIds.set(key, imageId);
               }
             }
           } catch (error) {
             console.warn('[MentionsLayer] Failed to load account image:', imageUrl, error);
-            accountImageIds.set(imageUrl, fallbackImageId);
+            accountImageIds.set(key, fallbackImageId);
           }
         });
         
         await Promise.all(imageLoadPromises);
         
-        // Build case expression for icon selection
+        // Build case expression for icon selection (match by image URL and plan)
         const iconExpression: any[] = ['case'];
-        accountImageIds.forEach((imageId, imageUrl) => {
-          iconExpression.push(['==', ['get', 'account_image_url'], imageUrl]);
-          iconExpression.push(imageId);
+        accountImageIds.forEach((imageId, key) => {
+          const [imageUrl, planType] = key.split('|');
+          if (planType === 'pro') {
+            // Match pro or plus accounts with this image URL
+            iconExpression.push([
+              'all',
+              ['==', ['get', 'account_image_url'], imageUrl],
+              ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]
+            ]);
+            iconExpression.push(imageId);
+          } else {
+            // Match regular accounts (plan is null or not pro/plus) with this image URL
+            iconExpression.push([
+              'all',
+              ['==', ['get', 'account_image_url'], imageUrl],
+              ['!', ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]]
+            ]);
+            iconExpression.push(imageId);
+          }
         });
         iconExpression.push(fallbackImageId); // Fallback to heart icon
 
@@ -429,7 +469,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                 const { supabase } = await import('@/lib/supabase');
                 const { data: accountData } = await supabase
                   .from('accounts')
-                  .select('id, username, first_name, image_url')
+                  .select('id, username, first_name, image_url, plan')
                   .eq('id', mention.account_id)
                   .single();
                 
@@ -441,6 +481,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
                       id: accountData.id,
                       username: accountData.username,
                       image_url: accountData.image_url,
+                      plan: accountData.plan,
                     }
                   };
                   // Update in refs

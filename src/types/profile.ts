@@ -41,6 +41,7 @@ export interface ProfileAccount {
   view_count: number;
   traits: string[] | null;
   user_id: string | null;
+  plan?: string | null;
   created_at: string;
 }
 

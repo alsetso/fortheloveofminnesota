@@ -71,7 +71,7 @@ export interface MentionGeoJSONFeature {
   };
   properties: {
     id: string;
-    description: string | null;
+    description?: string | null; // Optional - excluded for unauthenticated users
     account_id: string | null;
     collection_emoji: string | null;
     account_image_url: string | null;

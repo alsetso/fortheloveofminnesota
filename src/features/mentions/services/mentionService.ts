@@ -16,7 +16,8 @@ export class MentionService {
     const { data: { user } } = await supabase.auth.getUser();
     const isAuthenticated = !!user;
     
-    // Build query - for anonymous users, skip accounts and collections joins to avoid RLS issues
+    // Build query - for anonymous users, include accounts.image_url (public) but exclude username/description
+    // Note: collections join is excluded for anonymous users due to RLS restrictions
     let query = supabase
       .from('mentions')
       .select(isAuthenticated 
@@ -32,7 +33,22 @@ export class MentionService {
             emoji,
             title
           )`
-        : `*`
+        : `id,
+          lat,
+          lng,
+          account_id,
+          city_id,
+          collection_id,
+          visibility,
+          archived,
+          post_date,
+          map_meta,
+          atlas_meta,
+          created_at,
+          updated_at,
+          accounts(
+            image_url
+          )`
       )
       .eq('archived', false); // Exclude archived mentions
     
@@ -246,22 +262,34 @@ export class MentionService {
 
   /**
    * Convert mentions array to GeoJSON FeatureCollection
+   * For unauthenticated users, description is excluded but account_image_url is included
    */
   static mentionsToGeoJSON(mentions: Mention[]): MentionGeoJSONCollection {
-    const features: MentionGeoJSONFeature[] = mentions.map((mention) => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [mention.lng, mention.lat],
-      },
-      properties: {
+    const features: MentionGeoJSONFeature[] = mentions.map((mention) => {
+      // Check if mention has description (authenticated users) or not (unauthenticated)
+      const hasDescription = 'description' in mention && mention.description !== undefined;
+      
+      const properties: any = {
         id: mention.id,
-        description: mention.description,
         account_id: mention.account_id,
         collection_emoji: (mention as any).collections?.emoji || null,
         account_image_url: (mention as any).accounts?.image_url || null,
-      },
-    }));
+      };
+      
+      // Only include description if it exists (authenticated users)
+      if (hasDescription) {
+        properties.description = mention.description;
+      }
+      
+      return {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [mention.lng, mention.lat],
+        },
+        properties,
+      } as MentionGeoJSONFeature;
+    });
 
     return {
       type: 'FeatureCollection',

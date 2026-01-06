@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -39,7 +39,17 @@ interface AtlasEntitySuggestion {
   type: 'atlas';
 }
 
-type SearchSuggestion = MapboxFeature | AtlasEntitySuggestion;
+interface NewsArticleSuggestion {
+  id: string;
+  article_id: string;
+  title: string;
+  snippet?: string | null;
+  source_name?: string | null;
+  published_at: string;
+  type: 'news';
+}
+
+type SearchSuggestion = MapboxFeature | AtlasEntitySuggestion | NewsArticleSuggestion;
 
 // Type definitions for Web Speech API
 declare global {
@@ -209,8 +219,8 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     try {
       const searchTerm = query.trim().toLowerCase();
       
-      // Search both in parallel
-      const [mapboxResults, atlasResults] = await Promise.allSettled([
+      // Search all three in parallel: Mapbox geocoding, Atlas entities, News articles
+      const [mapboxResults, atlasResults, newsResults] = await Promise.allSettled([
         // Mapbox geocoding
         (async () => {
           const token = MAP_CONFIG.MAPBOX_TOKEN;
@@ -267,13 +277,42 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             return [];
           }
         })(),
+        // News articles search
+        (async () => {
+          try {
+            const { supabase } = await import('@/lib/supabase');
+            const { data, error } = await (supabase as any)
+              .schema('news')
+              .from('generated')
+              .select('article_id, title, snippet, source_name, published_at')
+              .or(`title.ilike.%${searchTerm}%,snippet.ilike.%${searchTerm}%`)
+              .order('published_at', { ascending: false })
+              .limit(5);
+            
+            if (error || !data) return [];
+            
+            return data.map((article: any): NewsArticleSuggestion => ({
+              id: article.article_id,
+              article_id: article.article_id,
+              title: article.title,
+              snippet: article.snippet,
+              source_name: article.source_name,
+              published_at: article.published_at,
+              type: 'news',
+            }));
+          } catch (error) {
+            console.error('News search error:', error);
+            return [];
+          }
+        })(),
       ]);
 
       const mapboxFeatures = mapboxResults.status === 'fulfilled' ? mapboxResults.value : [];
       const atlasEntities = atlasResults.status === 'fulfilled' ? atlasResults.value : [];
+      const newsArticles = newsResults.status === 'fulfilled' ? newsResults.value : [];
       
-      // Combine results: addresses first, then atlas entities
-      const combined = [...mapboxFeatures, ...atlasEntities];
+      // Combine results: addresses first, then atlas entities, then news articles
+      const combined = [...mapboxFeatures, ...atlasEntities, ...newsArticles];
       
       setSuggestions(combined);
       setShowSuggestions(combined.length > 0);
@@ -313,6 +352,16 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
   const handleSuggestionSelect = useCallback((suggestion: SearchSuggestion) => {
     setShowSuggestions(false);
     setSuggestions([]);
+    
+    // Handle news article
+    if ('type' in suggestion && suggestion.type === 'news') {
+      const article = suggestion as NewsArticleSuggestion;
+      setSearchQuery(article.title);
+      
+      // Navigate to news article page
+      window.location.href = `/news/${article.article_id}`;
+      return;
+    }
     
     // Handle atlas entity
     if ('type' in suggestion && suggestion.type === 'atlas') {
@@ -471,12 +520,16 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
       <div ref={containerRef} className="pointer-events-auto space-y-2 relative">
         {/* Search Bar */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-3 py-2 flex items-center gap-2 relative">
-          {/* Pin Icon */}
+          {/* Logo */}
           <div className="flex-shrink-0">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M10 0C6.13 0 3 3.13 3 7C3 12.25 10 20 10 20C10 20 17 12.25 17 7C17 3.13 13.87 0 10 0Z" fill="#EA4335"/>
-              <path d="M10 9.5C11.38 9.5 12.5 8.38 12.5 7C12.5 5.62 11.38 4.5 10 4.5C8.62 4.5 7.5 5.62 7.5 7C7.5 8.38 8.62 9.5 10 9.5Z" fill="white"/>
-            </svg>
+            <Image
+              src="/logo.png"
+              alt="Logo"
+              width={20}
+              height={20}
+              className="w-5 h-5"
+              unoptimized
+            />
           </div>
 
           {/* Search Input */}
@@ -513,8 +566,10 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
               <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto z-50">
                 {suggestions.map((suggestion, index) => {
                   const isAtlas = 'type' in suggestion && suggestion.type === 'atlas';
+                  const isNews = 'type' in suggestion && suggestion.type === 'news';
                   const entity = isAtlas ? (suggestion as AtlasEntitySuggestion) : null;
-                  const feature = !isAtlas ? (suggestion as MapboxFeature) : null;
+                  const article = isNews ? (suggestion as NewsArticleSuggestion) : null;
+                  const feature = !isAtlas && !isNews ? (suggestion as MapboxFeature) : null;
                   
                   return (
                     <button
@@ -534,6 +589,18 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                               </div>
                               <div className="text-xs text-gray-500 truncate capitalize">
                                 {entity!.table_name.replace('_', ' ')}
+                              </div>
+                            </div>
+                          </>
+                        ) : isNews ? (
+                          <>
+                            <NewspaperIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-gray-900 truncate">
+                                {article!.title}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {article!.source_name || 'News Article'}
                               </div>
                             </div>
                           </>

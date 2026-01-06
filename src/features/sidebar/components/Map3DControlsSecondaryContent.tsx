@@ -196,33 +196,30 @@ export default function Map3DControlsSecondaryContent({
           <div className="flex gap-1">
             <button
               onClick={() => setPitchValue(0)}
-              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                pitch === 0
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
+              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5"
             >
-              0°
+              {pitch === 0 && (
+                <div className="w-2 h-2 bg-green-500 rounded-full border border-white flex-shrink-0" />
+              )}
+              <span>0°</span>
             </button>
             <button
               onClick={() => setPitchValue(30)}
-              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                Math.round(pitch) === 30
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
+              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5"
             >
-              30°
+              {Math.round(pitch) === 30 && (
+                <div className="w-2 h-2 bg-green-500 rounded-full border border-white flex-shrink-0" />
+              )}
+              <span>30°</span>
             </button>
             <button
               onClick={() => setPitchValue(60)}
-              className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors ${
-                Math.round(pitch) === 60
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
-              }`}
+              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-1.5"
             >
-              60°
+              {Math.round(pitch) === 60 && (
+                <div className="w-2 h-2 bg-green-500 rounded-full border border-white flex-shrink-0" />
+              )}
+              <span>60°</span>
             </button>
           </div>
         </div>

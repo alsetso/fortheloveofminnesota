@@ -712,6 +712,17 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         isOpen={activeTab === 'news'}
         onClose={closeTab}
         title="News"
+        showSearch={true}
+        map={mapInstanceRef.current}
+        onLocationSelect={(coordinates, placeName) => {
+          if (mapInstanceRef.current && mapLoaded) {
+            mapInstanceRef.current.flyTo({
+              center: [coordinates.lng, coordinates.lat],
+              zoom: 15,
+              duration: 1500,
+            });
+          }
+        }}
       >
         <NewsContent />
       </MobileNavSheet>
@@ -721,6 +732,17 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         isOpen={activeTab === 'explore'}
         onClose={closeTab}
         title="Explore"
+        showSearch={true}
+        map={mapInstanceRef.current}
+        onLocationSelect={(coordinates, placeName) => {
+          if (mapInstanceRef.current && mapLoaded) {
+            mapInstanceRef.current.flyTo({
+              center: [coordinates.lng, coordinates.lat],
+              zoom: 15,
+              duration: 1500,
+            });
+          }
+        }}
       >
         <NearbyPlacesContainer
           map={mapInstanceRef.current}
@@ -734,6 +756,17 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         isOpen={activeTab === 'create'}
         onClose={closeTab}
         title="Create"
+        showSearch={true}
+        map={mapInstanceRef.current}
+        onLocationSelect={(coordinates, placeName) => {
+          if (mapInstanceRef.current && mapLoaded) {
+            mapInstanceRef.current.flyTo({
+              center: [coordinates.lng, coordinates.lat],
+              zoom: 15,
+              duration: 1500,
+            });
+          }
+        }}
       >
         <div className="space-y-3 p-4">
           <p className="text-xs text-gray-600">

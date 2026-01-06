@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
@@ -37,6 +37,8 @@ interface MapEntityPopupProps {
  */
 export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntityPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,12 +54,44 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
     } else {
       // Restore body scroll
       document.body.style.overflow = '';
+      setIsAtMaxHeight(false);
     }
 
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen]);
+
+  // Check if content reaches max height
+  useEffect(() => {
+    if (!isOpen || !contentRef.current || !popupRef.current) return;
+
+    const checkMaxHeight = () => {
+      if (contentRef.current && popupRef.current) {
+        const contentHeight = contentRef.current.scrollHeight;
+        const containerHeight = popupRef.current.clientHeight;
+        const maxHeight = window.innerHeight - 64; // 4rem = 64px for mobile nav
+        
+        // Check if content is scrollable (reached max height)
+        setIsAtMaxHeight(contentHeight >= maxHeight || contentRef.current.scrollHeight > contentRef.current.clientHeight);
+      }
+    };
+
+    // Check immediately and after a short delay for content to render
+    checkMaxHeight();
+    const timeoutId = setTimeout(checkMaxHeight, 100);
+
+    // Use ResizeObserver to watch for content changes
+    const resizeObserver = new ResizeObserver(checkMaxHeight);
+    if (contentRef.current) {
+      resizeObserver.observe(contentRef.current);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      resizeObserver.disconnect();
+    };
+  }, [isOpen, data]);
 
   const handleClose = () => {
     if (popupRef.current) {
@@ -90,10 +124,12 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
       {/* Popup - Covers mobile nav */}
       <div
         ref={popupRef}
-        className="fixed bottom-0 left-0 right-0 z-[60] bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out flex flex-col"
+        className={`fixed bottom-0 left-0 right-0 z-[60] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col ${
+          isAtMaxHeight ? 'rounded-none' : 'rounded-t-3xl'
+        }`}
         style={{
           transform: 'translateY(100%)',
-          maxHeight: '100vh',
+          maxHeight: 'calc(100vh - 4rem)',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
@@ -117,7 +153,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={contentRef} className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-4">
             {/* Pin/Mention Content */}
             {type === 'pin' && (

@@ -16,6 +16,11 @@ export default function MapsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
+
+  // Redirect to /live immediately
+  useEffect(() => {
+    router.replace('/live');
+  }, [router]);
   const [userMaps, setUserMaps] = useState<MapItem[]>([]);
   const [accountMaps, setAccountMaps] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -421,6 +426,13 @@ export default function MapsPage() {
   return (
     <>
       <PageViewTracker />
+      {/* Full overlay to ensure redirect happens */}
+      <div className="fixed inset-0 z-[9999] bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-gray-900 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="text-sm font-medium text-gray-900">Redirecting to Live Map...</div>
+        </div>
+      </div>
       <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3">
         <div className="max-w-7xl mx-auto">
           <div className="w-full space-y-3">

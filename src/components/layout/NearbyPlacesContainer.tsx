@@ -1,20 +1,20 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Image from 'next/image';
 import { MapPinIcon } from '@heroicons/react/24/outline';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import { supabase } from '@/lib/supabase';
 import { watchGeolocation, getCurrentPosition, getGeolocationErrorMessage, type GeolocationError } from '@/utils/geolocation';
+import { extractFeature, type ExtractedFeature } from '@/features/map-metadata/services/featureService';
 
 interface NearbyPlace {
   id: string;
   name: string;
-  table_name: string;
+  category: string;
+  icon: string;
   lat: number;
   lng: number;
   distance?: number;
-  icon_path?: string | null;
+  layerId: string;
 }
 
 interface NearbyPlacesContainerProps {
@@ -55,68 +55,144 @@ export default function NearbyPlacesContainer({
     return R * c; // Distance in km
   }, []);
 
-  // Fetch nearby places
+  // Fetch nearby places from Mapbox viewport
   const fetchNearbyPlaces = useCallback(async (lat: number, lng: number) => {
     if (!map || !mapLoaded) return;
 
     setIsLoading(true);
     try {
-      // Calculate bounding box (roughly 2km radius)
-      const radiusKm = 2;
-      const latDelta = radiusKm / 111; // Rough conversion: 1 degree lat ≈ 111 km
-      const lngDelta = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
-
-      const { data, error } = await supabase
-        .from('atlas_entities')
-        .select('id, name, table_name, lat, lng')
-        .gte('lat', lat - latDelta)
-        .lte('lat', lat + latDelta)
-        .gte('lng', lng - lngDelta)
-        .lte('lng', lng + lngDelta)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .limit(10);
-
-      if (error) {
-        console.error('[NearbyPlacesContainer] Error fetching nearby places:', error);
+      const mapboxMap = map as any;
+      
+      // Get viewport bounds
+      const bounds = mapboxMap.getBounds();
+      if (!bounds) {
         setNearbyPlaces([]);
+        setIsLoading(false);
         return;
       }
 
-      if (data) {
-        // Get unique table names to fetch icons
-        const tableNames = [...new Set((data as NearbyPlace[]).map(p => p.table_name))];
-        
-        // Fetch icon paths from atlas_types
-        const iconPaths: Record<string, string | null> = {};
-        if (tableNames.length > 0) {
-          try {
-            const { data: typesData } = await (supabase as any)
-              .schema('atlas')
-              .from('atlas_types')
-              .select('slug, icon_path')
-              .in('slug', tableNames);
-            
-            if (typesData) {
-              typesData.forEach((type: { slug: string; icon_path: string | null }) => {
-                iconPaths[type.slug] = type.icon_path;
-              });
+      // Convert bounds to bounding box for queryRenderedFeatures
+      const bbox: [[number, number], [number, number]] = [
+        [bounds.getWest(), bounds.getSouth()],
+        [bounds.getEast(), bounds.getNorth()]
+      ];
+
+      // Query all features in viewport
+      const allFeatures = mapboxMap.queryRenderedFeatures(bbox);
+
+      if (!allFeatures || allFeatures.length === 0) {
+        setNearbyPlaces([]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Filter out custom layers and extract meaningful features
+      const meaningfulFeatures: Array<{ feature: ExtractedFeature; rawFeature: any }> = [];
+      const seenFeatures = new Set<string>(); // Deduplicate by name+coordinates
+
+      for (const rawFeature of allFeatures) {
+        const layerId = rawFeature.layer?.id || '';
+        const source = rawFeature.source || '';
+
+        // Skip custom layers
+        if (source === 'map-pins' || source.startsWith('atlas-')) continue;
+        if (layerId.includes('map-pins') || layerId.includes('atlas-')) continue;
+        if (layerId.includes('pin') && !layerId.includes('spinning')) continue;
+
+        // Only include meaningful POI/building features
+        // Exclude: roads, water labels, place labels (cities), building numbers, road labels
+        if (layerId.includes('road-label') || 
+            layerId.includes('street-label') ||
+            layerId.includes('place-label') ||
+            layerId.includes('settlement-label') ||
+            layerId.includes('building-number') ||
+            layerId.includes('housenum') ||
+            layerId.includes('water-label') ||
+            layerId.includes('state-label') ||
+            layerId.includes('country-label')) {
+          continue;
+        }
+
+        // Extract feature
+        const extracted = extractFeature(rawFeature);
+        if (!extracted || !extracted.hasUsefulData) continue;
+
+        // Skip if category is road, highway, street, path, trail, or unknown
+        if (extracted.category === 'road' || 
+            extracted.category === 'highway' || 
+            extracted.category === 'street' || 
+            extracted.category === 'path' || 
+            extracted.category === 'trail' ||
+            extracted.category === 'unknown') {
+          continue;
+        }
+
+        // Get coordinates from geometry
+        let featureLat: number | null = null;
+        let featureLng: number | null = null;
+
+        const geometry = rawFeature.geometry;
+        if (geometry) {
+          if (geometry.type === 'Point' && geometry.coordinates) {
+            [featureLng, featureLat] = geometry.coordinates;
+          } else if ((geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') && geometry.coordinates) {
+            // For polygons, use the first coordinate of the first ring
+            const coords = geometry.coordinates[0];
+            if (coords && coords[0]) {
+              [featureLng, featureLat] = coords[0];
             }
-          } catch (error) {
-            console.error('[NearbyPlacesContainer] Error fetching atlas types:', error);
           }
         }
-        
-        // Calculate distances and sort by proximity, add icon paths
-        const placesWithDistance = (data as NearbyPlace[]).map(place => ({
-          ...place,
-          distance: calculateDistance(lat, lng, place.lat, place.lng),
-          icon_path: iconPaths[place.table_name] || null,
-        })).sort((a, b) => (a.distance || 0) - (b.distance || 0))
-          .slice(0, 5); // Top 5 closest
 
-        setNearbyPlaces(placesWithDistance);
+        // Skip if no coordinates
+        if (featureLat === null || featureLng === null) continue;
+
+        // Create unique key for deduplication
+        const name = extracted.name || extracted.label || '';
+        const key = `${name}-${featureLat.toFixed(4)}-${featureLng.toFixed(4)}`;
+        if (seenFeatures.has(key)) continue;
+        seenFeatures.add(key);
+
+        meaningfulFeatures.push({
+          feature: extracted,
+          rawFeature,
+        });
       }
+
+      // Calculate distances and sort by proximity
+      const placesWithDistance = meaningfulFeatures
+        .map(({ feature, rawFeature }) => {
+          // Get coordinates
+          let featureLat: number = 0;
+          let featureLng: number = 0;
+          const geometry = rawFeature.geometry;
+          if (geometry) {
+            if (geometry.type === 'Point' && geometry.coordinates) {
+              [featureLng, featureLat] = geometry.coordinates;
+            } else if ((geometry.type === 'Polygon' || geometry.type === 'MultiPolygon') && geometry.coordinates) {
+              const coords = geometry.coordinates[0];
+              if (coords && coords[0]) {
+                [featureLng, featureLat] = coords[0];
+              }
+            }
+          }
+
+          return {
+            id: `${feature.layerId}-${featureLat}-${featureLng}`,
+            name: feature.name || feature.label || 'Unknown',
+            category: feature.category,
+            icon: feature.icon,
+            lat: featureLat,
+            lng: featureLng,
+            distance: calculateDistance(lat, lng, featureLat, featureLng),
+            layerId: feature.layerId,
+          };
+        })
+        .filter(place => place.lat !== 0 && place.lng !== 0) // Filter out invalid coordinates
+        .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+        .slice(0, 10); // Top 10 closest
+
+      setNearbyPlaces(placesWithDistance);
     } catch (error) {
       console.error('[NearbyPlacesContainer] Error fetching nearby places:', error);
       setNearbyPlaces([]);
@@ -388,25 +464,21 @@ export default function NearbyPlacesContainer({
               }}
               className="w-full flex items-center gap-2 text-xs text-gray-700 hover:bg-gray-50 p-2 rounded-md transition-colors text-left"
             >
-              {place.icon_path ? (
-                <Image
-                  src={place.icon_path}
-                  alt={place.name}
-                  width={14}
-                  height={14}
-                  className="w-3.5 h-3.5 object-contain flex-shrink-0"
-                  unoptimized
-                />
-              ) : (
-                <div className="w-3.5 h-3.5 bg-gray-200 rounded flex-shrink-0" />
-              )}
+              <span className="text-xs flex-shrink-0">{place.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">{place.name}</div>
-                {place.distance !== undefined && (
-                  <div className="text-[10px] text-gray-500">
-                    {(place.distance * 0.621371).toFixed(2)} mi away
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5">
+                  {place.distance !== undefined && (
+                    <div className="text-[10px] text-gray-500">
+                      {(place.distance * 0.621371).toFixed(2)} mi away
+                    </div>
+                  )}
+                  {place.category && place.category !== 'unknown' && (
+                    <span className="text-[10px] text-gray-400 capitalize">
+                      · {place.category.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           ))}

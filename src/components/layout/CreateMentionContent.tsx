@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -16,6 +17,7 @@ interface CreateMentionContentProps {
   mapLoaded: boolean;
   initialCoordinates?: { lat: number; lng: number } | null;
   initialAtlasMeta?: Record<string, any> | null;
+  initialMapMeta?: Record<string, any> | null;
   onMentionCreated?: () => void;
 }
 
@@ -24,6 +26,7 @@ export default function CreateMentionContent({
   mapLoaded,
   initialCoordinates,
   initialAtlasMeta,
+  initialMapMeta,
   onMentionCreated 
 }: CreateMentionContentProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
@@ -34,6 +37,24 @@ export default function CreateMentionContent({
   const [visibility, setVisibility] = useState<'public' | 'only_me'>('public');
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(initialCoordinates || null);
   const [showFirstMentionModal, setShowFirstMentionModal] = useState(false);
+  const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
+  const mapMetaInfoRef = useRef<HTMLDivElement>(null);
+
+  // Close map meta info popup when clicking outside
+  useEffect(() => {
+    if (!showMapMetaInfo) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mapMetaInfoRef.current && !mapMetaInfoRef.current.contains(event.target as Node)) {
+        setShowMapMetaInfo(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMapMetaInfo]);
 
   // Use initialCoordinates if provided, otherwise get map center coordinates
   useEffect(() => {
@@ -109,6 +130,7 @@ export default function CreateMentionContent({
         description: description.trim() || null,
         visibility,
         atlas_meta: initialAtlasMeta || null,
+        map_meta: initialMapMeta || null,
       };
 
       const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
@@ -138,6 +160,9 @@ export default function CreateMentionContent({
       
       // Trigger refresh
       window.dispatchEvent(new CustomEvent('mention-created'));
+      
+      // Dispatch event to remove temporary marker after mention is created
+      window.dispatchEvent(new CustomEvent('mention-created-remove-temp-pin'));
       
       if (onMentionCreated) {
         onMentionCreated();
@@ -195,6 +220,96 @@ export default function CreateMentionContent({
           </div>
         </div>
       )}
+
+      {/* Map Metadata Label */}
+      {initialMapMeta && !initialAtlasMeta && initialMapMeta.feature && (() => {
+        const feature = initialMapMeta.feature;
+        const props = feature.properties || {};
+        
+        // Determine display label - prefer name, fallback to type/class/layerId
+        let displayName = feature.name || 'Map Feature';
+        if (!feature.name) {
+          if (props.type) {
+            displayName = String(props.type);
+          } else if (props.class) {
+            displayName = String(props.class).replace(/_/g, ' ');
+          } else if (feature.layerId) {
+            // Parse layerId for common patterns
+            const layerId = feature.layerId.toLowerCase();
+            if (layerId.includes('poi')) displayName = 'Point of Interest';
+            else if (layerId.includes('building')) displayName = 'Building';
+            else if (layerId.includes('road') || layerId.includes('highway')) displayName = 'Road';
+            else if (layerId.includes('water')) displayName = 'Water';
+            else if (layerId.includes('landuse')) displayName = 'Land Use';
+            else if (layerId.includes('place')) displayName = 'Place';
+            else displayName = feature.layerId.replace(/-/g, ' ').replace(/_/g, ' ');
+          }
+        }
+        
+        // Determine category label - prefer category, fallback to type/class
+        let categoryLabel = feature.category && feature.category !== 'unknown' 
+          ? feature.category.replace(/_/g, ' ')
+          : null;
+        
+        if (!categoryLabel || categoryLabel === 'unknown') {
+          if (props.type) {
+            categoryLabel = String(props.type).replace(/_/g, ' ');
+          } else if (props.class) {
+            categoryLabel = String(props.class).replace(/_/g, ' ');
+          } else if (feature.sourceLayer) {
+            categoryLabel = feature.sourceLayer.replace(/_/g, ' ');
+          } else if (feature.layerId) {
+            const layerId = feature.layerId.toLowerCase();
+            if (layerId.includes('poi')) categoryLabel = 'Point of Interest';
+            else if (layerId.includes('building')) categoryLabel = 'Building';
+            else if (layerId.includes('road') || layerId.includes('highway')) categoryLabel = 'Road';
+            else if (layerId.includes('water')) categoryLabel = 'Water';
+            else categoryLabel = feature.layerId.replace(/-/g, ' ').replace(/_/g, ' ');
+          }
+        }
+        
+        // Combine displayName and categoryLabel into single line
+        const singleLineLabel = categoryLabel && categoryLabel !== displayName
+          ? `${displayName} • ${categoryLabel}`
+          : displayName;
+
+        return (
+          <div className="relative">
+            <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
+              {feature.icon && feature.icon !== '📍' && (
+                <span className="text-xs flex-shrink-0">{feature.icon}</span>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-gray-900 truncate">
+                  {singleLineLabel}
+                </div>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMapMetaInfo(!showMapMetaInfo);
+                }}
+                className="flex-shrink-0 p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Map metadata information"
+              >
+                <InformationCircleIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            
+            {/* Info Popup */}
+            {showMapMetaInfo && (
+              <div
+                ref={mapMetaInfoRef}
+                className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-gray-200 rounded-md shadow-lg p-2"
+              >
+                <p className="text-xs text-gray-600">
+                  By dropping a pin, hovering over labels on the map will reference these in the mention.
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Description */}
       <div>

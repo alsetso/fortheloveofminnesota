@@ -53,8 +53,8 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
   
-  // Atlas layer visibility state (default true)
-  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(true);
+  // Atlas layer visibility state (disabled - hiding all atlas entities)
+  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(false);
   
   // Atlas entity state (managed at parent level)
   const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<{
@@ -199,44 +199,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           }
         });
 
-        // Handle double-click to select location and expand inline mention form
-        mapInstance.on('dblclick', (e: any) => {
-          if (!mounted) return;
-          
-          // Prevent mention creation if hovering over a mention
-          if (isHoveringMentionRef.current || hoveredMentionIdRef.current) {
-            return;
-          }
-          
-          // Check if click hit a mention layer - if so, don't create new mention
-          // Mention click handlers will handle opening the popup
-          const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
-          // Query a box around the click point (20px radius) for larger clickable area
-          const hitRadius = 20;
-          const box: [[number, number], [number, number]] = [
-            [e.point.x - hitRadius, e.point.y - hitRadius],
-            [e.point.x + hitRadius, e.point.y + hitRadius]
-          ];
-          const features = (mapInstance as any).queryRenderedFeatures(box, {
-            layers: mentionLayers,
-          });
-
-          // If clicked on a mention, don't create new mention (mention click handler will handle it)
-          if (features.length > 0) {
-            return;
-          }
-          
-          const lng = e.lngLat.lng;
-          const lat = e.lngLat.lat;
-          // Dispatch event to show location in sidebar and expand mention form
-          // Location details can be shown without authentication - auth check happens when creating mention
-          // Only dispatch if not hovering over a mention
-          if (!isHoveringMentionRef.current && !hoveredMentionIdRef.current) {
-            window.dispatchEvent(new CustomEvent('show-location-for-mention', {
-              detail: { lat, lng }
-            }));
-          }
-        });
 
         mapInstance.on('error', (e: unknown) => {
           const errorMessage = e instanceof Error 

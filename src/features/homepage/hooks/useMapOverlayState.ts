@@ -6,7 +6,7 @@ import { MobileNavTab } from '@/components/layout/MobileNavTabs';
 export type PopupType = 'pin' | 'atlas' | 'location';
 
 export type OverlayType = 
-  | MobileNavTab  // 'news' | 'explore' | 'controls' | 'contribute'
+  | MobileNavTab  // 'news' | 'contribute'
   | 'create'      // Create sheet (special, opened via "Add Label")
   | `popup-${PopupType}`  // 'popup-pin' | 'popup-atlas' | 'popup-location'
   | null;
@@ -22,7 +22,7 @@ export interface OverlayData {
  * Priority (highest to lowest):
  * 1. Entity popups (popup-pin, popup-atlas, popup-location) - highest priority
  * 2. Create sheet (create) - medium priority
- * 3. Mobile nav tabs (news, explore, controls, contribute) - lowest priority
+ * 3. Mobile nav tabs (news, contribute) - lowest priority
  * 
  * Rules:
  * - Only one overlay can be open at a time
@@ -56,7 +56,7 @@ export function useMapOverlayState() {
   // Close mobile nav tab
   const closeTab = useCallback(() => {
     setOverlay(prev => {
-      if (prev.type === 'news' || prev.type === 'explore' || prev.type === 'controls' || prev.type === 'contribute') {
+      if (prev.type === 'news' || prev.type === 'contribute') {
         return { type: null, data: null };
       }
       return prev;
@@ -108,8 +108,7 @@ export function useMapOverlayState() {
 
   // Helper: Get current active tab (if a tab is open)
   const activeTab: MobileNavTab | null = 
-    overlay.type === 'news' || overlay.type === 'explore' || 
-    overlay.type === 'controls' || overlay.type === 'contribute'
+    overlay.type === 'news' || overlay.type === 'contribute'
       ? overlay.type
       : null;
 

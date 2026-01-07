@@ -131,7 +131,7 @@ export default function AccountDropdown({
     try {
       // Set localStorage immediately before switching to ensure persistence
       if (typeof window !== 'undefined') {
-        localStorage.setItem('mnuda_active_account_id', accountId);
+        // Account switching is handled by setActiveAccountId which stores username
       }
       await setActiveAccountId(accountId);
       setIsOpen(false);

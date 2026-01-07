@@ -140,11 +140,33 @@ export default function LocationSidebar({
   const accountRef = useRef(account);
   const authLoadingRef = useRef(authLoading);
   
+  // Inline pin creation form state (declared early for use in useEffect)
+  const [isDropHeartExpanded, setIsDropHeartExpanded] = useState(false);
+  
   useEffect(() => {
     userRef.current = user;
     accountRef.current = account;
     authLoadingRef.current = authLoading;
   }, [user, account, authLoading]);
+  
+  // Listen for live account modal open/close to close mention form
+  useEffect(() => {
+    const handleAccountModalChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ isOpen: boolean }>;
+      const isOpen = customEvent.detail?.isOpen || false;
+      
+      // Close mention form when account modal opens
+      if (isOpen && isDropHeartExpanded) {
+        setIsDropHeartExpanded(false);
+      }
+    };
+
+    window.addEventListener('live-account-modal-change', handleAccountModalChange);
+    return () => {
+      window.removeEventListener('live-account-modal-change', handleAccountModalChange);
+    };
+  }, [isDropHeartExpanded]);
+  
   const { openWindow } = useWindowManager();
   const router = useRouter();
 
@@ -237,8 +259,6 @@ export default function LocationSidebar({
   }>>([]);
   const [isLoadingVisibleAtlas, setIsLoadingVisibleAtlas] = useState(false);
   
-  // Inline pin creation form state
-  const [isDropHeartExpanded, setIsDropHeartExpanded] = useState(false);
   const [pinDescription, setPinDescription] = useState('');
   const [pinSelectedFile, setPinSelectedFile] = useState<File | null>(null);
   const [pinEventMonth, setPinEventMonth] = useState<string>('');
@@ -269,9 +289,25 @@ export default function LocationSidebar({
     }
   }, [hookClickFeature]);
 
-  // Reset pin form when location changes
+  // Reset pin form when location changes (but preserve expansion if user is authenticated)
+  const previousCoordinatesRef = useRef<{ lat: number; lng: number } | null>(null);
   useEffect(() => {
-    if (isDropHeartExpanded) {
+    const currentCoords = locationData?.coordinates;
+    const prevCoords = previousCoordinatesRef.current;
+    
+    // Check if coordinates actually changed
+    const coordsChanged = prevCoords && currentCoords && 
+      (prevCoords.lat !== currentCoords.lat || prevCoords.lng !== currentCoords.lng);
+    
+    if (coordsChanged && isDropHeartExpanded) {
+      // Reset form fields but keep form expanded if user is authenticated
+      setPinDescription('');
+      setPinSelectedFile(null);
+      setPinFilePreview(null);
+      setPinVisibility('public');
+      setPinError(null);
+    } else if (!currentCoords && isDropHeartExpanded) {
+      // Location cleared - collapse form
       setIsDropHeartExpanded(false);
       setPinDescription('');
       setPinSelectedFile(null);
@@ -279,8 +315,18 @@ export default function LocationSidebar({
       setPinVisibility('public');
       setPinError(null);
     }
+    
+    // Update previous coordinates
+    previousCoordinatesRef.current = currentCoords || null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationData?.coordinates?.lat, locationData?.coordinates?.lng]);
+  }, [locationData?.coordinates?.lat, locationData?.coordinates?.lng, isDropHeartExpanded]);
+
+  // Auto-expand mention form when location is set and user is authenticated
+  useEffect(() => {
+    if (locationData?.coordinates && user && !isDropHeartExpanded) {
+      setIsDropHeartExpanded(true);
+    }
+  }, [locationData?.coordinates, user, isDropHeartExpanded]);
 
   // Abort controller for canceling in-flight atlas entity fetches
   const atlasEntityAbortControllerRef = useRef<AbortController | null>(null);

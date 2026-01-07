@@ -16,13 +16,13 @@ import MobileNavTabs, { type MobileNavTab } from '@/components/layout/MobileNavT
 import MobileNavSheet from '@/components/layout/MobileNavSheet';
 import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
-import NearbyPlacesContainer from '@/components/layout/NearbyPlacesContainer';
 import Map3DControlsSecondaryContent from '@/features/sidebar/components/Map3DControlsSecondaryContent';
 import ContributeContent from '@/components/layout/ContributeContent';
 import NewsContent from '@/components/layout/NewsContent';
-import CreateMentionContent from '@/components/layout/CreateMentionContent';
+import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useMapOverlayState } from '../hooks/useMapOverlayState';
+import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
 
 // Helper to format last generation timestamp
 function formatLastGeneration(timestamp: string): string {
@@ -77,14 +77,16 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
   const temporaryMarkerRef = useRef<any>(null);
+  const isTransitioningToCreateRef = useRef(false);
   const [createTabSelectedLocation, setCreateTabSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [createTabAtlasMeta, setCreateTabAtlasMeta] = useState<Record<string, any> | null>(null);
+  const [createTabMapMeta, setCreateTabMapMeta] = useState<Record<string, any> | null>(null);
   
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
   
-  // Atlas layer visibility state (default true)
-  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(true);
+  // Atlas layer visibility state (disabled - hiding all atlas entities)
+  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(false);
   
   // Unified overlay state management
   const {
@@ -171,24 +173,169 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       setMentionsRefreshKey(prev => prev + 1);
     };
 
+    const handleRemoveTempPin = () => {
+      if (temporaryMarkerRef.current) {
+        temporaryMarkerRef.current.remove();
+        temporaryMarkerRef.current = null;
+      }
+    };
+
     window.addEventListener('mention-created', handleMentionCreatedEvent);
+    window.addEventListener('mention-created-remove-temp-pin', handleRemoveTempPin);
     return () => {
       window.removeEventListener('mention-created', handleMentionCreatedEvent);
+      window.removeEventListener('mention-created-remove-temp-pin', handleRemoveTempPin);
     };
   }, []);
 
-  // Listen for live account modal open/close to hide/show mobile nav
+  // Listen for live account modal open/close to hide/show mobile nav and close all overlays
   useEffect(() => {
     const handleAccountModalChange = (event: Event) => {
       const customEvent = event as CustomEvent<{ isOpen: boolean }>;
-      setIsAccountModalOpen(customEvent.detail?.isOpen || false);
+      const isOpen = customEvent.detail?.isOpen || false;
+      setIsAccountModalOpen(isOpen);
+      
+      // Close all overlays when account modal opens
+      if (isOpen) {
+        closeAll();
+      }
     };
 
     window.addEventListener('live-account-modal-change', handleAccountModalChange);
     return () => {
       window.removeEventListener('live-account-modal-change', handleAccountModalChange);
     };
-  }, []);
+  }, [closeAll]);
+
+  // Maintain preview marker when create sheet is open
+  useEffect(() => {
+    const isCreateOpen = isOverlayOpen('create');
+    if (isCreateOpen && createTabSelectedLocation && account && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
+      // Ensure marker exists and is properly positioned
+      const ensurePreviewMarker = async () => {
+        try {
+          const mapbox = await import('mapbox-gl');
+          const currentMap = mapInstanceRef.current;
+          if (!currentMap || (currentMap as any).removed) return;
+
+          const { lat, lng } = createTabSelectedLocation;
+
+          // If marker doesn't exist or is at wrong position, create/update it
+          if (!temporaryMarkerRef.current) {
+            const el = document.createElement('div');
+            el.className = 'mention-preview-marker';
+            el.style.cssText = `
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              pointer-events: none;
+            `;
+
+            // Account image circle
+            const imageContainer = document.createElement('div');
+            imageContainer.style.cssText = `
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              border: 2px solid white;
+              overflow: hidden;
+              background-color: white;
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            `;
+
+            if (account.image_url) {
+              const img = document.createElement('img');
+              img.src = account.image_url;
+              img.style.cssText = `
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+              `;
+              img.onerror = () => {
+                const initial = document.createElement('div');
+                initial.style.cssText = `
+                  width: 100%;
+                  height: 100%;
+                  display: flex;
+                  align-items: center;
+                  justify-center;
+                  background-color: #f3f4f6;
+                  color: #6b7280;
+                  font-size: 14px;
+                  font-weight: 500;
+                `;
+                initial.textContent = account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'U';
+                imageContainer.innerHTML = '';
+                imageContainer.appendChild(initial);
+              };
+              imageContainer.appendChild(img);
+            } else {
+              const initial = document.createElement('div');
+              initial.style.cssText = `
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-center;
+                background-color: #f3f4f6;
+                color: #6b7280;
+                font-size: 14px;
+                font-weight: 500;
+              `;
+              initial.textContent = account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'U';
+              imageContainer.appendChild(initial);
+            }
+
+            el.appendChild(imageContainer);
+
+            // Preview label
+            const label = document.createElement('div');
+            label.style.cssText = `
+              margin-top: 4px;
+              padding: 2px 6px;
+              background-color: rgba(0, 0, 0, 0.6);
+              color: white;
+              font-size: 10px;
+              font-weight: 500;
+              border-radius: 4px;
+              white-space: nowrap;
+            `;
+            label.textContent = 'Preview';
+            el.appendChild(label);
+
+            const marker = new mapbox.Marker({
+              element: el,
+              anchor: 'bottom',
+            })
+              .setLngLat([lng, lat])
+              .addTo(currentMap as any);
+
+            temporaryMarkerRef.current = marker;
+          } else {
+            // Update position if marker exists but is at wrong location
+            const currentLngLat = temporaryMarkerRef.current.getLngLat();
+            const tolerance = 0.0001; // Small tolerance for floating point comparison
+            if (Math.abs(currentLngLat.lng - lng) > tolerance || Math.abs(currentLngLat.lat - lat) > tolerance) {
+              temporaryMarkerRef.current.setLngLat([lng, lat]);
+            }
+          }
+        } catch (err) {
+          console.error('[LiveMap] Error ensuring preview marker:', err);
+        }
+      };
+
+      ensurePreviewMarker();
+    } else if (!isCreateOpen && temporaryMarkerRef.current) {
+      // Only remove marker when create sheet closes (not during transition)
+      if (!isTransitioningToCreateRef.current) {
+        temporaryMarkerRef.current.remove();
+        temporaryMarkerRef.current = null;
+      }
+    }
+  }, [isOverlayOpen('create'), createTabSelectedLocation, account]);
 
   // Handle atlas entity click
   const handleAtlasEntityClick = useCallback(async (entity: {
@@ -304,29 +451,106 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     };
   }, [handleAtlasEntityClick]);
 
-  // Listen for show-location-for-mention event (from "Add Label" button in location/atlas popup)
+  // Unified handler for opening create form with location
+  // Handles: single-click, "Add Mention" button, any show-location-for-mention event
   useEffect(() => {
-    const handleShowLocationForMention = (event: Event) => {
+    const handleShowLocationForMention = async (event: Event) => {
       const customEvent = event as CustomEvent<{
         lat: number;
         lng: number;
         atlas_meta?: Record<string, any>;
+        map_meta?: Record<string, any>;
       }>;
-      const { lat, lng, atlas_meta } = customEvent.detail || {};
-      if (lat && lng) {
-        // Close any open popup and tabs, then open Create sheet
-        closeAll();
-        setCreateTabSelectedLocation({ lat, lng });
-        setCreateTabAtlasMeta(atlas_meta || null);
-        openCreate({ lat, lng, atlas_meta });
-      }
+      const { lat, lng, atlas_meta, map_meta } = customEvent.detail || {};
+      if (!lat || !lng) return;
+
+      // Set flag to prevent popup from removing marker during transition
+      isTransitioningToCreateRef.current = true;
+
+      // Set location state FIRST (before any async operations or closing popups)
+      setCreateTabSelectedLocation({ lat, lng });
+      setCreateTabAtlasMeta(atlas_meta || null);
+      setCreateTabMapMeta(map_meta || null);
+
+      // Close any open popups/tabs
+      closeAll();
+
+      // Open create form
+      openCreate({ lat, lng, atlas_meta, map_meta });
+
+      // Transform existing white pin to red pin when create form opens
+      setTimeout(() => {
+        if (temporaryMarkerRef.current && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
+          const markerElement = temporaryMarkerRef.current.getElement();
+          if (markerElement) {
+            // The pin element itself is the circle, find the dot inside
+            const pinDot = markerElement.querySelector('.map-click-pin-dot') as HTMLElement;
+            
+            if (markerElement && pinDot) {
+              // Change white pin to red pin
+              markerElement.style.backgroundColor = '#ef4444'; // red-500
+              markerElement.style.borderColor = '#ef4444';
+              
+              // Change black dot to white dot
+              pinDot.style.backgroundColor = '#ffffff'; // white
+            }
+          }
+        }
+        
+        // Clear flag
+        isTransitioningToCreateRef.current = false;
+      }, 50);
     };
 
     window.addEventListener('show-location-for-mention', handleShowLocationForMention);
     return () => {
       window.removeEventListener('show-location-for-mention', handleShowLocationForMention);
     };
-  }, [closePopup, closeTab]);
+  }, [account, closeAll, openCreate, setCreateTabSelectedLocation, setCreateTabAtlasMeta, setCreateTabMapMeta]);
+
+  // Maintain red pin when create sheet is open - ensures it persists at correct location
+  useEffect(() => {
+    const isCreateOpen = isOverlayOpen('create');
+    
+    // When create form closes, remove marker (unless transitioning)
+    if (!isCreateOpen && temporaryMarkerRef.current && !isTransitioningToCreateRef.current) {
+      temporaryMarkerRef.current.remove();
+      temporaryMarkerRef.current = null;
+      return;
+    }
+
+    // When create form is open, ensure marker exists at correct location and is red
+    if (isCreateOpen && createTabSelectedLocation && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
+      const { lat, lng } = createTabSelectedLocation;
+
+      // If marker exists, verify it's at correct location and is red
+      if (temporaryMarkerRef.current) {
+        const currentLngLat = temporaryMarkerRef.current.getLngLat();
+        const tolerance = 0.0001;
+        const isCorrectLocation = 
+          Math.abs(currentLngLat.lng - lng) < tolerance && 
+          Math.abs(currentLngLat.lat - lat) < tolerance;
+        
+        if (!isCorrectLocation) {
+          // Update position if marker is at wrong location
+          temporaryMarkerRef.current.setLngLat([lng, lat]);
+        }
+        
+        // Ensure marker is red (transform if needed)
+        const markerElement = temporaryMarkerRef.current.getElement();
+        if (markerElement) {
+          const pinDot = markerElement.querySelector('.map-click-pin-dot') as HTMLElement;
+          
+          if (markerElement && pinDot) {
+            // Ensure it's red with white dot
+            markerElement.style.backgroundColor = '#ef4444';
+            markerElement.style.borderColor = '#ef4444';
+            pinDot.style.backgroundColor = '#ffffff';
+          }
+        }
+      }
+    }
+  }, [isOverlayOpen('create'), createTabSelectedLocation]);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -480,7 +704,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             return;
           }
           
-          // Add red pin marker at clicked location
+          // Add white pin marker at clicked location (will turn red when form opens)
           const addRedPinMarker = async () => {
             const currentMap = mapInstanceRef.current;
             if (!currentMap || (currentMap as any).removed) return;
@@ -534,8 +758,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
                 justify-content: center;
               `;
               
-              // Add black dot in the middle
+              // Add black dot in the middle with class for easy transformation
               const dot = document.createElement('div');
+              dot.className = 'map-click-pin-dot';
               dot.style.cssText = `
                 width: 6px;
                 height: 6px;
@@ -543,6 +768,8 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
                 background-color: #000000;
                 position: absolute;
               `;
+              el.className = 'map-click-pin-marker';
+              el.classList.add('map-click-pin-circle');
               el.appendChild(dot);
               
               // Create marker
@@ -555,7 +782,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
               
               temporaryMarkerRef.current = marker;
             } catch (err) {
-              console.error('[LiveMap] Error creating red pin marker:', err);
+              console.error('[LiveMap] Error creating pin marker:', err);
             }
           };
           
@@ -576,86 +803,42 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             });
           }
           
-          // Reverse geocode to get place name
+          // Capture mapbox feature at click point for map_meta
+          // Structure matches FloatingMapContainer: { location: LocationData | null, feature: ExtractedFeature | null }
+          let mapMeta: Record<string, any> | null = null;
           try {
-            const token = MAP_CONFIG.MAPBOX_TOKEN;
-            if (token) {
-              const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json`;
-              const params = new URLSearchParams({
-                access_token: token,
-                types: 'address,poi,place',
-                limit: '1',
-              });
-              
-              const response = await fetch(`${url}?${params}`);
-              if (response.ok) {
-                const data = await response.json();
-                const feature = data.features?.[0];
-                
-                openPopup('location', {
-                  place_name: feature?.place_name || 'Location',
-                  address: feature?.place_name || '',
-                  coordinates: { lat, lng },
-                });
-              } else {
-                // Fallback if geocoding fails
-                openPopup('location', {
-                  place_name: 'Location',
-                  coordinates: { lat, lng },
-                });
+            const point = mapboxMap.project([lng, lat]);
+            const result = queryFeatureAtPoint(mapboxMap, point, 'labels-first', false);
+            if (result) {
+              // queryFeatureAtPoint with returnRaw=false returns ExtractedFeature directly
+              const extractedFeature = 'feature' in result ? result.feature : result;
+              if (extractedFeature && 'layerId' in extractedFeature) {
+                mapMeta = {
+                  location: null, // Location data not available in LiveMap context
+                  feature: {
+                    layerId: extractedFeature.layerId,
+                    sourceLayer: extractedFeature.sourceLayer,
+                    category: extractedFeature.category,
+                    name: extractedFeature.name,
+                    label: extractedFeature.label,
+                    icon: extractedFeature.icon,
+                    properties: extractedFeature.properties,
+                    atlasType: extractedFeature.atlasType,
+                    showIntelligence: extractedFeature.showIntelligence,
+                  },
+                };
               }
-            } else {
-              // Fallback if no token
-              openPopup('location', {
-                place_name: 'Location',
-                coordinates: { lat, lng },
-              });
             }
-          } catch (error) {
-            console.error('Reverse geocoding error:', error);
-            openPopup('location', {
-              place_name: 'Location',
-              coordinates: { lat, lng },
-            });
+          } catch (err) {
+            console.debug('[LiveMap] Error capturing map feature:', err);
           }
+          
+          // Dispatch event to open create form (single-click to mention)
+          window.dispatchEvent(new CustomEvent('show-location-for-mention', {
+            detail: { lat, lng, map_meta: mapMeta }
+          }));
         });
 
-        // Handle double-click to select location
-        mapInstance.on('dblclick', (e: any) => {
-          if (!mounted) return;
-          
-          // Prevent mention creation if hovering over a mention
-          if (isHoveringMentionRef.current || hoveredMentionIdRef.current) {
-            return;
-          }
-          
-          // Check if click hit a mention layer - if so, don't create new mention
-          // Mention click handlers will handle opening the popup
-          const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
-          // Query a box around the click point (20px radius) for larger clickable area
-          const hitRadius = 20;
-          const box: [[number, number], [number, number]] = [
-            [e.point.x - hitRadius, e.point.y - hitRadius],
-            [e.point.x + hitRadius, e.point.y + hitRadius]
-          ];
-          const features = (mapInstance as any).queryRenderedFeatures(box, {
-            layers: mentionLayers,
-          });
-
-          // If clicked on a mention, don't create new mention (mention click handler will handle it)
-          if (features.length > 0) {
-            return;
-          }
-          
-          const lng = e.lngLat.lng;
-          const lat = e.lngLat.lat;
-          // Dispatch event for location selection (can be handled by other components)
-          if (!isHoveringMentionRef.current && !hoveredMentionIdRef.current) {
-            window.dispatchEvent(new CustomEvent('show-location-for-mention', {
-              detail: { lat, lng }
-            }));
-          }
-        });
 
         mapInstance.on('error', (e: unknown) => {
           const errorMessage = e instanceof Error 
@@ -800,7 +983,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
       {/* News Sheet */}
       <MobileNavSheet
-        isOpen={activeTab === 'news'}
+        isOpen={activeTab === 'news' && !isAccountModalOpen}
         onClose={closeTab}
         title="News"
         showSearch={true}
@@ -848,93 +1031,37 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         }} />
       </MobileNavSheet>
 
-      {/* Explore Sheet */}
-      <MobileNavSheet
-        isOpen={activeTab === 'explore'}
-        onClose={closeTab}
-        title="Explore"
-        showSearch={true}
-        map={mapInstanceRef.current}
-        onLocationSelect={(coordinates, placeName) => {
-          if (mapInstanceRef.current && mapLoaded) {
-            mapInstanceRef.current.flyTo({
-              center: [coordinates.lng, coordinates.lat],
-              zoom: 15,
-              duration: 1500,
-            });
-          }
-        }}
-      >
-        <NearbyPlacesContainer
-          map={mapInstanceRef.current}
-          mapLoaded={mapLoaded}
-          isVisible={activeTab === 'explore'}
-        />
-      </MobileNavSheet>
-
-      {/* Create Sheet - Only opened via "Add Label" button */}
-      <MobileNavSheet
-        isOpen={isOverlayOpen('create')}
+      {/* Create Popup - Only opened via "Add Label" button */}
+      <CreateMentionPopup
+        isOpen={isOverlayOpen('create') && !isAccountModalOpen}
         onClose={() => {
           closeCreate();
           setCreateTabSelectedLocation(null);
           setCreateTabAtlasMeta(null);
-        }}
-        title="Create"
-        showSearch={true}
-        map={mapInstanceRef.current}
-        onLocationSelect={(coordinates, placeName) => {
-          if (mapInstanceRef.current && mapLoaded) {
-            mapInstanceRef.current.flyTo({
-              center: [coordinates.lng, coordinates.lat],
-              zoom: 15,
-              duration: 1500,
-            });
-            setCreateTabSelectedLocation({ lat: coordinates.lat, lng: coordinates.lng });
-            // Clear atlas meta when user selects a new location
-            setCreateTabAtlasMeta(null);
+          setCreateTabMapMeta(null);
+          // Remove temporary marker when create popup closes
+          if (temporaryMarkerRef.current) {
+            temporaryMarkerRef.current.remove();
+            temporaryMarkerRef.current = null;
           }
         }}
-        contentPadding={false}
-      >
-        {createTabSelectedLocation ? (
-          <CreateMentionContent
-            map={mapInstanceRef.current}
-            mapLoaded={mapLoaded}
-            initialCoordinates={createTabSelectedLocation}
-            initialAtlasMeta={createTabAtlasMeta}
-            onMentionCreated={() => {
-              closeCreate();
-              setCreateTabSelectedLocation(null);
-              setCreateTabAtlasMeta(null);
-              setMentionsRefreshKey(prev => prev + 1);
-            }}
-          />
-        ) : (
-          <div className="space-y-3 p-4">
-            <p className="text-xs text-gray-600">
-              Click on the map to select a location, then create a mention.
-            </p>
-          </div>
-        )}
-      </MobileNavSheet>
-
-      {/* Controls Sheet */}
-      <MobileNavSheet
-        isOpen={activeTab === 'controls'}
-        onClose={closeTab}
-        title="Map Controls"
-      >
-        <Map3DControlsSecondaryContent 
-          map={mapInstanceRef.current} 
-          pointsOfInterestVisible={isPointsOfInterestVisible}
-          onPointsOfInterestVisibilityChange={setIsPointsOfInterestVisible}
-        />
-      </MobileNavSheet>
+        map={mapInstanceRef.current}
+        mapLoaded={mapLoaded}
+        initialCoordinates={createTabSelectedLocation}
+        initialAtlasMeta={createTabAtlasMeta}
+        initialMapMeta={createTabMapMeta}
+        onMentionCreated={() => {
+          closeCreate();
+          setCreateTabSelectedLocation(null);
+          setCreateTabAtlasMeta(null);
+          setCreateTabMapMeta(null);
+          setMentionsRefreshKey(prev => prev + 1);
+        }}
+      />
 
       {/* Contribute Sheet */}
       <MobileNavSheet
-        isOpen={activeTab === 'contribute'}
+        isOpen={activeTab === 'contribute' && !isAccountModalOpen}
         onClose={closeTab}
         title="Contribute"
       >
@@ -943,11 +1070,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
       {/* Map Entity Popup - Above mobile nav */}
       <MapEntityPopup
-        isOpen={popupData.type !== null}
+        isOpen={popupData.type !== null && !isAccountModalOpen}
         onClose={() => {
           closePopup();
-          // Remove red pin marker when popup closes
-          if (temporaryMarkerRef.current) {
+          // Only remove red pin marker when popup closes if we're not transitioning to create
+          // (If transitioning to create, we want to keep the preview marker)
+          if (temporaryMarkerRef.current && !isTransitioningToCreateRef.current && !isOverlayOpen('create')) {
             temporaryMarkerRef.current.remove();
             temporaryMarkerRef.current = null;
           }

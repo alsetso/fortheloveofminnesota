@@ -64,7 +64,7 @@ export default function ProfileAccountsSecondaryContent() {
     try {
       // Set localStorage immediately before switching to ensure persistence
       if (typeof window !== 'undefined') {
-        localStorage.setItem('mnuda_active_account_id', accountId);
+        // Account switching is handled by setActiveAccountId which stores username
       }
       await setActiveAccountId(accountId);
       // Refresh server components to pick up the new active account cookie

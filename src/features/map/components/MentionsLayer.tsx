@@ -40,10 +40,14 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
   const isHandlingStyleChangeRef = useRef<boolean>(false);
   const mentionCreatedHandlerRef = useRef<EventListener | null>(null);
   const mentionArchivedHandlerRef = useRef<EventListener | null>(null);
+  const styleLoadHandlerRef = useRef<(() => void) | null>(null);
+  const layersDataRef = useRef<{ geoJSON: any; iconExpression: any[]; accountImageIds: Map<string, string>; fallbackImageId: string } | null>(null);
+  const loadMentionsRef = useRef<((showLoading?: boolean) => Promise<void>) | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>('24h');
+  const [isLoadingMentions, setIsLoadingMentions] = useState(false);
   const currentMentionRef = useRef<Mention | null>(null);
   const accountRef = useRef(account);
   const openWelcomeRef = useRef(openWelcome);
@@ -67,9 +71,17 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       setTimeFilter(filter === 'all' ? null : filter || '24h');
     };
 
+    const handleReloadMentions = () => {
+      if (loadMentionsRef.current) {
+        loadMentionsRef.current(true);
+      }
+    };
+
     window.addEventListener('mention-time-filter-change', handleTimeFilterChange);
+    window.addEventListener('reload-mentions', handleReloadMentions);
     return () => {
       window.removeEventListener('mention-time-filter-change', handleTimeFilterChange);
+      window.removeEventListener('reload-mentions', handleReloadMentions);
     };
   }, []);
 
@@ -79,9 +91,13 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
 
     let mounted = true;
 
-    const loadMentions = async () => {
+    const loadMentions = async (showLoading = false) => {
       // Prevent concurrent calls
       if (isAddingLayersRef.current) return;
+      
+      if (showLoading) {
+        setIsLoadingMentions(true);
+      }
       
       try {
         // Get year filter from URL
@@ -387,6 +403,14 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         });
         iconExpression.push(fallbackImageId); // Fallback to heart icon
 
+        // Store layer data for re-adding after style changes (before adding layers)
+        layersDataRef.current = {
+          geoJSON,
+          iconExpression,
+          accountImageIds: new Map(accountImageIds),
+          fallbackImageId,
+        };
+
         // Verify source exists before adding layers
         if (!mapboxMap.getSource(sourceId)) {
           console.error('[MentionsLayer] Source does not exist before adding layer');
@@ -436,6 +460,21 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         }
 
         isAddingLayersRef.current = false;
+
+        // Ensure layers are visible after adding
+        try {
+          if (mapboxMap.getLayer(pointLayerId)) {
+            mapboxMap.setLayoutProperty(pointLayerId, 'visibility', 'visible');
+          }
+          if (mapboxMap.getLayer(pointLabelLayerId)) {
+            mapboxMap.setLayoutProperty(pointLabelLayerId, 'visibility', 'visible');
+          }
+          
+          // Dispatch event to hide reload button
+          window.dispatchEvent(new CustomEvent('mentions-reloaded'));
+        } catch (error) {
+          console.warn('[MentionsLayer] Error showing layers:', error);
+        }
 
         // Add click handlers for mention interactions (only once)
         if (!clickHandlersAddedRef.current) {
@@ -615,6 +654,34 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
 
           clickHandlersAddedRef.current = true;
         }
+
+        // Listen for style.load events to hide mentions layer when map style changes
+        if (!styleLoadHandlerRef.current) {
+          styleLoadHandlerRef.current = () => {
+            if (!mounted || !map) return;
+            
+            const mapboxMap = map as any;
+            if (!mapboxMap.isStyleLoaded || !mapboxMap.isStyleLoaded()) return;
+
+            // Hide mentions layers when style changes (if they exist)
+            try {
+              if (mapboxMap.getLayer(pointLayerId)) {
+                mapboxMap.setLayoutProperty(pointLayerId, 'visibility', 'none');
+              }
+              if (mapboxMap.getLayer(pointLabelLayerId)) {
+                mapboxMap.setLayoutProperty(pointLabelLayerId, 'visibility', 'none');
+              }
+            } catch (error) {
+              // Layers may not exist yet - that's okay
+              console.debug('[MentionsLayer] Layers may not exist after style change:', error);
+            }
+            
+            // Always dispatch event to show reload button (even if layers don't exist yet)
+            window.dispatchEvent(new CustomEvent('mentions-layer-hidden'));
+          };
+
+          mapboxMap.on('style.load', styleLoadHandlerRef.current);
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Failed to load map mentions';
         console.error('[MentionsLayer] Error loading map mentions:', errorMessage, error);
@@ -627,8 +694,15 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           });
         }
         isAddingLayersRef.current = false;
+      } finally {
+        if (showLoading) {
+          setIsLoadingMentions(false);
+        }
       }
     };
+
+    // Store loadMentions in ref for style.load handler
+    loadMentionsRef.current = loadMentions;
 
     loadMentions();
 
@@ -675,6 +749,17 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         clearTimeout(styleChangeTimeoutRef.current);
         styleChangeTimeoutRef.current = null;
       }
+
+      // Remove style.load handler
+      if (styleLoadHandlerRef.current && map) {
+        try {
+          const mapboxMap = map as any;
+          mapboxMap.off('style.load', styleLoadHandlerRef.current);
+        } catch (e) {
+          // Map may be removed
+        }
+        styleLoadHandlerRef.current = null;
+      }
       
       // Remove layers and source if map still exists
       if (map && !(map as any).removed) {
@@ -717,6 +802,18 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       }
     };
   }, [map, mapLoaded, searchParams, timeFilter]);
+
+  // Loading spinner overlay
+  if (isLoadingMentions) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-30 pointer-events-none">
+        <div className="bg-white/95 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
+          <span className="text-xs font-medium text-gray-900">Loading mentions...</span>
+        </div>
+      </div>
+    );
+  }
 
   return null;
 }

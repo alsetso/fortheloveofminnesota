@@ -61,7 +61,8 @@ interface AuthStateContextType extends AuthState {
 
 const AuthStateContext = createContext<AuthStateContextType | undefined>(undefined);
 
-const ACTIVE_ACCOUNT_STORAGE_KEY = 'mnuda_active_account_id';
+const LAST_SELECTED_ACCOUNT_KEY = 'LAST_SELECTED_ACCOUNT';
+const OLD_ACCOUNT_STORAGE_KEY = 'mnuda_active_account_id'; // Legacy key for migration
 
 export function AuthStateProvider({ children }: { children: ReactNode }) {
   // Core auth state
@@ -82,18 +83,13 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
   
   // Track previous account ID to detect changes
   const previousAccountIdRef = useRef<string | null>(null);
+  // Track if we've loaded from localStorage on initial mount
+  const hasLoadedFromStorageRef = useRef(false);
+  // Track if we've completed initial auth check to distinguish between "loading" and "signed out"
+  const hasCheckedAuthRef = useRef(false);
 
-  // Load active account ID from localStorage on mount and set cookie
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
-      if (stored) {
-        setActiveAccountIdState(stored);
-        // Set cookie so server-side can access active account ID
-        document.cookie = `active_account_id=${stored}; path=/; SameSite=Strict; max-age=31536000`;
-      }
-    }
-  }, []);
+  // Load last selected account from localStorage on mount
+  // This runs before user/auth loads, so we'll use it in the account loading effect
   
   // Computed states
   const isAuthenticated = !!user;
@@ -165,14 +161,28 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
 
   // Load active account when user or activeAccountId changes
   useEffect(() => {
-    if (!user) {
+    // Only clear localStorage if user is actually signed out (not just initial load)
+    if (!user && hasCheckedAuthRef.current && !isLoading) {
+      // User was loaded but is now null - they signed out
       setAccount(null);
       setActiveAccountIdState(null);
+      hasLoadedFromStorageRef.current = false;
       if (typeof window !== 'undefined') {
-        localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+        localStorage.removeItem(LAST_SELECTED_ACCOUNT_KEY);
+        localStorage.removeItem(OLD_ACCOUNT_STORAGE_KEY);
         // Clear the cookie
         document.cookie = 'active_account_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
       }
+      return;
+    }
+    
+    // Mark that we've checked auth status
+    if (!isLoading) {
+      hasCheckedAuthRef.current = true;
+    }
+    
+    // If user is not loaded yet, don't proceed (but don't clear localStorage)
+    if (!user) {
       return;
     }
 
@@ -180,26 +190,102 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
       setIsAccountLoading(true);
       try {
         let accountId = activeAccountId;
+        let accountData: Account | null = null;
 
-        // If no active account ID, check localStorage first before defaulting to first account
-        if (!accountId && typeof window !== 'undefined') {
-          const stored = localStorage.getItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+        // On initial load (first time user is loaded), always check localStorage first
+        // This ensures we use the last selected account even if activeAccountId state is null
+        if (!hasLoadedFromStorageRef.current && typeof window !== 'undefined') {
+          hasLoadedFromStorageRef.current = true;
+          
+          // Check all localStorage keys to debug
+          const allKeys = Object.keys(localStorage);
+          let stored = localStorage.getItem(LAST_SELECTED_ACCOUNT_KEY);
+          
+          // Migration: If new key doesn't exist, check old key
+          if (!stored) {
+            const oldStored = localStorage.getItem(OLD_ACCOUNT_STORAGE_KEY);
+            if (oldStored) {
+              // Migrate to new key
+              localStorage.setItem(LAST_SELECTED_ACCOUNT_KEY, oldStored);
+              stored = oldStored;
+            }
+          }
+          
           if (stored) {
-            accountId = stored;
-            setActiveAccountIdState(stored);
-            // Set cookie so server-side can access active account ID
-            document.cookie = `active_account_id=${stored}; path=/; SameSite=Strict; max-age=31536000`;
+            // Find account by ID (we always store ID now)
+            const { data: accountById, error: idError } = await supabase
+              .from('accounts')
+              .select('*')
+              .eq('id', stored)
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            if (accountById) {
+              accountId = accountById.id;
+              accountData = accountById as Account;
+            } else {
+              // Fallback: try as username (for migration from old system that stored username)
+              const { data: accountByUsername, error: usernameError } = await supabase
+                .from('accounts')
+                .select('*')
+                .eq('username', stored)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+              if (accountByUsername) {
+                accountId = accountByUsername.id;
+                accountData = accountByUsername as Account;
+              } else if (process.env.NODE_ENV === 'development') {
+                console.warn('[AuthStateContext] Account not found by ID or username:', stored, { idError, usernameError });
+              }
+            }
+          }
+        } else if (!accountId && typeof window !== 'undefined') {
+          // If not initial load but no activeAccountId, check localStorage
+          const stored = localStorage.getItem(LAST_SELECTED_ACCOUNT_KEY);
+          if (stored) {
+            // Find account by ID (we always store ID now)
+            const { data: accountById } = await supabase
+              .from('accounts')
+              .select('*')
+              .eq('id', stored)
+              .eq('user_id', user.id)
+              .maybeSingle();
+
+            if (accountById) {
+              accountId = accountById.id;
+              accountData = accountById as Account;
+            } else {
+              // Fallback: try as username (for migration)
+              const { data: accountByUsername } = await supabase
+                .from('accounts')
+                .select('*')
+                .eq('username', stored)
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+              if (accountByUsername) {
+                accountId = accountByUsername.id;
+                accountData = accountByUsername as Account;
+              }
+            }
           }
         }
 
-        // If still no account ID, get first account
+        // If still no account, get first account (only if no stored account found)
         if (!accountId) {
           const { needsOnboarding, account: firstAccount } = await checkOnboardingStatus();
           if (firstAccount) {
             accountId = firstAccount.id;
-            setActiveAccountIdState(accountId);
+            accountData = firstAccount;
+            // Only save to localStorage if we don't already have a stored value
+            // This prevents overwriting the user's last selection
             if (typeof window !== 'undefined') {
-              localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, accountId);
+              const existingStored = localStorage.getItem(LAST_SELECTED_ACCOUNT_KEY);
+              if (!existingStored) {
+                // Always store account ID
+                localStorage.setItem(LAST_SELECTED_ACCOUNT_KEY, firstAccount.id);
+              }
               // Set cookie so server-side can access active account ID
               document.cookie = `active_account_id=${accountId}; path=/; SameSite=Strict; max-age=31536000`;
             }
@@ -209,35 +295,44 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Load the active account
-        if (accountId) {
-          const { data: accountData, error } = await supabase
+        // Load the active account if we don't already have it
+        if (accountId && !accountData) {
+          const { data: accountDataFromDb, error } = await supabase
             .from('accounts')
             .select('*')
             .eq('id', accountId)
             .eq('user_id', user.id)
             .single();
 
-          if (error || !accountData) {
+          if (error || !accountDataFromDb) {
             // Account not found, reset to first account
             const { account: firstAccount } = await checkOnboardingStatus();
             if (firstAccount) {
-              const newAccountId = firstAccount.id;
-              setActiveAccountIdState(newAccountId);
+              accountId = firstAccount.id;
+              accountData = firstAccount;
+              setActiveAccountIdState(accountId);
               setAccount(firstAccount);
               if (typeof window !== 'undefined') {
-                localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, newAccountId);
+                // Always store account ID
+                localStorage.setItem(LAST_SELECTED_ACCOUNT_KEY, firstAccount.id);
+                document.cookie = `active_account_id=${accountId}; path=/; SameSite=Strict; max-age=31536000`;
               }
             } else {
               setAccount(null);
             }
           } else {
-            setAccount(accountData as Account);
-            // Dispatch event when account loads/changes
-            if (typeof window !== 'undefined' && accountId !== previousAccountIdRef.current) {
-              previousAccountIdRef.current = accountId;
-              window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId, account: accountData } }));
-            }
+            accountData = accountDataFromDb as Account;
+          }
+        }
+
+        // Set the account and activeAccountId
+        if (accountData && accountId) {
+          setActiveAccountIdState(accountId);
+          setAccount(accountData);
+          // Dispatch event when account loads/changes
+          if (typeof window !== 'undefined' && accountId !== previousAccountIdRef.current) {
+            previousAccountIdRef.current = accountId;
+            window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId, account: accountData } }));
           }
         } else {
           setAccount(null);
@@ -323,7 +418,7 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('freemap_sessions');
       localStorage.removeItem('freemap_current_session');
       localStorage.removeItem('freemap_api_usage');
-      localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+      localStorage.removeItem(LAST_SELECTED_ACCOUNT_KEY);
       
       // Clear the active account cookie
       if (typeof window !== 'undefined') {
@@ -368,7 +463,7 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
         setActiveAccountIdState(null);
         setAccount(null);
         if (typeof window !== 'undefined') {
-          localStorage.removeItem(ACTIVE_ACCOUNT_STORAGE_KEY);
+          localStorage.removeItem(LAST_SELECTED_ACCOUNT_KEY);
           // Clear the cookie
           document.cookie = 'active_account_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC';
           window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId: null, account: null } }));
@@ -395,7 +490,17 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     // Only update activeAccountIdState - useEffect will load the account
     setActiveAccountIdState(accountId);
     if (typeof window !== 'undefined') {
-      localStorage.setItem(ACTIVE_ACCOUNT_STORAGE_KEY, accountId);
+      // Always store account ID (more reliable than username - IDs are always present and unique)
+      localStorage.setItem(LAST_SELECTED_ACCOUNT_KEY, accountId);
+      
+      // Verify it was set (only log in development)
+      if (process.env.NODE_ENV === 'development') {
+        const verify = localStorage.getItem(LAST_SELECTED_ACCOUNT_KEY);
+        if (verify !== accountId) {
+          console.warn('[AuthStateContext] localStorage verification failed:', { accountId, stored: verify });
+        }
+      }
+      
       // Set cookie so server-side can access active account ID
       // Use SameSite=Strict for security, path=/ to make it available site-wide
       document.cookie = `active_account_id=${accountId}; path=/; SameSite=Strict; max-age=31536000`; // 1 year

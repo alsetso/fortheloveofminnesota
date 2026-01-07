@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { UserIcon, PlusIcon, Cog6ToothIcon, MagnifyingGlassIcon, NewspaperIcon } from '@heroicons/react/24/outline';
-import { PlusIcon as PlusIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, MagnifyingGlassIcon as MagnifyingGlassIconSolid, NewspaperIcon as NewspaperIconSolid } from '@heroicons/react/24/solid';
+import { UserIcon, PlusIcon, NewspaperIcon } from '@heroicons/react/24/outline';
+import { PlusIcon as PlusIconSolid, NewspaperIcon as NewspaperIconSolid } from '@heroicons/react/24/solid';
 import { useAuthStateSafe } from '@/features/auth';
 
-export type MobileNavTab = 'news' | 'explore' | 'controls' | 'contribute';
+export type MobileNavTab = 'news' | 'contribute';
 
 interface MobileNavTabsProps {
   activeTab: MobileNavTab | null;
@@ -41,38 +41,6 @@ export default function MobileNavTabs({ activeTab, onTabClick }: MobileNavTabsPr
           )}
           <span className={`text-[10px] font-medium ${activeTab === 'news' ? 'text-gray-900' : 'text-gray-500'}`}>
             News
-          </span>
-        </button>
-
-        {/* Explore Tab */}
-        <button
-          onClick={() => onTabClick('explore')}
-          className={baseClasses}
-          aria-label="Explore"
-        >
-          {activeTab === 'explore' ? (
-            <MagnifyingGlassIconSolid className="w-5 h-5 text-gray-900" />
-          ) : (
-            <MagnifyingGlassIcon className="w-5 h-5 text-gray-500" />
-          )}
-          <span className={`text-[10px] font-medium ${activeTab === 'explore' ? 'text-gray-900' : 'text-gray-500'}`}>
-            Explore
-          </span>
-        </button>
-
-        {/* Controls Tab */}
-        <button
-          onClick={() => onTabClick('controls')}
-          className={baseClasses}
-          aria-label="Controls"
-        >
-          {activeTab === 'controls' ? (
-            <Cog6ToothIconSolid className="w-5 h-5 text-gray-900" />
-          ) : (
-            <Cog6ToothIcon className="w-5 h-5 text-gray-500" />
-          )}
-          <span className={`text-[10px] font-medium ${activeTab === 'controls' ? 'text-gray-900' : 'text-gray-500'}`}>
-            Controls
           </span>
         </button>
 

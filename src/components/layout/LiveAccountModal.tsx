@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChevronDownIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronDownIcon, ChevronUpIcon, CameraIcon } from '@heroicons/react/24/outline';
 import { 
   UserIcon, 
   ClockIcon, 
@@ -14,9 +14,11 @@ import {
   BuildingStorefrontIcon,
   QuestionMarkCircleIcon
 } from '@heroicons/react/24/outline';
-import { useAuthStateSafe, AccountService } from '@/features/auth';
+import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
+
+const LAST_SELECTED_ACCOUNT_KEY = 'LAST_SELECTED_ACCOUNT';
 
 interface LiveAccountModalProps {
   isOpen: boolean;
@@ -32,8 +34,12 @@ interface MenuItem {
 }
 
 export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalProps) {
-  const { account, user, isLoading } = useAuthStateSafe();
+  const { account, user, isLoading, activeAccountId, setActiveAccountId } = useAuthStateSafe();
   const { openAccount, openWelcome } = useAppModalContextSafe();
+  const [allAccounts, setAllAccounts] = useState<Account[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [isAccountsExpanded, setIsAccountsExpanded] = useState(false);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -46,6 +52,75 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
       document.body.style.overflow = '';
     };
   }, [isOpen]);
+
+  // Fetch all user accounts when modal opens and account is admin
+  useEffect(() => {
+    if (isOpen && account && account.role === 'admin') {
+      const fetchAccounts = async () => {
+        setLoadingAccounts(true);
+        try {
+          const response = await fetch('/api/accounts?limit=50', {
+            credentials: 'include',
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setAllAccounts(data.accounts || []);
+          }
+        } catch (error) {
+          console.error('[LiveAccountModal] Error fetching accounts:', error);
+        } finally {
+          setLoadingAccounts(false);
+        }
+      };
+      fetchAccounts();
+    }
+  }, [isOpen, account, activeAccountId]);
+
+  // Switch to a different account
+  const handleSwitchAccount = async (accountId: string) => {
+    if (accountId === activeAccountId) return;
+    
+    setSwitchingAccountId(accountId);
+    
+    try {
+      // Find the account to switch to
+      const accountToSwitch = allAccounts.find(acc => acc.id === accountId);
+      if (!accountToSwitch) {
+        console.error('[LiveAccountModal] Account not found in list');
+        setSwitchingAccountId(null);
+        return;
+      }
+      
+      // Use setActiveAccountId which handles localStorage and state updates
+      await setActiveAccountId(accountId);
+      
+      // Verify localStorage was set (we always store account ID now)
+      // Add a small delay to ensure setActiveAccountId has completed
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const storedValue = typeof window !== 'undefined' 
+        ? localStorage.getItem(LAST_SELECTED_ACCOUNT_KEY) 
+        : null;
+      
+      if (process.env.NODE_ENV === 'development') {
+        if (storedValue === accountId) {
+          console.log('[LiveAccountModal] Success: Last selected account set to', accountId);
+        } else {
+          console.warn('[LiveAccountModal] Warning: localStorage value mismatch', { 
+            expected: accountId, 
+            actual: storedValue
+          });
+        }
+      }
+      
+      // Close modal after switching
+      onClose();
+      setSwitchingAccountId(null);
+    } catch (error) {
+      console.error('[LiveAccountModal] Error switching account:', error);
+      setSwitchingAccountId(null);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -251,21 +326,9 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
 
               {/* Name and Email */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-sm font-semibold text-gray-900 truncate">
-                    {displayName}
-                  </h3>
-                  <button
-                    onClick={() => {
-                      onClose();
-                      openAccount('settings');
-                    }}
-                    className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-                    aria-label="More account options"
-                  >
-                    <ChevronDownIcon className="w-4 h-4" />
-                  </button>
-                </div>
+                <h3 className="text-sm font-semibold text-gray-900 truncate mb-1">
+                  {displayName}
+                </h3>
                 {userEmail && (
                   <p className="text-xs text-gray-600 truncate">
                     {userEmail}
@@ -285,6 +348,75 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
               Manage your account
             </button>
           </div>
+
+          {/* Other Accounts Section - Only show if role is admin */}
+          {account && account.role === 'admin' && (
+            <div className="px-4 pt-3 pb-3 border-b border-gray-200">
+              <button
+                onClick={() => setIsAccountsExpanded(!isAccountsExpanded)}
+                className="w-full flex items-center justify-between text-left"
+              >
+                <span className="text-xs font-semibold text-gray-900">Other accounts</span>
+                {isAccountsExpanded ? (
+                  <ChevronUpIcon className="w-4 h-4 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4 text-gray-500" />
+                )}
+              </button>
+
+              {isAccountsExpanded && (
+                <div className="mt-2 space-y-1">
+                  {loadingAccounts ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                    </div>
+                  ) : allAccounts.length > 0 ? (
+                    allAccounts
+                      .filter((acc) => acc.id !== activeAccountId)
+                      .map((acc) => {
+                        const displayName = AccountService.getDisplayName(acc);
+                        const isActive = acc.id === activeAccountId;
+                        const isSwitching = switchingAccountId === acc.id;
+                        
+                        return (
+                          <button
+                            key={acc.id}
+                            onClick={() => handleSwitchAccount(acc.id)}
+                            disabled={isSwitching}
+                            className={`w-full flex items-center gap-2 px-2 py-2 rounded-md transition-colors text-left ${
+                              isActive
+                                ? 'bg-gray-100'
+                                : isSwitching
+                                ? 'bg-gray-50 opacity-75'
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <ProfilePhoto account={acc} size="sm" editable={false} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-gray-900 truncate">
+                                {displayName}
+                              </div>
+                              {acc.email && (
+                                <div className="text-[10px] text-gray-500 truncate">
+                                  {acc.email}
+                                </div>
+                              )}
+                            </div>
+                            {isSwitching ? (
+                              <div className="w-3 h-3 border-2 border-gray-400 border-t-gray-600 rounded-full animate-spin flex-shrink-0" />
+                            ) : isActive ? (
+                              <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0" />
+                            ) : null}
+                          </button>
+                        );
+                      })
+                  ) : (
+                    <p className="text-xs text-gray-500 py-2">No other accounts</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Menu Items */}
           <div className="py-2">

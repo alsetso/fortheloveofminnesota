@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, Squares2X2Icon, UserIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -9,6 +9,8 @@ import { useToast } from '@/features/ui/hooks/useToast';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMetadata } from '@/types/mapbox';
 import LiveAccountModal from './LiveAccountModal';
+import MapStylesPopup from './MapStylesPopup';
+import DynamicSearchModal from './DynamicSearchModal';
 
 interface MapboxFeature {
   id: string;
@@ -32,15 +34,6 @@ interface MapboxFeature {
   }>;
 }
 
-interface AtlasEntitySuggestion {
-  id: string;
-  name: string;
-  table_name: string;
-  lat: number;
-  lng: number;
-  type: 'atlas';
-}
-
 interface NewsArticleSuggestion {
   id: string;
   article_id: string;
@@ -51,7 +44,13 @@ interface NewsArticleSuggestion {
   type: 'news';
 }
 
-type SearchSuggestion = MapboxFeature | AtlasEntitySuggestion | NewsArticleSuggestion;
+interface PeopleSuggestion {
+  id: string;
+  name: string;
+  type: 'people';
+}
+
+type SearchSuggestion = MapboxFeature | NewsArticleSuggestion | PeopleSuggestion;
 
 // Type definitions for Web Speech API
 declare global {
@@ -110,14 +109,31 @@ interface MapTopContainerProps {
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: MapboxMetadata) => void;
 }
 
-interface AtlasType {
-  id: string;
-  slug: string;
-  name: string;
-  icon_path?: string | null;
-  emoji?: string | null;
-  status: 'active' | 'coming_soon' | 'hidden';
-}
+// Map meta layer definitions
+// Note: Mapbox layers can be identified by layer.id OR layer['source-layer']
+// Some layers use source-layer for the data type (e.g., 'landuse', 'building')
+// Based on Mapbox Streets v8 layer structure and maki icon categories
+const MAP_META_LAYERS = [
+  // Core infrastructure
+  { id: 'buildings', name: 'Buildings', icon: '🏢', layerPatterns: ['building'], sourceLayerPatterns: ['building'] },
+  { id: 'roads', name: 'Roads', icon: '🛣️', layerPatterns: ['road', 'highway', 'bridge', 'tunnel'], sourceLayerPatterns: ['road', 'highway'] },
+  { id: 'water', name: 'Water', icon: '💧', layerPatterns: ['water', 'waterway'], sourceLayerPatterns: ['water', 'waterway'] },
+  { id: 'landuse', name: 'Land Use', icon: '🌳', layerPatterns: ['landuse', 'landcover'], sourceLayerPatterns: ['landuse', 'landcover'] },
+  { id: 'places', name: 'Places', icon: '🏙️', layerPatterns: ['place', 'settlement'], sourceLayerPatterns: ['place'] },
+  
+  // POI categories (based on maki.md)
+  { id: 'pois', name: 'POIs', icon: '📍', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'] },
+  { id: 'airports', name: 'Airports', icon: '✈️', layerPatterns: ['airport'], sourceLayerPatterns: ['airport'] },
+  { id: 'natural', name: 'Natural', icon: '⛰️', layerPatterns: ['natural'], sourceLayerPatterns: ['natural'] },
+  { id: 'transit', name: 'Transit', icon: '🚌', layerPatterns: ['transit'], sourceLayerPatterns: ['transit'] },
+  
+  // Specific POI subcategories (for more granular control)
+  { id: 'restaurants', name: 'Restaurants', icon: '🍽️', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['restaurant', 'cafe', 'bar', 'fast-food', 'restaurant-noodle', 'restaurant-pizza', 'restaurant-seafood', 'restaurant-bbq', 'bakery', 'ice-cream', 'confectionery'] },
+  { id: 'shops', name: 'Shops', icon: '🛍️', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['shop', 'grocery', 'supermarket', 'clothing-store', 'convenience', 'hardware', 'furniture', 'jewelry-store', 'shoe', 'watch', 'alcohol-shop'] },
+  { id: 'entertainment', name: 'Entertainment', icon: '🎭', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['cinema', 'theatre', 'museum', 'stadium', 'amusement-park', 'aquarium', 'zoo', 'casino', 'music', 'art-gallery', 'attraction'] },
+  { id: 'sports', name: 'Sports', icon: '⚽', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['pitch', 'swimming', 'tennis', 'basketball', 'american-football', 'volleyball', 'table-tennis', 'skateboard', 'horse-riding', 'golf', 'bowling-alley', 'fitness-centre'] },
+  { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
+];
 
 export default function MapTopContainer({ map, onLocationSelect }: MapTopContainerProps) {
   const { account } = useAuthStateSafe();
@@ -127,17 +143,22 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
-  const [atlasTypes, setAtlasTypes] = useState<AtlasType[]>([]);
-  const [visibleAtlasTypes, setVisibleAtlasTypes] = useState<Set<string>>(new Set());
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
+  const [showMapStylesPopup, setShowMapStylesPopup] = useState(false);
+  const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
+  const [placeholderWord, setPlaceholderWord] = useState<'News' | 'Addresses' | 'People'>('News');
+  const [showDynamicSearchModal, setShowDynamicSearchModal] = useState(false);
+  const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
+  const [dynamicSearchType, setDynamicSearchType] = useState<'news' | 'people'>('news');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const placeholderIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize time filter to 24h on mount
   useEffect(() => {
@@ -146,34 +167,94 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     }));
   }, []);
 
-  // Fetch visible atlas types
+  // Listen for mentions layer hidden event
   useEffect(() => {
-    const fetchAtlasTypes = async () => {
+    const handleMentionsHidden = () => {
+      setMentionsLayerHidden(true);
+    };
+
+    const handleMentionsReloaded = () => {
+      setMentionsLayerHidden(false);
+    };
+
+    window.addEventListener('mentions-layer-hidden', handleMentionsHidden);
+    window.addEventListener('mentions-reloaded', handleMentionsReloaded);
+
+    return () => {
+      window.removeEventListener('mentions-layer-hidden', handleMentionsHidden);
+      window.removeEventListener('mentions-reloaded', handleMentionsReloaded);
+    };
+  }, []);
+
+  // Handle reload mentions button click
+  const handleReloadMentions = () => {
+    window.dispatchEvent(new CustomEvent('reload-mentions'));
+  };
+
+  // Ensure all map meta layers are visible by default (no toggling)
+  useEffect(() => {
+    if (!map) return;
+    
+    const mapboxMap = map as any;
+    const ensureLayersVisible = () => {
       try {
-        const response = await fetch('/api/atlas/types');
-        if (response.ok) {
-          const data = await response.json();
-          // API returns { types: [...] }
-          const types = data.types || [];
-          setAtlasTypes(types);
+        const style = mapboxMap.getStyle();
+        if (!style || !style.layers) return;
+        
+        // Make all map meta layers visible
+        MAP_META_LAYERS.forEach(layerConfig => {
+          const matchingLayers = style.layers.filter((layer: any) => {
+            const layerIdLower = layer.id?.toLowerCase() || '';
+            const sourceLayer = layer['source-layer']?.toLowerCase() || '';
+            
+            const matchesLayerId = layerConfig.layerPatterns.some(pattern => 
+              layerIdLower.includes(pattern.toLowerCase())
+            );
+            const matchesSourceLayer = layerConfig.sourceLayerPatterns?.some(pattern =>
+              sourceLayer.includes(pattern.toLowerCase())
+            );
+            
+            let matchesMaki = false;
+            if (layerConfig.makiPatterns && layerConfig.makiPatterns.length > 0) {
+              matchesMaki = layerIdLower.includes('poi') || sourceLayer === 'poi';
+            }
+            
+            return matchesLayerId || matchesSourceLayer || matchesMaki;
+          });
           
-          // Initialize all active types as visible by default
-          const activeSlugs = types
-            .filter((type: AtlasType) => type.status === 'active')
-            .map((type: AtlasType) => type.slug);
-          setVisibleAtlasTypes(new Set(activeSlugs));
-          
-          // Dispatch initial visibility event
-          window.dispatchEvent(new CustomEvent('atlas-visibility-change', {
-            detail: { visibleTables: activeSlugs }
-          }));
-        }
-      } catch (error) {
-        console.error('Failed to fetch atlas types:', error);
+          // Ensure all matching layers are visible
+          matchingLayers.forEach((layer: any) => {
+            try {
+              mapboxMap.setLayoutProperty(layer.id, 'visibility', 'visible');
+            } catch (e) {
+              // Some layers might not have visibility property, try opacity
+              try {
+                const currentOpacity = mapboxMap.getPaintProperty(layer.id, layer.type === 'fill' ? 'fill-opacity' : 'fill-extrusion-opacity') || 1;
+                if (currentOpacity === 0) {
+                  mapboxMap.setPaintProperty(
+                    layer.id, 
+                    layer.type === 'fill' ? 'fill-opacity' : 'fill-extrusion-opacity',
+                    1
+                  );
+                }
+              } catch (e2) {
+                // Ignore if we can't set it
+              }
+            }
+          });
+        });
+      } catch (e) {
+        console.debug('[MapTopContainer] Error ensuring layers visible:', e);
       }
     };
-    fetchAtlasTypes();
-  }, []);
+    
+    if (mapboxMap.isStyleLoaded && mapboxMap.isStyleLoaded()) {
+      ensureLayersVisible();
+    } else {
+      mapboxMap.once('style.load', ensureLayersVisible);
+      mapboxMap.once('load', ensureLayersVisible);
+    }
+  }, [map]);
 
   // Check for browser support and initialize Speech Recognition
   useEffect(() => {
@@ -219,7 +300,7 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     };
   }, []);
 
-  // Combined search: Mapbox geocoding + Atlas entities
+  // Combined search: Mapbox geocoding + News articles
   const searchLocations = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
       setSuggestions([]);
@@ -231,8 +312,8 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     try {
       const searchTerm = query.trim().toLowerCase();
       
-      // Search all three in parallel: Mapbox geocoding, Atlas entities, News articles
-      const [mapboxResults, atlasResults, newsResults] = await Promise.allSettled([
+      // Search in parallel: Mapbox geocoding, News articles, and People
+      const [mapboxResults, newsResults, peopleResults] = await Promise.allSettled([
         // Mapbox geocoding
         (async () => {
           const token = MAP_CONFIG.MAPBOX_TOKEN;
@@ -262,33 +343,6 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             );
           });
         })(),
-        // Atlas entities search
-        (async () => {
-          try {
-            const { supabase } = await import('@/lib/supabase');
-            const { data, error } = await supabase
-              .from('atlas_entities')
-              .select('id, name, table_name, lat, lng')
-              .ilike('name', `%${searchTerm}%`)
-              .not('lat', 'is', null)
-              .not('lng', 'is', null)
-              .limit(5);
-            
-            if (error || !data) return [];
-            
-            return data.map((entity): AtlasEntitySuggestion => ({
-              id: entity.id,
-              name: entity.name,
-              table_name: entity.table_name,
-              lat: entity.lat,
-              lng: entity.lng,
-              type: 'atlas',
-            }));
-          } catch (error) {
-            console.error('Atlas search error:', error);
-            return [];
-          }
-        })(),
         // News articles search
         (async () => {
           try {
@@ -317,14 +371,37 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             return [];
           }
         })(),
+        // People search
+        (async () => {
+          try {
+            const { supabase } = await import('@/lib/supabase');
+            const { data, error } = await (supabase as any)
+              .schema('civic')
+              .from('people')
+              .select('id, name')
+              .ilike('name', `%${searchTerm}%`)
+              .limit(5);
+            
+            if (error || !data) return [];
+            
+            return data.map((person: any): PeopleSuggestion => ({
+              id: person.id,
+              name: person.name,
+              type: 'people',
+            }));
+          } catch (error) {
+            console.error('People search error:', error);
+            return [];
+          }
+        })(),
       ]);
 
       const mapboxFeatures = mapboxResults.status === 'fulfilled' ? mapboxResults.value : [];
-      const atlasEntities = atlasResults.status === 'fulfilled' ? atlasResults.value : [];
       const newsArticles = newsResults.status === 'fulfilled' ? newsResults.value : [];
+      const people = peopleResults.status === 'fulfilled' ? peopleResults.value : [];
       
-      // Combine results: addresses first, then atlas entities, then news articles
-      const combined = [...mapboxFeatures, ...atlasEntities, ...newsArticles];
+      // Combine results: addresses first, then news articles, then people
+      const combined = [...mapboxFeatures, ...newsArticles, ...people];
       
       setSuggestions(combined);
       setShowSuggestions(combined.length > 0);
@@ -336,6 +413,23 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     } finally {
       setIsSearching(false);
     }
+  }, []);
+
+  // Rotating placeholder
+  useEffect(() => {
+    placeholderIntervalRef.current = setInterval(() => {
+      setPlaceholderWord(prev => {
+        if (prev === 'News') return 'Addresses';
+        if (prev === 'Addresses') return 'People';
+        return 'News';
+      });
+    }, 3000); // Rotate every 3 seconds
+
+    return () => {
+      if (placeholderIntervalRef.current) {
+        clearInterval(placeholderIntervalRef.current);
+      }
+    };
   }, []);
 
   // Debounced search
@@ -365,40 +459,23 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     setShowSuggestions(false);
     setSuggestions([]);
     
-    // Handle news article
+    // Handle news article - show modal with raw data
     if ('type' in suggestion && suggestion.type === 'news') {
       const article = suggestion as NewsArticleSuggestion;
       setSearchQuery(article.title);
-      
-      // Navigate to news article page
-      window.location.href = `/news/${article.article_id}`;
+      setDynamicSearchData(article);
+      setDynamicSearchType('news');
+      setShowDynamicSearchModal(true);
       return;
     }
     
-    // Handle atlas entity
-    if ('type' in suggestion && suggestion.type === 'atlas') {
-      const entity = suggestion as AtlasEntitySuggestion;
-      setSearchQuery(entity.name);
-      
-      // Fly to location
-      if (map && map.flyTo) {
-        map.flyTo({
-          center: [entity.lng, entity.lat],
-          zoom: 15,
-          duration: 1500,
-        });
-      }
-      
-      // Dispatch event to show atlas entity popup
-      window.dispatchEvent(new CustomEvent('atlas-entity-click', {
-        detail: {
-          id: entity.id,
-          name: entity.name,
-          table_name: entity.table_name,
-          lat: entity.lat,
-          lng: entity.lng,
-        }
-      }));
+    // Handle people - show modal with raw data
+    if ('type' in suggestion && suggestion.type === 'people') {
+      const person = suggestion as PeopleSuggestion;
+      setSearchQuery(person.name);
+      setDynamicSearchData(person);
+      setDynamicSearchType('people');
+      setShowDynamicSearchModal(true);
       return;
     }
     
@@ -481,76 +558,6 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     }
   };
 
-  const handleAtlasTypeClick = async (atlasType: AtlasType) => {
-    // Only allow toggling active types
-    if (atlasType.status !== 'active') {
-      return;
-    }
-
-    const wasVisible = visibleAtlasTypes.has(atlasType.slug);
-    const newVisible = new Set(visibleAtlasTypes);
-    if (wasVisible) {
-      newVisible.delete(atlasType.slug);
-    } else {
-      newVisible.add(atlasType.slug);
-    }
-    
-    setVisibleAtlasTypes(newVisible);
-    
-    // Dispatch visibility change event for AtlasLayer
-    const visibleTables = Array.from(newVisible);
-    window.dispatchEvent(new CustomEvent('atlas-visibility-change', {
-      detail: { visibleTables }
-    }));
-
-    // Also update map filters directly if map is available
-    if (map) {
-      const mapboxMap = map as any;
-      const pointLayerId = 'atlas-layer-point';
-      const labelLayerId = 'atlas-layer-label';
-
-      try {
-        const pointLayer = mapboxMap.getLayer(pointLayerId);
-        const labelLayer = mapboxMap.getLayer(labelLayerId);
-        
-        if (pointLayer && labelLayer) {
-          // Build filter: show all visible entities
-          const newFilter = visibleTables.length > 0
-            ? ['any', ...visibleTables.map(name => ['==', ['get', 'table_name'], name])]
-            : ['literal', false]; // Hide all if none visible
-
-          mapboxMap.setFilter(pointLayerId, newFilter);
-          mapboxMap.setFilter(labelLayerId, newFilter);
-        }
-      } catch (e) {
-        console.warn('[MapTopContainer] Error updating map filters:', e);
-      }
-    }
-
-    // Count entities and show toast
-    try {
-      const { supabase } = await import('@/lib/supabase');
-      const { count, error } = await supabase
-        .from('atlas_entities')
-        .select('*', { count: 'exact', head: true })
-        .eq('table_name', atlasType.slug)
-        .not('lat', 'is', null)
-        .not('lng', 'is', null);
-
-      if (!error && count !== null) {
-        const action = wasVisible ? 'hidden' : 'shown';
-        const typeName = atlasType.name || atlasType.slug;
-        const countText = count.toLocaleString();
-        info(
-          `${countText} ${typeName} ${count === 1 ? 'is' : 'are'} being ${action}`,
-          ''
-        );
-      }
-    } catch (error) {
-      // Silently fail - toast is not critical
-      console.warn('[MapTopContainer] Error fetching entity count:', error);
-    }
-  };
 
   return (
     <div className="fixed top-4 left-4 right-4 z-[45] pointer-events-none">
@@ -594,7 +601,7 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                   handleSuggestionSelect(suggestions[0]);
                 }
               }}
-              placeholder="Search here"
+              placeholder={`Search ${placeholderWord}`}
               className="w-full bg-transparent border-0 outline-none text-gray-900 placeholder:text-gray-500 text-sm"
             />
             
@@ -602,11 +609,11 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             {showSuggestions && suggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto z-50">
                 {suggestions.map((suggestion, index) => {
-                  const isAtlas = 'type' in suggestion && suggestion.type === 'atlas';
                   const isNews = 'type' in suggestion && suggestion.type === 'news';
-                  const entity = isAtlas ? (suggestion as AtlasEntitySuggestion) : null;
+                  const isPeople = 'type' in suggestion && suggestion.type === 'people';
                   const article = isNews ? (suggestion as NewsArticleSuggestion) : null;
-                  const feature = !isAtlas && !isNews ? (suggestion as MapboxFeature) : null;
+                  const person = isPeople ? (suggestion as PeopleSuggestion) : null;
+                  const feature = !isNews && !isPeople ? (suggestion as MapboxFeature) : null;
                   
                   return (
                     <button
@@ -617,19 +624,7 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                       }`}
                     >
                       <div className="flex items-start gap-2">
-                        {isAtlas ? (
-                          <>
-                            <MapPinIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium text-gray-900 truncate">
-                                {entity!.name}
-                              </div>
-                              <div className="text-xs text-gray-500 truncate capitalize">
-                                {entity!.table_name.replace('_', ' ')}
-                              </div>
-                            </div>
-                          </>
-                        ) : isNews ? (
+                        {isNews ? (
                           <>
                             <NewspaperIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
@@ -638,6 +633,18 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                               </div>
                               <div className="text-xs text-gray-500 truncate">
                                 {article!.source_name || 'News Article'}
+                              </div>
+                            </div>
+                          </>
+                        ) : isPeople ? (
+                          <>
+                            <UserIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-gray-900 truncate">
+                                {person!.name}
+                              </div>
+                              <div className="text-xs text-gray-500 truncate">
+                                Person
                               </div>
                             </div>
                           </>
@@ -735,103 +742,78 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           )}
         </div>
 
-        {/* Atlas Type Buttons */}
-        {atlasTypes.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-            {atlasTypes.map((atlasType) => {
-              const isActive = visibleAtlasTypes.has(atlasType.slug);
-              const isToggleable = atlasType.status === 'active';
-              
-              return (
-                <button
-                  key={atlasType.id}
-                  onClick={() => handleAtlasTypeClick(atlasType)}
-                  disabled={!isToggleable}
-                  className={`flex-shrink-0 rounded-md border px-2 py-1 flex items-center gap-1 transition-colors whitespace-nowrap relative ${
-                    isToggleable
-                      ? 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                      : 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  {atlasType.icon_path ? (
-                    <Image
-                      src={atlasType.icon_path}
-                      alt={atlasType.name}
-                      width={14}
-                      height={14}
-                      className={`w-3.5 h-3.5 object-contain ${isActive && isToggleable ? 'opacity-100' : 'opacity-60'}`}
-                      unoptimized
-                    />
-                  ) : atlasType.emoji ? (
-                    <span className="text-sm">{atlasType.emoji}</span>
-                  ) : null}
-                  <span className={`text-xs font-medium whitespace-nowrap ${
-                    isToggleable
-                      ? 'text-gray-700'
-                      : 'text-gray-400'
-                  }`}>
-                    {atlasType.name}
-                  </span>
-                  {isActive && isToggleable && (
-                    <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-white" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Time Filter and Layers Container */}
+        <div className="flex items-center gap-2">
+          {/* Time Filter Selector or Reload Mentions Button */}
+          {mentionsLayerHidden ? (
+            <button
+              onClick={handleReloadMentions}
+              className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-2 h-[25px] text-[10px] font-medium text-gray-900 hover:bg-white transition-colors whitespace-nowrap flex items-center"
+            >
+              Reload mentions
+            </button>
+          ) : (
+            <div className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1 h-[25px] flex items-center gap-0.5 w-fit">
+              <button
+                onClick={() => {
+                  setTimeFilter('24h');
+                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                    detail: { timeFilter: '24h' }
+                  }));
+                }}
+                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                  timeFilter === '24h'
+                    ? 'text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                24h
+              </button>
+              <button
+                onClick={() => {
+                  setTimeFilter('7d');
+                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                    detail: { timeFilter: '7d' }
+                  }));
+                }}
+                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                  timeFilter === '7d'
+                    ? 'text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                7d
+              </button>
+              <button
+                onClick={() => {
+                  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+                  if (!isPro) {
+                    openUpgrade('All time filter');
+                    return;
+                  }
+                  setTimeFilter('all');
+                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                    detail: { timeFilter: 'all' }
+                  }));
+                }}
+                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                  timeFilter === 'all'
+                    ? 'text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                All time
+              </button>
+            </div>
+          )}
 
-        {/* Time Filter Selector */}
-        <div className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1 py-0.5 flex items-center gap-0.5 w-fit">
+          {/* Layers Button */}
           <button
-            onClick={() => {
-              setTimeFilter('24h');
-              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                detail: { timeFilter: '24h' }
-              }));
-            }}
-            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
-              timeFilter === '24h'
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            onClick={() => setShowMapStylesPopup(true)}
+            className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1.5 h-[25px] hover:bg-white transition-colors flex items-center justify-center"
+            aria-label="Map Styles"
           >
-            24h
-          </button>
-          <button
-            onClick={() => {
-              setTimeFilter('7d');
-              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                detail: { timeFilter: '7d' }
-              }));
-            }}
-            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
-              timeFilter === '7d'
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            7d
-          </button>
-          <button
-            onClick={() => {
-              const isPro = account?.plan === 'pro' || account?.plan === 'plus';
-              if (!isPro) {
-                openUpgrade('All time filter');
-                return;
-              }
-              setTimeFilter('all');
-              window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                detail: { timeFilter: 'all' }
-              }));
-            }}
-            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap ${
-              timeFilter === 'all'
-                ? 'text-gray-900'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            All time
+            <Squares2X2Icon className="w-3.5 h-3.5 text-gray-600" />
           </button>
         </div>
       </div>
@@ -846,6 +828,21 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             detail: { isOpen: false }
           }));
         }}
+      />
+
+      {/* Map Styles Popup */}
+      <MapStylesPopup
+        isOpen={showMapStylesPopup}
+        onClose={() => setShowMapStylesPopup(false)}
+        map={map}
+      />
+
+      {/* Dynamic Search Modal */}
+      <DynamicSearchModal
+        isOpen={showDynamicSearchModal}
+        onClose={() => setShowDynamicSearchModal(false)}
+        data={dynamicSearchData}
+        type={dynamicSearchType}
       />
     </div>
   );

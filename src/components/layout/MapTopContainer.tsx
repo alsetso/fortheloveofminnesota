@@ -682,7 +682,13 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           {/* Profile Icon */}
           {account ? (
             <button
-              onClick={() => setShowLiveAccountModal(true)}
+              onClick={() => {
+                setShowLiveAccountModal(true);
+                // Dispatch event to hide mobile nav
+                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                  detail: { isOpen: true }
+                }));
+              }}
               className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden transition-colors ${
                 (account.plan === 'pro' || account.plan === 'plus')
                   ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
@@ -711,7 +717,13 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
             </button>
           ) : (
             <button
-              onClick={() => setShowLiveAccountModal(true)}
+              onClick={() => {
+                setShowLiveAccountModal(true);
+                // Dispatch event to hide mobile nav
+                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                  detail: { isOpen: true }
+                }));
+              }}
               className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 border-2 border-gray-200 hover:border-gray-300 transition-colors flex items-center justify-center"
               aria-label="Sign In"
             >
@@ -827,7 +839,13 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
       {/* Live Account Modal */}
       <LiveAccountModal
         isOpen={showLiveAccountModal}
-        onClose={() => setShowLiveAccountModal(false)}
+        onClose={() => {
+          setShowLiveAccountModal(false);
+          // Dispatch event to show mobile nav
+          window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+            detail: { isOpen: false }
+          }));
+        }}
       />
     </div>
   );

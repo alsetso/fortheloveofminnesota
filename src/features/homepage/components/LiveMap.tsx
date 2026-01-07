@@ -131,6 +131,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
   const isAdmin = account?.role === 'admin';
   const [lastNewsGeneration, setLastNewsGeneration] = useState<string | null>(null);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -173,6 +174,19 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     window.addEventListener('mention-created', handleMentionCreatedEvent);
     return () => {
       window.removeEventListener('mention-created', handleMentionCreatedEvent);
+    };
+  }, []);
+
+  // Listen for live account modal open/close to hide/show mobile nav
+  useEffect(() => {
+    const handleAccountModalChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{ isOpen: boolean }>;
+      setIsAccountModalOpen(customEvent.detail?.isOpen || false);
+    };
+
+    window.addEventListener('live-account-modal-change', handleAccountModalChange);
+    return () => {
+      window.removeEventListener('live-account-modal-change', handleAccountModalChange);
     };
   }, []);
 
@@ -776,11 +790,13 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         </div>
       </div>
 
-      {/* Mobile Nav Tabs - Fixed bottom bar */}
-      <MobileNavTabs
-        activeTab={activeTab}
-        onTabClick={handleTabClick}
-      />
+      {/* Mobile Nav Tabs - Fixed bottom bar - Hidden when account modal is open */}
+      {!isAccountModalOpen && (
+        <MobileNavTabs
+          activeTab={activeTab}
+          onTabClick={handleTabClick}
+        />
+      )}
 
       {/* News Sheet */}
       <MobileNavSheet

@@ -1,13 +1,8 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import {
-  HeartIcon,
   BuildingLibraryIcon,
-  MapPinIcon,
   GlobeAltIcon,
-  MagnifyingGlassIcon,
-  ArrowRightIcon,
-  MapIcon,
   UserGroupIcon,
   ScaleIcon,
   CurrencyDollarIcon,
@@ -17,9 +12,9 @@ import Image from 'next/image';
 import { createServerClient } from '@/lib/supabaseServer';
 import { getVisibleAtlasTypes } from '@/features/atlas/services/atlasTypesService';
 import HomepageViewTracker from '@/components/analytics/HomepageViewTracker';
-import HomepageMaps from '@/features/homepage/components/HomepageMaps';
 import HomepageProfileColumn from '@/features/homepage/components/HomepageProfileColumn';
 import HomepageNewsSection from '@/features/homepage/components/HomepageNewsSection';
+import HomepageMapPreview from '@/features/homepage/components/HomepageMapPreview';
 
 export const metadata: Metadata = {
   title: 'For the Love of Minnesota',
@@ -108,34 +103,12 @@ export default async function Home() {
               <p className="text-xs text-gray-600 leading-relaxed max-w-2xl mx-auto px-4">
                 Create and explore interactive maps of Minnesota. Drop pins to mark places, build custom maps for your community or business, and discover locations across the state through our comprehensive atlas layers.
               </p>
-              <div className="flex flex-wrap justify-center gap-2 pt-2">
-                <Link
-                  href="/maps"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-gray-900 rounded-md hover:bg-gray-800 transition-all shadow-sm hover:shadow"
-                >
-                  <MapIcon className="w-3.5 h-3.5" />
-                  <span>View Maps</span>
-                  <ArrowRightIcon className="w-3.5 h-3.5" />
-                </Link>
-                <Link
-                  href="/maps/new"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-900 bg-white rounded-md hover:bg-gray-50 transition-all border border-gray-300 shadow-sm hover:shadow"
-                >
-                  <MapPinIcon className="w-3.5 h-3.5" />
-                  <span>Create Map</span>
-                </Link>
-                <Link
-                  href="/maps?tab=atlas"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-gray-700 bg-white rounded-md hover:bg-gray-50 transition-all border border-gray-200"
-                >
-                  <GlobeAltIcon className="w-3.5 h-3.5" />
-                  <span>Explore Atlas</span>
-                </Link>
-              </div>
             </section>
 
-            {/* Maps Section */}
-            <HomepageMaps />
+            {/* Map Preview Section */}
+            <section className="pt-4">
+              <HomepageMapPreview />
+            </section>
 
             {/* Atlas Tables Grid */}
             <section className="space-y-3 pt-6 border-t border-gray-200">
@@ -204,6 +177,24 @@ export default async function Home() {
                     </Link>
                   );
                 })}
+              </div>
+            </section>
+
+            {/* Business Collaboration CTA */}
+            <section className="space-y-3 pt-6 border-t border-gray-200">
+              <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-semibold text-gray-900">Business Collaborations</h3>
+                  <p className="text-xs text-gray-600">
+                    We're open to business collaborations and partnerships. Interested in working together?
+                  </p>
+                  <a
+                    href="mailto:loveofminnesota@gmail.com"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                  >
+                    <span>loveofminnesota@gmail.com</span>
+                  </a>
+                </div>
               </div>
             </section>
 

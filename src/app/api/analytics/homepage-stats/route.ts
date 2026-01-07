@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     // Get homepage statistics for different time periods
     // Homepage URL is '/'
-    const [stats24h, stats7d, stats30d] = await Promise.all([
+    const [stats24h, stats7d, stats30d, allTimeStats] = await Promise.all([
       supabase.rpc('get_page_stats', {
         p_page_url: '/',
         p_hours: 24,
@@ -52,12 +52,18 @@ export async function GET(request: NextRequest) {
         p_page_url: '/',
         p_hours: 720, // 30 days
       } as any),
+      // Get all-time stats (use a very large number of hours, e.g., 10 years)
+      supabase.rpc('get_page_stats', {
+        p_page_url: '/',
+        p_hours: 87600, // ~10 years
+      } as any),
     ]);
 
     // Extract stats with default values
     const stats24hArray = stats24h.data as PageStats[] | null;
     const stats7dArray = stats7d.data as PageStats[] | null;
     const stats30dArray = stats30d.data as PageStats[] | null;
+    const allTimeArray = allTimeStats.data as PageStats[] | null;
 
     return NextResponse.json({
       last24Hours: {
@@ -74,6 +80,11 @@ export async function GET(request: NextRequest) {
         unique_visitors: stats30dArray?.[0]?.unique_viewers || 0,
         total_views: stats30dArray?.[0]?.total_views || 0,
         accounts_viewed: stats30dArray?.[0]?.accounts_viewed || 0,
+      },
+      allTime: {
+        unique_visitors: allTimeArray?.[0]?.unique_viewers || 0,
+        total_views: allTimeArray?.[0]?.total_views || 0,
+        accounts_viewed: allTimeArray?.[0]?.accounts_viewed || 0,
       },
     });
   } catch (error) {

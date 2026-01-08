@@ -5,7 +5,7 @@
 
 import { MAP_CONFIG } from '../config';
 
-type MapStyle = 'streets' | 'satellite' | 'light';
+type MapStyle = 'streets' | 'satellite';
 
 interface PreloadedStyle {
   styleUrl: string;
@@ -91,7 +91,7 @@ class MapStylePreloader {
    * Preload all map styles
    */
   async preloadAllStyles(): Promise<void> {
-    const styles: MapStyle[] = ['streets', 'satellite', 'light'];
+    const styles: MapStyle[] = ['streets', 'satellite'];
     await Promise.all(styles.map(style => this.preloadStyle(style)));
   }
 
@@ -116,7 +116,6 @@ class MapStylePreloader {
     return {
       streets: this.isPreloaded('streets'),
       satellite: this.isPreloaded('satellite'),
-      light: this.isPreloaded('light'),
     };
   }
 }

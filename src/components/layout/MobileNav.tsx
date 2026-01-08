@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -48,10 +48,12 @@ interface MobileNavProps {
 // Profile Avatar Component
 function ProfileAvatar({ 
   account, 
-  isActive 
+  isActive,
+  useWhiteText = false
 }: { 
   account: { image_url?: string | null; username?: string | null; plan?: string | null } | null; 
   isActive: boolean;
+  useWhiteText?: boolean;
 }) {
   const isPro = account?.plan === 'pro' || account?.plan === 'plus';
   
@@ -59,7 +61,10 @@ function ProfileAvatar({
     <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center ${
       isPro
         ? 'p-[1px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-        : `border ${isActive ? 'border-gray-900' : 'border-gray-300'}`
+        : `border ${isActive 
+          ? useWhiteText ? 'border-white' : 'border-gray-900'
+          : useWhiteText ? 'border-white/50' : 'border-gray-300'
+        }`
     }`}>
       <div className="w-full h-full rounded-full overflow-hidden bg-white">
         {account?.image_url ? (
@@ -73,7 +78,11 @@ function ProfileAvatar({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <UserIcon className={`w-3 h-3 ${isActive ? 'text-gray-900' : 'text-gray-500'}`} />
+            <UserIcon className={`w-3 h-3 ${
+              isActive 
+                ? useWhiteText ? 'text-white' : 'text-gray-900'
+                : useWhiteText ? 'text-white/80' : 'text-gray-500'
+            }`} />
           </div>
         )}
       </div>
@@ -91,6 +100,32 @@ export default function MobileNav({
   const router = useRouter();
   const { account } = useAuthStateSafe();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
+
+  // Listen for blur style and map style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+    };
+  }, []);
+
+  // Text color logic: white only when blur AND satellite, otherwise dark
+  const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
+  const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
 
   const profileHref = account?.username ? `/profile/${account.username}` : '/account/settings';
   const isProfileActive = account?.username ? pathname === `/profile/${account.username}` : pathname?.startsWith('/account');
@@ -150,7 +185,19 @@ export default function MobileNav({
   // Render nav item
   const renderNavItem = (item: NavItem) => {
     const Icon = item.isActive && item.iconSolid ? item.iconSolid : item.icon;
-    const baseClasses = "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors";
+    const baseClasses = `flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors rounded-md ${
+      useTransparentUI
+        ? 'hover:bg-white/10'
+        : useBlurStyle
+        ? 'hover:bg-white/20'
+        : 'hover:bg-gray-50'
+    }`;
+    const iconColor = useWhiteText 
+      ? (item.isActive ? 'text-white' : 'text-white/80')
+      : (item.isActive ? 'text-gray-900' : 'text-gray-500');
+    const textColor = useWhiteText 
+      ? (item.isActive ? 'text-white' : 'text-white/80')
+      : (item.isActive ? 'text-gray-900' : 'text-gray-500');
 
     if (item.type === 'link') {
       // For profile, use onClick handler to remove URL params
@@ -162,8 +209,8 @@ export default function MobileNav({
             className={baseClasses}
             aria-label={item.label}
           >
-            <ProfileAvatar account={account} isActive={item.isActive} />
-                <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+            <ProfileAvatar account={account} isActive={item.isActive} useWhiteText={useWhiteText} />
+                <span className={`text-[10px] font-medium ${textColor}`}>
                   {item.label}
                 </span>
           </button>
@@ -179,15 +226,15 @@ export default function MobileNav({
         >
           {item.id === 'profile' ? (
             <>
-              <ProfileAvatar account={account} isActive={item.isActive} />
-              <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+              <ProfileAvatar account={account} isActive={item.isActive} useWhiteText={useWhiteText} />
+              <span className={`text-[10px] font-medium ${textColor}`}>
                 {item.label}
               </span>
             </>
           ) : (
             <>
-              <Icon className={`w-5 h-5 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
-              <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+              <Icon className={`w-5 h-5 ${iconColor}`} />
+              <span className={`text-[10px] font-medium ${textColor}`}>
                 {item.label}
               </span>
             </>
@@ -215,14 +262,14 @@ export default function MobileNav({
                 unoptimized
               />
             </div>
-            <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+            <span className={`text-[10px] font-medium ${textColor}`}>
               {item.label}
             </span>
           </>
         ) : (
           <>
-            <Icon className={`w-5 h-5 ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`} />
-            <span className={`text-[10px] font-medium ${item.isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+            <Icon className={`w-5 h-5 ${iconColor}`} />
+            <span className={`text-[10px] font-medium ${textColor}`}>
               {item.label}
             </span>
           </>
@@ -251,7 +298,11 @@ export default function MobileNav({
     <>
       <nav 
         ref={containerRef}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200"
+        className={`fixed bottom-0 left-0 right-0 z-50 border-t transition-colors ${
+          useBlurStyle 
+            ? 'bg-transparent backdrop-blur-md border-white/20' 
+            : 'bg-white border-gray-200'
+        }`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-center justify-around h-16 px-2">
@@ -262,15 +313,25 @@ export default function MobileNav({
           {overflowItems.length > 0 && (
             <button
               onClick={() => setIsMoreOpen(true)}
-              className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors"
+              className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors rounded-md ${
+                useTransparentUI
+                  ? 'hover:bg-white/10'
+                  : useBlurStyle
+                  ? 'hover:bg-white/20'
+                  : 'hover:bg-gray-50'
+              }`}
               aria-label="More navigation options"
             >
               {isMoreOpen ? (
-                <EllipsisHorizontalIconSolid className="w-5 h-5 text-gray-900" />
+                <EllipsisHorizontalIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
               ) : (
-                <EllipsisHorizontalIcon className="w-5 h-5 text-gray-500" />
+                <EllipsisHorizontalIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
               )}
-              <span className={`text-[10px] font-medium ${isMoreOpen ? 'text-gray-900' : 'text-gray-500'}`}>
+              <span className={`text-[10px] font-medium ${
+                isMoreOpen 
+                  ? useWhiteText ? 'text-white' : 'text-gray-900'
+                  : useWhiteText ? 'text-white/80' : 'text-gray-500'
+              }`}>
                 More
               </span>
             </button>

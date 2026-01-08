@@ -98,7 +98,7 @@ export default function NearbyPlacesContainer({
         if (source === 'map-pins' || source.startsWith('atlas-')) continue;
         if (layerId.includes('map-pins') || layerId.includes('atlas-')) continue;
         if (layerId.includes('pin') && !layerId.includes('spinning')) continue;
-
+        
         // Only include meaningful POI/building features
         // Exclude: roads, water labels, place labels (cities), building numbers, road labels
         if (layerId.includes('road-label') || 
@@ -141,7 +141,7 @@ export default function NearbyPlacesContainer({
             if (coords && coords[0]) {
               [featureLng, featureLat] = coords[0];
             }
-          }
+            }
         }
 
         // Skip if no coordinates
@@ -157,8 +157,8 @@ export default function NearbyPlacesContainer({
           feature: extracted,
           rawFeature,
         });
-      }
-
+        }
+        
       // Calculate distances and sort by proximity
       const placesWithDistance = meaningfulFeatures
         .map(({ feature, rawFeature }) => {
@@ -192,7 +192,7 @@ export default function NearbyPlacesContainer({
         .sort((a, b) => (a.distance || 0) - (b.distance || 0))
         .slice(0, 10); // Top 10 closest
 
-      setNearbyPlaces(placesWithDistance);
+        setNearbyPlaces(placesWithDistance);
     } catch (error) {
       console.error('[NearbyPlacesContainer] Error fetching nearby places:', error);
       setNearbyPlaces([]);
@@ -468,11 +468,11 @@ export default function NearbyPlacesContainer({
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">{place.name}</div>
                 <div className="flex items-center gap-1.5">
-                  {place.distance !== undefined && (
-                    <div className="text-[10px] text-gray-500">
-                      {(place.distance * 0.621371).toFixed(2)} mi away
-                    </div>
-                  )}
+                {place.distance !== undefined && (
+                  <div className="text-[10px] text-gray-500">
+                    {(place.distance * 0.621371).toFixed(2)} mi away
+                  </div>
+                )}
                   {place.category && place.category !== 'unknown' && (
                     <span className="text-[10px] text-gray-400 capitalize">
                       · {place.category.replace(/_/g, ' ')}

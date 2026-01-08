@@ -11,6 +11,7 @@ const ROUTE_PROTECTION: Record<string, {
 }> = {
   '/account/settings': { auth: true },
   '/map-test': { auth: true },
+  '/admin': { auth: true, roles: ['admin'] },
 };
 
 /**
@@ -27,22 +28,44 @@ function isAccountComplete(account: {
 
 /**
  * Get user account data (role, onboarded status, and completeness)
+ * Checks active_account_id cookie first, then falls back to first account
  */
 async function getUserAccountData(
   supabase: ReturnType<typeof createServerClient>, 
-  userId: string
+  userId: string,
+  req: NextRequest
 ): Promise<{
   role: AccountRole | null;
   onboarded: boolean | null;
   isComplete: boolean;
 }> {
-  // Try to get account role, onboarded status, and username (only field needed for completion)
-  const { data: account, error: accountError } = await supabase
-    .from('accounts')
-    .select('role, onboarded, username')
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
+  // Get active account ID from cookie (set by client when switching accounts)
+  const activeAccountIdCookie = req.cookies.get('active_account_id');
+  const activeAccountId = activeAccountIdCookie?.value || null;
+
+  let account, accountError;
+  
+  if (activeAccountId) {
+    // Verify the active account belongs to this user before using it
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('role, onboarded, username')
+      .eq('id', activeAccountId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    account = data;
+    accountError = error;
+  } else {
+    // Fallback to first account if no active account ID in cookie
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('role, onboarded, username')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    account = data;
+    accountError = error;
+  }
 
   // If account doesn't exist or query fails, allow access (account will be created)
   if (accountError || !account) {
@@ -260,7 +283,7 @@ export async function middleware(req: NextRequest) {
   let accountData: { role: AccountRole | null; onboarded: boolean | null; isComplete: boolean } | null = null;
   
   if (user && protection?.auth) {
-    accountData = await getUserAccountData(supabase, user.id);
+    accountData = await getUserAccountData(supabase, user.id, req);
     
     // Check account completeness for protected routes
     // Source of truth: isComplete checks actual data (username, first_name, last_name, image_url)

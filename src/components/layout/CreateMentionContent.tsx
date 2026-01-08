@@ -11,6 +11,8 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import FirstMentionModal from '@/components/modals/FirstMentionModal';
 import { supabase } from '@/lib/supabase';
+import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
+import YouTubePreview from '@/features/mentions/components/YouTubePreview';
 
 interface CreateMentionContentProps {
   map: MapboxMapInstance | null;
@@ -18,6 +20,7 @@ interface CreateMentionContentProps {
   initialCoordinates?: { lat: number; lng: number } | null;
   initialAtlasMeta?: Record<string, any> | null;
   initialMapMeta?: Record<string, any> | null;
+  initialFullAddress?: string | null;
   onMentionCreated?: () => void;
 }
 
@@ -27,6 +30,7 @@ export default function CreateMentionContent({
   initialCoordinates,
   initialAtlasMeta,
   initialMapMeta,
+  initialFullAddress,
   onMentionCreated 
 }: CreateMentionContentProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
@@ -39,6 +43,34 @@ export default function CreateMentionContent({
   const [showFirstMentionModal, setShowFirstMentionModal] = useState(false);
   const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
   const mapMetaInfoRef = useRef<HTMLDivElement>(null);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
+
+  // Listen for blur style and map style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+    };
+  }, []);
+
+  // Use transparent backgrounds and white text when satellite + blur
+  const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
+
+  // Detect YouTube URLs in description
+  const youtubeUrls = findYouTubeUrls(description);
 
   // Close map meta info popup when clicking outside
   useEffect(() => {
@@ -124,11 +156,39 @@ export default function CreateMentionContent({
     setError(null);
 
     try {
+      // Reverse geocode if full_address not provided
+      let fullAddress = initialFullAddress || null;
+      if (!fullAddress && coordinates) {
+        try {
+          const { MAP_CONFIG } = await import('@/features/map/config');
+          const token = MAP_CONFIG.MAPBOX_TOKEN;
+          if (token) {
+            const url = `${MAP_CONFIG.GEOCODING_BASE_URL}/${coordinates.lng},${coordinates.lat}.json`;
+            const params = new URLSearchParams({
+              access_token: token,
+              types: 'address',
+              limit: '1',
+            });
+            
+            const response = await fetch(`${url}?${params}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.features && data.features.length > 0) {
+                fullAddress = data.features[0].place_name || null;
+              }
+            }
+          }
+        } catch (err) {
+          console.debug('[CreateMentionContent] Error reverse geocoding:', err);
+        }
+      }
+
       const mentionData = {
         lat: coordinates.lat,
         lng: coordinates.lng,
         description: description.trim() || null,
         visibility,
+        full_address: fullAddress,
         atlas_meta: initialAtlasMeta || null,
         map_meta: initialMapMeta || null,
       };
@@ -179,7 +239,7 @@ export default function CreateMentionContent({
   if (!user) {
     return (
       <div className="space-y-3 p-4">
-        <p className="text-xs text-gray-600">
+        <p className={`text-xs ${useTransparentUI ? 'text-white/80' : 'text-gray-600'}`}>
           Sign in to create mentions on the map.
         </p>
         <button
@@ -197,7 +257,11 @@ export default function CreateMentionContent({
       <form onSubmit={handleSubmit} className="space-y-3 px-4 py-4">
       {/* Atlas Entity Label */}
       {initialAtlasMeta && (
-        <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
+        <div className={`flex items-center gap-2 p-2 border rounded-md ${
+          useTransparentUI
+            ? 'bg-white/10 border-white/20'
+            : 'bg-gray-50 border-gray-200'
+        }`}>
           {initialAtlasMeta.icon_path && (
             <Image
               src={initialAtlasMeta.icon_path}
@@ -209,11 +273,11 @@ export default function CreateMentionContent({
             />
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-gray-900">
+            <div className={`text-xs font-semibold ${useTransparentUI ? 'text-white' : 'text-gray-900'}`}>
               {initialAtlasMeta.name || 'Atlas Entity'}
             </div>
             {initialAtlasMeta.table_name && (
-              <div className="text-[10px] text-gray-500 capitalize">
+              <div className={`text-[10px] capitalize ${useTransparentUI ? 'text-white/70' : 'text-gray-500'}`}>
                 {initialAtlasMeta.table_name.replace('_', ' ')}
               </div>
             )}
@@ -275,12 +339,16 @@ export default function CreateMentionContent({
 
         return (
           <div className="relative">
-            <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-md">
+            <div className={`flex items-center gap-2 p-2 border rounded-md ${
+              useTransparentUI
+                ? 'bg-white/10 border-white/20'
+                : 'bg-gray-50 border-gray-200'
+            }`}>
               {feature.icon && feature.icon !== '📍' && (
                 <span className="text-xs flex-shrink-0">{feature.icon}</span>
               )}
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-gray-900 truncate">
+                <div className={`text-xs font-semibold truncate ${useTransparentUI ? 'text-white' : 'text-gray-900'}`}>
                   {singleLineLabel}
                 </div>
               </div>
@@ -289,7 +357,11 @@ export default function CreateMentionContent({
                   e.stopPropagation();
                   setShowMapMetaInfo(!showMapMetaInfo);
                 }}
-                className="flex-shrink-0 p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+                className={`flex-shrink-0 p-0.5 transition-colors ${
+                  useTransparentUI
+                    ? 'text-white/60 hover:text-white'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
                 aria-label="Map metadata information"
               >
                 <InformationCircleIcon className="w-3.5 h-3.5" />
@@ -300,9 +372,13 @@ export default function CreateMentionContent({
             {showMapMetaInfo && (
               <div
                 ref={mapMetaInfoRef}
-                className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-gray-200 rounded-md shadow-lg p-2"
+                className={`absolute top-full left-0 right-0 mt-1 z-50 border rounded-md shadow-lg p-2 ${
+                  useTransparentUI
+                    ? 'bg-white/90 backdrop-blur-md border-white/20'
+                    : 'bg-white border-gray-200'
+                }`}
               >
-                <p className="text-xs text-gray-600">
+                <p className={`text-xs ${useTransparentUI ? 'text-white/90' : 'text-gray-600'}`}>
                   By dropping a pin, hovering over labels on the map will reference these in the mention.
                 </p>
               </div>
@@ -322,13 +398,21 @@ export default function CreateMentionContent({
             }
           }}
           maxLength={240}
-          className="w-full px-0 py-0 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none resize-none bg-transparent"
+          className={`w-full px-0 py-0 text-xs placeholder:text-gray-400 focus:outline-none resize-none bg-transparent ${
+            useTransparentUI ? 'text-white placeholder:text-white/50' : 'text-gray-900'
+          }`}
           placeholder="What's going on here?"
           rows={4}
           disabled={isSubmitting || !coordinates}
         />
         <div className="flex items-center justify-end gap-2 mt-1">
-          <span className={`text-[10px] ${description.length >= 240 ? 'text-red-500' : 'text-gray-400'}`}>
+          <span className={`text-[10px] ${
+            description.length >= 240 
+              ? 'text-red-500' 
+              : useTransparentUI 
+              ? 'text-white/60' 
+              : 'text-gray-400'
+          }`}>
             {description.length}/240
           </span>
           {/* Submit Button - Only show if description has at least 1 character */}
@@ -347,11 +431,29 @@ export default function CreateMentionContent({
             </button>
           )}
         </div>
+        
+        {/* YouTube Preview */}
+        {youtubeUrls.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {youtubeUrls.map((youtubeData, index) => (
+              <YouTubePreview
+                key={index}
+                url={youtubeData.url}
+                compact={false}
+                useTransparentUI={useTransparentUI}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Error */}
       {error && (
-        <div className="text-[10px] text-red-600 bg-red-50 p-2 rounded">
+        <div className={`text-[10px] p-2 rounded ${
+          useTransparentUI
+            ? 'text-red-300 bg-red-500/20'
+            : 'text-red-600 bg-red-50'
+        }`}>
           {error}
         </div>
       )}

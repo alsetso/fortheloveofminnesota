@@ -21,8 +21,10 @@ import ContributeContent from '@/components/layout/ContributeContent';
 import NewsContent from '@/components/layout/NewsContent';
 import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
-import { useMapOverlayState } from '../hooks/useMapOverlayState';
+import { useLivePageModals } from '../hooks/useLivePageModals';
 import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
+import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
+import CongressionalDistrictHoverInfo from '@/components/layout/CongressionalDistrictHoverInfo';
 
 // Helper to format last generation timestamp
 function formatLastGeneration(timestamp: string): string {
@@ -81,6 +83,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const [createTabSelectedLocation, setCreateTabSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [createTabAtlasMeta, setCreateTabAtlasMeta] = useState<Record<string, any> | null>(null);
   const [createTabMapMeta, setCreateTabMapMeta] = useState<Record<string, any> | null>(null);
+  const [createTabFullAddress, setCreateTabFullAddress] = useState<string | null>(null);
   
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
@@ -88,19 +91,30 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   // Atlas layer visibility state (disabled - hiding all atlas entities)
   const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(false);
   
-  // Unified overlay state management
+  // Congressional districts visibility state
+  const [showDistricts, setShowDistricts] = useState(false);
+  const [hoveredDistrict, setHoveredDistrict] = useState<any | null>(null);
+  
+  // Unified modal state management
   const {
     activeTab,
     popupData,
+    isAccountModalOpen,
     openTab,
     closeTab,
     openCreate,
     closeCreate,
     openPopup,
     closePopup,
+    openAccount,
+    openMapStyles,
+    openDynamicSearch,
+    closeAccount,
+    closeMapStyles,
+    closeDynamicSearch,
     closeAll,
-    isOverlayOpen,
-  } = useMapOverlayState();
+    isModalOpen,
+  } = useLivePageModals();
   
   const activeTabRef = useRef<MobileNavTab | null>(null);
   
@@ -119,7 +133,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   } | null>(null);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { isModalOpen, openWelcome, openAccount } = useAppModalContextSafe();
+  const { openWelcome } = useAppModalContextSafe();
   
   // URL-based state (only year filter)
   useUrlMapState();
@@ -133,7 +147,28 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
   const isAdmin = account?.role === 'admin';
   const [lastNewsGeneration, setLastNewsGeneration] = useState<string | null>(null);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
+
+  // Listen for blur style and map style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+    };
+  }, []);
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -193,11 +228,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     const handleAccountModalChange = (event: Event) => {
       const customEvent = event as CustomEvent<{ isOpen: boolean }>;
       const isOpen = customEvent.detail?.isOpen || false;
-      setIsAccountModalOpen(isOpen);
       
       // Close all overlays when account modal opens
       if (isOpen) {
-        closeAll();
+        openAccount();
+      } else {
+        // Modal state is managed by useLivePageModals, no need to set local state
       }
     };
 
@@ -205,11 +241,11 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     return () => {
       window.removeEventListener('live-account-modal-change', handleAccountModalChange);
     };
-  }, [closeAll]);
+  }, [openAccount]);
 
   // Maintain preview marker when create sheet is open
   useEffect(() => {
-    const isCreateOpen = isOverlayOpen('create');
+    const isCreateOpen = isModalOpen('create');
     if (isCreateOpen && createTabSelectedLocation && account && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
       // Ensure marker exists and is properly positioned
       const ensurePreviewMarker = async () => {
@@ -335,7 +371,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         temporaryMarkerRef.current = null;
       }
     }
-  }, [isOverlayOpen('create'), createTabSelectedLocation, account]);
+  }, [isModalOpen('create'), createTabSelectedLocation, account]);
 
   // Handle atlas entity click
   const handleAtlasEntityClick = useCallback(async (entity: {
@@ -460,8 +496,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         lng: number;
         atlas_meta?: Record<string, any>;
         map_meta?: Record<string, any>;
+        full_address?: string | null;
       }>;
-      const { lat, lng, atlas_meta, map_meta } = customEvent.detail || {};
+      const { lat, lng, atlas_meta, map_meta, full_address } = customEvent.detail || {};
       if (!lat || !lng) return;
 
       // Set flag to prevent popup from removing marker during transition
@@ -471,6 +508,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       setCreateTabSelectedLocation({ lat, lng });
       setCreateTabAtlasMeta(atlas_meta || null);
       setCreateTabMapMeta(map_meta || null);
+      setCreateTabFullAddress(full_address || null);
 
       // Close any open popups/tabs
       closeAll();
@@ -510,7 +548,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
   // Maintain red pin when create sheet is open - ensures it persists at correct location
   useEffect(() => {
-    const isCreateOpen = isOverlayOpen('create');
+    const isCreateOpen = isModalOpen('create');
     
     // When create form closes, remove marker (unless transitioning)
     if (!isCreateOpen && temporaryMarkerRef.current && !isTransitioningToCreateRef.current) {
@@ -550,7 +588,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         }
       }
     }
-  }, [isOverlayOpen('create'), createTabSelectedLocation]);
+  }, [isModalOpen('create'), createTabSelectedLocation]);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -699,7 +737,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           }
           
           // If Create sheet is open, update the selected location
-          if (isOverlayOpen('create')) {
+          if (isModalOpen('create')) {
             setCreateTabSelectedLocation({ lat, lng });
             return;
           }
@@ -833,10 +871,44 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             console.debug('[LiveMap] Error capturing map feature:', err);
           }
           
+          // Reverse geocode to get full address
+          let fullAddress: string | null = null;
+          try {
+            const token = MAP_CONFIG.MAPBOX_TOKEN;
+            if (token) {
+              const url = `${MAP_CONFIG.GEOCODING_BASE_URL}/${lng},${lat}.json`;
+              const params = new URLSearchParams({
+                access_token: token,
+                types: 'address',
+                limit: '1',
+              });
+              
+              const response = await fetch(`${url}?${params}`);
+              if (response.ok) {
+                const data = await response.json();
+                if (data.features && data.features.length > 0) {
+                  fullAddress = data.features[0].place_name || null;
+                }
+              }
+            }
+          } catch (err) {
+            console.debug('[LiveMap] Error reverse geocoding:', err);
+          }
+          
           // Dispatch event to open create form (single-click to mention)
           window.dispatchEvent(new CustomEvent('show-location-for-mention', {
-            detail: { lat, lng, map_meta: mapMeta }
+            detail: { lat, lng, map_meta: mapMeta, full_address: fullAddress }
           }));
+          
+          // Dispatch event to update search input with address and coordinates
+          if (fullAddress) {
+            window.dispatchEvent(new CustomEvent('update-search-address', {
+              detail: { 
+                address: fullAddress,
+                coordinates: { lat, lng }
+              }
+            }));
+          }
         });
 
 
@@ -908,6 +980,20 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
                 });
               }
             }}
+            modalState={{
+              isAccountModalOpen,
+              openAccount,
+              openMapStyles,
+              openDynamicSearch,
+              closeAccount,
+              closeMapStyles,
+              closeDynamicSearch,
+              isModalOpen,
+            }}
+            districtsState={{
+              showDistricts,
+              setShowDistricts,
+            }}
           />
 
 
@@ -942,6 +1028,15 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             />
           )}
 
+          {/* Congressional Districts Layer */}
+          {mapLoaded && mapInstanceRef.current && (
+            <CongressionalDistrictsLayer
+              map={mapInstanceRef.current}
+              mapLoaded={mapLoaded}
+              visible={showDistricts}
+              onDistrictHover={setHoveredDistrict}
+            />
+          )}
 
           {/* Loading/Error Overlay */}
           {!mapLoaded && (
@@ -973,11 +1068,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         </div>
       </div>
 
-      {/* Mobile Nav Tabs - Fixed bottom bar - Hidden when account modal is open */}
+      {/* Mobile Nav Tabs - Fixed bottom bar - Hidden when account modal is open, slides down when sheets open */}
       {!isAccountModalOpen && (
         <MobileNavTabs
           activeTab={activeTab}
           onTabClick={handleTabClick}
+          isSheetOpen={activeTab === 'news' || activeTab === 'contribute'}
         />
       )}
 
@@ -1001,7 +1097,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           isAdmin ? (
             <div className="flex items-center gap-2">
               {lastNewsGeneration && (
-                <span className="text-[10px] text-gray-500 whitespace-nowrap">
+                <span className={`text-[10px] whitespace-nowrap ${
+                  useBlurStyle ? 'text-white/80' : 'text-gray-500'
+                }`}>
                   {formatLastGeneration(lastNewsGeneration)}
                 </span>
               )}
@@ -1009,7 +1107,11 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent('generate-news'));
                 }}
-                className="px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                  useBlurStyle
+                    ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
+                    : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
+                }`}
                 title="Generate News"
               >
                 Generate
@@ -1033,7 +1135,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
       {/* Create Popup - Only opened via "Add Label" button */}
       <CreateMentionPopup
-        isOpen={isOverlayOpen('create') && !isAccountModalOpen}
+        isOpen={isModalOpen('create') && !isAccountModalOpen}
         onClose={() => {
           closeCreate();
           setCreateTabSelectedLocation(null);
@@ -1045,19 +1147,21 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             temporaryMarkerRef.current = null;
           }
         }}
-        map={mapInstanceRef.current}
-        mapLoaded={mapLoaded}
-        initialCoordinates={createTabSelectedLocation}
-        initialAtlasMeta={createTabAtlasMeta}
+            map={mapInstanceRef.current}
+            mapLoaded={mapLoaded}
+            initialCoordinates={createTabSelectedLocation}
+            initialAtlasMeta={createTabAtlasMeta}
         initialMapMeta={createTabMapMeta}
-        onMentionCreated={() => {
-          closeCreate();
-          setCreateTabSelectedLocation(null);
-          setCreateTabAtlasMeta(null);
+        initialFullAddress={createTabFullAddress}
+            onMentionCreated={() => {
+              closeCreate();
+              setCreateTabSelectedLocation(null);
+              setCreateTabAtlasMeta(null);
           setCreateTabMapMeta(null);
-          setMentionsRefreshKey(prev => prev + 1);
-        }}
-      />
+          setCreateTabFullAddress(null);
+              setMentionsRefreshKey(prev => prev + 1);
+            }}
+          />
 
       {/* Contribute Sheet */}
       <MobileNavSheet
@@ -1075,13 +1179,18 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           closePopup();
           // Only remove red pin marker when popup closes if we're not transitioning to create
           // (If transitioning to create, we want to keep the preview marker)
-          if (temporaryMarkerRef.current && !isTransitioningToCreateRef.current && !isOverlayOpen('create')) {
+          if (temporaryMarkerRef.current && !isTransitioningToCreateRef.current && !isModalOpen('create')) {
             temporaryMarkerRef.current.remove();
             temporaryMarkerRef.current = null;
           }
         }}
         type={popupData.type}
         data={popupData.data}
+      />
+
+      {/* Congressional District Hover Info - Right Side */}
+      <CongressionalDistrictHoverInfo
+        district={hoveredDistrict}
       />
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}

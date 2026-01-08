@@ -7,6 +7,8 @@ import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsS
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { MentionService } from '@/features/mentions/services/mentionService';
+import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
+import YouTubePreview from '@/features/mentions/components/YouTubePreview';
 
 interface MapEntityPopupProps {
   isOpen: boolean;
@@ -52,6 +54,33 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
+
+  // Listen for blur style and map style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+    };
+  }, []);
+
+  // Text color logic: white only when blur AND satellite, otherwise dark
+  const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
+  // Use transparent backgrounds and white text when satellite + blur
+  const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
 
   useEffect(() => {
     if (isOpen) {
@@ -264,26 +293,38 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
 
   return (
     <>
+      {/* Backdrop - hidden on desktop */}
+      <div
+        className="fixed inset-0 z-[60] bg-black/20 transition-opacity duration-300 xl:hidden"
+        onClick={handleClose}
+      />
+      
       {/* Popup - Covers mobile nav */}
       <div
         ref={popupRef}
-        className={`fixed bottom-0 left-0 right-0 z-[60] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col ${
-          isAtMaxHeight ? 'rounded-none' : 'rounded-t-3xl'
-        }`}
+        className={`fixed z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
+          /* Mobile: bottom sheet */
+          bottom-0 left-0 right-0 rounded-t-3xl
+          /* Desktop: bottom sheet with 500px width, left side, squared bottom corners */
+          xl:bottom-0 xl:left-4 xl:right-auto xl:w-[500px] xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
+          ${useBlurStyle ? 'bg-transparent backdrop-blur-md' : 'bg-white'}`}
         style={{
           transform: 'translateY(100%)',
-          maxHeight: 'calc(100vh - 4rem)',
+          minHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
+          maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : 'calc(100vh - 4rem)',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Handle bar */}
-        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0">
-          <div className="w-12 h-1 bg-gray-300 rounded-full" />
+        {/* Handle bar - hidden on desktop */}
+        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
+          <div className={`w-12 h-1 rounded-full ${useBlurStyle ? 'bg-white/40' : 'bg-gray-300'}`} />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-gray-900">
+        <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
+          useBlurStyle ? 'border-white/20' : 'border-gray-200'
+        }`}>
+          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
             {type === 'pin' ? 'Mention' : type === 'atlas' ? (data?.name || 'Location') : 'Location'}
           </h2>
           <div className="flex items-center gap-1">
@@ -292,17 +333,29 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
-                  className="p-1 text-gray-500 hover:text-gray-900 transition-colors"
+                  className={`p-1 transition-colors ${
+                    useWhiteText 
+                      ? 'text-white/80 hover:text-white' 
+                      : 'text-gray-500 hover:text-gray-900'
+                  }`}
                   aria-label="More options"
                   disabled={isDeleting}
                 >
                   <EllipsisVerticalIcon className="w-5 h-5" />
                 </button>
                 {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
+                  <div className={`absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[120px] ${
+                    useTransparentUI
+                      ? 'bg-white/90 backdrop-blur-md border border-white/20'
+                      : 'bg-white border border-gray-200'
+                  }`}>
                     <button
                       onClick={handleEdit}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                        useTransparentUI
+                          ? 'text-white hover:bg-white/20'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
                       disabled={isEditing || isSaving}
                     >
                       <PencilIcon className="w-4 h-4" />
@@ -310,7 +363,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     </button>
                     <button
                       onClick={handleDelete}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors"
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                        useTransparentUI
+                          ? 'text-red-300 hover:bg-red-500/20'
+                          : 'text-red-600 hover:bg-red-50'
+                      }`}
                       disabled={isDeleting}
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -322,7 +379,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             )}
             <button
               onClick={handleClose}
-              className="p-1 -mr-1 text-gray-500 hover:text-gray-900 transition-colors"
+              className={`p-1 -mr-1 transition-colors ${
+                useWhiteText 
+                  ? 'text-white/80 hover:text-white' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
               aria-label="Close"
             >
               <XMarkIcon className="w-5 h-5" />
@@ -331,7 +392,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
         </div>
 
         {/* Content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto">
+        {/* Content - Always scrollable on desktop */}
+        <div ref={contentRef} className="flex-1 overflow-y-auto xl:overflow-y-auto">
           <div className="p-4 space-y-4">
             {/* Pin/Mention Content */}
             {type === 'pin' && (
@@ -342,6 +404,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     <div className={`w-8 h-8 rounded-full overflow-hidden ${
                       (data.account.plan === 'pro' || data.account.plan === 'plus')
                         ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                        : useTransparentUI
+                        ? 'border border-white/30'
                         : 'border border-gray-200'
                     }`}>
                       <div className="w-full h-full rounded-full overflow-hidden bg-white">
@@ -355,8 +419,12 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                             unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
                           />
                         ) : (
-                          <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center">
-                            <span className="text-xs font-medium text-gray-600">
+                          <div className={`w-full h-full rounded-full flex items-center justify-center ${
+                            useTransparentUI ? 'bg-white/20' : 'bg-gray-100'
+                          }`}>
+                            <span className={`text-xs font-medium ${
+                              useWhiteText ? 'text-white' : 'text-gray-600'
+                            }`}>
                               {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
                             </span>
                           </div>
@@ -366,14 +434,18 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     <div className="flex-1">
                       {user ? (
                         // Authenticated: show username
-                        <div className="text-xs font-medium text-gray-900">
+                        <div className={`text-xs font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
                           {data.account.username || `${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
                         </div>
                       ) : (
                         // Unauthorized: show sign in prompt
                         <button
                           onClick={openWelcome}
-                          className="text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors text-left"
+                          className={`text-xs font-medium transition-colors text-left ${
+                            useWhiteText 
+                              ? 'text-white/80 hover:text-white' 
+                              : 'text-gray-600 hover:text-gray-900'
+                          }`}
                         >
                           Sign in to see who posted
                         </button>
@@ -386,7 +458,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     <textarea
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
-                      className="w-full px-3 py-2 text-xs text-gray-900 border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+                      className={`w-full px-3 py-2 text-xs rounded-md focus:outline-none focus:ring-1 resize-none ${
+                        useTransparentUI
+                          ? 'bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:ring-white'
+                          : 'text-gray-900 border border-gray-200 focus:ring-indigo-500'
+                      }`}
                       rows={3}
                       maxLength={240}
                       disabled={isSaving}
@@ -395,7 +471,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={handleCancelEdit}
-                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          useTransparentUI
+                            ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
+                            : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
+                        }`}
                         disabled={isSaving}
                       >
                         Cancel
@@ -411,13 +491,94 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                   </div>
                 ) : (
                   data.description && (
-                    <div className="text-xs text-gray-700">
-                      {data.description}
+                    <div className="space-y-2">
+                      {/* Description text with clickable YouTube links */}
+                      <div className={`text-xs ${useWhiteText ? 'text-white/90' : 'text-gray-700'}`}>
+                        {(() => {
+                          const youtubeUrls = findYouTubeUrls(data.description);
+                          if (youtubeUrls.length === 0) {
+                            return <span>{data.description}</span>;
+                          }
+
+                          // Split description by YouTube URLs and render with links
+                          const parts: Array<{ text: string; isUrl: boolean; url?: string }> = [];
+                          let lastIndex = 0;
+
+                          youtubeUrls.forEach((youtubeData) => {
+                            // Add text before URL
+                            if (youtubeData.startIndex > lastIndex) {
+                              parts.push({
+                                text: data.description!.substring(lastIndex, youtubeData.startIndex),
+                                isUrl: false,
+                              });
+                            }
+                            // Add URL
+                            parts.push({
+                              text: youtubeData.url,
+                              isUrl: true,
+                              url: youtubeData.url,
+                            });
+                            lastIndex = youtubeData.endIndex;
+                          });
+
+                          // Add remaining text
+                          if (lastIndex < data.description!.length) {
+                            parts.push({
+                              text: data.description!.substring(lastIndex),
+                              isUrl: false,
+                            });
+                          }
+
+                          return (
+                            <>
+                              {parts.map((part, index) => {
+                                if (part.isUrl && part.url) {
+                                  return (
+                                    <a
+                                      key={index}
+                                      href={part.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`underline transition-colors ${
+                                        useWhiteText
+                                          ? 'text-white hover:text-white/80'
+                                          : 'text-blue-600 hover:text-blue-700'
+                                      }`}
+                                    >
+                                      {part.text}
+                                    </a>
+                                  );
+                                }
+                                return <span key={index}>{part.text}</span>;
+                              })}
+                            </>
+                          );
+                        })()}
+                      </div>
+                      
+                      {/* YouTube Previews */}
+                      {(() => {
+                        const youtubeUrls = findYouTubeUrls(data.description);
+                        if (youtubeUrls.length === 0) return null;
+                        
+                        return (
+                          <div className="space-y-2">
+                            {youtubeUrls.map((youtubeData, index) => (
+                              <YouTubePreview
+                                key={index}
+                                url={youtubeData.url}
+                                compact={false}
+                                useTransparentUI={useTransparentUI}
+                              />
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )
                 )}
                 {data.created_at && (
-                  <div className="text-xs text-gray-500">
+                  <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
                     {formatTimeAgo(data.created_at)}
                   </div>
                 )}
@@ -439,11 +600,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     />
                   )}
                   <div>
-                    <div className="text-xs font-semibold text-gray-900">
+                    <div className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
                       {data.name}
                     </div>
                     {data.table_name && (
-                      <div className="text-xs text-gray-500 capitalize">
+                      <div className={`text-xs capitalize ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
                         {data.table_name.replace('_', ' ')}
                       </div>
                     )}
@@ -471,12 +632,20 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           }));
                           handleClose();
                         }}
-                        className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
+                        className={`mt-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          useTransparentUI
+                            ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
+                            : 'text-gray-900 bg-white border border-gray-200 hover:bg-gray-50'
+                        }`}
                       >
                         Add Mention
                       </button>
                     ) : (
-                      <div className="w-full mt-4 px-4 py-2.5 text-xs text-gray-600 bg-gray-100 rounded-md text-center">
+                      <div className={`w-full mt-4 px-4 py-2.5 text-xs rounded-md text-center ${
+                        useTransparentUI
+                          ? 'text-white/80 bg-white/10'
+                          : 'text-gray-600 bg-gray-100'
+                      }`}>
                         Location outside Minnesota
                       </div>
                     )}
@@ -489,20 +658,22 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             {type === 'location' && (
               <>
                 <div className="flex items-start gap-2">
-                  <MapPinIcon className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <MapPinIcon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
+                    useWhiteText ? 'text-white/60' : 'text-gray-400'
+                  }`} />
                   <div className="flex-1 min-w-0">
                     {data.place_name && (
-                      <div className="text-xs font-medium text-gray-900">
+                      <div className={`text-xs font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
                         {data.place_name}
                       </div>
                     )}
                     {data.address && (
-                      <div className="text-xs text-gray-500 mt-0.5">
+                      <div className={`text-xs mt-0.5 ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
                         {data.address}
                       </div>
                     )}
                     {data.coordinates && (
-                      <div className="text-xs text-gray-400 mt-1">
+                      <div className={`text-xs mt-1 ${useWhiteText ? 'text-white/50' : 'text-gray-400'}`}>
                         {data.coordinates.lat.toFixed(6)}, {data.coordinates.lng.toFixed(6)}
                       </div>
                     )}
@@ -524,12 +695,20 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           }));
                           handleClose();
                         }}
-                        className="mt-4 px-3 py-1.5 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
+                        className={`mt-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          useTransparentUI
+                            ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
+                            : 'text-gray-900 bg-white border border-gray-200 hover:bg-gray-50'
+                        }`}
                       >
                         Add Mention
                       </button>
                     ) : (
-                      <div className="w-full mt-4 px-4 py-2.5 text-xs text-gray-600 bg-gray-100 rounded-md text-center">
+                      <div className={`w-full mt-4 px-4 py-2.5 text-xs rounded-md text-center ${
+                        useTransparentUI
+                          ? 'text-white/80 bg-white/10'
+                          : 'text-gray-600 bg-gray-100'
+                      }`}>
                         Location outside Minnesota
                       </div>
                     )}

@@ -116,6 +116,20 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+
+  // Listen for blur style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    };
+  }, []);
 
   // Check for browser support and initialize Speech Recognition
   useEffect(() => {
@@ -364,8 +378,12 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
 
   return (
     <div className="relative">
-      <div className="bg-gray-100 rounded-lg px-3 py-2 flex items-center gap-2">
-        <MagnifyingGlassIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+      <div className={`rounded-lg px-3 py-2 flex items-center gap-2 ${
+        useBlurStyle ? 'bg-white/10' : 'bg-gray-100'
+      }`}>
+        <MagnifyingGlassIcon className={`w-4 h-4 flex-shrink-0 ${
+          useBlurStyle ? 'text-white/80' : 'text-gray-500'
+        }`} />
         <input
           ref={inputRef}
           type="text"
@@ -389,7 +407,11 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
             }
           }}
           placeholder="Search here"
-          className="flex-1 bg-transparent border-0 outline-none text-gray-900 placeholder:text-gray-500 text-sm"
+          className={`flex-1 bg-transparent border-0 outline-none text-sm ${
+            useBlurStyle 
+              ? 'text-white placeholder:text-white/60' 
+              : 'text-gray-900 placeholder:text-gray-500'
+          }`}
         />
         <button
           onClick={handleVoiceSearch}
@@ -398,7 +420,11 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
             isRecording
               ? 'text-red-500 animate-pulse'
               : isSupported
-              ? 'text-gray-500 hover:text-gray-700'
+              ? useBlurStyle
+              ? 'text-white/80 hover:text-white'
+              : 'text-gray-500 hover:text-gray-700'
+              : useBlurStyle
+              ? 'text-white/40 cursor-not-allowed'
               : 'text-gray-300 cursor-not-allowed'
           }`}
           aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
@@ -409,7 +435,11 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
 
       {/* Suggestions Dropdown */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto z-50">
+        <div className={`absolute top-full left-0 right-0 mt-1 rounded-lg shadow-lg border max-h-64 overflow-y-auto z-50 ${
+          useBlurStyle
+            ? 'bg-white/90 backdrop-blur-md border-white/20'
+            : 'bg-white border-gray-200'
+        }`}>
           {suggestions.map((suggestion, index) => {
             const isAtlas = 'type' in suggestion && suggestion.type === 'atlas';
             const isNews = 'type' in suggestion && suggestion.type === 'news';
@@ -421,40 +451,60 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
               <button
                 key={suggestion.id}
                 onClick={() => handleSuggestionSelect(suggestion)}
-                className={`w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors ${
-                  index === selectedIndex ? 'bg-gray-50' : ''
+                className={`w-full text-left px-3 py-2 transition-colors ${
+                  index === selectedIndex 
+                    ? useBlurStyle ? 'bg-white/20' : 'bg-gray-50'
+                    : useBlurStyle ? 'hover:bg-white/10' : 'hover:bg-gray-50'
                 }`}
               >
                 {isAtlas ? (
                   <div className="flex items-start gap-2">
-                    <MapPinIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <MapPinIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                      useBlurStyle ? 'text-white/60' : 'text-gray-400'
+                    }`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-gray-900 truncate">
+                      <div className={`text-xs font-medium truncate ${
+                        useBlurStyle ? 'text-white' : 'text-gray-900'
+                      }`}>
                         {entity!.name}
                       </div>
-                      <div className="text-[10px] text-gray-500">Atlas Entity</div>
+                      <div className={`text-[10px] ${
+                        useBlurStyle ? 'text-white/60' : 'text-gray-500'
+                      }`}>Atlas Entity</div>
                     </div>
                   </div>
                 ) : isNews ? (
                   <div className="flex items-start gap-2">
-                    <NewspaperIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <NewspaperIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                      useBlurStyle ? 'text-white/60' : 'text-gray-400'
+                    }`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-gray-900 truncate">
+                      <div className={`text-xs font-medium truncate ${
+                        useBlurStyle ? 'text-white' : 'text-gray-900'
+                      }`}>
                         {article!.title}
                       </div>
-                      <div className="text-[10px] text-gray-500 truncate">
+                      <div className={`text-[10px] truncate ${
+                        useBlurStyle ? 'text-white/60' : 'text-gray-500'
+                      }`}>
                         {article!.source_name || 'News Article'}
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-start gap-2">
-                    <MapPinIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <MapPinIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                      useBlurStyle ? 'text-white/60' : 'text-gray-400'
+                    }`} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-gray-900 truncate">
+                      <div className={`text-xs font-medium truncate ${
+                        useBlurStyle ? 'text-white' : 'text-gray-900'
+                      }`}>
                         {feature!.text}
                       </div>
-                      <div className="text-[10px] text-gray-500 truncate">
+                      <div className={`text-[10px] truncate ${
+                        useBlurStyle ? 'text-white/60' : 'text-gray-500'
+                      }`}>
                         {feature!.place_name}
                       </div>
                     </div>

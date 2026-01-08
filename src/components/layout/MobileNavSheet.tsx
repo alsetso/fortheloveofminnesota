@@ -24,6 +24,20 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+
+  // Listen for blur style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +47,7 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
       // Trigger animation on next frame
       requestAnimationFrame(() => {
         if (sheetRef.current) {
+          // Both mobile and desktop slide up from bottom
           sheetRef.current.style.transform = 'translateY(0)';
         }
       });
@@ -55,7 +70,7 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
       if (contentRef.current && sheetRef.current) {
         const contentHeight = contentRef.current.scrollHeight;
         const containerHeight = sheetRef.current.clientHeight;
-        const maxHeight = window.innerHeight - 64; // 4rem = 64px for mobile nav
+        const maxHeight = window.innerHeight; // Full viewport height
         
         // Check if content is scrollable (reached max height)
         setIsAtMaxHeight(contentHeight >= maxHeight || contentRef.current.scrollHeight > contentRef.current.clientHeight);
@@ -80,6 +95,7 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
 
   const handleClose = () => {
     if (sheetRef.current) {
+      // Both mobile and desktop slide down to bottom
       sheetRef.current.style.transform = 'translateY(100%)';
     }
     // Wait for animation to complete
@@ -92,31 +108,41 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
 
   return (
     <>
-      {/* Sheet - behind nav, in front of map top container */}
+      {/* Sheet - positioned at bottom on mobile and desktop */}
       <div
         ref={sheetRef}
-        className={`fixed bottom-16 left-0 right-0 z-[46] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col ${
-          isAtMaxHeight ? 'rounded-none' : 'rounded-t-3xl'
-        }`}
+        className={`fixed z-[46] shadow-2xl transition-all duration-300 ease-out flex flex-col
+          /* Mobile: bottom sheet */
+          bottom-0 left-0 right-0
+          ${isAtMaxHeight ? 'rounded-none' : 'rounded-t-3xl'}
+          /* Desktop: bottom sheet with 500px width, left side, squared bottom corners */
+          xl:bottom-0 xl:left-4 xl:w-[500px] xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
+          ${useBlurStyle ? 'bg-transparent backdrop-blur-md' : 'bg-white'}`}
         style={{
           transform: 'translateY(100%)',
-          maxHeight: 'calc(100vh - 4rem)',
+          maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '100vh',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Handle bar */}
-        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0">
-          <div className="w-12 h-1 bg-gray-300 rounded-full" />
+        {/* Handle bar - hidden on desktop */}
+        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
+          <div className={`w-12 h-1 rounded-full ${useBlurStyle ? 'bg-white/40' : 'bg-gray-300'}`} />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 flex-shrink-0">
-          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+        <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
+          useBlurStyle ? 'border-white/20' : 'border-gray-200'
+        }`}>
+          <h2 className={`text-sm font-semibold ${useBlurStyle ? 'text-white' : 'text-gray-900'}`}>{title}</h2>
           <div className="flex items-center gap-2">
             {headerAction}
             <button
               onClick={handleClose}
-              className="p-1 -mr-1 text-gray-500 hover:text-gray-900 transition-colors"
+              className={`p-1 -mr-1 transition-colors ${
+                useBlurStyle 
+                  ? 'text-white/80 hover:text-white' 
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
               aria-label="Close"
             >
               <XMarkIcon className="w-5 h-5" />
@@ -126,20 +152,24 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
 
         {/* Large Headline - Shows when at max height */}
         {isAtMaxHeight && (
-          <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0 transition-opacity duration-300" style={{ opacity: isAtMaxHeight ? 1 : 0 }}>
-            <h1 className="text-2xl font-semibold text-gray-900">{title}</h1>
+          <div className={`px-4 py-3 border-b flex-shrink-0 transition-opacity duration-300 ${
+            useBlurStyle ? 'border-white/20' : 'border-gray-200'
+          }`} style={{ opacity: isAtMaxHeight ? 1 : 0 }}>
+            <h1 className={`text-2xl font-semibold ${useBlurStyle ? 'text-white' : 'text-gray-900'}`}>{title}</h1>
           </div>
         )}
 
         {/* Search Input - Shows when at max height and showSearch is true */}
         {isAtMaxHeight && showSearch && (
-          <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0 transition-opacity duration-300" style={{ opacity: isAtMaxHeight ? 1 : 0 }}>
+          <div className={`px-4 py-3 border-b flex-shrink-0 transition-opacity duration-300 ${
+            useBlurStyle ? 'border-transparent' : 'border-gray-200'
+          }`} style={{ opacity: isAtMaxHeight ? 1 : 0 }}>
             <SheetSearchInput map={map} onLocationSelect={onLocationSelect} />
           </div>
         )}
 
-        {/* Content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto">
+        {/* Content - Always scrollable on desktop */}
+        <div ref={contentRef} className="flex-1 overflow-y-auto xl:overflow-y-auto">
           <div className={contentPadding ? 'p-4' : ''}>
             {children}
           </div>

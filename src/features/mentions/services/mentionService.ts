@@ -208,6 +208,7 @@ export class MentionService {
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
         icon_url: null, // Not used - we use account.image_url instead
+        full_address: data.full_address || null,
         map_meta: data.map_meta || null,
         atlas_meta: data.atlas_meta || null,
         collection_id: data.collection_id || null,

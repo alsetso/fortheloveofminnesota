@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UserIcon, PlusIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import { PlusIcon as PlusIconSolid, NewspaperIcon as NewspaperIconSolid } from '@heroicons/react/24/solid';
@@ -10,6 +11,7 @@ export type MobileNavTab = 'news' | 'contribute';
 interface MobileNavTabsProps {
   activeTab: MobileNavTab | null;
   onTabClick: (tab: MobileNavTab) => void;
+  isSheetOpen?: boolean; // Whether a sheet is open (news or contribute)
 }
 
 
@@ -17,17 +19,55 @@ interface MobileNavTabsProps {
  * Fixed bottom tab bar with 3 tabs: Create, Controls, Contribute/Sign In
  * Always visible on mobile, positioned at z-50 (above sheets)
  */
-export default function MobileNavTabs({ activeTab, onTabClick }: MobileNavTabsProps) {
+export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = false }: MobileNavTabsProps) {
   const { account } = useAuthStateSafe();
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
 
-  const baseClasses = "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors";
+  // Listen for blur style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+    };
+  }, []);
+
+  // Text color logic: white only when blur AND satellite, otherwise dark
+  const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
+  const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
+
+  const baseClasses = `flex flex-col items-center justify-center gap-0.5 px-3 py-2 transition-colors rounded-md ${
+    useTransparentUI
+      ? 'hover:bg-white/10'
+      : useBlurStyle
+      ? 'hover:bg-white/20'
+      : 'hover:bg-gray-50'
+  }`;
 
   return (
     <nav 
-      className="fixed bottom-0 left-0 right-0 z-[50] bg-gray-50 border-t border-gray-200"
+      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-[50] border rounded-lg shadow-lg transition-all duration-300 ease-out ${
+        useBlurStyle 
+          ? 'bg-transparent backdrop-blur-md border-white/20' 
+          : 'bg-white border-gray-200'
+      } ${
+        isSheetOpen ? 'translate-y-[calc(100%+1rem)] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+      }`}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex items-center justify-around h-16 px-2">
+      <div className="flex items-center justify-center gap-6 h-14 px-4">
         {/* News Tab */}
         <button
           onClick={() => onTabClick('news')}
@@ -35,11 +75,15 @@ export default function MobileNavTabs({ activeTab, onTabClick }: MobileNavTabsPr
           aria-label="News"
         >
           {activeTab === 'news' ? (
-            <NewspaperIconSolid className="w-5 h-5 text-gray-900" />
+            <NewspaperIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
           ) : (
-            <NewspaperIcon className="w-5 h-5 text-gray-500" />
+            <NewspaperIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
           )}
-          <span className={`text-[10px] font-medium ${activeTab === 'news' ? 'text-gray-900' : 'text-gray-500'}`}>
+          <span className={`text-[10px] font-medium ${
+            activeTab === 'news' 
+              ? useWhiteText ? 'text-white' : 'text-gray-900'
+              : useWhiteText ? 'text-white/80' : 'text-gray-500'
+          }`}>
             News
           </span>
         </button>
@@ -52,11 +96,15 @@ export default function MobileNavTabs({ activeTab, onTabClick }: MobileNavTabsPr
             aria-label="Contribute"
           >
             {activeTab === 'contribute' ? (
-              <PlusIconSolid className="w-5 h-5 text-gray-900" />
+              <PlusIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
             ) : (
-              <PlusIcon className="w-5 h-5 text-gray-500" />
+              <PlusIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
             )}
-            <span className={`text-[10px] font-medium ${activeTab === 'contribute' ? 'text-gray-900' : 'text-gray-500'}`}>
+            <span className={`text-[10px] font-medium ${
+              activeTab === 'contribute' 
+                ? useWhiteText ? 'text-white' : 'text-gray-900'
+                : useWhiteText ? 'text-white/80' : 'text-gray-500'
+            }`}>
               Contribute
             </span>
           </button>
@@ -66,8 +114,8 @@ export default function MobileNavTabs({ activeTab, onTabClick }: MobileNavTabsPr
             className={baseClasses}
             aria-label="Sign In"
           >
-            <UserIcon className="w-5 h-5 text-gray-500" />
-            <span className="text-[10px] font-medium text-gray-500">
+            <UserIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
+            <span className={`text-[10px] font-medium ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`}>
               Sign In
             </span>
           </Link>

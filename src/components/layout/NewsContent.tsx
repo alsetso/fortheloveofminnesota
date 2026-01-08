@@ -31,6 +31,20 @@ export default function NewsContent({ onGenerationComplete }: NewsContentProps =
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+
+  // Listen for blur style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      setUseBlurStyle(e.detail.useBlurStyle);
+    };
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    };
+  }, []);
 
   const fetchNews = async (currentOffset: number, append: boolean = false) => {
     if (append) {
@@ -120,21 +134,21 @@ export default function NewsContent({ onGenerationComplete }: NewsContentProps =
       {/* Loading State */}
       {loading && (
         <div className="px-2 py-1.5">
-          <p className="text-xs text-gray-600">Loading news...</p>
+          <p className={`text-xs ${useBlurStyle ? 'text-white/80' : 'text-gray-600'}`}>Loading news...</p>
         </div>
       )}
 
       {/* Error State */}
       {!loading && error && (
         <div className="px-2 py-1.5">
-          <p className="text-xs text-gray-600">{error}</p>
+          <p className={`text-xs ${useBlurStyle ? 'text-white/80' : 'text-gray-600'}`}>{error}</p>
         </div>
       )}
 
       {/* No News */}
       {!loading && !error && articles.length === 0 && (
         <div className="px-2 py-1.5">
-          <p className="text-xs text-gray-600">No news available.</p>
+          <p className={`text-xs ${useBlurStyle ? 'text-white/80' : 'text-gray-600'}`}>No news available.</p>
         </div>
       )}
 
@@ -149,7 +163,11 @@ export default function NewsContent({ onGenerationComplete }: NewsContentProps =
               <Link
                 key={article.id}
                 href={`/news/${article.id}`}
-                className="flex items-start gap-2 px-2 py-1.5 rounded text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                className={`flex items-start gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+                  useBlurStyle
+                    ? 'text-white/80 hover:bg-white/10 hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
               >
                 {/* Source Circle */}
                 <div
@@ -161,7 +179,9 @@ export default function NewsContent({ onGenerationComplete }: NewsContentProps =
                 {/* Title and Date */}
                 <div className="flex-1 min-w-0">
                   <div className="font-medium break-words">{article.title}</div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mt-0.5">
+                  <div className={`flex items-center gap-1.5 text-[10px] mt-0.5 ${
+                    useBlurStyle ? 'text-white/60' : 'text-gray-500'
+                  }`}>
                     <span className="truncate">{article.source?.name}</span>
                     <span>•</span>
                     <div className="flex items-center gap-1">
@@ -182,7 +202,11 @@ export default function NewsContent({ onGenerationComplete }: NewsContentProps =
           <button
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full px-3 py-2 text-xs font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              useBlurStyle
+                ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
+                : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
+            }`}
           >
             {loadingMore ? 'Loading...' : 'Load More'}
           </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, Squares2X2Icon, UserIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, Squares2X2Icon, UserIcon, ChevronDownIcon, ArrowPathIcon, MapIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -107,6 +107,20 @@ interface SpeechRecognitionAlternative {
 interface MapTopContainerProps {
   map?: any;
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: MapboxMetadata) => void;
+  modalState?: {
+    isAccountModalOpen: boolean;
+    openAccount: () => void;
+    openMapStyles: () => void;
+    openDynamicSearch: (data?: any, type?: 'news' | 'people') => void;
+    closeAccount: () => void;
+    closeMapStyles: () => void;
+    closeDynamicSearch: () => void;
+    isModalOpen: (type: 'account' | 'mapStyles' | 'dynamicSearch') => boolean;
+  };
+  districtsState?: {
+    showDistricts: boolean;
+    setShowDistricts: (show: boolean) => void;
+  };
 }
 
 // Map meta layer definitions
@@ -135,11 +149,10 @@ const MAP_META_LAYERS = [
   { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
 ];
 
-export default function MapTopContainer({ map, onLocationSelect }: MapTopContainerProps) {
+export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState }: MapTopContainerProps) {
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade } = useAppModalContextSafe();
   const { info } = useToast();
-  const [showLiveAccountModal, setShowLiveAccountModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -148,17 +161,31 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
-  const [showMapStylesPopup, setShowMapStylesPopup] = useState(false);
+  const [useBlurStyle, setUseBlurStyle] = useState(() => {
+    // Initialize from window state if available
+    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
+  
+  // Use white text when transparent blur + satellite map
+  const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
   const [placeholderWord, setPlaceholderWord] = useState<'News' | 'Addresses' | 'People'>('News');
-  const [showDynamicSearchModal, setShowDynamicSearchModal] = useState(false);
   const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
   const [dynamicSearchType, setDynamicSearchType] = useState<'news' | 'people'>('news');
+  
+  // Use modal state from parent if provided
+  const isAccountModalOpen = modalState?.isAccountModalOpen ?? false;
+  const showMapStylesPopup = modalState ? false : false; // Will be checked via modalState.isModalOpen('mapStyles')
+  const showDynamicSearchModal = modalState ? false : false; // Will be checked via modalState.isModalOpen('dynamicSearch')
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const placeholderIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isProgrammaticUpdateRef = useRef(false);
 
   // Initialize time filter to 24h on mount
   useEffect(() => {
@@ -166,6 +193,86 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
       detail: { timeFilter: '24h' }
     }));
   }, []);
+
+  // Listen for blur style and map style changes
+  useEffect(() => {
+    const handleBlurStyleChange = (e: CustomEvent) => {
+      const newValue = e.detail.useBlurStyle;
+      setUseBlurStyle(newValue);
+      // Store in window for session persistence
+      if (typeof window !== 'undefined') {
+        (window as any).__useBlurStyle = newValue;
+      }
+    };
+    
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
+
+    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    return () => {
+      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+    };
+  }, []);
+
+  // Listen for address updates from map clicks
+  useEffect(() => {
+    const handleUpdateSearchAddress = (event: Event) => {
+      const customEvent = event as CustomEvent<{ address: string; coordinates?: { lat: number; lng: number } }>;
+      const address = customEvent.detail?.address;
+      const coordinates = customEvent.detail?.coordinates;
+      
+      if (address) {
+        // Mark as programmatic update to prevent search from running
+        isProgrammaticUpdateRef.current = true;
+        
+        // Clear any pending search
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+          searchTimeoutRef.current = null;
+        }
+        
+        // Clear suggestions and close dropdown
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setSearchQuery(address);
+        
+        // If coordinates are provided, treat it like a search selection - fly to location
+        if (coordinates && map && map.flyTo) {
+          map.flyTo({
+            center: [coordinates.lng, coordinates.lat],
+            zoom: 15,
+            duration: 1500,
+          });
+          
+          // Call onLocationSelect callback if provided
+          if (onLocationSelect) {
+            onLocationSelect(coordinates, address);
+          }
+        }
+      }
+    };
+
+    const handleMentionCreated = () => {
+      setSearchQuery('');
+    };
+
+    const handleMentionFormClosed = () => {
+      setSearchQuery('');
+    };
+
+    window.addEventListener('update-search-address', handleUpdateSearchAddress);
+    window.addEventListener('mention-created', handleMentionCreated);
+    window.addEventListener('mention-form-closed', handleMentionFormClosed);
+
+    return () => {
+      window.removeEventListener('update-search-address', handleUpdateSearchAddress);
+      window.removeEventListener('mention-created', handleMentionCreated);
+      window.removeEventListener('mention-form-closed', handleMentionFormClosed);
+    };
+  }, [map, onLocationSelect]);
 
   // Listen for mentions layer hidden event
   useEffect(() => {
@@ -434,6 +541,12 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
 
   // Debounced search
   useEffect(() => {
+    // Skip search if this is a programmatic update (from map click)
+    if (isProgrammaticUpdateRef.current) {
+      isProgrammaticUpdateRef.current = false;
+      return;
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -465,7 +578,9 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
       setSearchQuery(article.title);
       setDynamicSearchData(article);
       setDynamicSearchType('news');
-      setShowDynamicSearchModal(true);
+      if (modalState) {
+        modalState.openDynamicSearch(article, 'news');
+      }
       return;
     }
     
@@ -475,7 +590,9 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
       setSearchQuery(person.name);
       setDynamicSearchData(person);
       setDynamicSearchType('people');
-      setShowDynamicSearchModal(true);
+      if (modalState) {
+        modalState.openDynamicSearch(person, 'people');
+      }
       return;
     }
     
@@ -563,7 +680,13 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
     <div className="fixed top-4 left-4 right-4 z-[45] pointer-events-none">
       <div ref={containerRef} className="pointer-events-auto space-y-2 relative">
         {/* Search Bar */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 px-3 py-2 flex items-center gap-2 relative">
+        <div 
+          className={`rounded-xl shadow-lg px-3 py-2 flex items-center gap-2 relative transition-all ${
+            useBlurStyle 
+              ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
+              : 'bg-white border border-gray-200'
+          }`}
+        >
           {/* Logo */}
           <div className="flex-shrink-0">
             <Image
@@ -577,7 +700,7 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           </div>
 
           {/* Search Input */}
-          <div className="flex-1 min-w-0 relative">
+          <div className="flex-1 min-w-0 relative flex items-center gap-2">
             <input
               ref={inputRef}
               type="text"
@@ -602,8 +725,15 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                 }
               }}
               placeholder={`Search ${placeholderWord}`}
-              className="w-full bg-transparent border-0 outline-none text-gray-900 placeholder:text-gray-500 text-sm"
+              className={`flex-1 bg-transparent border-0 outline-none text-sm ${
+                useWhiteText 
+                  ? 'text-white placeholder:text-white/50' 
+                  : 'text-gray-900 placeholder:text-gray-500'
+              }`}
             />
+            {useBlurStyle && (
+              <ChevronDownIcon className={`w-4 h-4 flex-shrink-0 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+            )}
             
             {/* Suggestions Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
@@ -677,8 +807,8 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
               isRecording
                 ? 'text-red-500 animate-pulse'
                 : isSupported
-                ? 'text-gray-500 hover:text-gray-700'
-                : 'text-gray-300 cursor-not-allowed'
+                ? useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                : useWhiteText ? 'text-white/30 cursor-not-allowed' : 'text-gray-300 cursor-not-allowed'
             }`}
             aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
             title={isSupported ? (isRecording ? 'Stop recording' : 'Start voice search') : 'Voice search not supported'}
@@ -690,11 +820,13 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           {account ? (
             <button
               onClick={() => {
-                setShowLiveAccountModal(true);
-                // Dispatch event to hide mobile nav
-                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                  detail: { isOpen: true }
-                }));
+                if (modalState) {
+                  modalState.openAccount();
+                  // Dispatch event to hide mobile nav
+                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                    detail: { isOpen: true }
+                  }));
+                }
               }}
               className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden transition-colors ${
                 (account.plan === 'pro' || account.plan === 'plus')
@@ -725,11 +857,13 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           ) : (
             <button
               onClick={() => {
-                setShowLiveAccountModal(true);
-                // Dispatch event to hide mobile nav
-                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                  detail: { isOpen: true }
-                }));
+                if (modalState) {
+                  modalState.openAccount();
+                  // Dispatch event to hide mobile nav
+                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                    detail: { isOpen: true }
+                  }));
+                }
               }}
               className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 border-2 border-gray-200 hover:border-gray-300 transition-colors flex items-center justify-center"
               aria-label="Sign In"
@@ -748,12 +882,23 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
           {mentionsLayerHidden ? (
             <button
               onClick={handleReloadMentions}
-              className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-2 h-[25px] text-[10px] font-medium text-gray-900 hover:bg-white transition-colors whitespace-nowrap flex items-center"
+              className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 border-2 border-red-500 ${
+                useBlurStyle 
+                  ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg text-white hover:bg-red-500/20' 
+                  : 'bg-white hover:bg-red-50 text-gray-900'
+              }`}
             >
+              <ArrowPathIcon className="w-3 h-3" />
               Reload mentions
             </button>
           ) : (
-            <div className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1 h-[25px] flex items-center gap-0.5 w-fit">
+            <div 
+              className={`rounded-md px-1 h-[25px] flex items-center gap-0.5 w-fit transition-all ${
+                useBlurStyle 
+                  ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
+                  : 'bg-white border border-gray-200'
+              }`}
+            >
               <button
                 onClick={() => {
                   setTimeFilter('24h');
@@ -763,8 +908,8 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                 }}
                 className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
                   timeFilter === '24h'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? useWhiteText ? 'text-white' : 'text-gray-900'
+                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 24h
@@ -778,8 +923,8 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                 }}
                 className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
                   timeFilter === '7d'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? useWhiteText ? 'text-white' : 'text-gray-900'
+                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 7d
@@ -798,52 +943,89 @@ export default function MapTopContainer({ map, onLocationSelect }: MapTopContain
                 }}
                 className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
                   timeFilter === 'all'
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? useWhiteText ? 'text-white' : 'text-gray-900'
+                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 All time
               </button>
+              {useBlurStyle && (
+                <ChevronDownIcon className={`w-3 h-3 mr-1 flex-shrink-0 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+              )}
             </div>
           )}
 
           {/* Layers Button */}
           <button
-            onClick={() => setShowMapStylesPopup(true)}
-            className="bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 px-1.5 h-[25px] hover:bg-white transition-colors flex items-center justify-center"
+            onClick={() => {
+              if (modalState) {
+                modalState.openMapStyles();
+              }
+            }}
+            className={`rounded-md px-1.5 h-[25px] transition-colors flex items-center justify-center gap-1.5 ${
+              useBlurStyle 
+                ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg border-2 border-transparent' 
+                : 'bg-white hover:bg-gray-50 border border-gray-200'
+            }`}
             aria-label="Map Styles"
           >
-            <Squares2X2Icon className="w-3.5 h-3.5 text-gray-600" />
+            <Squares2X2Icon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
+            {useBlurStyle && (
+              <ChevronDownIcon className={`w-3 h-3 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+            )}
           </button>
+
+          {/* Districts Toggle Button */}
+          {districtsState && (
+            <button
+              onClick={() => districtsState.setShowDistricts(!districtsState.showDistricts)}
+              className={`rounded-md px-1.5 h-[25px] transition-colors flex items-center justify-center gap-1.5 ${
+                useBlurStyle 
+                  ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg border-2 border-transparent' 
+                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+              }`}
+              aria-label={districtsState.showDistricts ? 'Hide Districts' : 'Show Districts'}
+              title={districtsState.showDistricts ? 'Hide Congressional Districts' : 'Show Congressional Districts'}
+            >
+              <MapIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Live Account Modal */}
-      <LiveAccountModal
-        isOpen={showLiveAccountModal}
-        onClose={() => {
-          setShowLiveAccountModal(false);
-          // Dispatch event to show mobile nav
-          window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-            detail: { isOpen: false }
-          }));
-        }}
-      />
+      {modalState && (
+        <LiveAccountModal
+          isOpen={isAccountModalOpen}
+          onClose={() => {
+            modalState.closeAccount();
+            // Dispatch event to show mobile nav
+            window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+              detail: { isOpen: false }
+            }));
+          }}
+        />
+      )}
 
       {/* Map Styles Popup */}
-      <MapStylesPopup
-        isOpen={showMapStylesPopup}
-        onClose={() => setShowMapStylesPopup(false)}
-        map={map}
-      />
+      {modalState && (
+        <MapStylesPopup
+          isOpen={modalState.isModalOpen('mapStyles')}
+          onClose={() => modalState.closeMapStyles()}
+          map={map}
+          districtsState={districtsState}
+        />
+      )}
 
       {/* Dynamic Search Modal */}
-      <DynamicSearchModal
-        isOpen={showDynamicSearchModal}
-        onClose={() => setShowDynamicSearchModal(false)}
-        data={dynamicSearchData}
-        type={dynamicSearchType}
-      />
+      {modalState && (
+        <DynamicSearchModal
+          isOpen={modalState.isModalOpen('dynamicSearch')}
+          onClose={() => modalState.closeDynamicSearch()}
+          data={dynamicSearchData}
+          type={dynamicSearchType}
+        />
+      )}
     </div>
   );
 }

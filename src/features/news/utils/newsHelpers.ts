@@ -47,17 +47,20 @@ export function getSourceColor(sourceName: string | undefined | null): { bg: str
 }
 
 /**
- * Format date with relative time (Today, Yesterday, X days ago, etc.)
+ * Format date with relative time (hours or days ago)
  */
 export function formatDate(dateString: string): string {
   try {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
-    if (diffDays === 0) {
-      return 'Today';
+    if (diffHours < 1) {
+      return 'Just now';
+    } else if (diffHours < 24) {
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
     } else if (diffDays === 1) {
       return 'Yesterday';
     } else if (diffDays < 7) {

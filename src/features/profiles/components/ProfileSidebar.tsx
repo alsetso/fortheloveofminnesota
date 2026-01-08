@@ -623,7 +623,7 @@ export default function ProfileSidebar({
               {isOwnProfile ? (
                 <>
                   <Link
-                    href="/?modal=account&tab=onboarding"
+                    href="/"
                     className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-gray-900 text-white text-[10px] font-medium rounded hover:bg-gray-800 transition-colors"
                   >
                     <PencilSquareIcon className="w-3 h-3" />

@@ -21,6 +21,8 @@ export interface CivicPerson {
   email: string | null;
   phone: string | null;
   address: string | null;
+  building_id: string | null;
+  title: string | null;
   created_at: string;
 }
 
@@ -222,6 +224,26 @@ export async function getCivicPersonBySlug(slug: string): Promise<{ person: Civi
       org: orgsMap.get(role.org_id) || undefined,
     })) as (CivicRole & { org?: CivicOrg })[],
   };
+}
+
+/**
+ * Fetch people by building_id
+ */
+export async function getCivicPeopleByBuildingId(buildingId: string): Promise<CivicPerson[]> {
+  const supabase = createServerClient();
+  
+  const { data, error } = await supabase
+    .from('people')
+    .select('*')
+    .eq('building_id', buildingId)
+    .order('name');
+
+  if (error) {
+    console.error('[civicService] Error fetching people by building_id:', error);
+    return [];
+  }
+
+  return (data || []) as CivicPerson[];
 }
 
 /**

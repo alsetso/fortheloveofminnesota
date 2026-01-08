@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
 import { TRAIT_OPTIONS, type TraitId } from '@/types/profile';
 import { AccountService } from '@/features/auth';
@@ -23,6 +23,7 @@ export default function ProfileEditModal({
   const { success, error: showError } = useToast();
   const [account, setAccount] = useState<ProfileAccount>(initialAccount);
   const [isSaving, setIsSaving] = useState(false);
+  const [showTraitsAccordion, setShowTraitsAccordion] = useState(false);
   
   const firstNameInputRef = useRef<HTMLInputElement>(null);
   const lastNameInputRef = useRef<HTMLInputElement>(null);
@@ -93,7 +94,7 @@ export default function ProfileEditModal({
       {/* Modal */}
       <div className="fixed inset-0 z-[101] flex items-center justify-center pointer-events-none p-4">
         <div
-          className="bg-white rounded-md border border-gray-200 shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
+          className="bg-white rounded-md border border-gray-200 shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto pointer-events-auto animate-in fade-in slide-in-from-bottom-2 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -179,40 +180,76 @@ export default function ProfileEditModal({
 
             {/* Traits */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                Traits
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-gray-700">
+                  Traits
+                </label>
+                {selectedTraits.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTraitsAccordion(!showTraitsAccordion)}
+                    className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <span>Set traits</span>
+                    {showTraitsAccordion ? (
+                      <ChevronUpIcon className="w-3 h-3" />
+                    ) : (
+                      <ChevronDownIcon className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </div>
+              
+              {/* Selected Traits */}
               {selectedTraits.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {selectedTraits.filter(Boolean).map((trait) => (
-                    <span
-                      key={trait!.id}
-                      className="px-2 py-0.5 bg-gray-100 border border-gray-200 text-xs text-gray-900 rounded"
-                    >
-                      {trait!.label}
-                    </span>
-                  ))}
+                <div className="mb-2">
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {selectedTraits.filter(Boolean).map((trait) => (
+                      <span
+                        key={trait!.id}
+                        className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 text-[10px] text-gray-900 rounded"
+                      >
+                        {trait!.label}
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowTraitsAccordion(!showTraitsAccordion)}
+                    className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <span>{showTraitsAccordion ? 'Hide' : 'Show'} all traits</span>
+                    {showTraitsAccordion ? (
+                      <ChevronUpIcon className="w-3 h-3" />
+                    ) : (
+                      <ChevronDownIcon className="w-3 h-3" />
+                    )}
+                  </button>
                 </div>
               )}
-              <div className="flex flex-wrap gap-1.5">
-                {TRAIT_OPTIONS.map((trait) => {
-                  const isSelected = account.traits?.includes(trait.id) || false;
-                  return (
-                    <button
-                      key={trait.id}
-                      type="button"
-                      onClick={() => toggleTrait(trait.id)}
-                      className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                        isSelected
-                          ? 'bg-gray-700 text-white hover:bg-gray-600'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {trait.label}
-                    </button>
-                  );
-                })}
-              </div>
+              
+              {/* All Traits Accordion */}
+              {(showTraitsAccordion || selectedTraits.length === 0) && (
+                <div className="flex flex-wrap gap-1">
+                  {TRAIT_OPTIONS.map((trait) => {
+                    const isSelected = account.traits?.includes(trait.id) || false;
+                    return (
+                      <button
+                        key={trait.id}
+                        type="button"
+                        onClick={() => toggleTrait(trait.id)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
+                          isSelected
+                            ? 'bg-gray-700 text-white hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {trait.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Actions */}

@@ -490,14 +490,41 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     </div>
                   </div>
                 ) : (
-                  data.description && (
                     <div className="space-y-2">
+                    {data.description ? (
+                      <>
                       {/* Description text with clickable YouTube links */}
                       <div className={`text-xs ${useWhiteText ? 'text-white/90' : 'text-gray-700'}`}>
                         {(() => {
-                          const youtubeUrls = findYouTubeUrls(data.description);
+                            // For non-authenticated users: truncate to 90 characters
+                            const description = data.description || '';
+                            const shouldTruncate = !user && description.length > 90;
+                            const displayDescription = shouldTruncate 
+                              ? description.substring(0, 90) 
+                              : description;
+
+                          const youtubeUrls = findYouTubeUrls(displayDescription);
                           if (youtubeUrls.length === 0) {
-                            return <span>{data.description}</span>;
+                            return (
+                              <>
+                                <span>{displayDescription}</span>
+                                {shouldTruncate && (
+                                  <>
+                                    <span>...</span>
+                                    <button
+                                      onClick={openWelcome}
+                                      className={`ml-1 underline transition-colors ${
+                                        useWhiteText
+                                          ? 'text-white hover:text-white/80'
+                                          : 'text-blue-600 hover:text-blue-700'
+                                      }`}
+                                    >
+                                      (sign in)
+                                    </button>
+                                  </>
+                                )}
+                              </>
+                            );
                           }
 
                           // Split description by YouTube URLs and render with links
@@ -508,7 +535,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                             // Add text before URL
                             if (youtubeData.startIndex > lastIndex) {
                               parts.push({
-                                text: data.description!.substring(lastIndex, youtubeData.startIndex),
+                                text: displayDescription.substring(lastIndex, youtubeData.startIndex),
                                 isUrl: false,
                               });
                             }
@@ -522,9 +549,9 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           });
 
                           // Add remaining text
-                          if (lastIndex < data.description!.length) {
+                          if (lastIndex < displayDescription.length) {
                             parts.push({
-                              text: data.description!.substring(lastIndex),
+                              text: displayDescription.substring(lastIndex),
                               isUrl: false,
                             });
                           }
@@ -551,14 +578,30 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                                 }
                                 return <span key={index}>{part.text}</span>;
                               })}
+                              {shouldTruncate && (
+                                <>
+                                  <span>...</span>
+                                  <button
+                                    onClick={openWelcome}
+                                    className={`ml-1 underline transition-colors ${
+                                      useWhiteText
+                                        ? 'text-white hover:text-white/80'
+                                        : 'text-blue-600 hover:text-blue-700'
+                                    }`}
+                                  >
+                                    (sign in)
+                                  </button>
+                                </>
+                              )}
                             </>
                           );
                         })()}
                       </div>
                       
-                      {/* YouTube Previews */}
-                      {(() => {
-                        const youtubeUrls = findYouTubeUrls(data.description);
+                      {/* YouTube Previews - only show for authenticated users */}
+                      {user && (() => {
+                        const description = data.description || '';
+                        const youtubeUrls = findYouTubeUrls(description);
                         if (youtubeUrls.length === 0) return null;
                         
                         return (
@@ -574,8 +617,13 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           </div>
                         );
                       })()}
+                      </>
+                    ) : (
+                      <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        No description available
+                      </div>
+                    )}
                     </div>
-                  )
                 )}
                 {data.created_at && (
                   <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>

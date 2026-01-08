@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { UserIcon, PlusIcon, NewspaperIcon } from '@heroicons/react/24/outline';
-import { PlusIcon as PlusIconSolid, NewspaperIcon as NewspaperIconSolid } from '@heroicons/react/24/solid';
+import { PlusIcon, NewspaperIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { PlusIcon as PlusIconSolid, NewspaperIcon as NewspaperIconSolid, WrenchScrewdriverIcon as WrenchScrewdriverIconSolid } from '@heroicons/react/24/solid';
 import { useAuthStateSafe } from '@/features/auth';
 
-export type MobileNavTab = 'news' | 'contribute';
+export type MobileNavTab = 'news' | 'contribute' | 'tools';
 
 interface MobileNavTabsProps {
   activeTab: MobileNavTab | null;
@@ -48,13 +47,7 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
 
-  const baseClasses = `flex flex-col items-center justify-center gap-0.5 px-3 py-2 transition-colors rounded-md ${
-    useTransparentUI
-      ? 'hover:bg-white/10'
-      : useBlurStyle
-      ? 'hover:bg-white/20'
-      : 'hover:bg-gray-50'
-  }`;
+  const baseClasses = `flex flex-col items-center justify-center gap-0 px-2 py-2 transition-colors group`;
 
   return (
     <nav 
@@ -67,19 +60,27 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
       }`}
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="flex items-center justify-center gap-6 h-14 px-4">
+      <div className="flex items-center justify-center gap-5 h-14 px-3">
         {/* News Tab */}
         <button
           onClick={() => onTabClick('news')}
           className={baseClasses}
           aria-label="News"
         >
+          <div className={`p-1.5 rounded-md transition-colors ${
+            useTransparentUI
+              ? 'group-hover:bg-white/10'
+              : useBlurStyle
+              ? 'group-hover:bg-white/20'
+              : 'group-hover:bg-gray-100'
+          }`}>
           {activeTab === 'news' ? (
             <NewspaperIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
           ) : (
             <NewspaperIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
           )}
-          <span className={`text-[10px] font-medium ${
+          </div>
+          <span className={`text-[10px] font-medium mt-0.5 ${
             activeTab === 'news' 
               ? useWhiteText ? 'text-white' : 'text-gray-900'
               : useWhiteText ? 'text-white/80' : 'text-gray-500'
@@ -88,19 +89,27 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
           </span>
         </button>
 
-        {/* Contribute Tab (when signed in) or Sign In (when not signed in) */}
-        {account ? (
+        {/* Contribute Tab (only when signed in) */}
+        {account && (
           <button
             onClick={() => onTabClick('contribute')}
             className={baseClasses}
             aria-label="Contribute"
           >
+            <div className={`p-1.5 rounded-md transition-colors ${
+              useTransparentUI
+                ? 'group-hover:bg-white/10'
+                : useBlurStyle
+                ? 'group-hover:bg-white/20'
+                : 'group-hover:bg-gray-100'
+            }`}>
             {activeTab === 'contribute' ? (
               <PlusIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
             ) : (
               <PlusIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
             )}
-            <span className={`text-[10px] font-medium ${
+            </div>
+            <span className={`text-[10px] font-medium mt-0.5 ${
               activeTab === 'contribute' 
                 ? useWhiteText ? 'text-white' : 'text-gray-900'
                 : useWhiteText ? 'text-white/80' : 'text-gray-500'
@@ -108,18 +117,35 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
               Contribute
             </span>
           </button>
-        ) : (
-          <Link
-            href="/account/settings"
-            className={baseClasses}
-            aria-label="Sign In"
-          >
-            <UserIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
-            <span className={`text-[10px] font-medium ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`}>
-              Sign In
-            </span>
-          </Link>
         )}
+
+        {/* Tools Tab */}
+        <button
+          onClick={() => onTabClick('tools')}
+          className={baseClasses}
+          aria-label="Tools"
+        >
+          <div className={`p-1.5 rounded-md transition-colors ${
+            useTransparentUI
+              ? 'group-hover:bg-white/10'
+              : useBlurStyle
+              ? 'group-hover:bg-white/20'
+              : 'group-hover:bg-gray-100'
+          }`}>
+          {activeTab === 'tools' ? (
+            <WrenchScrewdriverIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
+          ) : (
+            <WrenchScrewdriverIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
+          )}
+          </div>
+          <span className={`text-[10px] font-medium mt-0.5 ${
+            activeTab === 'tools' 
+              ? useWhiteText ? 'text-white' : 'text-gray-900'
+              : useWhiteText ? 'text-white/80' : 'text-gray-500'
+          }`}>
+            Tools
+          </span>
+        </button>
       </div>
     </nav>
   );

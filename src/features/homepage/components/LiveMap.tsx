@@ -13,18 +13,24 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
 import MobileNavTabs, { type MobileNavTab } from '@/components/layout/MobileNavTabs';
-import MobileNavSheet from '@/components/layout/MobileNavSheet';
+import MobileNavPopup from '@/components/layout/MobileNavPopup';
 import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
 import Map3DControlsSecondaryContent from '@/features/sidebar/components/Map3DControlsSecondaryContent';
 import ContributeContent from '@/components/layout/ContributeContent';
 import NewsContent from '@/components/layout/NewsContent';
+import ToolsContent from '@/components/layout/ToolsContent';
 import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
+import DailyWelcomeModal from '@/components/layout/DailyWelcomeModal';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useLivePageModals } from '../hooks/useLivePageModals';
 import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
 import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
 import CongressionalDistrictHoverInfo from '@/components/layout/CongressionalDistrictHoverInfo';
+import CTUHoverInfo from '@/components/layout/CTUHoverInfo';
+import GovernmentBuildingsLayer from '@/features/map/components/GovernmentBuildingsLayer';
+import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
+import BuildingDetailView from '@/features/admin/components/BuildingDetailView';
 
 // Helper to format last generation timestamp
 function formatLastGeneration(timestamp: string): string {
@@ -95,6 +101,14 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const [showDistricts, setShowDistricts] = useState(false);
   const [hoveredDistrict, setHoveredDistrict] = useState<any | null>(null);
   
+  // Government buildings visibility state
+  const [showBuildings, setShowBuildings] = useState(true);
+  const [selectedBuilding, setSelectedBuilding] = useState<any | null>(null);
+  
+  // CTU boundaries visibility state
+  const [showCTU, setShowCTU] = useState(false);
+  const [hoveredCTU, setHoveredCTU] = useState<any | null>(null);
+  
   // Unified modal state management
   const {
     activeTab,
@@ -133,7 +147,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   } | null>(null);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { openWelcome } = useAppModalContextSafe();
+  const { openWelcome, closeModal, modal } = useAppModalContextSafe();
   
   // URL-based state (only year filter)
   useUrlMapState();
@@ -145,6 +159,24 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     isLoading: authLoading,
   } = useAuthStateSafe();
 
+  // Show welcome modal for unauthenticated users and keep it open until authenticated
+  useEffect(() => {
+    // Wait for auth to finish loading
+    if (authLoading) return;
+
+    // If user is not authenticated, open welcome modal
+    if (!user) {
+      if (modal.type !== 'welcome') {
+        openWelcome();
+      }
+    } else {
+      // If user becomes authenticated, close welcome modal
+      if (modal.type === 'welcome') {
+        closeModal();
+      }
+    }
+  }, [user, authLoading, modal.type, openWelcome, closeModal]);
+
   const isAdmin = account?.role === 'admin';
   const [lastNewsGeneration, setLastNewsGeneration] = useState<string | null>(null);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
@@ -153,6 +185,29 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
     return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
   });
+  const [showDailyWelcome, setShowDailyWelcome] = useState(false);
+
+  // Show welcome toast when page loads (for authenticated users)
+  useEffect(() => {
+    if (!user || !account || !mapLoaded || authLoading) return undefined;
+
+    let hideTimer: NodeJS.Timeout | null = null;
+
+    // Small delay to ensure map is fully rendered
+    const showWelcome = setTimeout(() => {
+      setShowDailyWelcome(true);
+      
+      // Auto-hide after 3 seconds (toast behavior)
+      hideTimer = setTimeout(() => {
+        setShowDailyWelcome(false);
+      }, 3000);
+    }, 500); // 500ms delay after map loads
+
+    return () => {
+      clearTimeout(showWelcome);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, [user, account, mapLoaded, authLoading]);
 
   // Listen for blur style and map style changes
   useEffect(() => {
@@ -646,10 +701,10 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
-          style: MAP_CONFIG.MAPBOX_STYLE,
-          center: MAP_CONFIG.DEFAULT_CENTER,
-          zoom: MAP_CONFIG.DEFAULT_ZOOM,
-          pitch: 0, // Start at 0% angle
+          style: MAP_CONFIG.STRATEGIC_STYLES.streets,
+          center: [-93.1022, 44.9553], // Minnesota State Capitol, St. Paul, MN
+          zoom: 14, // Zoom level 14 for detailed view
+          pitch: 60, // Start at 60 degrees
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
@@ -966,6 +1021,13 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         className="relative flex-1 w-full overflow-hidden flex"
         style={{ height: '100vh' }}
       >
+        {/* Title Card */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <div className="bg-white rounded-md border border-gray-200 px-3 py-2 shadow-sm">
+            <h1 className="text-sm font-semibold text-gray-900">Live</h1>
+          </div>
+        </div>
+
         {/* Map and other components - no sidebar */}
         <div className="flex-1 flex relative overflow-hidden">
           {/* Map Top Container - Search and Categories */}
@@ -993,6 +1055,14 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             districtsState={{
               showDistricts,
               setShowDistricts,
+            }}
+            buildingsState={{
+              showBuildings,
+              setShowBuildings,
+            }}
+            ctuState={{
+              showCTU,
+              setShowCTU,
             }}
           />
 
@@ -1038,6 +1108,26 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             />
           )}
 
+          {/* Government Buildings Layer */}
+          {mapLoaded && mapInstanceRef.current && (
+            <GovernmentBuildingsLayer
+              map={mapInstanceRef.current}
+              mapLoaded={mapLoaded}
+              visible={showBuildings}
+              onBuildingClick={(building) => setSelectedBuilding(building)}
+            />
+          )}
+
+          {/* CTU Boundaries Layer */}
+          {mapLoaded && mapInstanceRef.current && (
+            <CTUBoundariesLayer
+              map={mapInstanceRef.current}
+              mapLoaded={mapLoaded}
+              visible={showCTU}
+              onCTUHover={setHoveredCTU}
+            />
+          )}
+
           {/* Loading/Error Overlay */}
           {!mapLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
@@ -1073,12 +1163,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         <MobileNavTabs
           activeTab={activeTab}
           onTabClick={handleTabClick}
-          isSheetOpen={activeTab === 'news' || activeTab === 'contribute'}
+          isSheetOpen={activeTab === 'news' || activeTab === 'contribute' || activeTab === 'tools'}
         />
       )}
 
       {/* News Sheet */}
-      <MobileNavSheet
+      <MobileNavPopup
         isOpen={activeTab === 'news' && !isAccountModalOpen}
         onClose={closeTab}
         title="News"
@@ -1131,7 +1221,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             })
             .catch(err => console.error('Failed to fetch last generation:', err));
         }} />
-      </MobileNavSheet>
+      </MobileNavPopup>
 
       {/* Create Popup - Only opened via "Add Label" button */}
       <CreateMentionPopup
@@ -1164,13 +1254,22 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           />
 
       {/* Contribute Sheet */}
-      <MobileNavSheet
+      <MobileNavPopup
         isOpen={activeTab === 'contribute' && !isAccountModalOpen}
         onClose={closeTab}
         title="Contribute"
       >
         <ContributeContent map={mapInstanceRef.current} mapLoaded={mapLoaded} />
-      </MobileNavSheet>
+      </MobileNavPopup>
+
+      {/* Tools Sheet */}
+      <MobileNavPopup
+        isOpen={activeTab === 'tools' && !isAccountModalOpen}
+        onClose={closeTab}
+        title="Tools"
+      >
+        <ToolsContent />
+      </MobileNavPopup>
 
       {/* Map Entity Popup - Above mobile nav */}
       <MapEntityPopup
@@ -1191,6 +1290,27 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       {/* Congressional District Hover Info - Right Side */}
       <CongressionalDistrictHoverInfo
         district={hoveredDistrict}
+      />
+
+      {/* CTU Hover Info - Right Side */}
+      <CTUHoverInfo
+        ctu={hoveredCTU}
+      />
+
+      {/* Building Detail View - Full Screen Modal */}
+      {selectedBuilding && (
+        <BuildingDetailView
+          building={selectedBuilding}
+          onClose={() => setSelectedBuilding(null)}
+          // Don't show edit/delete buttons for public users
+        />
+      )}
+
+      {/* Daily Welcome Modal */}
+      <DailyWelcomeModal
+        isOpen={showDailyWelcome}
+        onClose={() => setShowDailyWelcome(false)}
+        useBlurStyle={useBlurStyle}
       />
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}

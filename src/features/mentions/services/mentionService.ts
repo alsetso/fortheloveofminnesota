@@ -16,7 +16,7 @@ export class MentionService {
     const { data: { user } } = await supabase.auth.getUser();
     const isAuthenticated = !!user;
     
-    // Build query - for anonymous users, include accounts.image_url (public) but exclude username/description
+    // Build query - for anonymous users, include description and accounts.image_url (public) but exclude username
     // Note: collections join is excluded for anonymous users due to RLS restrictions
     let query = supabase
       .from('mentions')
@@ -37,6 +37,7 @@ export class MentionService {
         : `id,
           lat,
           lng,
+          description,
           account_id,
           city_id,
           collection_id,
@@ -264,13 +265,10 @@ export class MentionService {
 
   /**
    * Convert mentions array to GeoJSON FeatureCollection
-   * For unauthenticated users, description is excluded but account_image_url is included
+   * Includes description and account_image_url for all users
    */
   static mentionsToGeoJSON(mentions: Mention[]): MentionGeoJSONCollection {
     const features: MentionGeoJSONFeature[] = mentions.map((mention) => {
-      // Check if mention has description (authenticated users) or not (unauthenticated)
-      const hasDescription = 'description' in mention && mention.description !== undefined;
-      
       const properties: any = {
         id: mention.id,
         account_id: mention.account_id,
@@ -279,8 +277,8 @@ export class MentionService {
         account_plan: (mention as any).accounts?.plan || null, // Include plan for gold border on map pins
       };
       
-      // Only include description if it exists (authenticated users)
-      if (hasDescription) {
+      // Include description if it exists
+      if (mention.description !== null && mention.description !== undefined) {
         properties.description = mention.description;
       }
       

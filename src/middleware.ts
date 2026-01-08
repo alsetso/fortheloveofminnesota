@@ -185,12 +185,8 @@ export async function middleware(req: NextRequest) {
       '/account/analytics': 'analytics',
     };
     
-    const tab = accountRouteMap[pathname] || 'settings';
+    // Redirect to home page, preserving query params (e.g., session_id from Stripe)
     const redirectUrl = new URL('/', req.url);
-    redirectUrl.searchParams.set('modal', 'account');
-    redirectUrl.searchParams.set('tab', tab);
-    
-    // Preserve query params (e.g., session_id from Stripe)
     req.nextUrl.searchParams.forEach((value, key) => {
       redirectUrl.searchParams.set(key, value);
     });
@@ -272,8 +268,6 @@ export async function middleware(req: NextRequest) {
     }
     
     const redirectUrl = new URL('/', req.url);
-    redirectUrl.searchParams.set('modal', 'account');
-    redirectUrl.searchParams.set('tab', 'settings');
     redirectUrl.searchParams.set('redirect', pathname);
     redirectUrl.searchParams.set('message', 'Please sign in to access this page');
     return NextResponse.redirect(redirectUrl);

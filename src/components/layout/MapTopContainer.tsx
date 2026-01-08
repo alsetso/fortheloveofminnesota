@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, Squares2X2Icon, UserIcon, ChevronDownIcon, ArrowPathIcon, MapIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, CogIcon, UserIcon, ChevronDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui/hooks/useToast';
@@ -11,6 +12,7 @@ import type { MapboxMetadata } from '@/types/mapbox';
 import LiveAccountModal from './LiveAccountModal';
 import MapStylesPopup from './MapStylesPopup';
 import DynamicSearchModal from './DynamicSearchModal';
+import NewsStream from './NewsStream';
 
 interface MapboxFeature {
   id: string;
@@ -121,6 +123,14 @@ interface MapTopContainerProps {
     showDistricts: boolean;
     setShowDistricts: (show: boolean) => void;
   };
+  buildingsState?: {
+    showBuildings: boolean;
+    setShowBuildings: (show: boolean) => void;
+  };
+  ctuState?: {
+    showCTU: boolean;
+    setShowCTU: (show: boolean) => void;
+  };
 }
 
 // Map meta layer definitions
@@ -149,9 +159,10 @@ const MAP_META_LAYERS = [
   { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
 ];
 
-export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState }: MapTopContainerProps) {
+export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, buildingsState, ctuState }: MapTopContainerProps) {
+  const router = useRouter();
   const { account } = useAuthStateSafe();
-  const { openAccount, openUpgrade } = useAppModalContextSafe();
+  const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
   const { info } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -161,6 +172,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
+  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     // Initialize from window state if available
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
@@ -172,6 +184,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   // Use white text when transparent blur + satellite map
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
+  const timeDropdownRef = useRef<HTMLDivElement>(null);
   const [placeholderWord, setPlaceholderWord] = useState<'News' | 'Addresses' | 'People'>('News');
   const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
   const [dynamicSearchType, setDynamicSearchType] = useState<'news' | 'people'>('news');
@@ -641,11 +654,14 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showSuggestions, suggestions, selectedIndex, handleSuggestionSelect]);
 
-  // Close suggestions when clicking outside
+  // Close suggestions and time dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+      }
+      if (timeDropdownRef.current && !timeDropdownRef.current.contains(event.target as Node)) {
+        setShowTimeDropdown(false);
       }
     };
 
@@ -675,6 +691,27 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     }
   };
 
+  const handleLogoClick = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const referrer = document.referrer;
+      // Check if referrer exists and is from the same origin
+      if (referrer && referrer.startsWith(window.location.origin)) {
+        // Extract the path from the referrer URL
+        const referrerPath = new URL(referrer).pathname;
+        // Only navigate back if it's not the same page
+        if (referrerPath !== window.location.pathname) {
+          router.push(referrerPath);
+          return;
+        }
+      }
+      // Fallback: use browser back or go to home
+      if (window.history.length > 1) {
+        router.back();
+      } else {
+        router.push('/');
+      }
+    }
+  }, [router]);
 
   return (
     <div className="fixed top-4 left-4 right-4 z-[45] pointer-events-none">
@@ -687,8 +724,13 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
               : 'bg-white border border-gray-200'
           }`}
         >
-          {/* Logo */}
-          <div className="flex-shrink-0">
+          {/* Logo - Back Button */}
+          <button
+            onClick={handleLogoClick}
+            className="flex-shrink-0 cursor-pointer p-1 rounded-md hover:bg-gray-100 transition-colors"
+            aria-label="Go back"
+            type="button"
+          >
             <Image
               src="/logo.png"
               alt="Logo"
@@ -697,7 +739,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
               className="w-5 h-5"
               unoptimized
             />
-          </div>
+          </button>
 
           {/* Search Input */}
           <div className="flex-1 min-w-0 relative flex items-center gap-2">
@@ -820,13 +862,16 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           {account ? (
             <button
               onClick={() => {
+                // Use global modal context to open LiveAccountModal
+                openAccount('settings');
+                // Also use local modalState if available (for live page)
                 if (modalState) {
                   modalState.openAccount();
-                  // Dispatch event to hide mobile nav
-                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                    detail: { isOpen: true }
-                  }));
                 }
+                // Dispatch event to hide mobile nav
+                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                  detail: { isOpen: true }
+                }));
               }}
               className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden transition-colors ${
                 (account.plan === 'pro' || account.plan === 'plus')
@@ -857,139 +902,198 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           ) : (
             <button
               onClick={() => {
-                if (modalState) {
-                  modalState.openAccount();
-                  // Dispatch event to hide mobile nav
-                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                    detail: { isOpen: true }
-                  }));
-                }
+                openWelcome();
+                // Dispatch event to hide mobile nav
+                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                  detail: { isOpen: true }
+                }));
               }}
-              className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 border-2 border-gray-200 hover:border-gray-300 transition-colors flex items-center justify-center"
+              className={`flex-shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                useBlurStyle
+                  ? 'bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20'
+                  : 'bg-gray-900 text-white hover:bg-gray-800'
+              }`}
               aria-label="Sign In"
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="8" cy="6" r="3" stroke="#6B7280" strokeWidth="1.5" fill="none"/>
-                <path d="M3 14C3 11.24 5.24 9 8 9C10.76 9 13 11.24 13 14" stroke="#6B7280" strokeWidth="1.5" fill="none"/>
-              </svg>
+              Sign In
             </button>
           )}
         </div>
 
-        {/* Time Filter and Layers Container */}
-        <div className="flex items-center gap-2">
-          {/* Time Filter Selector or Reload Mentions Button */}
-          {mentionsLayerHidden ? (
-            <button
-              onClick={handleReloadMentions}
-              className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 border-2 border-red-500 ${
-                useBlurStyle 
-                  ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg text-white hover:bg-red-500/20' 
-                  : 'bg-white hover:bg-red-50 text-gray-900'
-              }`}
-            >
-              <ArrowPathIcon className="w-3 h-3" />
-              Reload mentions
-            </button>
-          ) : (
-            <div 
-              className={`rounded-md px-1 h-[25px] flex items-center gap-0.5 w-fit transition-all ${
-                useBlurStyle 
-                  ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
-                  : 'bg-white border border-gray-200'
-              }`}
-            >
+        {/* Bottom Row: Time Filter/Map Settings on left, News Stream on right */}
+        <div className="flex items-start justify-between gap-2">
+          {/* Time Filter and Layers Container */}
+          <div className="flex items-center gap-2">
+            {/* Time Filter Selector or Reload Mentions Button */}
+            {mentionsLayerHidden ? (
               <button
-                onClick={() => {
-                  setTimeFilter('24h');
-                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                    detail: { timeFilter: '24h' }
-                  }));
-                }}
-                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
-                  timeFilter === '24h'
-                    ? useWhiteText ? 'text-white' : 'text-gray-900'
-                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                onClick={handleReloadMentions}
+                className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 border-2 border-red-500 ${
+                  useBlurStyle 
+                    ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg text-white hover:bg-red-500/20' 
+                    : 'bg-white hover:bg-red-50 text-gray-900'
                 }`}
               >
-                24h
+                <ArrowPathIcon className="w-3 h-3" />
+                Reload mentions
               </button>
-              <button
-                onClick={() => {
-                  setTimeFilter('7d');
-                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                    detail: { timeFilter: '7d' }
-                  }));
-                }}
-                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
-                  timeFilter === '7d'
-                    ? useWhiteText ? 'text-white' : 'text-gray-900'
-                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                7d
-              </button>
-              <button
-                onClick={() => {
-                  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
-                  if (!isPro) {
-                    openUpgrade('All time filter');
-                    return;
-                  }
-                  setTimeFilter('all');
-                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                    detail: { timeFilter: 'all' }
-                  }));
-                }}
-                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
-                  timeFilter === 'all'
-                    ? useWhiteText ? 'text-white' : 'text-gray-900'
-                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                All time
-              </button>
-              {useBlurStyle && (
-                <ChevronDownIcon className={`w-3 h-3 mr-1 flex-shrink-0 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
-              )}
-            </div>
-          )}
+            ) : (
+              <>
+                {/* Large screens: Side by side buttons */}
+                <div 
+                  className={`hidden lg:flex rounded-md px-1 h-[25px] items-center gap-0.5 w-fit transition-all ${
+                    useBlurStyle 
+                      ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
+                      : 'bg-white border border-gray-200'
+                  }`}
+                >
+                  <button
+                    onClick={() => {
+                      setTimeFilter('24h');
+                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                        detail: { timeFilter: '24h' }
+                      }));
+                    }}
+                    className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                      timeFilter === '24h'
+                        ? useWhiteText ? 'text-white' : 'text-gray-900'
+                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    24h
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTimeFilter('7d');
+                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                        detail: { timeFilter: '7d' }
+                      }));
+                    }}
+                    className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                      timeFilter === '7d'
+                        ? useWhiteText ? 'text-white' : 'text-gray-900'
+                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    7d
+                  </button>
+                  <button
+                    onClick={() => {
+                      const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+                      if (!isPro) {
+                        openUpgrade('All time filter');
+                        return;
+                      }
+                      setTimeFilter('all');
+                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                        detail: { timeFilter: 'all' }
+                      }));
+                    }}
+                    className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                      timeFilter === 'all'
+                        ? useWhiteText ? 'text-white' : 'text-gray-900'
+                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    All time
+                  </button>
+                </div>
 
-          {/* Layers Button */}
-          <button
-            onClick={() => {
-              if (modalState) {
-                modalState.openMapStyles();
-              }
-            }}
-            className={`rounded-md px-1.5 h-[25px] transition-colors flex items-center justify-center gap-1.5 ${
-              useBlurStyle 
-                ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg border-2 border-transparent' 
-                : 'bg-white hover:bg-gray-50 border border-gray-200'
-            }`}
-            aria-label="Map Styles"
-          >
-            <Squares2X2Icon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
-            {useBlurStyle && (
-              <ChevronDownIcon className={`w-3 h-3 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+                {/* Small screens: Dropdown */}
+                <div ref={timeDropdownRef} className="relative lg:hidden">
+                  <button
+                    onClick={() => setShowTimeDropdown(!showTimeDropdown)}
+                    className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
+                      useBlurStyle 
+                        ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
+                        : 'bg-white border border-gray-200'
+                    }`}
+                  >
+                    <span className={useWhiteText ? 'text-white' : 'text-gray-900'}>
+                      {timeFilter === '24h' ? '24h' : timeFilter === '7d' ? '7d' : 'All time'}
+                    </span>
+                    <ChevronDownIcon className={`w-3 h-3 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showTimeDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 min-w-[100px]">
+                      <button
+                        onClick={() => {
+                          setTimeFilter('24h');
+                          window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                            detail: { timeFilter: '24h' }
+                          }));
+                          setShowTimeDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${
+                          timeFilter === '24h' ? 'font-semibold text-gray-900' : 'text-gray-600'
+                        }`}
+                      >
+                        24h
+                      </button>
+                      <button
+                        onClick={() => {
+                          setTimeFilter('7d');
+                          window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                            detail: { timeFilter: '7d' }
+                          }));
+                          setShowTimeDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${
+                          timeFilter === '7d' ? 'font-semibold text-gray-900' : 'text-gray-600'
+                        }`}
+                      >
+                        7d
+                      </button>
+                      <button
+                        onClick={() => {
+                          const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+                          if (!isPro) {
+                            openUpgrade('All time filter');
+                            setShowTimeDropdown(false);
+                            return;
+                          }
+                          setTimeFilter('all');
+                          window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                            detail: { timeFilter: 'all' }
+                          }));
+                          setShowTimeDropdown(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors rounded-b-lg ${
+                          timeFilter === 'all' ? 'font-semibold text-gray-900' : 'text-gray-600'
+                        }`}
+                      >
+                        All time
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
-          </button>
 
-          {/* Districts Toggle Button */}
-          {districtsState && (
+            {/* Map Settings Button */}
             <button
-              onClick={() => districtsState.setShowDistricts(!districtsState.showDistricts)}
-              className={`rounded-md px-1.5 h-[25px] transition-colors flex items-center justify-center gap-1.5 ${
+              onClick={() => {
+                if (modalState) {
+                  modalState.openMapStyles();
+                }
+              }}
+              className={`rounded-md px-1.5 h-[25px] transition-colors flex items-center justify-center ${
                 useBlurStyle 
                   ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg border-2 border-transparent' 
                   : 'bg-white hover:bg-gray-50 border border-gray-200'
               }`}
-              aria-label={districtsState.showDistricts ? 'Hide Districts' : 'Show Districts'}
-              title={districtsState.showDistricts ? 'Hide Congressional Districts' : 'Show Congressional Districts'}
+              aria-label="Map Settings"
             >
-              <MapIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
+              <CogIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
             </button>
-          )}
+          </div>
+
+          {/* News Stream - Visible on small screens and up */}
+          <div className="flex-1 max-w-[280px] sm:max-w-[320px] lg:max-w-[280px]">
+            <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />
+          </div>
         </div>
       </div>
 
@@ -1014,6 +1118,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           onClose={() => modalState.closeMapStyles()}
           map={map}
           districtsState={districtsState}
+          buildingsState={buildingsState}
+          ctuState={ctuState}
         />
       )}
 

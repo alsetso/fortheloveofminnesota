@@ -1,7 +1,6 @@
 import { Metadata } from 'next';
 import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import PayrollTable from './PayrollTable';
 
 export const revalidate = 3600;
 
@@ -32,7 +31,7 @@ export default async function PayrollPage() {
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
-          { label: 'Home', href: '/' },
+          { label: 'Minnesota', href: '/' },
           { label: 'Government', href: '/gov' },
           { label: 'State Checkbook', href: '/gov/checkbook' },
           { label: 'Payroll', href: null },
@@ -52,8 +51,15 @@ export default async function PayrollPage() {
           </div>
         </div>
 
-        {/* Payroll Table */}
-        <PayrollTable />
+        {/* Coming Soon */}
+        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
+          <h2 className="text-xs font-semibold text-gray-900">
+            Coming Soon
+          </h2>
+          <p className="text-xs text-gray-600">
+            Payroll data will be available here soon. This section will include government employee compensation, salary information, and related payroll records.
+          </p>
+        </div>
       </div>
     </SimplePageLayout>
   );

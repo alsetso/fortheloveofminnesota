@@ -1,23 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { XMarkIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import BuildingPeopleTab from './BuildingPeopleTab';
+import BuildingTransparencyTab from './BuildingTransparencyTab';
 
-type Tab = 'overview' | 'events' | 'resources';
-
-interface Event {
-  id: string;
-  title: string;
-  description: string | null;
-  start_date: string;
-  end_date: string | null;
-  location_name: string | null;
-  location_address: string | null;
-  building_id?: string | null;
-  created_at: string;
-  updated_at: string;
-}
+type Tab = 'overview' | 'people' | 'transparency';
 
 interface Building {
   id: string;
@@ -49,30 +38,10 @@ export default function BuildingDetailView({
   const [showMenu, setShowMenu] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
-  const [events, setEvents] = useState<Event[]>([]);
-  const [eventsLoading, setEventsLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   
   const coverImages = building.cover_images || [];
   const hasMultipleImages = coverImages.length > 1;
-
-  // Fetch events when Events tab is active
-  useEffect(() => {
-    if (activeTab === 'events' && building.id) {
-      setEventsLoading(true);
-      fetch(`/api/civic/events?building_id=${building.id}&upcoming=true`)
-        .then((res) => res.json())
-        .then((data) => {
-          setEvents(data || []);
-          setEventsLoading(false);
-        })
-        .catch((error) => {
-          console.error('Error fetching events:', error);
-          setEvents([]);
-          setEventsLoading(false);
-        });
-    }
-  }, [activeTab, building.id]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -243,24 +212,25 @@ export default function BuildingDetailView({
                     Overview
                   </button>
                   <button
-                    onClick={() => setActiveTab('events')}
+                    onClick={() => setActiveTab('people')}
                     className={`py-3 text-xs font-medium border-b-2 transition-colors ${
-                      activeTab === 'events'
+                      activeTab === 'people'
                         ? 'border-gray-900 text-gray-900'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    Events
+                    People
                   </button>
                   <button
-                    onClick={() => setActiveTab('resources')}
-                    className={`py-3 text-xs font-medium border-b-2 transition-colors ${
-                      activeTab === 'resources'
+                    onClick={() => setActiveTab('transparency')}
+                    className={`flex items-center gap-1.5 py-3 text-xs font-medium border-b-2 transition-colors ${
+                      activeTab === 'transparency'
                         ? 'border-gray-900 text-gray-900'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    Resources
+                    <CurrencyDollarIcon className="w-3 h-3 text-green-600" />
+                    Transparency
                   </button>
                 </div>
               </div>
@@ -339,58 +309,14 @@ export default function BuildingDetailView({
                 </div>
               )}
 
-              {/* Events Tab */}
-              {activeTab === 'events' && (
-                <div className="space-y-3">
-                  {eventsLoading ? (
-                    <div className="text-center py-8">
-                      <p className="text-xs text-gray-500">Loading events...</p>
-                    </div>
-                  ) : events.length === 0 ? (
-                    <div className="text-center py-8">
-                      <p className="text-xs text-gray-500">No upcoming events scheduled for this building.</p>
-                    </div>
-                  ) : (
-                    events.map((event) => (
-                      <div
-                        key={event.id}
-                        className="border border-gray-200 rounded-md p-3 space-y-2"
-                      >
-                        <h3 className="text-sm font-semibold text-gray-900">
-                          {event.title}
-                        </h3>
-                        {event.description && (
-                          <p className="text-xs text-gray-600">
-                            {event.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>
-                            {new Date(event.start_date).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          {(event.location_name || event.location_address) && (
-                            <span>
-                              {event.location_name || event.location_address}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+              {/* People Tab */}
+              {activeTab === 'people' && (
+                <BuildingPeopleTab buildingId={building.id} />
               )}
 
-              {/* Resources Tab */}
-              {activeTab === 'resources' && (
-                <div className="text-center py-8">
-                  <p className="text-xs text-gray-500">Content coming soon</p>
-                </div>
+              {/* Transparency Tab */}
+              {activeTab === 'transparency' && (
+                <BuildingTransparencyTab />
               )}
             </div>
           </div>

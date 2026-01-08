@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminApiAccess } from '@/lib/adminHelpers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
-import { hasNewsGeneratedRecently, savePrompt } from '@/features/news/services/newsService';
+import { savePrompt } from '@/features/news/services/newsService';
 import { fetchNewsFromRapidAPI, deduplicateArticles, formatNewsArticles } from '@/features/news/services/newsApiService';
 import { handleApiError } from '@/lib/apiErrorHandler';
 
@@ -21,14 +21,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if news was already generated in the last 24 hours
-    const alreadyGenerated = await hasNewsGeneratedRecently();
-    if (alreadyGenerated) {
-      return NextResponse.json(
-        { error: 'News has already been generated in the last 24 hours. Please wait before generating again.' },
-        { status: 400 }
-      );
-    }
+    // No 24-hour check for admin - allow generating anytime
 
     // Get account ID - get user from supabase to ensure proper auth context
     const supabase = await createServerClientWithAuth(cookies());
@@ -65,11 +58,15 @@ export async function POST(request: NextRequest) {
 
     const accountId = (accounts[0] as { id: string }).id;
 
-    // Default query: "Minnesota, MN" with 24 hours
-    const query = 'Minnesota, MN';
-    const timePublished = '1d'; // 24 hours
-    const country = 'US';
-    const lang = 'en';
+    // Parse request body for custom parameters
+    const body = await request.json().catch(() => ({}));
+    const limit = body.limit || 100; // Default to 100 articles
+
+    // Default query: "Minnesota, MN" with 7 days
+    const query = body.query || 'Minnesota, MN';
+    const timePublished = body.timePublished || '7d'; // 7 days for more articles
+    const country = body.country || 'US';
+    const lang = body.lang || 'en';
 
     // Fetch news from RapidAPI using shared service
     let data;
@@ -79,7 +76,7 @@ export async function POST(request: NextRequest) {
         timePublished,
         country,
         lang,
-        // No limit - get all news
+        limit, // Pass limit to API
       });
     } catch (error) {
       if (error instanceof Error && error.message.includes('SSL certificate')) {

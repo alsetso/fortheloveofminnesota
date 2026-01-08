@@ -10,7 +10,7 @@ import { PopupType } from './useMapOverlayState';
  * 1. Top-level modals (account, mapStyles, dynamicSearch) - highest priority
  * 2. Entity popups (pin, atlas, location) - high priority
  * 3. Create sheet - medium priority
- * 4. Mobile nav tabs (news, contribute) - lowest priority
+ * 4. Mobile nav tabs (news, contribute, tools) - lowest priority
  */
 export type LivePageModalType =
   | 'account'           // LiveAccountModal
@@ -18,7 +18,7 @@ export type LivePageModalType =
   | 'dynamicSearch'     // DynamicSearchModal
   | `popup-${PopupType}` // 'popup-pin' | 'popup-atlas' | 'popup-location'
   | 'create'            // CreateMentionPopup
-  | MobileNavTab        // 'news' | 'contribute'
+  | MobileNavTab        // 'news' | 'contribute' | 'tools'
   | null;
 
 export interface LivePageModalState {
@@ -165,7 +165,7 @@ export function useLivePageModals() {
 
   const closeTab = useCallback(() => {
     setModal(prev => {
-      if (prev.type === 'news' || prev.type === 'contribute') {
+      if (prev.type === 'news' || prev.type === 'contribute' || prev.type === 'tools') {
         return { type: null, data: null };
       }
       return prev;
@@ -187,7 +187,7 @@ export function useLivePageModals() {
 
   // Helper: Get current active tab (if a tab is open)
   const activeTab: MobileNavTab | null = 
-    modal.type === 'news' || modal.type === 'contribute'
+    modal.type === 'news' || modal.type === 'contribute' || modal.type === 'tools'
       ? modal.type
       : null;
 

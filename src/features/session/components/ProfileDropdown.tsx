@@ -67,7 +67,7 @@ export default function ProfileDropdown({ className = '' }: ProfileDropdownProps
   if (!user) {
     return (
       <Link
-        href="/?modal=account&tab=settings"
+        href="/"
         className={`px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-header-focus/60 border border-header-focus rounded transition-colors ${className}`}
       >
         Sign In

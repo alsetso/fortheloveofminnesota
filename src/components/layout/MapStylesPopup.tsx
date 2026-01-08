@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon, MapIcon, ViewfinderCircleIcon, CubeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CubeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { MAP_CONFIG } from '@/features/map/config';
 import { mapStylePreloader } from '@/features/map/services/mapStylePreloader';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
@@ -17,13 +17,21 @@ interface MapStylesPopupProps {
     showDistricts: boolean;
     setShowDistricts: (show: boolean) => void;
   };
+  buildingsState?: {
+    showBuildings: boolean;
+    setShowBuildings: (show: boolean) => void;
+  };
+  ctuState?: {
+    showCTU: boolean;
+    setShowCTU: (show: boolean) => void;
+  };
 }
 
 /**
  * Slide-up popup for map styles/layers selection
  * Appears from the bottom of the screen, positioned in front of mobile nav (z-[60])
  */
-export default function MapStylesPopup({ isOpen, onClose, map, districtsState }: MapStylesPopupProps) {
+export default function MapStylesPopup({ isOpen, onClose, map, districtsState, buildingsState, ctuState }: MapStylesPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [selectedStyle, setSelectedStyle] = useState<MapStyle>('streets');
   const [mounted, setMounted] = useState(false);
@@ -248,11 +256,6 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
   // Text color logic: white only when blur AND satellite, otherwise dark
   const useWhiteText = useBlurStyle && selectedStyle === 'satellite';
 
-  const styles: Array<{ id: MapStyle; label: string; Icon: React.ComponentType<{ className?: string }> }> = [
-    { id: 'streets', label: 'Default', Icon: MapIcon },
-    { id: 'satellite', label: 'Satellite', Icon: ViewfinderCircleIcon },
-  ];
-
   const popupContent = (
     <>
       {/* Backdrop - hidden on desktop */}
@@ -286,7 +289,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
         <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
           useBlurStyle ? 'border-transparent' : 'border-gray-200'
         }`}>
-          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Map type</h2>
+          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Map Settings</h2>
           <button
             onClick={handleClose}
             className={`p-1 -mr-1 transition-colors ${
@@ -303,54 +306,10 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
         {/* Content - Always scrollable on desktop */}
         <div className="flex-1 overflow-y-auto xl:overflow-y-auto">
           <div className="p-3 space-y-3">
-            {/* Map Styles */}
+            {/* 3D View Controls */}
             <div>
-              <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Map type</div>
-              <div className="grid grid-cols-2 gap-2">
-                {styles.map((style) => {
-                  const IconComponent = style.Icon;
-                  const isWhiteTextForStyle = useBlurStyle && style.id === 'satellite';
-                  const isSelected = selectedStyle === style.id;
-                  return (
-                    <button
-                      key={style.id}
-                      onClick={() => handleStyleChange(style.id)}
-                      className={`relative flex flex-col items-center gap-1.5 p-2 rounded-md border transition-all ${
-                        useBlurStyle
-                          ? 'border-white/20 bg-transparent hover:border-white/30 hover:bg-white/10'
-                          : 'border-gray-200 bg-transparent hover:border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {/* Green circle indicator for active status */}
-                      {isSelected && (
-                        <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full" />
-                      )}
-                      <IconComponent className={`w-5 h-5 ${
-                        isWhiteTextForStyle 
-                          ? 'text-white' 
-                          : 'text-gray-600'
-                      }`} />
-                      <span className={`text-[10px] font-medium ${
-                        isWhiteTextForStyle 
-                          ? 'text-white' 
-                          : 'text-gray-900'
-                      }`}>{style.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Additional Map Settings */}
-            <div className={`border-t pt-3 space-y-3 ${
-              useBlurStyle ? 'border-white/20' : 'border-gray-200'
-            }`}>
-              <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Additional map settings</div>
-              
-              {/* 3D View Controls */}
-              <div>
-                <div className={`text-xs font-medium mb-1.5 ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>3D View</div>
-                <div className="flex gap-1">
+              <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>3D View</div>
+              <div className="flex gap-1">
                   <button
                     onClick={() => setPitchValue(0)}
                     className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
@@ -401,7 +360,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
 
               {/* 3D Buildings Section */}
               <div>
-                <div className={`text-xs font-medium mb-1.5 ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>3D Buildings</div>
+                <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>3D Buildings</div>
                 <div className="space-y-1.5">
                   {/* Toggle Buildings */}
                   <button
@@ -481,10 +440,39 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
                 </div>
               </div>
 
+              {/* State Resources Section */}
+              {buildingsState && (
+                <div>
+                  <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>State Resources</div>
+                  <button
+                    onClick={() => {
+                      buildingsState.setShowBuildings(!buildingsState.showBuildings);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <CubeIcon className="w-3.5 h-3.5" />
+                      <span>Government Buildings</span>
+                    </div>
+                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                      buildingsState.showBuildings ? 'bg-gray-900' : 'bg-gray-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                        buildingsState.showBuildings ? 'translate-x-3.5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+                </div>
+              )}
+
               {/* Congressional Districts Toggle */}
               {districtsState && (
                 <div>
-                  <div className={`text-xs font-medium mb-1.5 ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>Layers</div>
+                  <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
                   <button
                     onClick={() => {
                       districtsState.setShowDistricts(!districtsState.showDistricts);
@@ -493,7 +481,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
                       useBlurStyle
                         ? 'bg-white/10 border-white/20 hover:bg-white/20'
                         : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
                   >
                     <span>Congressional Districts</span>
                     <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
@@ -507,42 +495,98 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState }:
                 </div>
               )}
 
-              {/* Blur Style Toggle */}
+              {/* CTU Boundaries Toggle */}
+              {ctuState && (
+                <div>
+                  {!districtsState && (
+                    <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
+                  )}
+                  <button
+                    onClick={() => {
+                      ctuState.setShowCTU(!ctuState.showCTU);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <span>CTU Boundaries</span>
+                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                      ctuState.showCTU ? 'bg-gray-900' : 'bg-gray-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                        ctuState.showCTU ? 'translate-x-3.5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* UI Style Section */}
               <div>
-                <div className={`text-xs font-medium mb-1.5 ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>UI Style</div>
-                <button
-                  onClick={() => {
-                    const newValue = !useBlurStyle;
-                    setUseBlurStyle(newValue);
-                    // Store in window for session persistence
-                    if (typeof window !== 'undefined') {
-                      (window as any).__useBlurStyle = newValue;
-                    }
-                    // Dispatch event to update all components
-                    window.dispatchEvent(new CustomEvent('blur-style-change', {
-                      detail: { useBlurStyle: newValue }
-                    }));
-                  }}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                    useBlurStyle
-                      ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
-                  } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  <span>Transparent Blur</span>
-                  <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                    useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}>
-                    <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                      useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
-                    }`} />
-                  </div>
-                </button>
+                <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>UI Style</div>
+                <div className="space-y-1.5">
+                  {/* Satellite Toggle */}
+                  <button
+                    onClick={() => {
+                      const newStyle = selectedStyle === 'satellite' ? 'streets' : 'satellite';
+                      handleStyleChange(newStyle);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      selectedStyle === 'satellite'
+                        ? useBlurStyle
+                        ? 'bg-white/10 border-white/20'
+                        : 'bg-gray-100 border-gray-200'
+                        : useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <span>Satellite</span>
+                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                      selectedStyle === 'satellite' ? 'bg-gray-900' : 'bg-gray-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                        selectedStyle === 'satellite' ? 'translate-x-3.5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+
+                  {/* Transparent Blur Toggle */}
+                  <button
+                    onClick={() => {
+                      const newValue = !useBlurStyle;
+                      setUseBlurStyle(newValue);
+                      // Store in window for session persistence
+                      if (typeof window !== 'undefined') {
+                        (window as any).__useBlurStyle = newValue;
+                      }
+                      // Dispatch event to update all components
+                      window.dispatchEvent(new CustomEvent('blur-style-change', {
+                        detail: { useBlurStyle: newValue }
+                      }));
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                  >
+                    <span>Transparent Blur</span>
+                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                      useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                        useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
     </>
   );
 

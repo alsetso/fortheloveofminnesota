@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import SheetSearchInput from './SheetSearchInput';
 
-interface MobileNavSheetProps {
+interface MobileNavPopupProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -13,32 +13,65 @@ interface MobileNavSheetProps {
   map?: any;
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string) => void;
   headerAction?: React.ReactNode;
-  contentPadding?: boolean; // Control content padding
+  contentPadding?: boolean;
 }
 
 /**
+ * Dynamic mobile nav popup that automatically adapts colors based on:
+ * - Map style (streets vs satellite)
+ * - Blur style (transparent vs solid)
+ * 
+ * Color logic:
+ * - Solid white background: Dark text
+ * - Transparent blur + streets: Dark text
+ * - Transparent blur + satellite: White text
+ * 
  * iOS-style slide-up sheet that appears behind the mobile nav (z-[50])
- * but in front of the map top container (z-[45]). Uses smooth spring-like animations.
+ * but in front of the map top container (z-[45]).
  */
-export default function MobileNavSheet({ isOpen, onClose, title, children, showSearch = false, map, onLocationSelect, headerAction, contentPadding = true }: MobileNavSheetProps) {
+export default function MobileNavPopup({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  showSearch = false, 
+  map, 
+  onLocationSelect, 
+  headerAction, 
+  contentPadding = true 
+}: MobileNavPopupProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
+  
+  // State for blur and map style
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
+    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
+  });
 
-  // Listen for blur style changes
+  // Dynamic color logic: White text only when transparent blur + satellite
+  const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
+
+  // Listen for blur style and map style changes
   useEffect(() => {
     const handleBlurStyleChange = (e: CustomEvent) => {
       setUseBlurStyle(e.detail.useBlurStyle);
     };
+    const handleMapStyleChange = (e: CustomEvent) => {
+      setCurrentMapStyle(e.detail.mapStyle);
+    };
     window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
     return () => {
       window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
     };
   }, []);
 
+  // Handle sheet open/close animations
   useEffect(() => {
     if (isOpen) {
       // Prevent body scroll when sheet is open
@@ -47,7 +80,6 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
       // Trigger animation on next frame
       requestAnimationFrame(() => {
         if (sheetRef.current) {
-          // Both mobile and desktop slide up from bottom
           sheetRef.current.style.transform = 'translateY(0)';
         }
       });
@@ -69,11 +101,13 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
     const checkMaxHeight = () => {
       if (contentRef.current && sheetRef.current) {
         const contentHeight = contentRef.current.scrollHeight;
-        const containerHeight = sheetRef.current.clientHeight;
-        const maxHeight = window.innerHeight; // Full viewport height
+        const maxHeight = window.innerHeight;
         
         // Check if content is scrollable (reached max height)
-        setIsAtMaxHeight(contentHeight >= maxHeight || contentRef.current.scrollHeight > contentRef.current.clientHeight);
+        setIsAtMaxHeight(
+          contentHeight >= maxHeight || 
+          contentRef.current.scrollHeight > contentRef.current.clientHeight
+        );
       }
     };
 
@@ -95,7 +129,6 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
 
   const handleClose = () => {
     if (sheetRef.current) {
-      // Both mobile and desktop slide down to bottom
       sheetRef.current.style.transform = 'translateY(100%)';
     }
     // Wait for animation to complete
@@ -126,20 +159,28 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
       >
         {/* Handle bar - hidden on desktop */}
         <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
-          <div className={`w-12 h-1 rounded-full ${useBlurStyle ? 'bg-white/40' : 'bg-gray-300'}`} />
+          <div className={`w-12 h-1 rounded-full ${
+            useBlurStyle 
+              ? (useWhiteText ? 'bg-white/40' : 'bg-gray-400') 
+              : 'bg-gray-300'
+          }`} />
         </div>
 
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
-          useBlurStyle ? 'border-white/20' : 'border-gray-200'
+          useBlurStyle 
+            ? (useWhiteText ? 'border-white/20' : 'border-gray-300') 
+            : 'border-gray-200'
         }`}>
-          <h2 className={`text-sm font-semibold ${useBlurStyle ? 'text-white' : 'text-gray-900'}`}>{title}</h2>
+          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+            {title}
+          </h2>
           <div className="flex items-center gap-2">
             {headerAction}
             <button
               onClick={handleClose}
               className={`p-1 -mr-1 transition-colors ${
-                useBlurStyle 
+                useWhiteText
                   ? 'text-white/80 hover:text-white' 
                   : 'text-gray-500 hover:text-gray-900'
               }`}
@@ -153,9 +194,13 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
         {/* Large Headline - Shows when at max height */}
         {isAtMaxHeight && (
           <div className={`px-4 py-3 border-b flex-shrink-0 transition-opacity duration-300 ${
-            useBlurStyle ? 'border-white/20' : 'border-gray-200'
+            useBlurStyle 
+              ? (useWhiteText ? 'border-white/20' : 'border-gray-300') 
+              : 'border-gray-200'
           }`} style={{ opacity: isAtMaxHeight ? 1 : 0 }}>
-            <h1 className={`text-2xl font-semibold ${useBlurStyle ? 'text-white' : 'text-gray-900'}`}>{title}</h1>
+            <h1 className={`text-2xl font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+              {title}
+            </h1>
           </div>
         )}
 
@@ -178,3 +223,4 @@ export default function MobileNavSheet({ isOpen, onClose, title, children, showS
     </>
   );
 }
+

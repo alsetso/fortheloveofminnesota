@@ -33,7 +33,7 @@ export default async function CheckbookPage() {
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
-          { label: 'Home', href: '/' },
+          { label: 'Minnesota', href: '/' },
           { label: 'Government', href: '/gov' },
           { label: 'State Checkbook', href: null },
         ]} />

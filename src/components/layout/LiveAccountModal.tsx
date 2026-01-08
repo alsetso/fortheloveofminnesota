@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
-import { XMarkIcon, ChevronDownIcon, ChevronUpIcon, CameraIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { XMarkIcon, ChevronDownIcon, ChevronUpIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { 
   UserIcon, 
   ClockIcon, 
@@ -17,29 +18,106 @@ import {
 import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
+import { useAccountTabs } from '@/features/account/hooks/useAccountTabs';
+import { useAccountData } from '@/features/account/hooks/useAccountData';
+import type { AccountTabId } from '@/features/account/types';
+import AnalyticsClient from '@/features/account/components/AnalyticsClient';
+import SettingsClient from '@/features/account/components/SettingsClient';
+import ProfilesClient from '@/features/account/components/ProfilesClient';
+import OnboardingClient from '@/features/account/components/OnboardingClient';
+import { isAccountComplete } from '@/lib/accountCompleteness';
+import { checkOnboardingStatus } from '@/lib/onboardingCheck';
 
 const LAST_SELECTED_ACCOUNT_KEY = 'LAST_SELECTED_ACCOUNT';
 
 interface LiveAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: AccountTabId;
 }
 
-interface MenuItem {
-  id: string;
+
+interface Tab {
+  id: AccountTabId;
   label: string;
-  icon: typeof UserIcon;
-  onClick: () => void;
-  disabled?: boolean;
+  icon: typeof ChartBarIcon;
 }
 
-export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalProps) {
-  const { account, user, isLoading, activeAccountId, setActiveAccountId } = useAuthStateSafe();
-  const { openAccount, openWelcome } = useAppModalContextSafe();
+export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAccountModalProps) {
+  const { account, user, isLoading, activeAccountId, setActiveAccountId, refreshAccount } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [isAccountsExpanded, setIsAccountsExpanded] = useState(false);
   const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
+  const [accountComplete, setAccountComplete] = useState(true);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(false);
+  
+  // Tab management - redirect 'profile' to 'settings' since profile tab is removed
+  const normalizedInitialTab = initialTab === 'profile' ? 'settings' : initialTab;
+  const { activeTab, setActiveTab } = useAccountTabs(normalizedInitialTab, isOpen);
+  const { account: accountData, userEmail, loading: accountLoading } = useAccountData(isOpen, activeTab);
+  
+  // Redirect away from profile tab if somehow activeTab becomes 'profile'
+  useEffect(() => {
+    if (activeTab === 'profile') {
+      setActiveTab('settings');
+    }
+  }, [activeTab, setActiveTab]);
+  
+  // Use accountData if available, otherwise fall back to account from auth
+  const currentAccount = accountData || account;
+  
+  // Check onboarding status when modal opens
+  useEffect(() => {
+    if (isOpen && user && !checkingOnboarding) {
+      const checkStatus = async () => {
+        setCheckingOnboarding(true);
+        try {
+          const { account: onboardingAccount } = await checkOnboardingStatus();
+          const complete = onboardingAccount ? isAccountComplete(onboardingAccount) : false;
+          setAccountComplete(complete);
+          // If incomplete, show onboarding tab
+          if (!complete) {
+            // Don't set tab here - let the UI handle it
+          }
+        } catch (error) {
+          console.error('[LiveAccountModal] Error checking onboarding:', error);
+          setAccountComplete(true); // Default to complete on error
+        } finally {
+          setCheckingOnboarding(false);
+        }
+      };
+      checkStatus();
+    }
+  }, [isOpen, user, checkingOnboarding]);
+  
+  // Build tabs array
+  const tabs: Tab[] = useMemo(() => {
+    // If account incomplete, don't show tabs - show onboarding
+    if (!accountComplete) {
+      return [];
+    }
+    
+    const baseTabs: Tab[] = [
+      { id: 'analytics', label: 'Analytics', icon: ChartBarIcon },
+      { id: 'settings', label: 'Settings', icon: UserIcon },
+    ];
+    
+    // Only include profiles tab if user is admin
+    if (currentAccount?.role === 'admin') {
+      baseTabs.push({ id: 'profiles', label: 'Profiles', icon: UserGroupIcon });
+    }
+    
+    return baseTabs;
+  }, [accountComplete, currentAccount?.role]);
+  
+  // Redirect away from profiles tab if user is not admin
+  useEffect(() => {
+    if (activeTab === 'profiles' && currentAccount?.role !== 'admin') {
+      setActiveTab('settings');
+    }
+  }, [activeTab, currentAccount?.role, setActiveTab]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -179,106 +257,32 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
     );
   }
 
-  const displayName = account ? AccountService.getDisplayName(account) : 'User';
-  const userEmail = user?.email || '';
-
-  // Build menu items
-  const menuItems: MenuItem[] = [
-    {
-      id: 'profile',
-      label: 'Your profile',
-      icon: UserIcon,
-      onClick: () => {
-        onClose();
-        openAccount('profile');
-      },
-    },
-    {
-      id: 'timeline',
-      label: 'Your timeline',
-      icon: ClockIcon,
-      onClick: () => {
-        onClose();
-        // Navigate to timeline or show timeline view
-        window.location.href = account?.username ? `/profile/${account.username}` : '/';
-      },
-    },
-    {
-      id: 'location-sharing',
-      label: 'Location sharing',
-      icon: ShareIcon,
-      onClick: () => {
-        onClose();
-        openAccount('settings');
-      },
-      disabled: true, // Coming soon
-    },
-    {
-      id: 'offline-maps',
-      label: 'Offline maps',
-      icon: CloudArrowDownIcon,
-      onClick: () => {
-        onClose();
-        // Coming soon
-      },
-      disabled: true,
-    },
-    {
-      id: 'your-data',
-      label: 'Your data in Maps',
-      icon: ShieldCheckIcon,
-      onClick: () => {
-        onClose();
-        openAccount('settings');
-      },
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: Cog6ToothIcon,
-      onClick: () => {
-        onClose();
-        openAccount('settings');
-      },
-    },
-    {
-      id: 'add-place',
-      label: 'Add a missing place',
-      icon: MapPinIcon,
-      onClick: () => {
-        onClose();
-        // Could open a form or navigate to contribute
-      },
-      disabled: true, // Coming soon
-    },
-    {
-      id: 'add-business',
-      label: 'Add your business',
-      icon: BuildingStorefrontIcon,
-      onClick: () => {
-        onClose();
-        // Could open business form
-      },
-      disabled: true, // Coming soon
-    },
-    {
-      id: 'help',
-      label: 'Help & Feedback',
-      icon: QuestionMarkCircleIcon,
-      onClick: () => {
-        onClose();
-        // Could open help modal or navigate to help page
-        window.open('mailto:loveoveminnesota@gmail.com', '_blank');
-      },
-    },
-  ];
+  const displayName = currentAccount ? AccountService.getDisplayName(currentAccount) : 'User';
+  const currentUserEmail = userEmail || user?.email || '';
+  
+  // Handle onboarding completion
+  const handleOnboardingComplete = async () => {
+    try {
+      if (refreshAccount) {
+        await refreshAccount();
+      }
+      const { account: updatedAccount } = await checkOnboardingStatus();
+      const complete = updatedAccount ? isAccountComplete(updatedAccount) : false;
+      setAccountComplete(complete);
+      if (complete) {
+        setActiveTab('settings');
+      }
+    } catch (error) {
+      console.error('[LiveAccountModal] Error refreshing after onboarding:', error);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-auto">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/40 pointer-events-auto"
-        onClick={onClose}
+        className={`absolute inset-0 bg-black/40 pointer-events-auto ${!accountComplete ? '' : ''}`}
+        onClick={accountComplete ? onClose : undefined}
       />
 
       {/* Modal - slides up from bottom on mobile, centered on desktop */}
@@ -296,9 +300,15 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
             />
           </div>
           <button
-            onClick={onClose}
-            className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+            onClick={accountComplete ? onClose : undefined}
+            disabled={!accountComplete}
+            className={`p-1 transition-colors ${
+              accountComplete 
+                ? 'text-gray-500 hover:text-gray-700' 
+                : 'text-gray-300 cursor-not-allowed'
+            }`}
             aria-label="Close"
+            title={!accountComplete ? 'Please complete your profile to continue' : 'Close'}
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
@@ -312,16 +322,6 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
               {/* Profile Picture with Camera Icon */}
               <div className="relative flex-shrink-0">
                 <ProfilePhoto account={account} size="lg" editable={false} />
-                <button
-                  onClick={() => {
-                    onClose();
-                    openAccount('profile');
-                  }}
-                  className="absolute bottom-0 right-0 w-6 h-6 bg-white rounded-full border-2 border-white flex items-center justify-center shadow-sm hover:bg-gray-50 transition-colors"
-                  aria-label="Change profile picture"
-                >
-                  <CameraIcon className="w-3 h-3 text-gray-600" />
-                </button>
               </div>
 
               {/* Name and Email */}
@@ -329,28 +329,40 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
                 <h3 className="text-sm font-semibold text-gray-900 truncate mb-1">
                   {displayName}
                 </h3>
-                {userEmail && (
-                  <p className="text-xs text-gray-600 truncate">
-                    {userEmail}
+                {currentUserEmail && (
+                  <p className="text-xs text-gray-600 truncate mb-1">
+                    {currentUserEmail}
                   </p>
                 )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {currentAccount?.role && (
+                    <span className="text-[10px] font-medium text-gray-600 px-1.5 py-0.5 bg-gray-100 rounded">
+                      {currentAccount.role === 'admin' ? 'Admin' : 'General'}
+                    </span>
+                  )}
+                  {currentAccount?.plan && (
+                    <span className="text-[10px] font-medium text-gray-600 px-1.5 py-0.5 bg-gray-100 rounded">
+                      {currentAccount.plan === 'pro' ? 'Pro' : currentAccount.plan === 'plus' ? 'Plus' : 'Hobby'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
+            
+            {/* View Profile Button */}
+            {currentAccount?.username && (
+              <Link
+                href={`/profile/${currentAccount.username}`}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-transparent border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                View Profile
+              </Link>
+            )}
 
-            {/* Manage Account Button */}
-            <button
-              onClick={() => {
-                onClose();
-                openAccount('settings');
-              }}
-              className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors text-left"
-            >
-              Manage your account
-            </button>
           </div>
 
-          {/* Other Accounts Section - Only show if role is admin */}
-          {account && account.role === 'admin' && (
+          {/* Other Accounts Section - Only show if role is admin and account complete */}
+          {accountComplete && currentAccount && currentAccount.role === 'admin' && (
             <div className="px-4 pt-3 pb-3 border-b border-gray-200">
               <button
                 onClick={() => setIsAccountsExpanded(!isAccountsExpanded)}
@@ -418,24 +430,50 @@ export default function LiveAccountModal({ isOpen, onClose }: LiveAccountModalPr
             </div>
           )}
 
-          {/* Menu Items */}
-          <div className="py-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  onClick={item.onClick}
-                  disabled={item.disabled}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-900 hover:bg-gray-50 transition-colors ${
-                    item.disabled ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  <Icon className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                  <span className="flex-1 text-left">{item.label}</span>
-                </button>
-              );
-            })}
+          {/* Tabs - Only show if account is complete */}
+          {accountComplete && tabs.length > 0 && (
+            <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`
+                      flex items-center gap-1.5 px-[10px] py-2 text-xs font-medium transition-colors whitespace-nowrap border-b-2
+                      ${activeTab === tab.id
+                        ? 'text-gray-900 border-gray-900'
+                        : 'text-gray-500 hover:text-gray-700 border-transparent'
+                      }
+                    `}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Tab Content or Onboarding */}
+          <div className="flex-1 overflow-y-auto p-[10px]">
+            {!accountComplete ? (
+              // Show onboarding if account incomplete
+              <OnboardingClient
+                initialAccount={currentAccount}
+                onComplete={handleOnboardingComplete}
+              />
+            ) : accountLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                {activeTab === 'analytics' && <AnalyticsClient />}
+                {activeTab === 'settings' && currentAccount && <SettingsClient initialAccount={currentAccount} userEmail={currentUserEmail} />}
+                {activeTab === 'profiles' && <ProfilesClient />}
+              </>
+            )}
           </div>
         </div>
       </div>

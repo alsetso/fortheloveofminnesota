@@ -16,9 +16,10 @@ import ProfileEditModal from './ProfileEditModal';
 interface ProfileCardProps {
   account: ProfileAccount;
   isOwnProfile: boolean;
+  showViewProfile?: boolean;
 }
 
-export default function ProfileCard({ account: initialAccount, isOwnProfile }: ProfileCardProps) {
+export default function ProfileCard({ account: initialAccount, isOwnProfile, showViewProfile = true }: ProfileCardProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { success, error: showError } = useToast();
@@ -219,30 +220,30 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
         )}
 
         {/* Traits */}
-        <div className="pt-2">
-          <div className="flex flex-wrap gap-1.5 items-center">
+        <div className="pt-1">
+          <div className="flex flex-wrap gap-1 items-center">
             {selectedTraits.length > 0 ? (
               selectedTraits.filter(Boolean).map((trait) => (
                 <span
                   key={trait!.id}
-                  className="px-2 py-0.5 bg-white border border-gray-200 text-xs text-gray-900 rounded"
+                  className="px-1.5 py-0.5 bg-white border border-gray-200 text-[10px] text-gray-900 rounded"
                 >
                   {trait!.label}
                 </span>
               ))
             ) : (
               isOwnProfile ? (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-gray-500">Let other Minnesotans know your vibe</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[10px] text-gray-500">Let other Minnesotans know your vibe</span>
                   <button
                     onClick={() => setIsEditModalOpen(true)}
-                    className="px-2 py-0.5 text-xs font-medium text-gray-900 hover:bg-gray-100 rounded transition-colors border border-gray-300"
+                    className="px-1.5 py-0.5 text-[10px] font-medium text-gray-900 hover:bg-gray-100 rounded transition-colors border border-gray-300"
                   >
                     +add traits
                   </button>
                 </div>
               ) : (
-                <span className="text-xs text-gray-400">No traits selected</span>
+                <span className="text-[10px] text-gray-400">No traits selected</span>
               )
             )}
           </div>
@@ -266,7 +267,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile }: P
         )}
 
         {/* View Profile Button */}
-        {account.username && !isOnProfilePage && (
+        {showViewProfile && account.username && !isOnProfilePage && (
           <div className="pt-3 mt-3 border-t border-gray-200">
             <Link
               href={`/profile/${account.username}`}

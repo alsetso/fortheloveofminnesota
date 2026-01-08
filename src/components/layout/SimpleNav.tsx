@@ -15,7 +15,6 @@ import {
 import ProfilePhoto from '../shared/ProfilePhoto';
 import AppSearch from '@/features/search/components/AppSearch';
 import BaseNav from '../shared/BaseNav';
-import AccountModal from '@/features/account/components/AccountModal';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import type { MapboxMetadata } from '@/types/mapbox';
 
@@ -33,7 +32,7 @@ export default function SimpleNav() {
     isLoading,
   } = useAuthStateSafe();
   
-  const { openWelcome, openOnboarding, modal } = useAppModalContextSafe();
+  const { openWelcome, openOnboarding, openAccount, modal } = useAppModalContextSafe();
   
   // Check if user is authenticated but missing username - show onboarding overlay
   useEffect(() => {
@@ -42,15 +41,12 @@ export default function SimpleNav() {
     
     // If user is authenticated and account exists but username is missing
     if (user && account && !isAccountComplete(account)) {
-      // Only open onboarding if it's not already open
-      if (modal.type !== 'onboarding') {
+      // Onboarding is now part of LiveAccountModal
+      if (modal.type !== 'account') {
         openOnboarding();
       }
     }
   }, [user, account, isLoading, modal.type, openOnboarding]);
-  
-  // Local modal state
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -86,7 +82,7 @@ export default function SimpleNav() {
       
       <div className="flex items-center justify-center px-2 h-full min-w-[44px]">
         <AccountDropdown
-          onAccountClick={() => setIsAccountModalOpen(true)}
+          onAccountClick={() => openAccount('settings')}
         />
       </div>
     </div>
@@ -118,7 +114,7 @@ export default function SimpleNav() {
         {user && account ? (
           <>
             <button
-              onClick={() => setIsAccountModalOpen(true)}
+              onClick={() => openAccount('settings')}
               className="block w-full px-3 py-2.5 text-base font-medium transition-colors text-gray-600 hover:text-black hover:bg-gray-100 flex items-center gap-3 text-left"
             >
               <ProfilePhoto account={account} size="sm" />
@@ -208,13 +204,6 @@ export default function SimpleNav() {
         searchSection={searchSection}
       />
       
-      {/* Account Modal */}
-      {account && (
-        <AccountModal
-          isOpen={isAccountModalOpen}
-          onClose={() => setIsAccountModalOpen(false)}
-        />
-      )}
     </>
   );
 }

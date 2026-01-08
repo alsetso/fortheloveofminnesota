@@ -32,7 +32,7 @@ export default async function ContractsPage() {
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
-          { label: 'Home', href: '/' },
+          { label: 'Minnesota', href: '/' },
           { label: 'Government', href: '/gov' },
           { label: 'State Checkbook', href: '/gov/checkbook' },
           { label: 'Contracts', href: null },

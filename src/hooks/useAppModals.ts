@@ -99,7 +99,9 @@ export function useAppModals(): UseAppModalsReturn {
   }, []);
 
   const openOnboarding = useCallback(() => {
-    setModal({ type: 'onboarding' });
+    // Onboarding is now part of LiveAccountModal
+    // If account is incomplete, LiveAccountModal will show onboarding automatically
+    setModal({ type: 'account', tab: 'settings' });
   }, []);
 
   const openAccount = useCallback((tab?: string) => {

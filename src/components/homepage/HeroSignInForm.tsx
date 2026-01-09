@@ -433,6 +433,19 @@ export default function HeroSignInForm() {
             {emailError}
           </p>
         )}
+        {!otpSent && (
+          <p className="mt-1.5 text-[10px] text-gray-500">
+            By continuing you accept our{' '}
+            <Link href="/terms" className="text-blue-600 hover:underline">
+              terms and conditions
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" className="text-blue-600 hover:underline">
+              privacy policy
+            </Link>
+            .
+          </p>
+        )}
       </div>
 
       {/* Code Input - 6 Separate Inputs */}

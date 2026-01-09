@@ -18,7 +18,6 @@ import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
 import Map3DControlsSecondaryContent from '@/features/sidebar/components/Map3DControlsSecondaryContent';
 import ContributeContent from '@/components/layout/ContributeContent';
-import NewsContent from '@/components/layout/NewsContent';
 import ToolsContent from '@/components/layout/ToolsContent';
 import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
 import DailyWelcomeModal from '@/components/layout/DailyWelcomeModal';
@@ -31,27 +30,6 @@ import CTUHoverInfo from '@/components/layout/CTUHoverInfo';
 import GovernmentBuildingsLayer from '@/features/map/components/GovernmentBuildingsLayer';
 import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
 import BuildingDetailView from '@/features/admin/components/BuildingDetailView';
-
-// Helper to format last generation timestamp
-function formatLastGeneration(timestamp: string): string {
-  try {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffMins < 1) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return '1d ago';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } catch {
-    return '';
-  }
-}
 
 interface LiveMapProps {
   cities: Array<{
@@ -178,7 +156,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   }, [user, authLoading, modal.type, openWelcome, closeModal]);
 
   const isAdmin = account?.role === 'admin';
-  const [lastNewsGeneration, setLastNewsGeneration] = useState<string | null>(null);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
@@ -236,20 +213,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     authLoadingRef.current = authLoading;
     openWelcomeRef.current = openWelcome;
   }, [user, authLoading, openWelcome]);
-
-  // Fetch last news generation timestamp when News tab opens
-  useEffect(() => {
-    if (activeTab === 'news' && isAdmin) {
-      fetch('/api/news/latest')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            setLastNewsGeneration(data.data.generatedAt || data.data.createdAt || null);
-          }
-        })
-        .catch(err => console.error('Failed to fetch last generation:', err));
-    }
-  }, [activeTab, isAdmin]);
 
   // Initialize component (one-time setup)
   useEffect(() => {
@@ -1163,65 +1126,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         <MobileNavTabs
           activeTab={activeTab}
           onTabClick={handleTabClick}
-          isSheetOpen={activeTab === 'news' || activeTab === 'contribute' || activeTab === 'tools'}
+          isSheetOpen={activeTab === 'contribute' || activeTab === 'tools'}
         />
       )}
-
-      {/* News Sheet */}
-      <MobileNavPopup
-        isOpen={activeTab === 'news' && !isAccountModalOpen}
-        onClose={closeTab}
-        title="News"
-        showSearch={true}
-        map={mapInstanceRef.current}
-        onLocationSelect={(coordinates, placeName) => {
-          if (mapInstanceRef.current && mapLoaded) {
-            mapInstanceRef.current.flyTo({
-              center: [coordinates.lng, coordinates.lat],
-              zoom: 15,
-              duration: 1500,
-            });
-          }
-        }}
-        headerAction={
-          isAdmin ? (
-            <div className="flex items-center gap-2">
-              {lastNewsGeneration && (
-                <span className={`text-[10px] whitespace-nowrap ${
-                  useBlurStyle ? 'text-white/80' : 'text-gray-500'
-                }`}>
-                  {formatLastGeneration(lastNewsGeneration)}
-                </span>
-              )}
-              <button
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('generate-news'));
-                }}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                  useBlurStyle
-                    ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
-                    : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
-                }`}
-                title="Generate News"
-              >
-                Generate
-              </button>
-            </div>
-          ) : undefined
-        }
-      >
-        <NewsContent onGenerationComplete={() => {
-          // Fetch latest generation timestamp after generation
-          fetch('/api/news/latest')
-            .then(res => res.json())
-            .then(data => {
-              if (data.success && data.data) {
-                setLastNewsGeneration(data.data.generatedAt || data.data.createdAt || null);
-              }
-            })
-            .catch(err => console.error('Failed to fetch last generation:', err));
-        }} />
-      </MobileNavPopup>
 
       {/* Create Popup - Only opened via "Add Label" button */}
       <CreateMentionPopup

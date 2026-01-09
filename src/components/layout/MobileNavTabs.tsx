@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PlusIcon, NewspaperIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
-import { PlusIcon as PlusIconSolid, NewspaperIcon as NewspaperIconSolid, WrenchScrewdriverIcon as WrenchScrewdriverIconSolid } from '@heroicons/react/24/solid';
+import { PlusIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { PlusIcon as PlusIconSolid, WrenchScrewdriverIcon as WrenchScrewdriverIconSolid } from '@heroicons/react/24/solid';
 import { useAuthStateSafe } from '@/features/auth';
 
-export type MobileNavTab = 'news' | 'contribute' | 'tools';
+export type MobileNavTab = 'contribute' | 'tools';
 
 interface MobileNavTabsProps {
   activeTab: MobileNavTab | null;
@@ -61,34 +61,6 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="flex items-center justify-center gap-5 h-14 px-3">
-        {/* News Tab */}
-        <button
-          onClick={() => onTabClick('news')}
-          className={baseClasses}
-          aria-label="News"
-        >
-          <div className={`p-1.5 rounded-md transition-colors ${
-            useTransparentUI
-              ? 'group-hover:bg-white/10'
-              : useBlurStyle
-              ? 'group-hover:bg-white/20'
-              : 'group-hover:bg-gray-100'
-          }`}>
-          {activeTab === 'news' ? (
-            <NewspaperIconSolid className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
-          ) : (
-            <NewspaperIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`} />
-          )}
-          </div>
-          <span className={`text-[10px] font-medium mt-0.5 ${
-            activeTab === 'news' 
-              ? useWhiteText ? 'text-white' : 'text-gray-900'
-              : useWhiteText ? 'text-white/80' : 'text-gray-500'
-          }`}>
-            News
-          </span>
-        </button>
-
         {/* Contribute Tab (only when signed in) */}
         {account && (
           <button

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ClockIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, ChevronDownIcon, ChevronUpIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import { getSourceInitials, getSourceColor, formatDate } from '@/features/news/utils/newsHelpers';
 import type { NewsArticle } from '@/types/news';
 
@@ -30,6 +30,7 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [currentBlurStyle, setCurrentBlurStyle] = useState(useBlurStyle);
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
     return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
@@ -143,18 +144,6 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
     };
   }, []);
 
-  if (loading && visibleArticles.length === 0) {
-    return (
-      <div className={`w-full max-w-xs rounded-md shadow-lg p-2 ${
-        currentBlurStyle 
-          ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
-          : 'bg-white border border-gray-200'
-      }`}>
-        <p className={`text-[10px] ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>Loading news...</p>
-      </div>
-    );
-  }
-
   if (allArticles.length === 0 && !loading) {
     return null;
   }
@@ -169,48 +158,88 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="overflow-hidden">
-        <div className="space-y-0.5 p-2">
-          {visibleArticles.map((article, index) => {
-            // Safely handle missing source
-            const sourceName = article.source?.name || 'Unknown';
-            const sourceColor = getSourceColor(sourceName);
-            const sourceInitials = getSourceInitials(sourceName);
-
-            return (
-              <a
-                key={`${article.id}-${index}`}
-                href={article.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex items-center gap-2 px-2 py-1.5 rounded transition-all duration-500 group ${
-                  currentBlurStyle
-                    ? 'hover:bg-white/10'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                {/* Source Circle Icon */}
-                <div
-                  className={`w-4 h-4 rounded-full ${sourceColor.bg} ${sourceColor.text} flex items-center justify-center flex-shrink-0 text-[8px] font-medium`}
-                >
-                  {sourceInitials}
-                </div>
-
-                {/* Title and Timestamp */}
-                <div className="flex-1 min-w-0">
-                  <div className={`text-[10px] font-medium truncate ${useWhiteText ? 'text-white/90 group-hover:text-white' : 'text-gray-900'}`}>
-                    {article.title}
-                  </div>
-                  <div className={`flex items-center gap-1 text-[8px] mt-0.5 ${useWhiteText ? 'text-white/60' : 'text-gray-500'}`}>
-                    <ClockIcon className={`w-2.5 h-2.5 ${useWhiteText ? 'text-white/60' : 'text-gray-500'}`} />
-                    <span>{formatDate(article.publishedAt)}</span>
-                  </div>
-                </div>
-              </a>
-            );
-          })}
+      {/* Accordion Header Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full flex items-center justify-between px-2 py-1.5 transition-colors ${
+          currentBlurStyle
+            ? 'hover:bg-white/10'
+            : 'hover:bg-gray-50'
+        }`}
+      >
+        <div className="flex items-center gap-1.5">
+          <NewspaperIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
+          <span className={`text-[10px] font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+            News
+          </span>
+          {visibleArticles.length > 0 && (
+            <span className={`text-[8px] px-1 py-0.5 rounded ${useWhiteText ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-600'}`}>
+              {visibleArticles.length}
+            </span>
+          )}
         </div>
-      </div>
+        {isOpen ? (
+          <ChevronUpIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
+        ) : (
+          <ChevronDownIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
+        )}
+      </button>
+
+      {/* Accordion Content */}
+      {isOpen && (
+        <div className={`overflow-hidden border-t ${
+          currentBlurStyle 
+            ? (useWhiteText ? 'border-white/20' : 'border-gray-300/50')
+            : 'border-gray-200'
+        }`}>
+          {loading && visibleArticles.length === 0 ? (
+            <div className="p-2">
+              <p className={`text-[10px] ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>Loading news...</p>
+            </div>
+          ) : (
+            <div className="space-y-0.5 p-2">
+              {visibleArticles.map((article, index) => {
+                // Safely handle missing source
+                const sourceName = article.source?.name || 'Unknown';
+                const sourceColor = getSourceColor(sourceName);
+                const sourceInitials = getSourceInitials(sourceName);
+
+                return (
+                  <a
+                    key={`${article.id}-${index}`}
+                    href={article.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded transition-all duration-500 group ${
+                      currentBlurStyle
+                        ? 'hover:bg-white/10'
+                        : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    {/* Source Circle Icon */}
+                    <div
+                      className={`w-4 h-4 rounded-full ${sourceColor.bg} ${sourceColor.text} flex items-center justify-center flex-shrink-0 text-[8px] font-medium`}
+                    >
+                      {sourceInitials}
+                    </div>
+
+                    {/* Title and Timestamp */}
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-[10px] font-medium truncate ${useWhiteText ? 'text-white/90 group-hover:text-white' : 'text-gray-900'}`}>
+                        {article.title}
+                      </div>
+                      <div className={`flex items-center gap-1 text-[8px] mt-0.5 ${useWhiteText ? 'text-white/60' : 'text-gray-500'}`}>
+                        <ClockIcon className={`w-2.5 h-2.5 ${useWhiteText ? 'text-white/60' : 'text-gray-500'}`} />
+                        <span>{formatDate(article.publishedAt)}</span>
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

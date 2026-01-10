@@ -33,6 +33,7 @@ import CountyBoundariesLayer from '@/features/map/components/CountyBoundariesLay
 import BuildingDetailView from '@/features/admin/components/BuildingDetailView';
 import LocationServicesPopup from '@/components/layout/LocationServicesPopup';
 import LayerRecordPopup from '@/components/layout/LayerRecordPopup';
+import LocationStepperOverlay from '@/components/layout/LocationStepperOverlay';
 
 interface LiveMapProps {
   cities: Array<{
@@ -82,6 +83,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const [createTabAtlasMeta, setCreateTabAtlasMeta] = useState<Record<string, any> | null>(null);
   const [createTabMapMeta, setCreateTabMapMeta] = useState<Record<string, any> | null>(null);
   const [createTabFullAddress, setCreateTabFullAddress] = useState<string | null>(null);
+  
+  // Location stepper overlay state
+  const [showLocationStepper, setShowLocationStepper] = useState(false);
   
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
@@ -227,6 +231,36 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
     };
   }, []);
+
+  // Check if location stepper should be shown (every 15 minutes)
+  useEffect(() => {
+    const STORAGE_KEY = 'location-stepper-last-shown';
+    const OVERLAY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+
+    const checkShouldShow = () => {
+      const lastShown = localStorage.getItem(STORAGE_KEY);
+      const now = Date.now();
+
+      if (!lastShown || now - parseInt(lastShown, 10) >= OVERLAY_INTERVAL_MS) {
+        setShowLocationStepper(true);
+        localStorage.setItem(STORAGE_KEY, now.toString());
+      }
+    };
+
+    // Check on mount
+    checkShouldShow();
+
+    // Check every minute
+    const interval = setInterval(checkShouldShow, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleLocationStepperClose = () => {
+    setShowLocationStepper(false);
+    const STORAGE_KEY = 'location-stepper-last-shown';
+    localStorage.setItem(STORAGE_KEY, Date.now().toString());
+  };
 
   // Refs to access current auth state in map event callbacks
   // These refs ensure we always have the latest auth state without re-rendering
@@ -1463,6 +1497,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         onClose={() => setShowDailyWelcome(false)}
         useBlurStyle={useBlurStyle}
         showTextOnly={showWelcomeTextOnly}
+      />
+
+      {/* Location Stepper Overlay */}
+      <LocationStepperOverlay
+        isOpen={showLocationStepper}
+        onClose={handleLocationStepperClose}
       />
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}

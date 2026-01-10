@@ -1,0 +1,385 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/map/config';
+import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+
+const OVERLAY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const STORAGE_KEY = 'location-stepper-last-shown';
+
+interface LocationStepperOverlayProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export default function LocationStepperOverlay({ isOpen, onClose }: LocationStepperOverlayProps) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
+  const [stateBoundary, setStateBoundary] = useState<any>(null);
+  const [ctus, setCTUs] = useState<any[]>([]);
+  const [selectedState, setSelectedState] = useState<any>(null);
+  const [selectedCTU, setSelectedCTU] = useState<any>(null);
+
+  // Initialize map
+  useEffect(() => {
+    if (!isOpen || !mapContainerRef.current) return;
+
+    let mapboxMap: MapboxMapInstance | null = null;
+
+    const initMap = async () => {
+      try {
+        const mapboxgl = await loadMapboxGL();
+        if (!mapboxgl || !mapContainerRef.current) return;
+
+        mapboxMap = new mapboxgl.Map({
+          container: mapContainerRef.current,
+          style: MAP_CONFIG.MAPBOX_STYLE,
+          center: MAP_CONFIG.DEFAULT_CENTER,
+          zoom: 6,
+          pitch: 0,
+          bearing: 0,
+        }) as MapboxMapInstance;
+
+        mapboxMap.on('load', () => {
+          setMapLoaded(true);
+          mapInstanceRef.current = mapboxMap;
+        });
+
+        mapboxMap.on('error', (e) => {
+          console.error('[LocationStepperOverlay] Map error:', e);
+        });
+      } catch (error) {
+        console.error('[LocationStepperOverlay] Failed to initialize map:', error);
+      }
+    };
+
+    initMap();
+
+    return () => {
+      if (mapboxMap) {
+        mapboxMap.remove();
+        mapboxMap = null;
+        mapInstanceRef.current = null;
+      }
+      setMapLoaded(false);
+    };
+  }, [isOpen]);
+
+  // Fetch state boundary for step 1
+  useEffect(() => {
+    if (!isOpen || step !== 1) return;
+
+    const fetchStateBoundary = async () => {
+      try {
+        const response = await fetch('/api/civic/state-boundary');
+        if (!response.ok) throw new Error('Failed to fetch state boundary');
+        const data = await response.json();
+        setStateBoundary(data);
+      } catch (error) {
+        console.error('[LocationStepperOverlay] Failed to fetch state boundary:', error);
+      }
+    };
+
+    fetchStateBoundary();
+  }, [isOpen, step]);
+
+  // Fetch CTUs for step 2
+  useEffect(() => {
+    if (!isOpen || step !== 2) return;
+
+    const fetchCTUs = async () => {
+      try {
+        const response = await fetch('/api/civic/ctu-boundaries');
+        if (!response.ok) throw new Error('Failed to fetch CTU boundaries');
+        const data = await response.json();
+        setCTUs(data);
+      } catch (error) {
+        console.error('[LocationStepperOverlay] Failed to fetch CTU boundaries:', error);
+      }
+    };
+
+    fetchCTUs();
+  }, [isOpen, step]);
+
+  // Render state boundary on map (step 1)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded || !stateBoundary || step !== 1) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+    const sourceId = 'stepper-state-boundary-source';
+    const fillLayerId = 'stepper-state-boundary-fill';
+    const outlineLayerId = 'stepper-state-boundary-outline';
+
+    const setupStateBoundary = async () => {
+      try {
+        // Remove existing layers/sources if they exist
+        if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
+        if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
+        if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+
+        // Add source
+        mapboxMap.addSource(sourceId, {
+          type: 'geojson',
+          data: stateBoundary.geometry,
+        });
+
+        // Add fill layer
+        mapboxMap.addLayer({
+          id: fillLayerId,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': '#3b82f6',
+            'fill-opacity': 0.3,
+          },
+        });
+
+        // Add outline layer
+        mapboxMap.addLayer({
+          id: outlineLayerId,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': '#3b82f6',
+            'line-width': 2,
+          },
+        });
+
+        // Fit bounds to state boundary
+        const mapboxgl = await loadMapboxGL();
+        if (mapboxgl) {
+          const bounds = new mapboxgl.LngLatBounds();
+          const coordinates = stateBoundary.geometry.coordinates[0];
+          coordinates.forEach((coord: [number, number]) => {
+            bounds.extend(coord);
+          });
+          mapboxMap.fitBounds(bounds, { padding: 50, duration: 1000 });
+        }
+      } catch (error) {
+        console.error('[LocationStepperOverlay] Failed to render state boundary:', error);
+      }
+    };
+
+    setupStateBoundary();
+
+    return () => {
+      try {
+        if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
+        if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
+        if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+      } catch {
+        // Ignore cleanup errors
+      }
+    };
+  }, [mapLoaded, stateBoundary, step]);
+
+  // Render CTU boundaries on map (step 2)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded || ctus.length === 0 || step !== 2) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+    const sourceId = 'stepper-ctu-boundaries-source';
+    const fillLayerId = 'stepper-ctu-boundaries-fill';
+    const outlineLayerId = 'stepper-ctu-boundaries-outline';
+
+    const setupCTUBoundaries = async () => {
+      try {
+        // Remove existing layers/sources if they exist
+        if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
+        if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
+        if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+
+        // Combine all CTU geometries into a single FeatureCollection
+        const allFeatures: any[] = [];
+        ctus.forEach((ctu) => {
+          if (ctu.geometry && ctu.geometry.type === 'FeatureCollection') {
+            ctu.geometry.features.forEach((feature: any) => {
+              allFeatures.push(feature);
+            });
+          } else if (ctu.geometry) {
+            allFeatures.push({
+              type: 'Feature',
+              properties: {
+                id: ctu.id,
+                feature_name: ctu.feature_name,
+                ctu_class: ctu.ctu_class,
+                county_name: ctu.county_name,
+              },
+              geometry: ctu.geometry,
+            });
+          }
+        });
+
+        const featureCollection = {
+          type: 'FeatureCollection',
+          features: allFeatures,
+        };
+
+        // Add source
+        mapboxMap.addSource(sourceId, {
+          type: 'geojson',
+          data: featureCollection,
+        });
+
+        // Add fill layer
+        mapboxMap.addLayer({
+          id: fillLayerId,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': '#10b981',
+            'fill-opacity': 0.3,
+          },
+        });
+
+        // Add outline layer
+        mapboxMap.addLayer({
+          id: outlineLayerId,
+          type: 'line',
+          source: sourceId,
+          paint: {
+            'line-color': '#10b981',
+            'line-width': 1,
+          },
+        });
+
+        // Fit bounds to CTUs
+        const mapboxgl = await loadMapboxGL();
+        if (mapboxgl) {
+          const bounds = new mapboxgl.LngLatBounds();
+          allFeatures.forEach((feature) => {
+            if (feature.geometry.type === 'Polygon') {
+              feature.geometry.coordinates[0].forEach((coord: [number, number]) => {
+                bounds.extend(coord);
+              });
+            } else if (feature.geometry.type === 'MultiPolygon') {
+              feature.geometry.coordinates.forEach((polygon: any) => {
+                polygon[0].forEach((coord: [number, number]) => {
+                  bounds.extend(coord);
+                });
+              });
+            }
+          });
+          mapboxMap.fitBounds(bounds, { padding: 50, duration: 1000 });
+        }
+      } catch (error) {
+        console.error('[LocationStepperOverlay] Failed to render CTU boundaries:', error);
+      }
+    };
+
+    setupCTUBoundaries();
+
+    return () => {
+      try {
+        if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
+        if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
+        if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+      } catch {
+        // Ignore cleanup errors
+      }
+    };
+  }, [mapLoaded, ctus, step]);
+
+  // Handle map clicks
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+
+    const handleClick = async (e: any) => {
+      if (step === 1) {
+        // Check if clicked on state boundary
+        const features = mapboxMap.queryRenderedFeatures(e.point, {
+          layers: ['stepper-state-boundary-fill'],
+        });
+
+        if (features.length > 0) {
+          setSelectedState(features[0]);
+          // Wait a moment then advance to step 2
+          setTimeout(() => {
+            setStep(2);
+            setSelectedState(null);
+          }, 500);
+        }
+      } else if (step === 2) {
+        // Check if clicked on CTU boundary
+        const features = mapboxMap.queryRenderedFeatures(e.point, {
+          layers: ['stepper-ctu-boundaries-fill'],
+        });
+
+        if (features.length > 0) {
+          setSelectedCTU(features[0]);
+          // Wait a moment then close
+          setTimeout(() => {
+            onClose();
+            setStep(1);
+            setSelectedCTU(null);
+          }, 500);
+        }
+      }
+    };
+
+    mapboxMap.on('click', handleClick);
+
+    return () => {
+      mapboxMap.off('click', handleClick);
+    };
+  }, [mapLoaded, step, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="relative w-full h-full max-w-4xl max-h-[80vh] bg-white rounded-lg shadow-2xl overflow-hidden m-4">
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+            aria-label="Close"
+          >
+            <XMarkIcon className="w-5 h-5 text-gray-600" />
+          </button>
+
+          {/* Header */}
+          <div className="absolute top-0 left-0 right-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {step === 1 ? 'Select Your State' : 'Select Your CTU'}
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {step === 1
+                    ? 'Click on Minnesota to continue'
+                    : 'Click on your City, Township, or Unorganized Territory to continue'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${step >= 1 ? 'bg-blue-600' : 'bg-gray-300'}`} />
+                <div className={`w-2 h-2 rounded-full ${step >= 2 ? 'bg-blue-600' : 'bg-gray-300'}`} />
+              </div>
+            </div>
+          </div>
+
+          {/* Map container */}
+          <div ref={mapContainerRef} className="w-full h-full" style={{ marginTop: '80px' }} />
+
+          {/* Loading overlay */}
+          {!mapLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Loading map...</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+

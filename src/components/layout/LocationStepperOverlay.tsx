@@ -5,6 +5,7 @@ import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import LayerGeometryMap from './LayerGeometryMap';
 
 const OVERLAY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const STORAGE_KEY = 'location-stepper-last-shown';
@@ -23,6 +24,8 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
   const [ctus, setCTUs] = useState<any[]>([]);
   const [selectedState, setSelectedState] = useState<any>(null);
   const [selectedCTU, setSelectedCTU] = useState<any>(null);
+  const [hoveredCTU, setHoveredCTU] = useState<any>(null);
+  const [showCTUDetailsPopup, setShowCTUDetailsPopup] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -403,6 +406,14 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
 
       if (features.length > 0) {
         const feature = features[0];
+        const properties = feature.properties || {};
+
+        // Set hovered CTU for floating card
+        setHoveredCTU({
+          feature_name: properties.feature_name || 'Unknown',
+          ctu_class: properties.ctu_class || 'Unknown',
+          county_name: properties.county_name || 'Unknown',
+        });
 
         // Highlight this specific CTU feature (darker overlay)
         const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
@@ -413,7 +424,8 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
           });
         }
       } else {
-        // Clear highlight when not hovering over a CTU
+        // Clear highlight and hovered CTU when not hovering over a CTU
+        setHoveredCTU(null);
         const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
         if (highlightSource && highlightSource.setData) {
           highlightSource.setData({
@@ -426,7 +438,8 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     };
 
     const handleMouseLeave = () => {
-      // Clear highlight when mouse leaves the map
+      // Clear highlight and hovered CTU when mouse leaves the map
+      setHoveredCTU(null);
       const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
       if (highlightSource && highlightSource.setData) {
         highlightSource.setData({
@@ -474,13 +487,27 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
         });
 
         if (features.length > 0) {
-          setSelectedCTU(features[0]);
-          // Wait a moment then close
-          setTimeout(() => {
-            onClose();
-            setStep(1);
-            setSelectedCTU(null);
-          }, 500);
+          const feature = features[0];
+          const properties = feature.properties || {};
+          
+          // Find the full CTU data from ctus array
+          const fullCTU = ctus.find(ctu => 
+            ctu.id === properties.ctu_id || 
+            (ctu.feature_name === properties.feature_name && ctu.county_name === properties.county_name)
+          );
+
+          setSelectedCTU({
+            ...feature,
+            ctuData: fullCTU || {
+              id: properties.ctu_id,
+              feature_name: properties.feature_name,
+              ctu_class: properties.ctu_class,
+              county_name: properties.county_name,
+            },
+          });
+          
+          // Open details popup
+          setShowCTUDetailsPopup(true);
         }
       }
     };
@@ -536,6 +563,129 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Loading map...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Hover card - bottom right */}
+          {hoveredCTU && step === 2 && (
+            <div className="absolute bottom-4 right-4 z-20 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-4 py-3 border border-gray-200 pointer-events-none">
+              <div className="text-sm font-semibold text-gray-900">{hoveredCTU.feature_name}</div>
+              <div className="text-xs text-gray-600 mt-0.5">
+                {hoveredCTU.ctu_class === 'CITY' ? 'City' : 
+                 hoveredCTU.ctu_class === 'TOWNSHIP' ? 'Township' : 
+                 'Unorganized Territory'} • {hoveredCTU.county_name} County
+              </div>
+            </div>
+          )}
+
+          {/* CTU Details Popup */}
+          {showCTUDetailsPopup && selectedCTU && (
+            <div className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {selectedCTU.ctuData?.feature_name || selectedCTU.properties?.feature_name || 'Area Details'}
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-0.5">
+                      {selectedCTU.ctuData?.ctu_class === 'CITY' ? 'City' : 
+                       selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? 'Township' : 
+                       'Unorganized Territory'} • {selectedCTU.ctuData?.county_name || selectedCTU.properties?.county_name || 'Unknown'} County
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowCTUDetailsPopup(false);
+                      setSelectedCTU(null);
+                    }}
+                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                    aria-label="Close"
+                  >
+                    <XMarkIcon className="w-5 h-5 text-gray-600" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="px-6 py-4 space-y-4">
+                  {/* Area Details */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-semibold text-gray-900">Area Information</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600">Type:</span>
+                        <span className="ml-2 text-gray-900 font-medium">
+                          {selectedCTU.ctuData?.ctu_class === 'CITY' ? 'City' : 
+                           selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? 'Township' : 
+                           'Unorganized Territory'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">County:</span>
+                        <span className="ml-2 text-gray-900 font-medium">
+                          {selectedCTU.ctuData?.county_name || selectedCTU.properties?.county_name || 'Unknown'}
+                        </span>
+                      </div>
+                      {selectedCTU.ctuData?.population && (
+                        <div>
+                          <span className="text-gray-600">Population:</span>
+                          <span className="ml-2 text-gray-900 font-medium">
+                            {selectedCTU.ctuData.population.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {selectedCTU.ctuData?.acres && (
+                        <div>
+                          <span className="text-gray-600">Area:</span>
+                          <span className="ml-2 text-gray-900 font-medium">
+                            {selectedCTU.ctuData.acres.toLocaleString()} acres
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Map */}
+                  {selectedCTU.geometry && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold text-gray-900">Boundary Map</h4>
+                      <div className="rounded-md border border-gray-200 overflow-hidden">
+                        <LayerGeometryMap
+                          geometry={selectedCTU.geometry}
+                          height="300px"
+                          fillColor={
+                            selectedCTU.ctuData?.ctu_class === 'CITY' ? '#4A90E2' :
+                            selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? '#7ED321' :
+                            '#F5A623'
+                          }
+                          outlineColor={
+                            selectedCTU.ctuData?.ctu_class === 'CITY' ? '#4A90E2' :
+                            selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? '#7ED321' :
+                            '#F5A623'
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mark as Primary Button */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        // TODO: Implement mark as primary functionality
+                        console.log('Mark as primary:', selectedCTU);
+                        setShowCTUDetailsPopup(false);
+                        setSelectedCTU(null);
+                        onClose();
+                        setStep(1);
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-md transition-colors"
+                    >
+                      Mark as Primary
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

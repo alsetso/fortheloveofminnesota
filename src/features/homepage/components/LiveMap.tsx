@@ -32,6 +32,7 @@ import StateBoundaryLayer from '@/features/map/components/StateBoundaryLayer';
 import CountyBoundariesLayer from '@/features/map/components/CountyBoundariesLayer';
 import BuildingDetailView from '@/features/admin/components/BuildingDetailView';
 import LocationServicesPopup from '@/components/layout/LocationServicesPopup';
+import LayerRecordPopup from '@/components/layout/LayerRecordPopup';
 
 interface LiveMapProps {
   cities: Array<{
@@ -104,6 +105,16 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   // County boundaries visibility state
   const [showCountyBoundaries, setShowCountyBoundaries] = useState(false);
   const [hoveredCounty, setHoveredCounty] = useState<any | null>(null);
+  
+  // Layer record popup state
+  const [layerRecordPopup, setLayerRecordPopup] = useState<{
+    layerType: string;
+    layerName: string;
+    geometry: GeoJSON.Geometry;
+    data: Record<string, any>;
+    coordinates: { lat: number; lng: number };
+    color: string;
+  } | null>(null);
   
   // Camera modal state
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -666,24 +677,218 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             return;
           }
           
-          // Dispatch event for location services popup (manual location input)
-          window.dispatchEvent(new CustomEvent('map-location-click', {
-            detail: { lat, lng }
-          }));
+          // Check if click hit a layer (county, CTU, state, districts)
+          // Layer IDs to check
+          const layerIdsToCheck = [
+            'county-boundaries-fill',
+            'ctu-boundaries-fill',
+            'state-boundary-fill',
+            'congressional-district-1-fill',
+            'congressional-district-2-fill',
+            'congressional-district-3-fill',
+            'congressional-district-4-fill',
+            'congressional-district-5-fill',
+            'congressional-district-6-fill',
+            'congressional-district-7-fill',
+            'congressional-district-8-fill',
+          ];
           
-          // If waiting for location after camera capture, set location and open create form
-          if (waitingForLocation && capturedImageBlob) {
-            setCreateTabSelectedLocation({ lat, lng });
-            setWaitingForLocation(false);
-            // Open create mention popup with captured image and selected location
-            openCreate();
-            return;
+          let layerFeature: any = null;
+          let layerType: string | null = null;
+          
+          try {
+            // Query all layer features at click point
+            const allFeatures = mapboxMap.queryRenderedFeatures(e.point, {
+              layers: layerIdsToCheck.filter(id => {
+                try {
+                  return mapboxMap.getLayer(id) !== undefined;
+                } catch {
+                  return false;
+                }
+              }),
+            });
+            
+            if (allFeatures.length > 0) {
+              layerFeature = allFeatures[0];
+              const layerId = layerFeature.layer.id;
+              
+              // Determine layer type from layer ID
+              if (layerId.startsWith('county-boundaries')) {
+                layerType = 'county';
+              } else if (layerId.startsWith('ctu-boundaries')) {
+                layerType = 'ctu';
+              } else if (layerId.startsWith('state-boundary')) {
+                layerType = 'state';
+              } else if (layerId.startsWith('congressional-district')) {
+                layerType = 'district';
+                // Extract district number from layer ID (e.g., "congressional-district-1-fill" -> 1)
+                const match = layerId.match(/congressional-district-(\d+)/);
+                if (match) {
+                  layerFeature.properties = layerFeature.properties || {};
+                  layerFeature.properties.district_number = parseInt(match[1], 10);
+                }
+              }
+              
+              // If we have a layer click, open the popup and still drop a pin
+              if (layerType && layerFeature) {
+                const props = layerFeature.properties || {};
+                const geometry = layerFeature.geometry;
+                
+                // Calculate color based on layer type and properties
+                let layerColor = '#3b82f6'; // Default blue
+                
+                if (layerType === 'county') {
+                  layerColor = '#7ED321'; // Green
+                } else if (layerType === 'ctu') {
+                  // CTU color based on class
+                  const ctuClass = props.ctu_class;
+                  if (ctuClass === 'CITY') {
+                    layerColor = '#4A90E2'; // Blue
+                  } else if (ctuClass === 'TOWNSHIP') {
+                    layerColor = '#7ED321'; // Green
+                  } else if (ctuClass === 'UNORGANIZED TERRITORY') {
+                    layerColor = '#F5A623'; // Orange
+                  }
+                } else if (layerType === 'state') {
+                  layerColor = '#4A90E2'; // Blue
+                } else if (layerType === 'district') {
+                  // Congressional district colors
+                  const districtColors = [
+                    '#FF6B6B', // District 1 - Red
+                    '#4ECDC4', // District 2 - Teal
+                    '#45B7D1', // District 3 - Blue
+                    '#96CEB4', // District 4 - Green
+                    '#FFEAA7', // District 5 - Yellow
+                    '#DDA15E', // District 6 - Orange
+                    '#BC6C25', // District 7 - Brown
+                    '#6C5CE7', // District 8 - Purple
+                  ];
+                  const districtNum = props.district_number;
+                  layerColor = districtColors[districtNum - 1] || '#888888';
+                }
+                
+                // Fetch full record from database
+                const fetchFullRecord = async () => {
+                  try {
+                    let fullRecord: any = null;
+                    
+                    if (layerType === 'county' && props.county_id) {
+                      const response = await fetch(`/api/civic/county-boundaries?id=${props.county_id}`);
+                      if (response.ok) {
+                        const data = await response.json();
+                        fullRecord = Array.isArray(data) ? data.find((r: any) => r.id === props.county_id) : data;
+                      }
+                    } else if (layerType === 'ctu' && props.ctu_id) {
+                      const response = await fetch(`/api/civic/ctu-boundaries?id=${props.ctu_id}`);
+                      if (response.ok) {
+                        const data = await response.json();
+                        fullRecord = Array.isArray(data) ? data.find((r: any) => r.id === props.ctu_id) : data;
+                      }
+                    } else if (layerType === 'state') {
+                      const response = await fetch('/api/civic/state-boundary');
+                      if (response.ok) {
+                        fullRecord = await response.json();
+                      }
+                    } else if (layerType === 'district' && props.district_number) {
+                      // For districts, we need to fetch all and find by district_number
+                      const response = await fetch('/api/civic/congressional-districts');
+                      if (response.ok) {
+                        const data = await response.json();
+                        fullRecord = Array.isArray(data) ? data.find((r: any) => r.district_number === props.district_number) : null;
+                      }
+                    }
+                    
+                    // Use full record if available, otherwise use properties
+                    const recordData: Record<string, any> = fullRecord || { ...props };
+                    
+                    // Determine layer name
+                    let layerName = layerType;
+                    if (layerType === 'county' && (fullRecord?.county_name || props.county_name)) {
+                      layerName = fullRecord?.county_name || props.county_name;
+                    } else if (layerType === 'ctu' && (fullRecord?.feature_name || props.feature_name)) {
+                      layerName = fullRecord?.feature_name || props.feature_name;
+                    } else if (layerType === 'state') {
+                      layerName = fullRecord?.name || 'Minnesota State Boundary';
+                    } else if (layerType === 'district' && (fullRecord?.district_number || props.district_number)) {
+                      layerName = `Congressional District ${fullRecord?.district_number || props.district_number}`;
+                    }
+                    
+                    // Update popup with full record data
+                    setLayerRecordPopup({
+                      layerType: layerType || 'unknown',
+                      layerName: layerName || 'Unknown',
+                      geometry,
+                      data: recordData,
+                      coordinates: { lat, lng },
+                      color: layerColor,
+                    });
+                  } catch (error) {
+                    console.error('[LiveMap] Error fetching full record:', error);
+                    // Fallback to properties if fetch fails
+                    const recordData: Record<string, any> = { ...props };
+                    let layerName = layerType;
+                    if (layerType === 'county' && props.county_name) {
+                      layerName = props.county_name;
+                    } else if (layerType === 'ctu' && props.feature_name) {
+                      layerName = props.feature_name;
+                    } else if (layerType === 'state') {
+                      layerName = 'Minnesota State Boundary';
+                    } else if (layerType === 'district' && props.district_number) {
+                      layerName = `Congressional District ${props.district_number}`;
+                    }
+                    
+                    setLayerRecordPopup({
+                      layerType: layerType || 'unknown',
+                      layerName: layerName || 'Unknown',
+                      geometry,
+                      data: recordData,
+                      coordinates: { lat, lng },
+                      color: layerColor,
+                    });
+                  }
+                };
+                
+                // Fetch full record asynchronously
+                fetchFullRecord();
+                
+                // Hide create mention form if open
+                if (isModalOpen('create')) {
+                  closeCreate();
+                }
+                
+                // Still drop a pin at the click location
+                // (continue with pin marker code below)
+              }
+            }
+          } catch (layerError) {
+            // Silently continue if layer query fails
+            console.debug('[LiveMap] Error querying layers:', layerError);
           }
           
-          // If Create sheet is open, update the selected location
-          if (isModalOpen('create')) {
-            setCreateTabSelectedLocation({ lat, lng });
-            return;
+          // If a layer was clicked, we've already handled it above
+          // Continue to drop pin but don't open create form
+          const layerWasClicked = layerType !== null;
+          
+          if (!layerWasClicked) {
+            // Dispatch event for location services popup (manual location input)
+            window.dispatchEvent(new CustomEvent('map-location-click', {
+              detail: { lat, lng }
+            }));
+            
+            // If waiting for location after camera capture, set location and open create form
+            if (waitingForLocation && capturedImageBlob) {
+              setCreateTabSelectedLocation({ lat, lng });
+              setWaitingForLocation(false);
+              // Open create mention popup with captured image and selected location
+              openCreate();
+              return;
+            }
+            
+            // If Create sheet is open, update the selected location
+            if (isModalOpen('create')) {
+              setCreateTabSelectedLocation({ lat, lng });
+              return;
+            }
           }
           
           // Add white pin marker at clicked location (will turn red when form opens)
@@ -1214,6 +1419,18 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         }}
         type={popupData.type}
         data={popupData.data}
+      />
+
+      {/* Layer Record Popup */}
+      <LayerRecordPopup
+        isOpen={layerRecordPopup !== null}
+        onClose={() => setLayerRecordPopup(null)}
+        record={layerRecordPopup}
+        onAddMention={(coordinates) => {
+          setLayerRecordPopup(null);
+          setCreateTabSelectedLocation(coordinates);
+          openCreate();
+        }}
       />
 
       {/* Congressional District Hover Info - Right Side */}

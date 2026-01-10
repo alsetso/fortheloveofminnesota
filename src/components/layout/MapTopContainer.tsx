@@ -722,6 +722,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   return (
     <div className="fixed top-3 left-3 right-3 z-[45] pointer-events-none">
       <div ref={containerRef} className="pointer-events-auto space-y-1.5 relative">
+        {/* News Stream - Positioned in upper right below search input */}
+        <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />
         {/* Search Bar */}
         <div 
           className={`rounded-xl shadow-lg px-2.5 py-2 flex items-center gap-1.5 relative transition-all ${
@@ -937,7 +939,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           )}
         </div>
 
-        {/* Bottom Row: Reload Mentions or Map Settings on left, News Stream on right */}
+        {/* Bottom Row: Reload Mentions or Map Settings on left */}
         <div className="flex items-start justify-between gap-1.5">
         {/* Reload Mentions or Map Settings Container */}
         <div className="flex items-center gap-1.5">
@@ -968,11 +970,6 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             </button>
           )}
         </div>
-
-          {/* News Stream - Visible on small screens and up */}
-          <div className="flex-1 max-w-[280px] sm:max-w-[320px] lg:max-w-[280px]">
-            <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />
-          </div>
         </div>
       </div>
 

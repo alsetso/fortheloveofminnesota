@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     
     // Optional filters
+    const id = searchParams.get('id');
     const countyName = searchParams.get('county_name');
     const limit = searchParams.get('limit');
     
@@ -19,6 +20,10 @@ export async function GET(request: NextRequest) {
       .order('county_name', { ascending: true });
     
     // Apply filters
+    if (id) {
+      query = query.eq('id', id);
+    }
+    
     if (countyName) {
       query = query.eq('county_name', countyName);
     }
@@ -38,6 +43,11 @@ export async function GET(request: NextRequest) {
         { error: error.message || 'Failed to fetch county boundaries' },
         { status: 500 }
       );
+    }
+    
+    // If querying by ID, return single object; otherwise return array
+    if (id) {
+      return NextResponse.json(Array.isArray(data) && data.length > 0 ? data[0] : data);
     }
     
     return NextResponse.json(data || []);

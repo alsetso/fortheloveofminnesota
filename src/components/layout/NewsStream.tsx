@@ -249,7 +249,7 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
       <div 
         ref={scrollContainerRef}
         data-news-scroll
-        className="space-y-2 overflow-y-auto"
+        className="pt-[10px] space-y-2 overflow-y-auto"
         style={{
           scrollbarWidth: 'none', // Firefox
           msOverflowStyle: 'none', // IE/Edge

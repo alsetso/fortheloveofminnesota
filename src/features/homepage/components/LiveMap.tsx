@@ -56,6 +56,17 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   usePageView();
   const pathname = usePathname();
   
+  // Prevent body scrolling on mount/unmount for PWA
+  useEffect(() => {
+    document.documentElement.classList.add('live-map-page');
+    document.body.classList.add('live-map-page');
+    
+    return () => {
+      document.documentElement.classList.remove('live-map-page');
+      document.body.classList.remove('live-map-page');
+    };
+  }, []);
+  
   // Map state
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -1003,10 +1014,24 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden">
+    <div 
+      className="fixed inset-0 w-full h-full overflow-hidden"
+      style={{ 
+        height: '100dvh', // Dynamic viewport height for mobile/PWA
+        width: '100vw',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+      }}
+    >
       <div 
-        className="relative flex-1 w-full overflow-hidden flex"
-        style={{ height: '100vh' }}
+        className="relative w-full h-full overflow-hidden flex"
+        style={{ 
+          height: '100%',
+          width: '100%',
+        }}
       >
         {/* Title Card */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
@@ -1066,8 +1091,18 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           {/* Mapbox Container */}
           <div 
             ref={mapContainer} 
-            className="flex-1 w-full h-full"
-            style={{ margin: 0, padding: 0, overflow: 'hidden', zIndex: 1 }}
+            className="absolute inset-0 w-full h-full"
+            style={{ 
+              margin: 0, 
+              padding: 0, 
+              overflow: 'hidden', 
+              zIndex: 1,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
           />
 
           {/* Mentions Layer */}

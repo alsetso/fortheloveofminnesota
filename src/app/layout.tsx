@@ -6,6 +6,7 @@ import { ErrorBoundary } from '@/components/errors/ErrorBoundary'
 import LocalStorageCleanup from '@/components/utils/LocalStorageCleanup'
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration'
 import { InstallPrompt } from '@/components/pwa/InstallPrompt'
+import { OfflineIndicator } from '@/components/pwa/OfflineIndicator'
 // Removed usage/billing context and modals after simplifying app
 // Footer moved to PageLayout component for consistent page structure
 
@@ -17,6 +18,13 @@ export const metadata: Metadata = {
   authors: [{ name: 'For the Love of Minnesota' }],
   creator: 'For the Love of Minnesota',
   publisher: 'For the Love of Minnesota',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+    viewportFit: 'cover', // For iOS notch support
+  },
   robots: {
     index: true,
     follow: true,
@@ -83,6 +91,7 @@ export default function RootLayout({
             <LocalStorageCleanup />
             <ServiceWorkerRegistration />
             <InstallPrompt />
+            <OfflineIndicator />
             {/* Pages handle their own header/footer via PageLayout component */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
               {children}

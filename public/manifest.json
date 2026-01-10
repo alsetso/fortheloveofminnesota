@@ -8,6 +8,7 @@
   "theme_color": "#dc2626",
   "orientation": "any",
   "scope": "/",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/fav.png",

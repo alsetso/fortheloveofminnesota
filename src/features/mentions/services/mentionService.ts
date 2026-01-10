@@ -118,7 +118,20 @@ export class MentionService {
         .lte('lng', filters.bbox.maxLng);
     }
 
-    const { data, error } = await query;
+    let data, error;
+    try {
+      const result = await query;
+      data = result.data;
+      error = result.error;
+    } catch (fetchError) {
+      // Handle network errors (e.g., "Failed to fetch")
+      console.error('[MentionService] Network error fetching mentions:', fetchError);
+      // Check if it's a network error vs Supabase error
+      if (fetchError instanceof TypeError && fetchError.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Unable to connect to server. Please check your internet connection.');
+      }
+      throw fetchError;
+    }
 
     if (error) {
       console.error('[MentionService] Error fetching mentions:', error);

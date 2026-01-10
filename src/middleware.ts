@@ -140,6 +140,9 @@ export async function middleware(req: NextRequest) {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   
+  // Permissions Policy - Allow camera access for PWA
+  response.headers.set('Permissions-Policy', 'camera=(self), microphone=()');
+  
   // HSTS - only in production with HTTPS
   if (process.env.NODE_ENV === 'production' && req.nextUrl.protocol === 'https:') {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

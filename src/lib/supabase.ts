@@ -41,7 +41,16 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
         headers.set('x-guest-id', guestId);
       }
       
-      return fetch(url, { ...options, headers });
+      // Supabase uses token-based auth (not cookies), so we don't need credentials
+      // Only use credentials for same-origin API routes (handled separately)
+      // The service worker already skips cross-origin Supabase requests
+      // Explicitly remove credentials to avoid CORS issues with Supabase
+      const { credentials, ...restOptions } = options;
+      return fetch(url, { 
+        ...restOptions, 
+        headers,
+        credentials: 'omit', // Explicitly omit credentials for Supabase (uses tokens, not cookies)
+      });
     },
   },
 });

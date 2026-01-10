@@ -811,9 +811,12 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                   const person = isPeople ? (suggestion as PeopleSuggestion) : null;
                   const feature = !isNews && !isPeople ? (suggestion as MapboxFeature) : null;
                   
+                  // Create unique key combining type, id, and index to prevent duplicates
+                  const uniqueKey = `${suggestion.id || 'unknown'}-${index}-${isNews ? 'news' : isPeople ? 'people' : 'mapbox'}`;
+                  
                   return (
                     <button
-                      key={suggestion.id}
+                      key={uniqueKey}
                       onClick={() => handleSuggestionSelect(suggestion)}
                       className={`w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors ${
                         index === selectedIndex ? 'bg-gray-50' : ''

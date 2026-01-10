@@ -35,6 +35,7 @@ import LocationServicesPopup from '@/components/layout/LocationServicesPopup';
 import LayerRecordPopup from '@/components/layout/LayerRecordPopup';
 import LocationStepperOverlay from '@/components/layout/LocationStepperOverlay';
 import OnboardingDemo from '@/components/layout/OnboardingDemo';
+import VisitorStats from '@/components/layout/VisitorStats';
 
 interface LiveMapProps {
   cities: Array<{
@@ -1539,6 +1540,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         map={mapInstanceRef.current}
         mapLoaded={mapLoaded}
       />
+
+      {/* Visitor Stats */}
+      <VisitorStats />
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}
     </div>

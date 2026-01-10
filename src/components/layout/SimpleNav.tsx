@@ -16,7 +16,6 @@ import ProfilePhoto from '../shared/ProfilePhoto';
 import AppSearch from '@/features/search/components/AppSearch';
 import BaseNav from '../shared/BaseNav';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
-import { PWAStatusIcon } from '@/components/pwa/PWAStatusIcon';
 import type { MapboxMetadata } from '@/types/mapbox';
 
 export default function SimpleNav() {
@@ -80,10 +79,6 @@ export default function SimpleNav() {
           <span className="text-[9px] font-medium mt-0.5 leading-none">Profile</span>
         </Link>
       )}
-      
-      <div className="px-2 h-full min-w-[44px]">
-        <PWAStatusIcon variant="light" size="sm" showLabel={true} labelPosition="below" />
-      </div>
       
       <div className="flex items-center justify-center px-2 h-full min-w-[44px]">
         <AccountDropdown

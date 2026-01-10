@@ -94,7 +94,7 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
         {/* Tools Tab */}
         <button
           onClick={() => onTabClick('tools')}
-          className={baseClasses}
+            className={baseClasses}
           aria-label="Tools"
         >
           <div className={`p-1.5 rounded-md transition-colors ${
@@ -116,7 +116,7 @@ export default function MobileNavTabs({ activeTab, onTabClick, isSheetOpen = fal
               : useWhiteText ? 'text-white/80' : 'text-gray-500'
           }`}>
             Tools
-          </span>
+            </span>
         </button>
       </div>
     </nav>

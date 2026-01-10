@@ -1,0 +1,1821 @@
+{
+  "senate": [
+    {
+      "name": "Mark T. Johnson",
+      "party": "R",
+      "district": "SD01",
+      "phone": "651-296-5782",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Steve Green",
+      "party": "R",
+      "district": "SD02",
+      "phone": "651-297-8063",
+      "email": "sen.steve.green@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Grant Hauschild",
+      "party": "DFL",
+      "district": "SD03",
+      "phone": "651-296-1789",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Robert J. Kupec",
+      "party": "DFL",
+      "district": "SD04",
+      "phone": "651-296-3205",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Paul J. Utke",
+      "party": "R",
+      "district": "SD05",
+      "phone": "651-296-9651",
+      "email": "sen.paul.utke@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Keri Heintzeman",
+      "party": "R",
+      "district": "SD06",
+      "phone": "651-296-7079",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Robert D. Farnsworth",
+      "party": "R",
+      "district": "SD07",
+      "phone": "651-296-8436",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jennifer A. McEwen",
+      "party": "DFL",
+      "district": "SD08",
+      "phone": "651-296-4188",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jordan Rasmusson",
+      "party": "R",
+      "district": "SD09",
+      "phone": "651-296-4875",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Nathan Wesenberg",
+      "party": "R",
+      "district": "SD10",
+      "phone": "651-296-4913",
+      "email": "sen.nathan.wesenberg@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jason Rarick",
+      "party": "R",
+      "district": "SD11",
+      "phone": "651-296-1508",
+      "email": "sen.jason.rarick@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Torrey N. Westrom",
+      "party": "R",
+      "district": "SD12",
+      "phone": "651-296-3826",
+      "email": "sen.torrey.westrom@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jeff R. Howe",
+      "party": "R",
+      "district": "SD13",
+      "phone": "651-296-2084",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Aric Putnam",
+      "party": "DFL",
+      "district": "SD14",
+      "phone": "651-296-6455",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Gary H. Dahms",
+      "party": "R",
+      "district": "SD15",
+      "phone": "651-296-8138",
+      "email": "sen.gary.dahms@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Andrew R. Lang",
+      "party": "R",
+      "district": "SD16",
+      "phone": "651-296-4918",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Glenn H. Gruenhagen",
+      "party": "R",
+      "district": "SD17",
+      "phone": "651-296-4131",
+      "email": "sen.glenn.gruenhagen@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Nick A. Frentz",
+      "party": "DFL",
+      "district": "SD18",
+      "phone": "651-296-6153",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "John R. Jasinski",
+      "party": "R",
+      "district": "SD19",
+      "phone": "651-296-0284",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Steve Drazkowski",
+      "party": "R",
+      "district": "SD20",
+      "phone": "651-296-5612",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Bill Weber",
+      "party": "R",
+      "district": "SD21",
+      "phone": "651-296-5650",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Rich Draheim",
+      "party": "R",
+      "district": "SD22",
+      "phone": "651-296-5558",
+      "email": "sen.rich.draheim@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Gene Dornink",
+      "party": "R",
+      "district": "SD23",
+      "phone": "651-296-5240",
+      "email": "sen.gene.dornink@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Carla J. Nelson",
+      "party": "R",
+      "district": "SD24",
+      "phone": "651-296-4848",
+      "email": "sen.carla.nelson@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Liz Boldon",
+      "party": "DFL",
+      "district": "SD25",
+      "phone": "651-296-3903",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jeremy R. Miller",
+      "party": "R",
+      "district": "SD26",
+      "phone": "651-296-5649",
+      "email": "sen.jeremy.miller@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Andrew Mathews",
+      "party": "R",
+      "district": "SD27",
+      "phone": "651-296-8075",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Mark W. Koran",
+      "party": "R",
+      "district": "SD28",
+      "phone": "651-296-5419",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Michael W. Holmstrom",
+      "party": "R",
+      "district": "SD29",
+      "phone": "651-296-5981",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Eric Lucero",
+      "party": "R",
+      "district": "SD30",
+      "phone": "651-296-5655",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Calvin K. Bahr",
+      "party": "R",
+      "district": "SD31",
+      "phone": "651-296-3219",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Michael E. Kreun",
+      "party": "R",
+      "district": "SD32",
+      "phone": "651-296-1282",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Karin Housley",
+      "party": "R",
+      "district": "SD33",
+      "phone": "651-296-4351",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "John A. Hoffman",
+      "party": "DFL",
+      "district": "SD34",
+      "phone": "651-296-4154",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jim Abeler",
+      "party": "R",
+      "district": "SD35",
+      "phone": "651-296-3733",
+      "email": "sen.jim.abeler@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Heather Gustafson",
+      "party": "DFL",
+      "district": "SD36",
+      "phone": "651-296-1253",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Warren Limmer",
+      "party": "R",
+      "district": "SD37",
+      "phone": "651-296-2159",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Susan Pha",
+      "party": "DFL",
+      "district": "SD38",
+      "phone": "651-296-2556",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Mary K. Kunesh",
+      "party": "DFL",
+      "district": "SD39",
+      "phone": "651-296-4334",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "John Marty",
+      "party": "DFL",
+      "district": "SD40",
+      "phone": "651-296-5645",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Judy Seeberger",
+      "party": "DFL",
+      "district": "SD41",
+      "phone": "651-297-8060",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Bonnie S. Westlin",
+      "party": "DFL",
+      "district": "SD42",
+      "phone": "651-296-8869",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Ann H. Rest",
+      "party": "DFL",
+      "district": "SD43",
+      "phone": "651-296-2889",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Tou Xiong",
+      "party": "DFL",
+      "district": "SD44",
+      "phone": "651-296-6820",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Ann M. Johnson Stewart",
+      "party": "DFL",
+      "district": "SD45",
+      "phone": "651-296-9261",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Ron Latz",
+      "party": "DFL",
+      "district": "SD46",
+      "phone": "651-297-8065",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Amanda H. Hemmingsen-Jaeger",
+      "party": "DFL",
+      "district": "SD47",
+      "phone": "651-296-5537",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Julia E. Coleman",
+      "party": "R",
+      "district": "SD48",
+      "phone": "651-296-4837",
+      "email": "sen.julia.coleman@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Steve A. Cwodzinski",
+      "party": "DFL",
+      "district": "SD49",
+      "phone": "651-296-1314",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Alice Mann",
+      "party": "DFL",
+      "district": "SD50",
+      "phone": "651-296-6238",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Melissa H. Wiklund",
+      "party": "DFL",
+      "district": "SD51",
+      "phone": "651-297-8061",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Jim Carlson",
+      "party": "DFL",
+      "district": "SD52",
+      "phone": "651-297-8073",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Matt D. Klein",
+      "party": "DFL",
+      "district": "SD53",
+      "phone": "651-296-4370",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Eric R. Pratt",
+      "party": "R",
+      "district": "SD54",
+      "phone": "651-296-4123",
+      "email": "sen.eric.pratt@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Lindsey Port",
+      "party": "DFL",
+      "district": "SD55",
+      "phone": "651-296-5975",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Erin K. Maye Quade",
+      "party": "DFL",
+      "district": "SD56",
+      "phone": "651-296-4120",
+      "email": "sen.erin.mayequade@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Zach Duckworth",
+      "party": "R",
+      "district": "SD57",
+      "phone": "651-296-7633",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Bill Lieske",
+      "party": "R",
+      "district": "SD58",
+      "phone": "651-296-5019",
+      "email": "sen.bill.lieske@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Bobby Joe Champion",
+      "party": "DFL",
+      "district": "SD59",
+      "phone": "651-296-9246",
+      "email": "sen.bobby.champion@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Doron Clark",
+      "party": "DFL",
+      "district": "SD60",
+      "phone": "651-296-7809",
+      "email": "sen.doron.clark@mnsenate.gov",
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "D. Scott Dibble",
+      "party": "DFL",
+      "district": "SD61",
+      "phone": "651-296-4191",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Omar Fateh",
+      "party": "DFL",
+      "district": "SD62",
+      "phone": "651-296-4261",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Zaynab Mohamed",
+      "party": "DFL",
+      "district": "SD63",
+      "phone": "651-296-4274",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Erin P. Murphy",
+      "party": "DFL",
+      "district": "SD64",
+      "phone": "651-296-5931",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Sandra L. Pappas",
+      "party": "DFL",
+      "district": "SD65",
+      "phone": "651-296-1802",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Clare Oumou Verbeten",
+      "party": "DFL",
+      "district": "SD66",
+      "phone": "651-296-8866",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    },
+    {
+      "name": "Foung Hawj",
+      "party": "DFL",
+      "district": "SD67",
+      "phone": "651-296-5285",
+      "email": null,
+      "building_id": "79c1d888-82e5-4210-93d8-ca9a71258bab",
+      "chamber": "senate"
+    }
+  ],
+  "house": [
+    {
+      "name": "John Burkel",
+      "party": "R",
+      "district": "HD01A",
+      "phone": "651-296-9635",
+      "email": "rep.john.burkel@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Steve Gander",
+      "party": "R",
+      "district": "HD01B",
+      "phone": "651-296-5091",
+      "email": "rep.steve.gander@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Bidal Duran",
+      "party": "R",
+      "district": "HD02A",
+      "phone": "651-296-4265",
+      "email": "rep.bidal.duran@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Matt Bliss",
+      "party": "R",
+      "district": "HD02B",
+      "phone": "651-296-5516",
+      "email": "rep.matt.bliss@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Roger Skraba",
+      "party": "R",
+      "district": "HD03A",
+      "phone": "651-296-2190",
+      "email": "rep.roger.skraba@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Natalie Zeleznikar",
+      "party": "R",
+      "district": "HD03B",
+      "phone": "651-296-2676",
+      "email": "rep.natalie.zeleznikar@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Heather Keeler",
+      "party": "DFL",
+      "district": "HD04A",
+      "phone": "651-296-5515",
+      "email": null,
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jim Joy",
+      "party": "R",
+      "district": "HD04B",
+      "phone": "651-296-6829",
+      "email": "rep.jim.joy@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Krista Knudsen",
+      "party": "R",
+      "district": "HD05A",
+      "phone": "651-296-9918",
+      "email": "rep.krista.knudsen@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Mike Wiener",
+      "party": "R",
+      "district": "HD05B",
+      "phone": "651-296-4293",
+      "email": "rep.mike.wiener@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Ben Davis",
+      "party": "R",
+      "district": "HD06A",
+      "phone": "651-296-0172",
+      "email": "rep.ben.davis@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Josh Heintzeman",
+      "party": "R",
+      "district": "HD06B",
+      "phone": "651-296-4333",
+      "email": "rep.josh.heintzeman@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Spencer Igo",
+      "party": "R",
+      "district": "HD07A",
+      "phone": "651-296-4936",
+      "email": "rep.spencer.igo@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Cal Warwas",
+      "party": "R",
+      "district": "HD07B",
+      "phone": "651-296-0170",
+      "email": "rep.cal.warwas@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Pete Johnson",
+      "party": "DFL",
+      "district": "HD08A",
+      "phone": "651-296-4246",
+      "email": "rep.pete.johnson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Liish Kozlowski",
+      "party": "DFL",
+      "district": "HD08B",
+      "phone": "651-296-2228",
+      "email": "rep.liish.kozlowski@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jeff Backer",
+      "party": "R",
+      "district": "HD09A",
+      "phone": "651-296-4929",
+      "email": "rep.jeff.backer@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Tom Murphy",
+      "party": "R",
+      "district": "HD09B",
+      "phone": "651-296-4946",
+      "email": "rep.tom.murphy@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Ron Kresha",
+      "party": "R",
+      "district": "HD10A",
+      "phone": "651-296-4247",
+      "email": "rep.ron.kresha@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Isaac Schultz",
+      "party": "R",
+      "district": "HD10B",
+      "phone": "651-296-6746",
+      "email": "rep.isaac.schultz@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jeff Dotseth",
+      "party": "R",
+      "district": "HD11A",
+      "phone": "651-296-4308",
+      "email": "rep.jeff.dotseth@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Nathan Nelson",
+      "party": "R",
+      "district": "HD11B",
+      "phone": "651-296-0518",
+      "email": "rep.nathan.nelson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Paul Anderson",
+      "party": "R",
+      "district": "HD12A",
+      "phone": "651-296-4317",
+      "email": "rep.paul.anderson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Mary Franson",
+      "party": "R",
+      "district": "HD12B",
+      "phone": "651-296-3201",
+      "email": "rep.mary.franson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Lisa Demuth",
+      "party": "R",
+      "district": "HD13A",
+      "phone": "651-296-4373",
+      "email": "rep.lisa.demuth@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Tim O'Driscoll",
+      "party": "R",
+      "district": "HD13B",
+      "phone": "651-296-7808",
+      "email": "rep.tim.odriscoll@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Bernie Perryman",
+      "party": "R",
+      "district": "HD14A",
+      "phone": "651-296-6316",
+      "email": "rep.bernie.perryman@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Dan Wolgamott",
+      "party": "DFL",
+      "district": "HD14B",
+      "phone": "651-296-6612",
+      "email": "rep.dan.wolgamott@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Chris Swedzinski",
+      "party": "R",
+      "district": "HD15A",
+      "phone": "651-296-5374",
+      "email": "rep.chris.swedzinski@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Paul Torkelson",
+      "party": "R",
+      "district": "HD15B",
+      "phone": "651-296-9303",
+      "email": "rep.paul.torkelson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Scott Van Binsbergen",
+      "party": "R",
+      "district": "HD16A",
+      "phone": "651-296-4344",
+      "email": "rep.scott.vanbinsbergen@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Dave Baker",
+      "party": "R",
+      "district": "HD16B",
+      "phone": "651-296-6206",
+      "email": "rep.dave.baker@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Dawn Gillman",
+      "party": "R",
+      "district": "HD17A",
+      "phone": "651-296-4228",
+      "email": "rep.dawn.gillman@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Bobbie Harder",
+      "party": "R",
+      "district": "HD17B",
+      "phone": "651-296-4229",
+      "email": "rep.bobbie.harder@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Erica Schwartz",
+      "party": "R",
+      "district": "HD18A",
+      "phone": "651-296-8634",
+      "email": "rep.erica.schwartz@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Luke Frederick",
+      "party": "DFL",
+      "district": "HD18B",
+      "phone": "651-296-3248",
+      "email": "rep.luke.frederick@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Keith Allen",
+      "party": "R",
+      "district": "HD19A",
+      "phone": "651-296-8237",
+      "email": "rep.keith.allen@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Tom Sexton",
+      "party": "R",
+      "district": "HD19B",
+      "phone": "651-296-5368",
+      "email": "rep.tom.sexton@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Pam Altendorf",
+      "party": "R",
+      "district": "HD20A",
+      "phone": "651-296-8635",
+      "email": "rep.pam.altendorf@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Steven Jacob",
+      "party": "R",
+      "district": "HD20B",
+      "phone": "651-296-2273",
+      "email": "rep.steven.jacob@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Joe Schomacker",
+      "party": "R",
+      "district": "HD21A",
+      "phone": "651-296-5505",
+      "email": "rep.joe.schomacker@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Marj Fogelman",
+      "party": "R",
+      "district": "HD21B",
+      "phone": "651-296-5373",
+      "email": "rep.marj.fogelman@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Bjorn Olson",
+      "party": "R",
+      "district": "HD22A",
+      "phone": "651-296-3240",
+      "email": "rep.bjorn.olson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Terry Stier",
+      "party": "R",
+      "district": "HD22B",
+      "phone": "651-296-7065",
+      "email": "rep.terry.stier@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Peggy Bennett",
+      "party": "R",
+      "district": "HD23A",
+      "phone": "651-296-8216",
+      "email": "rep.peggy.bennett@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Patricia Mueller",
+      "party": "R",
+      "district": "HD23B",
+      "phone": "651-296-4193",
+      "email": "rep.patricia.mueller@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Duane Quam",
+      "party": "R",
+      "district": "HD24A",
+      "phone": "651-296-9236",
+      "email": "rep.duane.quam@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Tina Liebling",
+      "party": "DFL",
+      "district": "HD24B",
+      "phone": "651-296-0573",
+      "email": "rep.tina.liebling@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kim Hicks",
+      "party": "DFL",
+      "district": "HD25A",
+      "phone": "651-296-4378",
+      "email": "rep.kim.hicks@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Andy Smith",
+      "party": "DFL",
+      "district": "HD25B",
+      "phone": "651-296-9249",
+      "email": "rep.andy.smith@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Aaron Repinski",
+      "party": "R",
+      "district": "HD26A",
+      "phone": "651-296-8637",
+      "email": "rep.aaron.repinski@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Greg Davids",
+      "party": "R",
+      "district": "HD26B",
+      "phone": "651-296-9278",
+      "email": "rep.greg.davids@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Shane Mekeland",
+      "party": "R",
+      "district": "HD27A",
+      "phone": "651-296-2451",
+      "email": "rep.shane.mekeland@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Bryan Lawrence",
+      "party": "R",
+      "district": "HD27B",
+      "phone": "651-296-5364",
+      "email": "rep.bryan.lawrence@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jimmy Gordon",
+      "party": "R",
+      "district": "HD28A",
+      "phone": "651-296-4346",
+      "email": "rep.jimmy.gordon@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Max Rymer",
+      "party": "R",
+      "district": "HD28B",
+      "phone": "651-296-5377",
+      "email": "rep.max.rymer@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Joe McDonald",
+      "party": "R",
+      "district": "HD29A",
+      "phone": "651-296-4336",
+      "email": "rep.joe.mcdonald@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Marion Rarick",
+      "party": "R",
+      "district": "HD29B",
+      "phone": "651-296-5063",
+      "email": "rep.marion.rarick@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Walter Hudson",
+      "party": "R",
+      "district": "HD30A",
+      "phone": "651-296-1534",
+      "email": "rep.walter.hudson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Paul Novotny",
+      "party": "R",
+      "district": "HD30B",
+      "phone": "651-296-4237",
+      "email": "rep.paul.novotny@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Harry Niska",
+      "party": "R",
+      "district": "HD31A",
+      "phone": "651-296-2439",
+      "email": "rep.harry.niska@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Peggy Scott",
+      "party": "R",
+      "district": "HD31B",
+      "phone": "651-296-4231",
+      "email": "rep.peggy.scott@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Nolan West",
+      "party": "R",
+      "district": "HD32A",
+      "phone": "651-296-4226",
+      "email": "rep.nolan.west@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Matt Norris",
+      "party": "DFL",
+      "district": "HD32B",
+      "phone": "651-296-2907",
+      "email": "rep.matt.norris@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Patti Anderson",
+      "party": "R",
+      "district": "HD33A",
+      "phone": "651-296-3018",
+      "email": "rep.patti.anderson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Josiah Hill",
+      "party": "DFL",
+      "district": "HD33B",
+      "phone": "651-296-4124",
+      "email": "rep.josiah.hill@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Danny Nadeau",
+      "party": "R",
+      "district": "HD34A",
+      "phone": "651-296-4315",
+      "email": "rep.danny.nadeau@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Xp Lee",
+      "party": "DFL",
+      "district": "HD34B",
+      "phone": "651-296-4280",
+      "email": "rep.xp.lee@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Zack Stephenson",
+      "party": "DFL",
+      "district": "HD35A",
+      "phone": "651-296-5513",
+      "email": "rep.zack.stephenson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kari Rehrauer",
+      "party": "DFL",
+      "district": "HD35B",
+      "phone": "651-296-1729",
+      "email": "rep.kari.rehrauer@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Elliott Engen",
+      "party": "R",
+      "district": "HD36A",
+      "phone": "651-296-2365",
+      "email": "rep.elliott.engen@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Brion Curran",
+      "party": "DFL",
+      "district": "HD36B",
+      "phone": "651-296-4342",
+      "email": "rep.brion.curran@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kristin Robbins",
+      "party": "R",
+      "district": "HD37A",
+      "phone": "651-296-7806",
+      "email": "rep.kristin.robbins@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kristin Bahner",
+      "party": "DFL",
+      "district": "HD37B",
+      "phone": "651-296-5502",
+      "email": "rep.kristin.bahner@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Huldah Momanyi-Hiltsley",
+      "party": "DFL",
+      "district": "HD38A",
+      "phone": "651-296-3751",
+      "email": "rep.huldah.momanyi-hiltsley@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Samantha Vang",
+      "party": "DFL",
+      "district": "HD38B",
+      "phone": "651-296-3709",
+      "email": "rep.samantha.vang@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Erin Koegel",
+      "party": "DFL",
+      "district": "HD39A",
+      "phone": "651-296-5369",
+      "email": "rep.erin.koegel@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Sandra Feist",
+      "party": "DFL",
+      "district": "HD39B",
+      "phone": "651-296-4331",
+      "email": "rep.sandra.feist@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kelly Moller",
+      "party": "DFL",
+      "district": "HD40A",
+      "phone": "651-296-0141",
+      "email": "rep.kelly.moller@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "David Gottfried",
+      "party": "DFL",
+      "district": "HD40B",
+      "phone": "651-296-7153",
+      "email": "rep.david.gottfried@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Wayne Johnson",
+      "party": "R",
+      "district": "HD41A",
+      "phone": "651-296-4244",
+      "email": "rep.wayne.johnson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Tom Dippel",
+      "party": "R",
+      "district": "HD41B",
+      "phone": "651-296-3135",
+      "email": null,
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Ned Carroll",
+      "party": "DFL",
+      "district": "HD42A",
+      "phone": "651-296-5510",
+      "email": "rep.ned.carroll@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Ginny Klevorn",
+      "party": "DFL",
+      "district": "HD42B",
+      "phone": "651-296-5511",
+      "email": "rep.ginny.klevorn@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Cedrick Frazier",
+      "party": "DFL",
+      "district": "HD43A",
+      "phone": "651-296-4255",
+      "email": "rep.cedrick.frazier@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Mike Freiberg",
+      "party": "DFL",
+      "district": "HD43B",
+      "phone": "651-296-4176",
+      "email": "rep.mike.freiberg@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Peter Fischer",
+      "party": "DFL",
+      "district": "HD44A",
+      "phone": "651-296-5363",
+      "email": "rep.peter.fischer@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Leon Lillie",
+      "party": "DFL",
+      "district": "HD44B",
+      "phone": "651-296-1188",
+      "email": "rep.leon.lillie@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Andrew Myers",
+      "party": "R",
+      "district": "HD45A",
+      "phone": "651-296-9188",
+      "email": "rep.andrew.myers@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Patty Acomb",
+      "party": "DFL",
+      "district": "HD45B",
+      "phone": "651-296-9934",
+      "email": "rep.patty.acomb@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Larry Kraft",
+      "party": "DFL",
+      "district": "HD46A",
+      "phone": "651-296-7026",
+      "email": "rep.larry.kraft@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Cheryl Youakim",
+      "party": "DFL",
+      "district": "HD46B",
+      "phone": "651-296-9889",
+      "email": "rep.cheryl.youakim@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Amanda Hemmingsen-Jaeger",
+      "party": "DFL",
+      "district": "HD47A",
+      "phone": "651-296-7807",
+      "email": "rep.amanda.hemmingsen-jaeger@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Ethan Cha",
+      "party": "DFL",
+      "district": "HD47B",
+      "phone": "651-296-1147",
+      "email": "rep.ethan.cha@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jim Nash",
+      "party": "R",
+      "district": "HD48A",
+      "phone": "651-296-4282",
+      "email": "rep.jim.nash@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Lucy Rehm",
+      "party": "DFL",
+      "district": "HD48B",
+      "phone": "651-296-5066",
+      "email": "rep.lucy.rehm@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Alex Falconer",
+      "party": "DFL",
+      "district": "HD49A",
+      "phone": "651-296-3964",
+      "email": "rep.alex.falconer@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Carlie Kotyza-Witthuhn",
+      "party": "DFL",
+      "district": "HD49B",
+      "phone": "651-296-7449",
+      "email": "rep.carlie.kotyza-witthuhn@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Julie Greene",
+      "party": "DFL",
+      "district": "HD50A",
+      "phone": "651-296-4363",
+      "email": "rep.julie.greene@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Steve Elkins",
+      "party": "DFL",
+      "district": "HD50B",
+      "phone": "651-296-7803",
+      "email": "rep.steve.elkins@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Michael Howard",
+      "party": "DFL",
+      "district": "HD51A",
+      "phone": "651-296-7158",
+      "email": "rep.michael.howard@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Nathan Coulter",
+      "party": "DFL",
+      "district": "HD51B",
+      "phone": "651-296-4218",
+      "email": "rep.nathan.coulter@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Liz Reyer",
+      "party": "DFL",
+      "district": "HD52A",
+      "phone": "651-296-4128",
+      "email": "rep.liz.reyer@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Bianca Virnig",
+      "party": "DFL",
+      "district": "HD52B",
+      "phone": "651-296-4192",
+      "email": "rep.bianca.virnig@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Mary Frances Clardy",
+      "party": "DFL",
+      "district": "HD53A",
+      "phone": "651-296-3533",
+      "email": "rep.mary.frances.clardy@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Rick Hansen",
+      "party": "DFL",
+      "district": "HD53B",
+      "phone": "651-296-6828",
+      "email": "rep.rick.hansen@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Brad Tabke",
+      "party": "DFL",
+      "district": "HD54A",
+      "phone": "651-296-8872",
+      "email": "rep.brad.tabke@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Ben Bakeberg",
+      "party": "R",
+      "district": "HD54B",
+      "phone": "651-296-5185",
+      "email": "rep.ben.bakeberg@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jessica Hanson",
+      "party": "DFL",
+      "district": "HD55A",
+      "phone": "651-296-4212",
+      "email": "rep.jessica.hanson@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kaela Berg",
+      "party": "DFL",
+      "district": "HD55B",
+      "phone": "651-296-5387",
+      "email": "rep.kaela.berg@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Robert Bierman",
+      "party": "DFL",
+      "district": "HD56A",
+      "phone": "651-296-5506",
+      "email": "rep.robert.bierman@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "John Huot",
+      "party": "DFL",
+      "district": "HD56B",
+      "phone": "651-296-4306",
+      "email": "rep.john.huot@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jon Koznick",
+      "party": "R",
+      "district": "HD57A",
+      "phone": "651-296-6926",
+      "email": "rep.jon.koznick@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jeff Witte",
+      "party": "R",
+      "district": "HD57B",
+      "phone": "651-296-4240",
+      "email": "rep.jeff.witte@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kristi Pursell",
+      "party": "DFL",
+      "district": "HD58A",
+      "phone": "651-296-0171",
+      "email": "rep.kristi.pursell@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Drew Roach",
+      "party": "R",
+      "district": "HD58B",
+      "phone": "651-296-1069",
+      "email": "rep.drew.roach@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Fue Lee",
+      "party": "DFL",
+      "district": "HD59A",
+      "phone": "651-296-4262",
+      "email": "rep.fue.lee@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Esther Agbaje",
+      "party": "DFL",
+      "district": "HD59B",
+      "phone": "651-296-8659",
+      "email": "rep.esther.agbaje@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Sydney Jordan",
+      "party": "DFL",
+      "district": "HD60A",
+      "phone": "651-296-4219",
+      "email": "rep.sydney.jordan@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Mohamud Noor",
+      "party": "DFL",
+      "district": "HD60B",
+      "phone": "651-296-4257",
+      "email": "rep.mohamud.noor@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Katie Jones",
+      "party": "DFL",
+      "district": "HD61A",
+      "phone": "651-296-9281",
+      "email": "rep.katie.jones@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jamie Long",
+      "party": "DFL",
+      "district": "HD61B",
+      "phone": "651-296-5375",
+      "email": "rep.jamie.long@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Aisha Gomez",
+      "party": "DFL",
+      "district": "HD62A",
+      "phone": "651-296-7152",
+      "email": "rep.aisha.gomez@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Anquam Mahamoud",
+      "party": "DFL",
+      "district": "HD62B",
+      "phone": "651-296-0294",
+      "email": "rep.anquam.mahamoud@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Samantha Sencer-Mura",
+      "party": "DFL",
+      "district": "HD63A",
+      "phone": "651-296-0173",
+      "email": "rep.samantha.sencer-mura@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Emma Greenman",
+      "party": "DFL",
+      "district": "HD63B",
+      "phone": "651-296-4200",
+      "email": "rep.emma.greenman@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Kaohly Vang Her",
+      "party": "DFL",
+      "district": "HD64A",
+      "phone": "651-296-8799",
+      "email": "rep.kaohly.her@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Dave Pinto",
+      "party": "DFL",
+      "district": "HD64B",
+      "phone": "651-296-4199",
+      "email": "rep.dave.pinto@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Samakab Hussein",
+      "party": "DFL",
+      "district": "HD65A",
+      "phone": "651-296-5158",
+      "email": "rep.samakab.hussein@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "María Isa Pérez-Vega",
+      "party": "DFL",
+      "district": "HD65B",
+      "phone": "651-296-9714",
+      "email": "rep.maria.isa.perez-vega@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Leigh Finke",
+      "party": "DFL",
+      "district": "HD66A",
+      "phone": "651-296-3824",
+      "email": null,
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Athena Hollins",
+      "party": "DFL",
+      "district": "HD66B",
+      "phone": "651-296-4224",
+      "email": "rep.athena.hollins@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Liz Lee",
+      "party": "DFL",
+      "district": "HD67A",
+      "phone": "651-296-4277",
+      "email": null,
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    },
+    {
+      "name": "Jay Xiong",
+      "party": "DFL",
+      "district": "HD67B",
+      "phone": "651-296-4201",
+      "email": "rep.jay.xiong@house.mn.gov",
+      "building_id": "ae0605df-bfd9-4ab3-8eb6-30d539adf562",
+      "chamber": "house"
+    }
+  ],
+  "summary": {
+    "senate_count": 67,
+    "house_count": 134,
+    "total": 201,
+    "generated_at": "2026-01-08T04:12:18.651Z"
+  }
+}

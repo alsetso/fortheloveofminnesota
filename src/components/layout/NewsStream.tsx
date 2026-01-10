@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ClockIcon, ChevronDownIcon, ChevronUpIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import { getSourceInitials, getSourceColor, formatDate } from '@/features/news/utils/newsHelpers';
+import { useAuthStateSafe } from '@/features/auth';
 import type { NewsArticle } from '@/types/news';
 
 interface NewsResponse {
@@ -25,11 +26,12 @@ interface NewsStreamProps {
 }
 
 export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsStreamProps) {
+  const { account } = useAuthStateSafe();
+  const isAdmin = account?.role === 'admin';
+  
   const [allArticles, setAllArticles] = useState<NewsArticle[]>([]);
-  const [visibleArticles, setVisibleArticles] = useState<NewsArticle[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isHovered, setIsHovered] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [currentBlurStyle, setCurrentBlurStyle] = useState(useBlurStyle);
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
@@ -71,16 +73,12 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
 
       if (data.success && data.data) {
         setAllArticles(data.data.articles);
-        setCurrentIndex(0);
-        setVisibleArticles([]);
       } else {
         setAllArticles([]);
-        setVisibleArticles([]);
       }
     } catch (err) {
       console.error('Failed to load news:', err);
       setAllArticles([]);
-      setVisibleArticles([]);
     } finally {
       setLoading(false);
     }
@@ -90,47 +88,6 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
     fetchNews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Stream in articles one at a time every 3 seconds
-  useEffect(() => {
-    if (allArticles.length === 0) {
-      return;
-    }
-
-    const intervalId = setInterval(() => {
-      // Pause streaming when hovering
-      if (isHovered) {
-        return;
-      }
-
-      setCurrentIndex((prevIndex) => {
-        if (prevIndex >= allArticles.length) {
-          return prevIndex;
-        }
-
-        const nextArticle = allArticles[prevIndex];
-        
-        setVisibleArticles((prev) => {
-          // Check if this article is already visible (prevent duplicates)
-          const isAlreadyVisible = prev.some(article => article.id === nextArticle.id);
-          if (isAlreadyVisible) {
-            return prev;
-          }
-
-          // If we already have 5 articles, remove the first one (oldest) before adding new one
-          if (prev.length >= maxItems) {
-            return [...prev.slice(1), nextArticle];
-          }
-          // Otherwise just add to the end
-          return [...prev, nextArticle];
-        });
-
-        return prevIndex + 1;
-      });
-    }, 3000); // Add one article every 3 seconds
-
-    return () => clearInterval(intervalId);
-  }, [allArticles, maxItems, isHovered]);
 
   // Listen for generate news event to refresh
   useEffect(() => {
@@ -144,6 +101,28 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
     };
   }, []);
 
+  const handleGenerateNews = async () => {
+    setGenerating(true);
+    try {
+      const response = await fetch('/api/news/generate', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate news');
+      }
+
+      // Refresh the news list after generation
+      await fetchNews();
+    } catch (err) {
+      console.error('Failed to generate news:', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   if (allArticles.length === 0 && !loading) {
     return null;
   }
@@ -155,8 +134,6 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
           ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
           : 'bg-white border border-gray-200'
       }`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Accordion Header Button */}
       <button
@@ -172,9 +149,9 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
           <span className={`text-[10px] font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
             News
           </span>
-          {visibleArticles.length > 0 && (
+          {allArticles.length > 0 && (
             <span className={`text-[8px] px-1 py-0.5 rounded ${useWhiteText ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-600'}`}>
-              {visibleArticles.length}
+              {allArticles.length}
             </span>
           )}
         </div>
@@ -192,13 +169,13 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
             ? (useWhiteText ? 'border-white/20' : 'border-gray-300/50')
             : 'border-gray-200'
         }`}>
-          {loading && visibleArticles.length === 0 ? (
+          {loading && allArticles.length === 0 ? (
             <div className="p-2">
               <p className={`text-[10px] ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>Loading news...</p>
             </div>
           ) : (
-            <div className="space-y-0.5 p-2">
-              {visibleArticles.map((article, index) => {
+            <div className="space-y-0.5 p-2 max-h-[300px] overflow-y-auto">
+              {allArticles.map((article, index) => {
                 // Safely handle missing source
                 const sourceName = article.source?.name || 'Unknown';
                 const sourceColor = getSourceColor(sourceName);
@@ -236,6 +213,21 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
                   </a>
                 );
               })}
+              {isAdmin && (
+                <div className={`pt-1 border-t ${
+                  currentBlurStyle 
+                    ? (useWhiteText ? 'border-white/20' : 'border-gray-300/50')
+                    : 'border-gray-200'
+                }`}>
+                  <button
+                    onClick={handleGenerateNews}
+                    disabled={generating}
+                    className={`text-[9px] ${useWhiteText ? 'text-white/80 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors disabled:opacity-50`}
+                  >
+                    {generating ? 'Generating...' : 'Generate more news'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

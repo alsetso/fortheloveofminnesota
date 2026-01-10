@@ -259,7 +259,7 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
 
   const displayName = currentAccount ? AccountService.getDisplayName(currentAccount) : 'User';
   const currentUserEmail = userEmail || user?.email || '';
-  
+
   // Handle onboarding completion
   const handleOnboardingComplete = async () => {
     try {
@@ -348,13 +348,13 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
                 </div>
               </div>
             </div>
-            
+
             {/* View Profile Button */}
             {currentAccount?.username && (
               <Link
                 href={`/profile/${currentAccount.username}`}
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-transparent border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-              >
+            >
                 View Profile
               </Link>
             )}
@@ -435,8 +435,8 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
             <div className="flex border-b border-gray-200 overflow-x-auto flex-shrink-0">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
-                return (
-                  <button
+              return (
+                <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`
@@ -449,9 +449,9 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
                   >
                     <Icon className="w-3 h-3" />
                     {tab.label}
-                  </button>
-                );
-              })}
+                </button>
+              );
+            })}
             </div>
           )}
 

@@ -38,6 +38,9 @@ export class MentionService {
           lat,
           lng,
           description,
+          image_url,
+          video_url,
+          media_type,
           account_id,
           city_id,
           collection_id,
@@ -209,6 +212,9 @@ export class MentionService {
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
         icon_url: null, // Not used - we use account.image_url instead
+        image_url: data.image_url || null,
+        video_url: data.video_url || null,
+        media_type: data.media_type || 'none',
         full_address: data.full_address || null,
         map_meta: data.map_meta || null,
         atlas_meta: data.atlas_meta || null,

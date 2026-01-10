@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, CogIcon, UserIcon, ChevronDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, AdjustmentsHorizontalIcon, UserIcon, ChevronDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
@@ -131,6 +131,16 @@ interface MapTopContainerProps {
     showCTU: boolean;
     setShowCTU: (show: boolean) => void;
   };
+  stateBoundaryState?: {
+    showStateBoundary: boolean;
+    setShowStateBoundary: (show: boolean) => void;
+  };
+  countyBoundariesState?: {
+    showCountyBoundaries: boolean;
+    setShowCountyBoundaries: (show: boolean) => void;
+  };
+  hideMicrophone?: boolean;
+  showWelcomeText?: boolean;
 }
 
 // Map meta layer definitions
@@ -159,11 +169,11 @@ const MAP_META_LAYERS = [
   { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
 ];
 
-export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, buildingsState, ctuState }: MapTopContainerProps) {
+export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false }: MapTopContainerProps) {
   const router = useRouter();
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
-  const { info } = useToast();
+  const { info, pro: proToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -842,6 +852,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           </div>
 
           {/* Microphone Icon */}
+          {!hideMicrophone && (
           <button
             onClick={handleVoiceSearch}
             disabled={!isSupported}
@@ -857,6 +868,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           >
             <MicrophoneIcon className="w-4 h-4" />
           </button>
+          )}
 
           {/* Profile Icon */}
           {account ? (
@@ -868,10 +880,10 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                 if (modalState) {
                   modalState.openAccount();
                 }
-                // Dispatch event to hide mobile nav
-                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                  detail: { isOpen: true }
-                }));
+                  // Dispatch event to hide mobile nav
+                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                    detail: { isOpen: true }
+                  }));
               }}
               className={`flex-shrink-0 w-8 h-8 rounded-full overflow-hidden transition-colors ${
                 (account.plan === 'pro' || account.plan === 'plus')
@@ -903,10 +915,10 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             <button
               onClick={() => {
                 openWelcome();
-                // Dispatch event to hide mobile nav
-                window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                  detail: { isOpen: true }
-                }));
+                  // Dispatch event to hide mobile nav
+                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
+                    detail: { isOpen: true }
+                  }));
               }}
               className={`flex-shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
                 useBlurStyle
@@ -922,88 +934,89 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
 
         {/* Bottom Row: Time Filter/Map Settings on left, News Stream on right */}
         <div className="flex items-start justify-between gap-2">
-          {/* Time Filter and Layers Container */}
-          <div className="flex items-center gap-2">
-            {/* Time Filter Selector or Reload Mentions Button */}
-            {mentionsLayerHidden ? (
-              <button
-                onClick={handleReloadMentions}
-                className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 border-2 border-red-500 ${
-                  useBlurStyle 
-                    ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg text-white hover:bg-red-500/20' 
-                    : 'bg-white hover:bg-red-50 text-gray-900'
-                }`}
-              >
-                <ArrowPathIcon className="w-3 h-3" />
-                Reload mentions
-              </button>
-            ) : (
+        {/* Time Filter and Layers Container */}
+        <div className="flex items-center gap-2">
+          {/* Time Filter Selector or Reload Mentions Button */}
+          {mentionsLayerHidden ? (
+            <button
+              onClick={handleReloadMentions}
+              className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 border-2 border-red-500 ${
+                useBlurStyle 
+                  ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg text-white hover:bg-red-500/20' 
+                  : 'bg-white hover:bg-red-50 text-gray-900'
+              }`}
+            >
+              <ArrowPathIcon className="w-3 h-3" />
+              Reload mentions
+            </button>
+          ) : (
               <>
                 {/* Large screens: Side by side buttons */}
-                <div 
-                  className={`hidden lg:flex rounded-md px-1 h-[25px] items-center gap-0.5 w-fit transition-all ${
-                    useBlurStyle 
-                      ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
-                      : 'bg-white border border-gray-200'
-                  }`}
-                >
-                  <button
-                    onClick={() => {
-                      setTimeFilter('24h');
-                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                        detail: { timeFilter: '24h' }
-                      }));
-                    }}
-                    className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
-                      timeFilter === '24h'
-                        ? useWhiteText ? 'text-white' : 'text-gray-900'
-                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    24h
-                  </button>
-                  <button
-                    onClick={() => {
-                      setTimeFilter('7d');
-                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                        detail: { timeFilter: '7d' }
-                      }));
-                    }}
-                    className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
-                      timeFilter === '7d'
-                        ? useWhiteText ? 'text-white' : 'text-gray-900'
-                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    7d
-                  </button>
-                  <button
-                    onClick={() => {
-                      const isPro = account?.plan === 'pro' || account?.plan === 'plus';
-                      if (!isPro) {
-                        openUpgrade('All time filter');
-                        return;
-                      }
-                      setTimeFilter('all');
-                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-                        detail: { timeFilter: 'all' }
-                      }));
-                    }}
-                    className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
-                      timeFilter === 'all'
-                        ? useWhiteText ? 'text-white' : 'text-gray-900'
-                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    All time
-                  </button>
+            <div 
+                  className={`hidden lg:flex rounded-md px-1 h-[28px] items-center gap-0.5 w-fit transition-all ${
+                useBlurStyle 
+                  ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
+                  : 'bg-white border border-gray-200'
+              }`}
+            >
+              <button
+                onClick={() => {
+                  setTimeFilter('24h');
+                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                    detail: { timeFilter: '24h' }
+                  }));
+                }}
+                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                  timeFilter === '24h'
+                    ? useWhiteText ? 'text-white' : 'text-gray-900'
+                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                24h
+              </button>
+              <button
+                onClick={() => {
+                  setTimeFilter('7d');
+                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                    detail: { timeFilter: '7d' }
+                  }));
+                }}
+                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                  timeFilter === '7d'
+                    ? useWhiteText ? 'text-white' : 'text-gray-900'
+                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                7d
+              </button>
+              <button
+                onClick={() => {
+                  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+                  if (!isPro) {
+                    openUpgrade('All time filter');
+                    return;
+                  }
+                  proToast('All time filter');
+                  setTimeFilter('all');
+                  window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                    detail: { timeFilter: 'all' }
+                  }));
+                }}
+                className={`rounded px-1.5 h-full text-[10px] font-medium transition-colors whitespace-nowrap flex items-center ${
+                  timeFilter === 'all'
+                    ? useWhiteText ? 'text-white' : 'text-gray-900'
+                    : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                All time
+              </button>
                 </div>
 
                 {/* Small screens: Dropdown */}
                 <div ref={timeDropdownRef} className="relative lg:hidden">
                   <button
                     onClick={() => setShowTimeDropdown(!showTimeDropdown)}
-                    className={`rounded-md px-2 h-[25px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1 ${
+                    className={`rounded-md px-2 h-[28px] text-[10px] font-medium transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       useBlurStyle 
                         ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
                         : 'bg-white border border-gray-200'
@@ -1012,7 +1025,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                     <span className={useWhiteText ? 'text-white' : 'text-gray-900'}>
                       {timeFilter === '24h' ? '24h' : timeFilter === '7d' ? '7d' : 'All time'}
                     </span>
-                    <ChevronDownIcon className={`w-3 h-3 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+                    <ChevronDownIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
                   </button>
 
                   {/* Dropdown Menu */}
@@ -1054,6 +1067,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                             setShowTimeDropdown(false);
                             return;
                           }
+                          proToast('All time filter');
                           setTimeFilter('all');
                           window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
                             detail: { timeFilter: 'all' }
@@ -1067,27 +1081,27 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                         All time
                       </button>
                     </div>
-                  )}
-                </div>
+              )}
+            </div>
               </>
-            )}
+          )}
 
             {/* Map Settings Button */}
-            <button
-              onClick={() => {
-                if (modalState) {
-                  modalState.openMapStyles();
-                }
-              }}
-              className={`rounded-md px-1.5 h-[25px] transition-colors flex items-center justify-center ${
-                useBlurStyle 
-                  ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg border-2 border-transparent' 
-                  : 'bg-white hover:bg-gray-50 border border-gray-200'
-              }`}
+          <button
+            onClick={() => {
+              if (modalState) {
+                modalState.openMapStyles();
+              }
+            }}
+              className={`rounded-md px-2 h-[28px] transition-colors flex items-center justify-center ${
+              useBlurStyle 
+                ? 'bg-transparent backdrop-blur-md hover:backdrop-blur-lg border-2 border-transparent' 
+                : 'bg-white hover:bg-gray-50 border border-gray-200'
+            }`}
               aria-label="Map Settings"
-            >
-              <CogIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
-            </button>
+          >
+              <AdjustmentsHorizontalIcon className={`w-4 h-4 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
+          </button>
           </div>
 
           {/* News Stream - Visible on small screens and up */}
@@ -1120,6 +1134,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           districtsState={districtsState}
           buildingsState={buildingsState}
           ctuState={ctuState}
+          stateBoundaryState={stateBoundaryState}
+          countyBoundariesState={countyBoundariesState}
         />
       )}
 

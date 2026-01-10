@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CameraIcon } from '@heroicons/react/24/outline';
 import CreateMentionContent from './CreateMentionContent';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import type { ReactNode } from 'react';
@@ -16,8 +16,16 @@ interface CreateMentionPopupProps {
   initialAtlasMeta?: Record<string, any> | null;
   initialMapMeta?: Record<string, any> | null;
   initialFullAddress?: string | null;
+  initialImageBlob?: Blob | null;
   onMentionCreated?: () => void;
+  onCameraClick?: () => void;
   children?: ReactNode;
+}
+
+interface CharacterCountState {
+  length: number;
+  maxLength: number;
+  isPro: boolean;
 }
 
 /**
@@ -33,13 +41,16 @@ export default function CreateMentionPopup({
   initialAtlasMeta,
   initialMapMeta,
   initialFullAddress,
+  initialImageBlob,
   onMentionCreated,
+  onCameraClick,
   children,
 }: CreateMentionPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
+  const [characterCount, setCharacterCount] = useState<CharacterCountState>({ length: 0, maxLength: 240, isPro: false });
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
@@ -66,6 +77,11 @@ export default function CreateMentionPopup({
   // Use transparent backgrounds and white text when satellite + blur
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
   const useWhiteText = useTransparentUI;
+
+  // Memoize the description change callback to prevent infinite loops
+  const handleDescriptionChange = useCallback((length: number, maxLength: number, isPro: boolean) => {
+    setCharacterCount({ length, maxLength, isPro });
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -213,7 +229,9 @@ export default function CreateMentionPopup({
                     initialAtlasMeta={initialAtlasMeta}
                     initialMapMeta={initialMapMeta}
                     initialFullAddress={initialFullAddress}
+                    initialImageBlob={initialImageBlob}
                     onMentionCreated={onMentionCreated}
+                    onDescriptionChange={handleDescriptionChange}
                   />
                   {children}
                 </>
@@ -225,7 +243,46 @@ export default function CreateMentionPopup({
                 </div>
               )}
             </div>
+
+            {/* Character Count - Bottom right of popup */}
+            {initialCoordinates && (
+              <div className="absolute bottom-4 right-4 z-10">
+                {characterCount.isPro ? (
+                  <span className={`text-[10px] ${useWhiteText ? 'text-white/60' : 'text-gray-400'}`}>
+                    {characterCount.length}/<span className="text-yellow-500">+240</span>
+                  </span>
+                ) : (
+                  <span className={`text-[10px] ${
+                    characterCount.length >= characterCount.maxLength 
+                      ? 'text-red-500' 
+                      : useWhiteText 
+                      ? 'text-white/60' 
+                      : 'text-gray-400'
+                  }`}>
+                    {characterCount.length}/{characterCount.maxLength}
+                  </span>
+                )}
+              </div>
+            )}
       </div>
+
+      {/* Camera Button - Fixed bottom center, in front of popup (z-[65] > popup z-[60]) */}
+      {isOpen && onCameraClick && (
+        <button
+          onClick={onCameraClick}
+          className={`fixed bottom-4 left-1/2 z-[65] -translate-x-1/2 transition-all duration-300 ease-out w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
+            useWhiteText
+              ? 'bg-transparent backdrop-blur-sm border-2 border-white/80 text-white hover:border-white'
+              : 'bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-50 hover:border-gray-800'
+          }`}
+          style={{
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}
+          aria-label="Open camera"
+        >
+          <CameraIcon className="w-6 h-6" />
+        </button>
+      )}
     </>
   );
 

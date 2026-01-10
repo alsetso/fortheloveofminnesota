@@ -12,24 +12,27 @@ import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
-import MobileNavTabs, { type MobileNavTab } from '@/components/layout/MobileNavTabs';
-import MobileNavPopup from '@/components/layout/MobileNavPopup';
 import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
 import Map3DControlsSecondaryContent from '@/features/sidebar/components/Map3DControlsSecondaryContent';
-import ContributeContent from '@/components/layout/ContributeContent';
-import ToolsContent from '@/components/layout/ToolsContent';
 import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
 import DailyWelcomeModal from '@/components/layout/DailyWelcomeModal';
+import CameraModal from '@/components/camera/CameraModal';
+import CameraCircleButton from '@/components/layout/CameraCircleButton';
+import CameraImagePreview from '@/components/layout/CameraImagePreview';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useLivePageModals } from '../hooks/useLivePageModals';
 import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
 import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
 import CongressionalDistrictHoverInfo from '@/components/layout/CongressionalDistrictHoverInfo';
 import CTUHoverInfo from '@/components/layout/CTUHoverInfo';
+import CountyHoverInfo from '@/components/layout/CountyHoverInfo';
 import GovernmentBuildingsLayer from '@/features/map/components/GovernmentBuildingsLayer';
 import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
+import StateBoundaryLayer from '@/features/map/components/StateBoundaryLayer';
+import CountyBoundariesLayer from '@/features/map/components/CountyBoundariesLayer';
 import BuildingDetailView from '@/features/admin/components/BuildingDetailView';
+import LocationServicesPopup from '@/components/layout/LocationServicesPopup';
 
 interface LiveMapProps {
   cities: Array<{
@@ -87,13 +90,24 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   const [showCTU, setShowCTU] = useState(false);
   const [hoveredCTU, setHoveredCTU] = useState<any | null>(null);
   
+  // State boundary visibility state
+  const [showStateBoundary, setShowStateBoundary] = useState(false);
+  const [hoveredState, setHoveredState] = useState<any | null>(null);
+  
+  // County boundaries visibility state
+  const [showCountyBoundaries, setShowCountyBoundaries] = useState(false);
+  const [hoveredCounty, setHoveredCounty] = useState<any | null>(null);
+  
+  // Camera modal state
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [capturedImageBlob, setCapturedImageBlob] = useState<Blob | null>(null);
+  const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
+  const [waitingForLocation, setWaitingForLocation] = useState(false);
+  
   // Unified modal state management
   const {
-    activeTab,
     popupData,
     isAccountModalOpen,
-    openTab,
-    closeTab,
     openCreate,
     closeCreate,
     openPopup,
@@ -107,13 +121,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     closeAll,
     isModalOpen,
   } = useLivePageModals();
-  
-  const activeTabRef = useRef<MobileNavTab | null>(null);
-  
-  // Keep ref in sync with activeTab for use in map click handler
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
   
   // Atlas entity state (managed at parent level)
   const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<{
@@ -163,26 +170,40 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
   });
   const [showDailyWelcome, setShowDailyWelcome] = useState(false);
+  const [hideMicrophone, setHideMicrophone] = useState(true);
+  const [showWelcomeTextOnly, setShowWelcomeTextOnly] = useState(true);
 
   // Show welcome toast when page loads (for authenticated users)
+  // Sequence: hide mic -> show welcome text only -> reshow mic
   useEffect(() => {
     if (!user || !account || !mapLoaded || authLoading) return undefined;
 
     let hideTimer: NodeJS.Timeout | null = null;
+    let showMicTimer: NodeJS.Timeout | null = null;
+
+    // Start with microphone hidden
+    setHideMicrophone(true);
+    setShowWelcomeTextOnly(true);
 
     // Small delay to ensure map is fully rendered
     const showWelcome = setTimeout(() => {
       setShowDailyWelcome(true);
       
-      // Auto-hide after 3 seconds (toast behavior)
-      hideTimer = setTimeout(() => {
+      // After showing welcome, wait then reshow microphone
+      showMicTimer = setTimeout(() => {
         setShowDailyWelcome(false);
-      }, 3000);
+        setShowWelcomeTextOnly(false);
+        // Small delay before showing mic again
+        setTimeout(() => {
+          setHideMicrophone(false);
+        }, 300);
+      }, 2500); // Show welcome for 2.5 seconds
     }, 500); // 500ms delay after map loads
 
     return () => {
       clearTimeout(showWelcome);
       if (hideTimer) clearTimeout(hideTimer);
+      if (showMicTimer) clearTimeout(showMicTimer);
     };
   }, [user, account, mapLoaded, authLoading]);
 
@@ -446,16 +467,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     }
   }, [mapLoaded, openPopup]);
 
-  // Handle tab click - toggle sheet
-  const handleTabClick = useCallback((tab: MobileNavTab) => {
-    if (activeTab === tab) {
-      closeTab();
-      // No need to clear Create sheet state here since it's managed separately
-    } else {
-      openTab(tab);
-    }
-  }, [activeTab, openTab, closeTab]);
-
   // Listen for mention click events to show popup
   useEffect(() => {
     const handleMentionClick = (event: Event) => {
@@ -470,6 +481,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         openPopup('pin', {
           id: mention.id,
           description: mention.description,
+          image_url: mention.image_url,
+          video_url: mention.video_url,
+          media_type: mention.media_type,
           account: mention.account,
           account_id: mention.account_id,
           created_at: mention.created_at,
@@ -754,6 +768,20 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             return;
           }
           
+          // Dispatch event for location services popup (manual location input)
+          window.dispatchEvent(new CustomEvent('map-location-click', {
+            detail: { lat, lng }
+          }));
+          
+          // If waiting for location after camera capture, set location and open create form
+          if (waitingForLocation && capturedImageBlob) {
+            setCreateTabSelectedLocation({ lat, lng });
+            setWaitingForLocation(false);
+            // Open create mention popup with captured image and selected location
+            openCreate();
+            return;
+          }
+          
           // If Create sheet is open, update the selected location
           if (isModalOpen('create')) {
             setCreateTabSelectedLocation({ lat, lng });
@@ -1027,6 +1055,15 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
               showCTU,
               setShowCTU,
             }}
+            stateBoundaryState={{
+              showStateBoundary,
+              setShowStateBoundary,
+            }}
+            countyBoundariesState={{
+              showCountyBoundaries,
+              setShowCountyBoundaries,
+            }}
+            hideMicrophone={hideMicrophone}
           />
 
 
@@ -1091,6 +1128,26 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             />
           )}
 
+          {/* State Boundary Layer */}
+          {mapLoaded && mapInstanceRef.current && (
+            <StateBoundaryLayer
+              map={mapInstanceRef.current}
+              mapLoaded={mapLoaded}
+              visible={showStateBoundary}
+              onStateHover={setHoveredState}
+            />
+          )}
+
+          {/* County Boundaries Layer */}
+          {mapLoaded && mapInstanceRef.current && (
+            <CountyBoundariesLayer
+              map={mapInstanceRef.current}
+              mapLoaded={mapLoaded}
+              visible={showCountyBoundaries}
+              onCountyHover={setHoveredCounty}
+            />
+          )}
+
           {/* Loading/Error Overlay */}
           {!mapLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
@@ -1121,12 +1178,73 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         </div>
       </div>
 
-      {/* Mobile Nav Tabs - Fixed bottom bar - Hidden when account modal is open, slides down when sheets open */}
-      {!isAccountModalOpen && (
-        <MobileNavTabs
-          activeTab={activeTab}
-          onTabClick={handleTabClick}
-          isSheetOpen={activeTab === 'contribute' || activeTab === 'tools'}
+      {/* Camera Modal */}
+      <CameraModal
+        isOpen={isCameraOpen}
+        onClose={() => {
+          setIsCameraOpen(false);
+          // Only clear image state if we're not waiting for location (user manually closed)
+          if (!waitingForLocation) {
+            setCapturedImageBlob(null);
+            setCapturedImagePreview(null);
+            setWaitingForLocation(false);
+          }
+        }}
+        onImageCaptured={(blob) => {
+          console.log('[LiveMap] Image captured from camera, blob size:', blob.size);
+          setCapturedImageBlob(blob);
+          
+          // Create preview URL for display
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setCapturedImagePreview(reader.result as string);
+            
+            // If create mention form is already open with coordinates, send media directly to it
+            // Otherwise, wait for location selection
+            if (isModalOpen('create') && createTabSelectedLocation) {
+              // Form is open with location - media will be passed via initialImageBlob prop
+              // Don't set waitingForLocation, just close camera modal
+              setIsCameraOpen(false);
+              console.log('[LiveMap] Image preview created, sending to open create mention form');
+            } else {
+              // Form not open or no location - wait for location selection
+              setWaitingForLocation(true);
+              setIsCameraOpen(false);
+              console.log('[LiveMap] Image preview created, waiting for location selection');
+            }
+          };
+          reader.readAsDataURL(blob);
+        }}
+      />
+
+      {/* Camera Image Preview - Floating in bottom right, waiting for location */}
+      {waitingForLocation && capturedImageBlob && capturedImagePreview && (
+        <CameraImagePreview
+          imageBlob={capturedImageBlob}
+          imagePreview={capturedImagePreview}
+          onRemove={() => {
+            setCapturedImageBlob(null);
+            setCapturedImagePreview(null);
+            setWaitingForLocation(false);
+          }}
+        />
+      )}
+
+      {/* Location Services Popup - Bottom right */}
+      <LocationServicesPopup
+        map={mapInstanceRef.current}
+        mapLoaded={mapLoaded}
+        onLocationSet={(location) => {
+          // Location set via GPS or manual input
+          // Map will already be centered by LocationServicesPopup
+          console.log('[LiveMap] Location set:', location);
+        }}
+      />
+
+      {/* Camera Circle Button - Fixed bottom center, hidden when create popup is open */}
+      {!isAccountModalOpen && !isModalOpen('create') && (
+        <CameraCircleButton
+          onClick={() => setIsCameraOpen(true)}
         />
       )}
 
@@ -1138,6 +1256,10 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           setCreateTabSelectedLocation(null);
           setCreateTabAtlasMeta(null);
           setCreateTabMapMeta(null);
+          setCreateTabFullAddress(null);
+          setCapturedImageBlob(null);
+          setCapturedImagePreview(null);
+          setWaitingForLocation(false);
           // Remove temporary marker when create popup closes
           if (temporaryMarkerRef.current) {
             temporaryMarkerRef.current.remove();
@@ -1148,37 +1270,25 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             mapLoaded={mapLoaded}
             initialCoordinates={createTabSelectedLocation}
             initialAtlasMeta={createTabAtlasMeta}
-        initialMapMeta={createTabMapMeta}
-        initialFullAddress={createTabFullAddress}
-            onMentionCreated={() => {
+            initialMapMeta={createTabMapMeta}
+            initialFullAddress={createTabFullAddress}
+            initialImageBlob={capturedImageBlob}
+            onCameraClick={() => setIsCameraOpen(true)}
+        onMentionCreated={() => {
               closeCreate();
               setCreateTabSelectedLocation(null);
               setCreateTabAtlasMeta(null);
           setCreateTabMapMeta(null);
           setCreateTabFullAddress(null);
+              // Clear captured image state after mention is created
+              setCapturedImageBlob(null);
+              setCapturedImagePreview(null);
+              setWaitingForLocation(false);
               setMentionsRefreshKey(prev => prev + 1);
             }}
           />
 
-      {/* Contribute Sheet */}
-      <MobileNavPopup
-        isOpen={activeTab === 'contribute' && !isAccountModalOpen}
-        onClose={closeTab}
-        title="Contribute"
-      >
-        <ContributeContent map={mapInstanceRef.current} mapLoaded={mapLoaded} />
-      </MobileNavPopup>
-
-      {/* Tools Sheet */}
-      <MobileNavPopup
-        isOpen={activeTab === 'tools' && !isAccountModalOpen}
-        onClose={closeTab}
-        title="Tools"
-      >
-        <ToolsContent />
-      </MobileNavPopup>
-
-      {/* Map Entity Popup - Above mobile nav */}
+      {/* Map Entity Popup */}
       <MapEntityPopup
         isOpen={popupData.type !== null && !isAccountModalOpen}
         onClose={() => {
@@ -1204,6 +1314,11 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         ctu={hoveredCTU}
       />
 
+      {/* County Hover Info - Right Side */}
+      <CountyHoverInfo
+        county={hoveredCounty}
+      />
+
       {/* Building Detail View - Full Screen Modal */}
       {selectedBuilding && (
         <BuildingDetailView
@@ -1218,6 +1333,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         isOpen={showDailyWelcome}
         onClose={() => setShowDailyWelcome(false)}
         useBlurStyle={useBlurStyle}
+        showTextOnly={showWelcomeTextOnly}
       />
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}

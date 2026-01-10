@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon, CubeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CubeIcon, EyeIcon, EyeSlashIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { MAP_CONFIG } from '@/features/map/config';
 import { mapStylePreloader } from '@/features/map/services/mapStylePreloader';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
@@ -25,13 +25,21 @@ interface MapStylesPopupProps {
     showCTU: boolean;
     setShowCTU: (show: boolean) => void;
   };
+  stateBoundaryState?: {
+    showStateBoundary: boolean;
+    setShowStateBoundary: (show: boolean) => void;
+  };
+  countyBoundariesState?: {
+    showCountyBoundaries: boolean;
+    setShowCountyBoundaries: (show: boolean) => void;
+  };
 }
 
 /**
  * Slide-up popup for map styles/layers selection
  * Appears from the bottom of the screen, positioned in front of mobile nav (z-[60])
  */
-export default function MapStylesPopup({ isOpen, onClose, map, districtsState, buildingsState, ctuState }: MapStylesPopupProps) {
+export default function MapStylesPopup({ isOpen, onClose, map, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [selectedStyle, setSelectedStyle] = useState<MapStyle>('streets');
   const [mounted, setMounted] = useState(false);
@@ -309,7 +317,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
             {/* 3D View Controls */}
             <div>
               <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>3D View</div>
-              <div className="flex gap-1">
+                <div className="flex gap-1">
                   <button
                     onClick={() => setPitchValue(0)}
                     className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
@@ -483,7 +491,21 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
                         : 'bg-white border-gray-200 hover:bg-gray-50'
                     } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
                   >
-                    <span>Congressional Districts</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>Congressional Districts</span>
+                      <a
+                        href="https://www.sos.mn.gov/election-administration-campaigns/data-maps/geojson-files/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className={`transition-colors ${
+                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        aria-label="View Congressional Districts data source"
+                      >
+                        <InformationCircleIcon className="w-3 h-3" />
+                      </a>
+                    </div>
                     <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
                       districtsState.showDistricts ? 'bg-gray-900' : 'bg-gray-300'
                     }`}>
@@ -511,7 +533,21 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
                         : 'bg-white border-gray-200 hover:bg-gray-50'
                     } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
                   >
-                    <span>CTU Boundaries</span>
+                    <div className="flex items-center gap-1.5">
+                      <span>CTU Boundaries</span>
+                      <a
+                        href="https://gisdata.mn.gov/dataset/bdry-mn-city-township-unorg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className={`transition-colors ${
+                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        aria-label="View CTU Boundaries data source"
+                      >
+                        <InformationCircleIcon className="w-3 h-3" />
+                      </a>
+                    </div>
                     <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
                       ctuState.showCTU ? 'bg-gray-900' : 'bg-gray-300'
                     }`}>
@@ -522,6 +558,186 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
                   </button>
                 </div>
               )}
+
+              {/* Water (National Hydrography Data) - Coming Soon */}
+              <div>
+                {!districtsState && !ctuState && !stateBoundaryState && !countyBoundariesState && (
+                  <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
+                )}
+                <div
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border ${
+                    useBlurStyle
+                      ? 'bg-white/5 border-white/10'
+                      : 'bg-gray-50 border-gray-200'
+                  } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Water</span>
+                    <a
+                      href="https://gisdata.mn.gov/dataset/water-national-hydrography-data"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`transition-colors ${
+                        useWhiteText ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      aria-label="View Water (National Hydrography Data) data source"
+                    >
+                      <InformationCircleIcon className="w-3 h-3" />
+                    </a>
+                    <span className="text-[10px] text-gray-400">(Coming Soon)</span>
+                  </div>
+                  <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                    <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                  </div>
+                </div>
+              </div>
+
+              {/* County Boundaries */}
+              {countyBoundariesState && (
+                <div>
+                  {!districtsState && !ctuState && (
+                    <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
+                  )}
+                  <button
+                    onClick={() => {
+                      countyBoundariesState.setShowCountyBoundaries(!countyBoundariesState.showCountyBoundaries);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>County Boundaries</span>
+                      <a
+                        href="https://gisdata.mn.gov/dataset/bdry-counties-in-minnesota"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className={`transition-colors ${
+                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        aria-label="View County Boundaries data source"
+                      >
+                        <InformationCircleIcon className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                      countyBoundariesState.showCountyBoundaries ? 'bg-gray-900' : 'bg-gray-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                        countyBoundariesState.showCountyBoundaries ? 'translate-x-3.5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* State Boundary */}
+              {stateBoundaryState && (
+                <div>
+                  {!districtsState && !ctuState && !countyBoundariesState && (
+                    <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
+                  )}
+                  <button
+                    onClick={() => {
+                      stateBoundaryState.setShowStateBoundary(!stateBoundaryState.showStateBoundary);
+                    }}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>State Boundary</span>
+                      <a
+                        href="https://gisdata.mn.gov/dataset/bdry-state-of-minnesota"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className={`transition-colors ${
+                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                        aria-label="View State Boundary data source"
+                      >
+                        <InformationCircleIcon className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                      stateBoundaryState.showStateBoundary ? 'bg-gray-900' : 'bg-gray-300'
+                    }`}>
+                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                        stateBoundaryState.showStateBoundary ? 'translate-x-3.5' : 'translate-x-0'
+                      }`} />
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* Roads (Route Centerlines) - Coming Soon */}
+              <div>
+                <div
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border ${
+                    useBlurStyle
+                      ? 'bg-white/5 border-white/10'
+                      : 'bg-gray-50 border-gray-200'
+                  } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Roads</span>
+                    <a
+                      href="https://gisdata.mn.gov/dataset/trans-roads-centerlines"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`transition-colors ${
+                        useWhiteText ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      aria-label="View Roads (Route Centerlines) data source"
+                    >
+                      <InformationCircleIcon className="w-3 h-3" />
+                    </a>
+                    <span className="text-[10px] text-gray-400">(Coming Soon)</span>
+                  </div>
+                  <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                    <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parcels - Coming Soon */}
+              <div>
+                <div
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border ${
+                    useBlurStyle
+                      ? 'bg-white/5 border-white/10'
+                      : 'bg-gray-50 border-gray-200'
+                  } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Parcels</span>
+                    <a
+                      href="https://gisdata.mn.gov/dataset/plan-parcels-open"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className={`transition-colors ${
+                        useWhiteText ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      aria-label="View Parcels data source"
+                    >
+                      <InformationCircleIcon className="w-3 h-3" />
+                    </a>
+                    <span className="text-[10px] text-gray-400">(Coming Soon)</span>
+                  </div>
+                  <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                    <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                  </div>
+                </div>
+              </div>
 
               {/* UI Style Section */}
               <div>
@@ -554,39 +770,39 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
                   </button>
 
                   {/* Transparent Blur Toggle */}
-                  <button
-                    onClick={() => {
-                      const newValue = !useBlurStyle;
-                      setUseBlurStyle(newValue);
-                      // Store in window for session persistence
-                      if (typeof window !== 'undefined') {
-                        (window as any).__useBlurStyle = newValue;
-                      }
-                      // Dispatch event to update all components
-                      window.dispatchEvent(new CustomEvent('blur-style-change', {
-                        detail: { useBlurStyle: newValue }
-                      }));
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                  >
-                    <span>Transparent Blur</span>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    const newValue = !useBlurStyle;
+                    setUseBlurStyle(newValue);
+                    // Store in window for session persistence
+                    if (typeof window !== 'undefined') {
+                      (window as any).__useBlurStyle = newValue;
+                    }
+                    // Dispatch event to update all components
+                    window.dispatchEvent(new CustomEvent('blur-style-change', {
+                      detail: { useBlurStyle: newValue }
+                    }));
+                  }}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                    useBlurStyle
+                      ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                  } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                >
+                  <span>Transparent Blur</span>
+                  <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                    useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
+                  }`}>
+                    <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                      useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
+                    }`} />
+                  </div>
+                </button>
               </div>
             </div>
           </div>
         </div>
+      </div>
     </>
   );
 

@@ -33,6 +33,10 @@ export function useToast() {
     return toast('info', title, message);
   }, [toast]);
 
+  const pro = useCallback((featureName: string) => {
+    return toast('pro', `Pro feature: ${featureName}`, undefined);
+  }, [toast]);
+
   // API-specific toast methods
   const apiToast = useCallback((apiCall: string, message?: string) => {
     return {
@@ -87,6 +91,7 @@ export function useToast() {
     error,
     loading,
     info,
+    pro,
     
     // API methods
     apiToast,

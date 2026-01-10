@@ -23,15 +23,13 @@ const nextConfig: NextConfig = {
     tsconfigPath: './tsconfig.json',
   },
   // Exclude _archive folders from build output tracing
-  experimental: {
-    outputFileTracingExcludes: {
-      '*': [
-        '**/_archive/**',
-        '**/*_archive/**',
-        '**/features/_archive/**',
-        '**/components/_archive/**',
-      ],
-    },
+  outputFileTracingExcludes: {
+    '*': [
+      '**/_archive/**',
+      '**/*_archive/**',
+      '**/features/_archive/**',
+      '**/components/_archive/**',
+    ],
   },
   images: {
     remotePatterns: [

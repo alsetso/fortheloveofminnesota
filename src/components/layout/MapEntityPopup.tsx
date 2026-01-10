@@ -18,6 +18,9 @@ interface MapEntityPopupProps {
     // Pin/Mention data
     id?: string;
     description?: string;
+    image_url?: string | null;
+    video_url?: string | null;
+    media_type?: 'image' | 'video' | 'none';
     account_id?: string | null;
     account?: {
       username?: string | null;
@@ -597,6 +600,39 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                           );
                         })()}
                       </div>
+                      
+                      {/* Mention Media (Image or Video) */}
+                      {(data.image_url || data.video_url) && (
+                        <div className="relative w-full rounded-md overflow-hidden border border-gray-200 mt-2 bg-black">
+                          {data.video_url ? (
+                            <video
+                              key={data.video_url}
+                              src={data.video_url}
+                              controls
+                              playsInline
+                              preload="metadata"
+                              className="w-full h-auto max-h-64 object-contain"
+                              onError={(e) => {
+                                console.error('[MapEntityPopup] Video load error:', e);
+                                const target = e.target as HTMLVideoElement;
+                                if (target.error) {
+                                  console.error('[MapEntityPopup] Video error code:', target.error.code, 'Message:', target.error.message);
+                                  console.error('[MapEntityPopup] Video URL:', data.video_url);
+                                }
+                              }}
+                            />
+                          ) : data.image_url ? (
+                            <Image
+                              src={data.image_url}
+                              alt="Mention image"
+                              width={400}
+                              height={300}
+                              className="w-full h-auto object-cover"
+                              unoptimized={data.image_url.includes('supabase.co')}
+                            />
+                          ) : null}
+                        </div>
+                      )}
                       
                       {/* YouTube Previews - only show for authenticated users */}
                       {user && (() => {

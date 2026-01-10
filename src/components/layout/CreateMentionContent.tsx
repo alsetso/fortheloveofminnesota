@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-import { InformationCircleIcon } from '@heroicons/react/24/outline';
+import { InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
 import YouTubePreview from '@/features/mentions/components/YouTubePreview';
 
+
 interface CreateMentionContentProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
@@ -21,7 +22,9 @@ interface CreateMentionContentProps {
   initialAtlasMeta?: Record<string, any> | null;
   initialMapMeta?: Record<string, any> | null;
   initialFullAddress?: string | null;
+  initialImageBlob?: Blob | null;
   onMentionCreated?: () => void;
+  onDescriptionChange?: (length: number, maxLength: number, isPro: boolean) => void;
 }
 
 export default function CreateMentionContent({ 
@@ -31,10 +34,17 @@ export default function CreateMentionContent({
   initialAtlasMeta,
   initialMapMeta,
   initialFullAddress,
-  onMentionCreated 
+  initialImageBlob,
+  onMentionCreated,
+  onDescriptionChange
 }: CreateMentionContentProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
+  
+  // Determine max length based on account plan (240 for hobby, unlimited for pro/plus)
+  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+  const maxLength = isPro ? 10000 : 240; // Very high limit for pro users (effectively unlimited)
+  
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +53,12 @@ export default function CreateMentionContent({
   const [showFirstMentionModal, setShowFirstMentionModal] = useState(false);
   const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
   const mapMetaInfoRef = useRef<HTMLDivElement>(null);
+  const initialCoordinatesProcessedRef = useRef<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
@@ -72,6 +88,20 @@ export default function CreateMentionContent({
   // Detect YouTube URLs in description
   const youtubeUrls = findYouTubeUrls(description);
 
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set height based on scrollHeight, with min and max constraints
+      const minHeight = 60; // ~4 rows at text-xs
+      const maxHeight = 200; // ~13 rows max
+      const newHeight = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight);
+      textarea.style.height = `${newHeight}px`;
+    }
+  }, [description]);
+
   // Close map meta info popup when clicking outside
   useEffect(() => {
     if (!showMapMetaInfo) return;
@@ -88,28 +118,71 @@ export default function CreateMentionContent({
     };
   }, [showMapMetaInfo]);
 
+  // Notify parent of description changes
+  useEffect(() => {
+    onDescriptionChange?.(description.length, maxLength, isPro);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description.length, maxLength, isPro]); // Only depend on values, not the callback function
+
+  // Handle initial image/video blob from camera
+  useEffect(() => {
+    if (initialImageBlob) {
+      const isVideo = initialImageBlob.type.startsWith('video/');
+      console.log('[CreateMentionContent] Received initial blob from camera:', isVideo ? 'video' : 'image');
+      
+      // Convert Blob to File for consistency with file input handling
+      const fileName = isVideo 
+        ? `camera-capture-${Date.now()}.webm`
+        : `camera-capture-${Date.now()}.jpg`;
+      const file = new File([initialImageBlob], fileName, { type: initialImageBlob.type });
+      setImageFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+        console.log('[CreateMentionContent] Preview created from camera blob');
+      };
+      reader.readAsDataURL(initialImageBlob);
+    }
+    // Note: We don't clear imageFile/imagePreview when initialImageBlob becomes null
+    // because the user might have manually selected an image via file input
+    // The parent (LiveMap) handles clearing the blob state after mention creation
+  }, [initialImageBlob]);
+
   // Use initialCoordinates if provided, otherwise get map center coordinates
   useEffect(() => {
     if (initialCoordinates) {
-      setCoordinates(initialCoordinates);
-      setError(null);
-    } else if (map && mapLoaded) {
-      const mapboxMap = map as any;
-      const center = mapboxMap.getCenter();
-      if (center) {
-        const lat = center.lat;
-        const lng = center.lng;
-        
-        // Check if within Minnesota bounds
-        if (MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
-          setCoordinates({ lat, lng });
-        } else {
-          setCoordinates(null);
-          setError('Map center is outside Minnesota');
+      // Create a stable key to compare coordinates
+      const coordKey = `${initialCoordinates.lat},${initialCoordinates.lng}`;
+      // Only update if coordinates actually changed
+      if (initialCoordinatesProcessedRef.current !== coordKey) {
+        setCoordinates(initialCoordinates);
+        setError(null);
+        initialCoordinatesProcessedRef.current = coordKey;
+      }
+    } else {
+      // Reset processed ref when initialCoordinates is null
+      initialCoordinatesProcessedRef.current = null;
+      if (map && mapLoaded) {
+        const mapboxMap = map as any;
+        const center = mapboxMap.getCenter();
+        if (center) {
+          const lat = center.lat;
+          const lng = center.lng;
+          
+          // Check if within Minnesota bounds
+          if (MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
+            setCoordinates({ lat, lng });
+          } else {
+            setCoordinates(null);
+            setError('Map center is outside Minnesota');
+          }
         }
       }
     }
-  }, [map, mapLoaded, initialCoordinates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, mapLoaded, initialCoordinates?.lat, initialCoordinates?.lng]); // Only depend on lat/lng values, not the object
 
   // Listen for map movement to update coordinates (only if no initialCoordinates provided)
   useEffect(() => {
@@ -137,7 +210,116 @@ export default function CreateMentionContent({
     return () => {
       mapboxMap.off('moveend', updateCoordinates);
     };
-  }, [map, mapLoaded, initialCoordinates]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, mapLoaded, initialCoordinates?.lat, initialCoordinates?.lng]); // Only depend on lat/lng values, not the object
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!user) {
+      setError('Please sign in to upload images');
+      return;
+    }
+
+    // Validate file type - only images allowed for now
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+    
+    if (isVideo) {
+      setError('Video uploads are not available yet. Please upload an image instead.');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+    
+    if (!isImage) {
+      setError('Please select a valid image file');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Validate file size (max 5MB for images)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError('Image must be smaller than 5MB');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setImageFile(file);
+    setError(null);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadMedia = async (): Promise<{ url: string; type: 'image' | 'video' } | null> => {
+    if (!imageFile || !user) return null;
+
+    setIsUploadingImage(true);
+    try {
+      const isVideo = imageFile.type.startsWith('video/');
+      const isImage = imageFile.type.startsWith('image/');
+      
+      // Allow images and videos from camera, but only images from file upload
+      // (file upload validation happens in handleImageSelect)
+      if (!isImage && !isVideo) {
+        throw new Error('Only image and video files are allowed');
+      }
+      
+      const fileExt = imageFile.name.split('.').pop() || (isVideo ? 'webm' : 'jpg');
+      const fileName = `${user.id}/mentions/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      // Upload to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from('mentions-media')
+        .upload(fileName, imageFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('mentions-media')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get media URL');
+      }
+
+      return {
+        url: urlData.publicUrl,
+        type: isVideo ? 'video' : 'image',
+      };
+    } catch (err) {
+      console.error('[CreateMentionContent] Error uploading media:', err);
+      throw err;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,6 +338,31 @@ export default function CreateMentionContent({
     setError(null);
 
     try {
+      // Upload media first if one is selected
+      let imageUrl: string | null = null;
+      let videoUrl: string | null = null;
+      let mediaType: 'image' | 'video' | 'none' = 'none';
+      
+      if (imageFile) {
+        try {
+          const mediaResult = await uploadMedia();
+          if (mediaResult) {
+            if (mediaResult.type === 'video') {
+              videoUrl = mediaResult.url;
+              mediaType = 'video';
+            } else {
+              imageUrl = mediaResult.url;
+              mediaType = 'image';
+            }
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to upload media';
+          setError(errorMessage);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       // Reverse geocode if full_address not provided
       let fullAddress = initialFullAddress || null;
       if (!fullAddress && coordinates) {
@@ -188,6 +395,9 @@ export default function CreateMentionContent({
         lng: coordinates.lng,
         description: description.trim() || null,
         visibility,
+        image_url: imageUrl,
+        video_url: videoUrl,
+        media_type: mediaType,
         full_address: fullAddress,
         atlas_meta: initialAtlasMeta || null,
         map_meta: initialMapMeta || null,
@@ -217,6 +427,11 @@ export default function CreateMentionContent({
       // Reset form
       setDescription('');
       setVisibility('public');
+      setImageFile(null);
+      setImagePreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
       // Trigger refresh
       window.dispatchEvent(new CustomEvent('mention-created'));
@@ -390,36 +605,39 @@ export default function CreateMentionContent({
       {/* Description */}
       <div>
         <textarea
+          ref={textareaRef}
           value={description}
           onChange={(e) => {
             const value = e.target.value;
-            if (value.length <= 240) {
+            if (value.length <= maxLength) {
               setDescription(value);
+              onDescriptionChange?.(value.length, maxLength, isPro);
             }
           }}
-          maxLength={240}
-          className={`w-full px-0 py-0 text-xs placeholder:text-gray-400 focus:outline-none resize-none bg-transparent ${
+          maxLength={maxLength}
+          className={`w-full px-0 py-0 text-xs placeholder:text-gray-400 focus:outline-none resize-none bg-transparent overflow-hidden ${
             useTransparentUI ? 'text-white placeholder:text-white/50' : 'text-gray-900'
           }`}
           placeholder="What's going on here?"
-          rows={4}
+          style={{ minHeight: '60px', maxHeight: '200px' }}
           disabled={isSubmitting || !coordinates}
         />
-        <div className="flex items-center justify-end gap-2 mt-1">
-          <span className={`text-[10px] ${
-            description.length >= 240 
-              ? 'text-red-500' 
-              : useTransparentUI 
-              ? 'text-white/60' 
-              : 'text-gray-400'
-          }`}>
-            {description.length}/240
-          </span>
-          {/* Submit Button - Only show if description has at least 1 character */}
-          {description.trim().length > 0 && (
+        <div className="flex items-center justify-end gap-2 mt-1.5">
+          {/* Hidden file input for image upload (still needed for image preview functionality) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            className="hidden"
+            disabled={isSubmitting || isUploadingImage}
+          />
+
+          {/* Submit Button - Only show if description has at least 1 character or image is selected */}
+          {(description.trim().length > 0 || imageFile) && (
             <button
               type="submit"
-              disabled={isSubmitting || !coordinates || !description.trim()}
+              disabled={isSubmitting || isUploadingImage || !coordinates || (!description.trim() && !imageFile)}
               className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Create Mention"
             >
@@ -431,6 +649,38 @@ export default function CreateMentionContent({
             </button>
           )}
         </div>
+        
+        {/* Image Preview */}
+        {imagePreview && (
+          <div className="relative mt-2">
+            <div className="relative w-full h-32 rounded-md overflow-hidden border border-gray-200">
+              {imageFile?.type.startsWith('video/') ? (
+                <video
+                  src={imagePreview}
+                  controls
+                  className="w-full h-full object-cover"
+                  playsInline
+                />
+              ) : (
+                <Image
+                  src={imagePreview}
+                  alt="Preview"
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              )}
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+                aria-label="Remove media"
+              >
+                <XMarkIcon className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        )}
         
         {/* YouTube Preview */}
         {youtubeUrls.length > 0 && (

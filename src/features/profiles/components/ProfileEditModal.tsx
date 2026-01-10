@@ -182,8 +182,8 @@ export default function ProfileEditModal({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-medium text-gray-700">
-                  Traits
-                </label>
+                Traits
+              </label>
                 {selectedTraits.length === 0 && (
                   <button
                     type="button"
@@ -204,14 +204,14 @@ export default function ProfileEditModal({
               {selectedTraits.length > 0 && (
                 <div className="mb-2">
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {selectedTraits.filter(Boolean).map((trait) => (
-                      <span
-                        key={trait!.id}
+                  {selectedTraits.filter(Boolean).map((trait) => (
+                    <span
+                      key={trait!.id}
                         className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 text-[10px] text-gray-900 rounded"
-                      >
-                        {trait!.label}
-                      </span>
-                    ))}
+                    >
+                      {trait!.label}
+                    </span>
+                  ))}
                   </div>
                   <button
                     type="button"
@@ -231,24 +231,24 @@ export default function ProfileEditModal({
               {/* All Traits Accordion */}
               {(showTraitsAccordion || selectedTraits.length === 0) && (
                 <div className="flex flex-wrap gap-1">
-                  {TRAIT_OPTIONS.map((trait) => {
-                    const isSelected = account.traits?.includes(trait.id) || false;
-                    return (
-                      <button
-                        key={trait.id}
-                        type="button"
-                        onClick={() => toggleTrait(trait.id)}
+                {TRAIT_OPTIONS.map((trait) => {
+                  const isSelected = account.traits?.includes(trait.id) || false;
+                  return (
+                    <button
+                      key={trait.id}
+                      type="button"
+                      onClick={() => toggleTrait(trait.id)}
                         className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
-                          isSelected
-                            ? 'bg-gray-700 text-white hover:bg-gray-600'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {trait.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                        isSelected
+                          ? 'bg-gray-700 text-white hover:bg-gray-600'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {trait.label}
+                    </button>
+                  );
+                })}
+              </div>
               )}
             </div>
 

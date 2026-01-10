@@ -1,6 +1,6 @@
 // Toast notification system types and utilities
 
-export type ToastType = 'success' | 'error' | 'loading' | 'info';
+export type ToastType = 'success' | 'error' | 'loading' | 'info' | 'pro';
 
 export interface ToastData {
   id: string;

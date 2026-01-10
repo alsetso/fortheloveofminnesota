@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Large GIS data files (keep locally, don't commit to git)
+minnesota_gov/GIS/Water/water_data/
+minnesota_gov/GIS/Parcels/gpkg_plan_parcels_open/
+minnesota_gov/GIS/Road/roads_centerlines/
+minnesota_gov/GIS/County/County Boundaries/
+minnesota_gov/GIS/State/State Boundary/
+# Keep README files and small metadata
+!minnesota_gov/GIS/*/README.md
+!minnesota_gov/GIS/*/README.MD

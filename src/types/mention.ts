@@ -16,6 +16,9 @@ export interface Mention {
   archived?: boolean;
   post_date?: string | null; // Date when the event/memory happened (for year filtering)
   icon_url?: string | null; // URL to the icon image for this mention pin
+  image_url?: string | null; // URL to user-uploaded image associated with this mention
+  video_url?: string | null; // URL to user-uploaded video associated with this mention
+  media_type?: 'image' | 'video' | 'none'; // Type of media attached to this mention
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
   atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details (parks, schools, cities, etc.) when mention is created on an atlas pin
@@ -43,6 +46,9 @@ export interface CreateMentionData {
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
   icon_url?: string | null; // URL to the icon image for this mention pin
+  image_url?: string | null; // URL to user-uploaded image associated with this mention
+  video_url?: string | null; // URL to user-uploaded video associated with this mention
+  media_type?: 'image' | 'video' | 'none'; // Type of media attached to this mention
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
   atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details when mention is created on an atlas pin

@@ -216,9 +216,20 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
         // Combine all CTU geometries into a single FeatureCollection
         const allFeatures: any[] = [];
         ctus.forEach((ctu) => {
-          if (ctu.geometry && ctu.geometry.type === 'FeatureCollection') {
-            ctu.geometry.features.forEach((feature: any) => {
-              allFeatures.push(feature);
+          const featureCollection = ctu.geometry;
+          if (featureCollection && featureCollection.type === 'FeatureCollection' && featureCollection.features) {
+            featureCollection.features.forEach((feature: any) => {
+              // Add CTU metadata to each feature's properties (same as CTUBoundariesLayer)
+              allFeatures.push({
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  ctu_id: ctu.id,
+                  ctu_class: ctu.ctu_class,
+                  feature_name: ctu.feature_name,
+                  county_name: ctu.county_name,
+                },
+              });
             });
           } else if (ctu.geometry) {
             allFeatures.push({

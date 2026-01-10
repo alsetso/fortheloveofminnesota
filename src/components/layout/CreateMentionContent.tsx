@@ -329,6 +329,14 @@ export default function CreateMentionContent({
       return;
     }
 
+    // Check if user is onboarded
+    if (account && !account.onboarded) {
+      setError('Please complete onboarding to create mentions');
+      // Trigger onboarding demo to show (it should already be visible, but ensure it's focused)
+      window.dispatchEvent(new CustomEvent('show-onboarding-demo'));
+      return;
+    }
+
     if (!coordinates) {
       setError('Please center the map on a location in Minnesota');
       return;

@@ -4,11 +4,12 @@ import { createServerClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 
 /**
- * GET /api/analytics/live-visitors
+ * GET /api/analytics/live-visitors?period=today|total
  * Returns visitor statistics for the live page
+ * Query params: period (today or total, default today)
  * Public endpoint - no authentication required
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -36,25 +37,40 @@ export async function GET(_request: NextRequest) {
       }
     );
 
-    // Get today's date range (start of today to now)
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    
-    // Get total visitors (all time)
-    const { count: totalCount, error: totalError } = await supabase
-      .from('page_views')
-      .select('*', { count: 'exact', head: true })
-      .eq('page_url', '/live');
+    // Get period filter from query params (today or total)
+    const { searchParams } = new URL(request.url);
+    const periodParam = searchParams.get('period');
+    const period = periodParam === 'total' ? 'total' : 'today';
 
-    // Get today's visitors
-    const { count: todayCount, error: todayError } = await supabase
-      .from('page_views')
-      .select('*', { count: 'exact', head: true })
-      .eq('page_url', '/live')
-      .gte('viewed_at', todayStart.toISOString());
+    let visitorCount: number;
+    let error;
 
-    if (totalError || todayError) {
-      console.error('Error fetching visitor stats:', { totalError, todayError });
+    if (period === 'today') {
+      // Get today's date range (start of today to now)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      
+      const result = await supabase
+        .from('page_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('page_url', '/live')
+        .gte('viewed_at', todayStart.toISOString());
+      
+      visitorCount = result.count || 0;
+      error = result.error;
+    } else {
+      // Get total visitors (all time)
+      const result = await supabase
+        .from('page_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('page_url', '/live');
+      
+      visitorCount = result.count || 0;
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Error fetching visitor stats:', error);
       return NextResponse.json(
         { error: 'Failed to fetch visitor statistics' },
         { status: 500 }
@@ -62,8 +78,8 @@ export async function GET(_request: NextRequest) {
     }
 
     return NextResponse.json({
-      totalVisitors: totalCount || 0,
-      todayVisitors: todayCount || 0,
+      visitors: visitorCount,
+      period: period,
     });
   } catch (error) {
     console.error('Error in live-visitors route:', error);

@@ -25,7 +25,7 @@ export default function CreateMentionModal({
   onBack,
   onVisibilityChange,
 }: CreateMentionModalProps) {
-  const { user, activeAccountId } = useAuthStateSafe();
+  const { user, account, activeAccountId } = useAuthStateSafe();
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +53,15 @@ export default function CreateMentionModal({
 
     if (!user) {
       setError('Please sign in to create mentions');
+      return;
+    }
+
+    // Check if user is onboarded
+    if (account && !account.onboarded) {
+      setError('Please complete onboarding to create mentions');
+      // Trigger onboarding demo to show
+      window.dispatchEvent(new CustomEvent('show-onboarding-demo'));
+      onClose();
       return;
     }
 

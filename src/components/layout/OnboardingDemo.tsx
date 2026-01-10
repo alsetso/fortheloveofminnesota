@@ -60,6 +60,21 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
     }
   }, [account, mapLoaded]);
 
+  // Listen for custom event to show onboarding demo
+  useEffect(() => {
+    const handleShowOnboarding = () => {
+      if (account && !account.onboarded && mapLoaded) {
+        setIsVisible(true);
+        setCurrentStep(0); // Reset to first step
+      }
+    };
+
+    window.addEventListener('show-onboarding-demo', handleShowOnboarding);
+    return () => {
+      window.removeEventListener('show-onboarding-demo', handleShowOnboarding);
+    };
+  }, [account, mapLoaded]);
+
   // Track map interactions (zoom/move) for step 1
   useEffect(() => {
     if (!map || !isVisible || currentStep !== 0) return;

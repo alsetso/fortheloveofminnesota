@@ -1034,6 +1034,14 @@ export default function LocationSidebar({
       return;
     }
 
+    // Require onboarding to create mentions
+    if (!accountRef.current?.onboarded) {
+      setPinError('Please complete onboarding to create mentions');
+      // Trigger onboarding demo to show
+      window.dispatchEvent(new CustomEvent('show-onboarding-demo'));
+      return;
+    }
+
     setIsPinSubmitting(true);
     setPinError(null);
 

@@ -47,18 +47,25 @@ export default function DailyWelcomeModal({ isOpen, onClose, useBlurStyle = fals
 
   const displayName = getDisplayName(account);
 
+  // Calculate position: search input container is at top-3 (12px)
+  // Search input has py-2 (8px top/bottom) + content height (~32px) = ~48px total
+  // Bottom row has space-y-1.5 (6px gap) below search
+  // Bottom row starts at: 12px (top-3) + 48px (search height) + 6px (gap) = 66px
+  // Map settings button is in bottom row, so align toast at same vertical position
+  const topPosition = '4.125rem'; // 66px = 4.125rem
+
   return (
     <>
-      {/* Sheet - positioned at top right, toast-like */}
+      {/* Sheet - positioned below search input, across from map settings */}
       <div
         ref={sheetRef}
-        className={`fixed z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col pointer-events-none
-          /* Top right positioning, auto width */
-          top-4 right-4 left-auto w-auto max-w-fit rounded-md
-          ${useBlurStyle ? 'bg-transparent backdrop-blur-md' : 'bg-white'}`}
+        className={`fixed z-[60] shadow-lg transition-all duration-300 ease-out flex flex-col pointer-events-none
+          /* Positioned below search input, on the right side, aligned with map settings */
+          right-3 left-auto w-auto max-w-fit rounded-md
+          ${useBlurStyle ? 'bg-transparent backdrop-blur-md border-2 border-transparent' : 'bg-white border border-gray-200'}`}
         style={{
+          top: topPosition,
           transform: 'translateY(calc(-100% - 1rem))',
-          paddingTop: 'env(safe-area-inset-top)',
         }}
       >
         {/* Content - compact toast style */}

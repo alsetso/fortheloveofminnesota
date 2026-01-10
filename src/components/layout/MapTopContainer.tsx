@@ -13,6 +13,7 @@ import LiveAccountModal from './LiveAccountModal';
 import MapStylesPopup from './MapStylesPopup';
 import DynamicSearchModal from './DynamicSearchModal';
 import NewsStream from './NewsStream';
+import DailyWelcomeModal from './DailyWelcomeModal';
 
 interface MapboxFeature {
   id: string;
@@ -141,6 +142,9 @@ interface MapTopContainerProps {
   };
   hideMicrophone?: boolean;
   showWelcomeText?: boolean;
+  showDailyWelcome?: boolean;
+  onCloseDailyWelcome?: () => void;
+  useBlurStyle?: boolean;
 }
 
 // Map meta layer definitions
@@ -169,7 +173,7 @@ const MAP_META_LAYERS = [
   { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
 ];
 
-export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false }: MapTopContainerProps) {
+export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
   const router = useRouter();
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
@@ -183,7 +187,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('7d');
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
-    // Initialize from window state if available
+    // Use prop if provided, otherwise initialize from window state
+    if (propUseBlurStyle !== undefined) return propUseBlurStyle;
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
@@ -980,15 +985,29 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                   modalState.openMapStyles();
                 }
               }}
-              className={`rounded-md px-2 py-1.5 transition-colors flex items-center justify-center shadow-lg bg-white hover:bg-gray-50 border border-gray-200`}
+              className={`rounded-md px-2 py-1.5 transition-colors flex items-center justify-center shadow-lg ${
+                useBlurStyle
+                  ? 'bg-transparent backdrop-blur-md border-2 border-transparent hover:backdrop-blur-lg'
+                  : 'bg-white hover:bg-gray-50 border border-gray-200'
+              }`}
               aria-label="Map Layers"
             >
-              <Squares2X2Icon className="w-5 h-5 text-gray-600" />
+              <Squares2X2Icon className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
             </button>
           )}
         </div>
         </div>
       </div>
+
+      {/* Daily Welcome Modal - positioned below search input, across from map settings */}
+      {showDailyWelcome && onCloseDailyWelcome && (
+        <DailyWelcomeModal
+          isOpen={showDailyWelcome}
+          onClose={onCloseDailyWelcome}
+          useBlurStyle={useBlurStyle}
+          showTextOnly={true}
+        />
+      )}
 
       {/* Live Account Modal */}
       {modalState && (

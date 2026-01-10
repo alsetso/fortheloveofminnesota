@@ -287,15 +287,28 @@ export default function CameraView({
   // Auto-focus text input when editor opens
   useEffect(() => {
     if (showTextEditor && textInputRef.current) {
-      // Small delay to ensure modal is rendered
-      const timeoutId = setTimeout(() => {
-        textInputRef.current?.focus();
-        // Center cursor in input if text exists
-        if (textInputRef.current && textOverlay) {
-          const length = textOverlay.length;
-          textInputRef.current.setSelectionRange(length, length);
-        }
-      }, 100);
+      // Use requestAnimationFrame for better mobile support
+      // Double RAF ensures the input is fully rendered and ready
+      const focusInput = () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (textInputRef.current) {
+              textInputRef.current.focus();
+              // On mobile, explicitly trigger focus to show keyboard
+              textInputRef.current.click();
+              
+              // Center cursor in input if text exists
+              if (textOverlay) {
+                const length = textOverlay.length;
+                textInputRef.current.setSelectionRange(length, length);
+              }
+            }
+          });
+        });
+      };
+      
+      // Small delay for desktop, immediate for mobile
+      const timeoutId = setTimeout(focusInput, 50);
       
       return () => clearTimeout(timeoutId);
     }
@@ -531,6 +544,18 @@ export default function CameraView({
                       setTextPosition({ x: 50, y: 50 }); // Center text when opening editor
                       setIsEditingText(true);
                       setShowTextEditor(true);
+                      
+                      // Immediately focus input on mobile - use requestAnimationFrame to ensure DOM is updated
+                      requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                          // Double RAF ensures the input is rendered and ready
+                          if (textInputRef.current) {
+                            textInputRef.current.focus();
+                            // On mobile, we may need to explicitly show the keyboard
+                            textInputRef.current.click();
+                          }
+                        });
+                      });
                     }}
                     className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-md text-sm font-medium hover:bg-white/30 transition-colors"
                     aria-label="Add text"

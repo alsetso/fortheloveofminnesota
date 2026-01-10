@@ -13,7 +13,6 @@ import LiveAccountModal from './LiveAccountModal';
 import MapStylesPopup from './MapStylesPopup';
 import DynamicSearchModal from './DynamicSearchModal';
 import NewsStream from './NewsStream';
-import { PWAStatusIcon } from '@/components/pwa/PWAStatusIcon';
 
 interface MapboxFeature {
   id: string;
@@ -191,8 +190,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
   });
   const [showNews, setShowNews] = useState(() => {
-    // Initialize from window state if available, default to true
-    return typeof window !== 'undefined' ? (window as any).__showNews !== false : true;
+    // Initialize from window state if available, default to false
+    return typeof window !== 'undefined' ? (window as any).__showNews === true : false;
   });
   
   // Use white text when transparent blur + satellite map
@@ -741,6 +740,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
         {showNews && <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />}
         {/* Search Bar */}
         <div 
+          data-search-container
           className={`rounded-xl shadow-lg px-2.5 py-2 flex items-center gap-1.5 relative transition-all ${
             useBlurStyle 
               ? 'bg-transparent backdrop-blur-md border-2 border-transparent' 
@@ -768,6 +768,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           <div className="flex-1 min-w-0 relative flex items-center gap-1.5">
             <input
               ref={inputRef}
+              data-search-input
               type="text"
               value={searchQuery || ''}
               onChange={(e) => {
@@ -867,34 +868,31 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           {/* Microphone Icon */}
           {!hideMicrophone && (
           <button
+            data-microphone-button
             onClick={handleVoiceSearch}
             disabled={!isSupported}
-            className={`flex-shrink-0 p-1.5 transition-colors flex items-center justify-center ${
+            className={`flex-shrink-0 w-8 h-8 rounded-full transition-colors flex items-center justify-center ${
               isRecording
-                ? 'text-red-500 animate-pulse'
+                ? 'bg-red-100 text-red-500 animate-pulse'
                 : isSupported
-                ? useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                : useWhiteText ? 'text-white/30 cursor-not-allowed' : 'text-gray-300 cursor-not-allowed'
+                ? useWhiteText 
+                  ? 'bg-white/20 hover:bg-white/30 text-white/70 hover:text-white' 
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700'
+                : useWhiteText 
+                  ? 'bg-white/10 text-white/30 cursor-not-allowed' 
+                  : 'bg-gray-50 text-gray-300 cursor-not-allowed'
             }`}
             aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
             title={isSupported ? (isRecording ? 'Stop recording' : 'Start voice search') : 'Voice search not supported'}
           >
-            <MicrophoneIcon className="w-5 h-5" />
+            <MicrophoneIcon className="w-4 h-4" />
           </button>
           )}
-
-          {/* PWA Status Icon */}
-          <div className="flex items-center justify-center">
-            <PWAStatusIcon 
-              variant={useWhiteText ? 'dark' : 'light'} 
-              size="sm"
-              showLabel={false}
-            />
-          </div>
 
           {/* Profile Icon */}
           {account ? (
             <button
+              data-account-button
               onClick={() => {
                 // Use global modal context to open LiveAccountModal
                 openAccount('settings');
@@ -959,7 +957,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
         {/* Reload Mentions or Map Settings Container */}
         <div className="flex items-center gap-1.5">
           {/* Reload Mentions Button or Map Settings Button */}
-          {mentionsLayerHidden ? (
+          {mentionsLayerHidden && currentMapStyle !== 'satellite' ? (
             <button
               onClick={handleReloadMentions}
               className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 border-2 border-red-500 ${
@@ -973,6 +971,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             </button>
           ) : (
             <button
+              data-map-settings-button
               onClick={() => {
                 if (modalState) {
                   modalState.openMapStyles();

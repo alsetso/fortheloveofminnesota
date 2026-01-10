@@ -15,6 +15,7 @@ import {
   BuildingStorefrontIcon,
   QuestionMarkCircleIcon
 } from '@heroicons/react/24/outline';
+import { PWAStatusIcon } from '@/components/pwa/PWAStatusIcon';
 import { useAuthStateSafe, AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
@@ -299,19 +300,26 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
               priority
             />
           </div>
-          <button
-            onClick={accountComplete ? onClose : undefined}
-            disabled={!accountComplete}
-            className={`p-1 transition-colors ${
-              accountComplete 
-                ? 'text-gray-500 hover:text-gray-700' 
-                : 'text-gray-300 cursor-not-allowed'
-            }`}
-            aria-label="Close"
-            title={!accountComplete ? 'Please complete your profile to continue' : 'Close'}
-          >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <PWAStatusIcon 
+              variant="light" 
+              size="sm"
+              showLabel={false}
+            />
+            <button
+              onClick={accountComplete ? onClose : undefined}
+              disabled={!accountComplete}
+              className={`p-1 transition-colors ${
+                accountComplete 
+                  ? 'text-gray-500 hover:text-gray-700' 
+                  : 'text-gray-300 cursor-not-allowed'
+              }`}
+              aria-label="Close"
+              title={!accountComplete ? 'Please complete your profile to continue' : 'Close'}
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Content */}

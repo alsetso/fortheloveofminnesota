@@ -60,8 +60,8 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
   const [showNews, setShowNews] = useState(() => {
-    // Initialize from window state if available, default to true
-    return typeof window !== 'undefined' ? (window as any).__showNews !== false : true;
+    // Initialize from window state if available, default to false
+    return typeof window !== 'undefined' ? (window as any).__showNews === true : false;
   });
 
   // Listen for blur style changes (in case changed elsewhere)

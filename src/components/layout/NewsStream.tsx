@@ -44,8 +44,8 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveredRef = useRef(false);
   
-  // Use white text when transparent blur + satellite map
-  const useWhiteText = currentBlurStyle && currentMapStyle === 'satellite';
+  // Use white text when on satellite map
+  const useWhiteText = currentMapStyle === 'satellite';
 
   // Listen for blur style and map style changes
   useEffect(() => {

@@ -4,11 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MapPinIcon, CheckIcon } from '@heroicons/react/24/outline';
 import LayerGeometryMap from './LayerGeometryMap';
+import { useLocation } from '@/features/map/hooks/useLocation';
 
 const OVERLAY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const STORAGE_KEY = 'location-stepper-last-shown';
+const PRIMARY_LOCATION_STORAGE_KEY = 'PRIMARY_LOCATION_AREA_ONBOARDING';
 
 interface LocationStepperOverlayProps {
   isOpen: boolean;
@@ -16,17 +18,15 @@ interface LocationStepperOverlayProps {
 }
 
 export default function LocationStepperOverlay({ isOpen, onClose }: LocationStepperOverlayProps) {
-  const [step, setStep] = useState<1 | 2>(1);
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
-  const [stateBoundary, setStateBoundary] = useState<any>(null);
   const [ctus, setCTUs] = useState<any[]>([]);
-  const [selectedState, setSelectedState] = useState<any>(null);
   const [selectedCTU, setSelectedCTU] = useState<any>(null);
   const [hoveredCTU, setHoveredCTU] = useState<any>(null);
   const [showCTUDetailsPopup, setShowCTUDetailsPopup] = useState(false);
   const ctuDetailsPopupRef = useRef<HTMLDivElement>(null);
+  const { location, isLoading: isLocationLoading, isSupported: isLocationSupported, requestLocation } = useLocation();
 
   // Initialize map
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
 
         mapboxMap = new mapboxgl.Map({
           container: mapContainerRef.current,
-          style: MAP_CONFIG.MAPBOX_STYLE,
+          style: MAP_CONFIG.STRATEGIC_STYLES.streets,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: 6,
           pitch: 0,
@@ -73,27 +73,9 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     };
   }, [isOpen]);
 
-  // Fetch state boundary for step 1
+  // Fetch CTUs when overlay opens
   useEffect(() => {
-    if (!isOpen || step !== 1) return;
-
-    const fetchStateBoundary = async () => {
-      try {
-        const response = await fetch('/api/civic/state-boundary');
-        if (!response.ok) throw new Error('Failed to fetch state boundary');
-        const data = await response.json();
-        setStateBoundary(data);
-      } catch (error) {
-        console.error('[LocationStepperOverlay] Failed to fetch state boundary:', error);
-      }
-    };
-
-    fetchStateBoundary();
-  }, [isOpen, step]);
-
-  // Fetch CTUs for step 2
-  useEffect(() => {
-    if (!isOpen || step !== 2) return;
+    if (!isOpen) return;
 
     const fetchCTUs = async () => {
       try {
@@ -107,97 +89,11 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     };
 
     fetchCTUs();
-  }, [isOpen, step]);
+  }, [isOpen]);
 
-  // Render state boundary on map (step 1)
+  // Render CTU boundaries on map
   useEffect(() => {
-    if (!mapInstanceRef.current || !mapLoaded || !stateBoundary || step !== 1) return;
-
-    const mapboxMap = mapInstanceRef.current as any;
-    const sourceId = 'stepper-state-boundary-source';
-    const fillLayerId = 'stepper-state-boundary-fill';
-    const outlineLayerId = 'stepper-state-boundary-outline';
-
-    const setupStateBoundary = async () => {
-      try {
-        // Remove existing layers/sources if they exist
-        if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
-        if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
-        if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
-
-        // Add source
-        mapboxMap.addSource(sourceId, {
-          type: 'geojson',
-          data: stateBoundary.geometry,
-        });
-
-        // Add fill layer
-        mapboxMap.addLayer({
-          id: fillLayerId,
-          type: 'fill',
-          source: sourceId,
-          paint: {
-            'fill-color': '#3b82f6',
-            'fill-opacity': 0.3,
-          },
-        });
-
-        // Add outline layer
-        mapboxMap.addLayer({
-          id: outlineLayerId,
-          type: 'line',
-          source: sourceId,
-          paint: {
-            'line-color': '#3b82f6',
-            'line-width': 2,
-          },
-        });
-
-        // Fit bounds to state boundary
-        const mapboxgl = await loadMapboxGL();
-        if (mapboxgl && stateBoundary.geometry && stateBoundary.geometry.type === 'FeatureCollection') {
-          const bounds = new mapboxgl.LngLatBounds();
-          // Extract coordinates from FeatureCollection features
-          stateBoundary.geometry.features.forEach((feature: any) => {
-            if (feature.geometry && feature.geometry.coordinates) {
-              if (feature.geometry.type === 'Polygon') {
-                feature.geometry.coordinates[0].forEach((coord: [number, number]) => {
-                  bounds.extend(coord);
-                });
-              } else if (feature.geometry.type === 'MultiPolygon') {
-                feature.geometry.coordinates.forEach((polygon: any) => {
-                  polygon[0].forEach((coord: [number, number]) => {
-                    bounds.extend(coord);
-                  });
-                });
-              }
-            }
-          });
-          if (bounds.getNorth() && bounds.getSouth() && bounds.getEast() && bounds.getWest()) {
-            mapboxMap.fitBounds(bounds, { padding: 50, duration: 1000 });
-          }
-        }
-      } catch (error) {
-        console.error('[LocationStepperOverlay] Failed to render state boundary:', error);
-      }
-    };
-
-    setupStateBoundary();
-
-    return () => {
-      try {
-        if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
-        if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
-        if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
-      } catch {
-        // Ignore cleanup errors
-      }
-    };
-  }, [mapLoaded, stateBoundary, step]);
-
-  // Render CTU boundaries on map (step 2)
-  useEffect(() => {
-    if (!mapInstanceRef.current || !mapLoaded || ctus.length === 0 || step !== 2) return;
+    if (!mapInstanceRef.current || !mapLoaded || ctus.length === 0) return;
 
     const mapboxMap = mapInstanceRef.current as any;
     const sourceId = 'stepper-ctu-boundaries-source';
@@ -387,11 +283,11 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
         // Ignore cleanup errors
       }
     };
-  }, [mapLoaded, ctus, step]);
+  }, [mapLoaded, ctus]);
 
-  // Handle CTU hover (step 2 only)
+  // Handle CTU hover (disabled when area is selected)
   useEffect(() => {
-    if (!mapInstanceRef.current || !mapLoaded || step !== 2) return;
+    if (!mapInstanceRef.current || !mapLoaded || selectedCTU) return;
 
     const mapboxMap = mapInstanceRef.current as any;
     const fillLayerId = 'stepper-ctu-boundaries-fill';
@@ -458,7 +354,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
       mapboxMap.off('mousemove', fillLayerId, handleMouseMove);
       mapboxMap.off('mouseleave', fillLayerId, handleMouseLeave);
     };
-  }, [mapLoaded, step]);
+  }, [mapLoaded, selectedCTU]);
 
   // Handle map clicks
   useEffect(() => {
@@ -467,27 +363,12 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     const mapboxMap = mapInstanceRef.current as any;
 
     const handleClick = async (e: any) => {
-      if (step === 1) {
-        // Check if clicked on state boundary
-        const features = mapboxMap.queryRenderedFeatures(e.point, {
-          layers: ['stepper-state-boundary-fill'],
-        });
+      // Check if clicked on CTU boundary
+      const features = mapboxMap.queryRenderedFeatures(e.point, {
+        layers: ['stepper-ctu-boundaries-fill'],
+      });
 
-        if (features.length > 0) {
-          setSelectedState(features[0]);
-          // Wait a moment then advance to step 2
-          setTimeout(() => {
-            setStep(2);
-            setSelectedState(null);
-          }, 500);
-        }
-      } else if (step === 2) {
-        // Check if clicked on CTU boundary
-        const features = mapboxMap.queryRenderedFeatures(e.point, {
-          layers: ['stepper-ctu-boundaries-fill'],
-        });
-
-        if (features.length > 0) {
+      if (features.length > 0) {
           const feature = features[0];
           const properties = feature.properties || {};
           
@@ -507,72 +388,9 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
             },
           });
           
-          // Fly to selected area and hide other CTUs
-          const flyToSelectedArea = async () => {
-            const mapboxgl = await loadMapboxGL();
-            if (mapboxgl && feature.geometry) {
-              const bounds = new mapboxgl.LngLatBounds();
-              
-              // Calculate bounds from geometry
-              if (feature.geometry.type === 'Polygon') {
-                feature.geometry.coordinates[0].forEach((coord: [number, number]) => {
-                  bounds.extend(coord);
-                });
-              } else if (feature.geometry.type === 'MultiPolygon') {
-                feature.geometry.coordinates.forEach((polygon: any) => {
-                  polygon[0].forEach((coord: [number, number]) => {
-                    bounds.extend(coord);
-                  });
-                });
-              }
-
-              // Fly to bounds
-              mapboxMap.flyTo({
-                bounds: bounds,
-                padding: 50,
-                duration: 1000,
-              });
-
-              // Hide all other CTU boundaries (set opacity to 0)
-              const fillLayerId = 'stepper-ctu-boundaries-fill';
-              const outlineLayerId = 'stepper-ctu-boundaries-outline';
-              
-              // Match by feature_name and county_name (more reliable than ctu_id)
-              const selectedFeatureName = properties.feature_name || '';
-              const selectedCountyName = properties.county_name || '';
-              
-              if (mapboxMap.getLayer(fillLayerId)) {
-                mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', [
-                  'case',
-                  ['all',
-                    ['==', ['get', 'feature_name'], selectedFeatureName],
-                    ['==', ['get', 'county_name'], selectedCountyName]
-                  ],
-                  0.3, // Keep selected visible
-                  0, // Hide all others
-                ]);
-              }
-              
-              if (mapboxMap.getLayer(outlineLayerId)) {
-                mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', [
-                  'case',
-                  ['all',
-                    ['==', ['get', 'feature_name'], selectedFeatureName],
-                    ['==', ['get', 'county_name'], selectedCountyName]
-                  ],
-                  1, // Keep selected visible
-                  0, // Hide all others
-                ]);
-              }
-            }
-          };
-
-          flyToSelectedArea();
-          
           // Open details popup
           setShowCTUDetailsPopup(true);
         }
-      }
     };
 
     mapboxMap.on('click', handleClick);
@@ -580,7 +398,100 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     return () => {
       mapboxMap.off('click', handleClick);
     };
-  }, [mapLoaded, step, onClose, ctus]);
+  }, [mapLoaded, onClose, ctus]);
+
+  // Manage CTU visibility based on selectedCTU state
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+    const fillLayerId = 'stepper-ctu-boundaries-fill';
+    const outlineLayerId = 'stepper-ctu-boundaries-outline';
+
+    if (!mapboxMap.getLayer(fillLayerId) || !mapboxMap.getLayer(outlineLayerId)) return;
+
+    if (selectedCTU) {
+      // Hide all other CTUs, show only selected
+      const properties = selectedCTU.properties || {};
+      const selectedFeatureName = properties.feature_name || '';
+      const selectedCountyName = properties.county_name || '';
+
+      mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', [
+        'case',
+        ['all',
+          ['==', ['get', 'feature_name'], selectedFeatureName],
+          ['==', ['get', 'county_name'], selectedCountyName]
+        ],
+        0.3, // Keep selected visible
+        0, // Hide all others
+      ]);
+
+      mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', [
+        'case',
+        ['all',
+          ['==', ['get', 'feature_name'], selectedFeatureName],
+          ['==', ['get', 'county_name'], selectedCountyName]
+        ],
+        1, // Keep selected visible
+        0, // Hide all others
+      ]);
+    } else {
+      // Show all CTUs
+      mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.3);
+      mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 1);
+    }
+  }, [selectedCTU, mapLoaded]);
+
+  // Fly to selected CTU when it changes
+  useEffect(() => {
+    if (!selectedCTU || !mapInstanceRef.current || !mapLoaded) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+    if (mapboxMap.removed) return;
+
+    const flyToSelectedArea = async () => {
+      const mapboxgl = await loadMapboxGL();
+      if (!mapboxgl || !selectedCTU.geometry) return;
+
+      const bounds = new mapboxgl.LngLatBounds();
+
+      // Calculate bounds from geometry
+      if (selectedCTU.geometry.type === 'Polygon') {
+        selectedCTU.geometry.coordinates[0].forEach((coord: [number, number]) => {
+          bounds.extend(coord);
+        });
+      } else if (selectedCTU.geometry.type === 'MultiPolygon') {
+        selectedCTU.geometry.coordinates.forEach((polygon: any) => {
+          polygon[0].forEach((coord: [number, number]) => {
+            bounds.extend(coord);
+          });
+        });
+      }
+
+      // Fly to bounds
+      mapboxMap.flyTo({
+        bounds: bounds,
+        padding: 50,
+        duration: 1000,
+      });
+    };
+
+    flyToSelectedArea();
+  }, [selectedCTU, mapLoaded]);
+
+  // Center map on user location when location is received
+  useEffect(() => {
+    if (!location || !mapInstanceRef.current || !mapLoaded) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+    if (mapboxMap.removed) return;
+
+    mapboxMap.flyTo({
+      center: [location.longitude, location.latitude],
+      zoom: Math.max(mapboxMap.getZoom(), 15),
+      duration: 1000,
+    });
+  }, [location, mapLoaded]);
 
   // Animate CTU details popup slide up
   useEffect(() => {
@@ -594,8 +505,16 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     } else if (!showCTUDetailsPopup && ctuDetailsPopupRef.current) {
       // Reset transform when closing
       ctuDetailsPopupRef.current.style.transform = 'translateY(100%)';
+      // Clear selected CTU when popup closes (this will restore all boundaries via useEffect)
+      setSelectedCTU(null);
     }
-  }, [showCTUDetailsPopup]);
+  }, [showCTUDetailsPopup, mapLoaded]);
+
+  // Handle user location button click
+  const handleCenterOnLocation = () => {
+    if (isLocationLoading || !isLocationSupported) return;
+    requestLocation();
+  };
 
   if (!isOpen) return null;
 
@@ -603,32 +522,38 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" style={{ width: '100vw', height: '100vh' }}>
       <div className="absolute inset-0" style={{ width: '100vw', height: '100vh' }}>
         <div className="relative overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="w-5 h-5 text-gray-600" />
-          </button>
+          {/* Top right controls container */}
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+            {/* User Location button */}
+            <button
+              onClick={handleCenterOnLocation}
+              disabled={!isLocationSupported || isLocationLoading || !mapLoaded}
+              className="w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Center on my location"
+              title="Center on my location"
+            >
+              <MapPinIcon className={`w-5 h-5 text-gray-600 ${isLocationLoading ? 'animate-pulse' : ''}`} />
+            </button>
+            
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
+              aria-label="Close"
+            >
+              <XMarkIcon className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
 
-          {/* Header - Overlay white text */}
-          <div className="absolute top-0 left-0 right-0 z-10 px-6 py-4 pointer-events-none">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-white drop-shadow-lg">
-                  {step === 1 ? 'Select Your State' : 'Select Your CTU'}
-                </h2>
-                <p className="text-sm text-white/90 drop-shadow-md mt-1">
-                  {step === 1
-                    ? 'Click on Minnesota to continue'
-                    : 'Click on your City, Township, or Unorganized Territory to continue'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${step >= 1 ? 'bg-white' : 'bg-white/40'}`} />
-                <div className={`w-2 h-2 rounded-full ${step >= 2 ? 'bg-white' : 'bg-white/40'}`} />
-              </div>
+          {/* Header - White container with dark text */}
+          <div className="absolute top-4 left-4 z-10 pointer-events-none">
+            <div className="bg-white rounded-md shadow-lg px-4 py-3 border border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Select Your Location
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Click an area on the map
+              </p>
             </div>
           </div>
 
@@ -645,8 +570,8 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
             </div>
           )}
 
-          {/* Hover card - bottom right */}
-          {hoveredCTU && step === 2 && (
+          {/* Hover card - bottom right (hidden when popup is open) */}
+          {hoveredCTU && !showCTUDetailsPopup && (
             <div className="absolute bottom-4 right-4 z-20 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-4 py-3 border border-gray-200 pointer-events-none">
               <div className="text-sm font-semibold text-gray-900">{hoveredCTU.feature_name}</div>
               <div className="text-xs text-gray-600 mt-0.5">
@@ -660,15 +585,6 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
           {/* CTU Details Popup */}
           {showCTUDetailsPopup && selectedCTU && (
             <>
-              {/* Backdrop - hidden on desktop */}
-              <div
-                className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-300 xl:hidden"
-                onClick={() => {
-                  setShowCTUDetailsPopup(false);
-                  setSelectedCTU(null);
-                }}
-              />
-              
               {/* Popup - slide up from bottom on mobile, left side on desktop */}
               <div
                 ref={ctuDetailsPopupRef}
@@ -691,15 +607,10 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
 
                 {/* Header */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0 xl:rounded-t-lg">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-semibold text-gray-900">
                       {selectedCTU.ctuData?.feature_name || selectedCTU.properties?.feature_name || 'Area Details'}
                     </h3>
-                    <p className="text-sm text-gray-600 mt-0.5">
-                      {selectedCTU.ctuData?.ctu_class === 'CITY' ? 'City' : 
-                       selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? 'Township' : 
-                       'Unorganized Territory'} • {selectedCTU.ctuData?.county_name || selectedCTU.properties?.county_name || 'Unknown'} County
-                    </p>
                   </div>
                   <button
                     onClick={() => {
@@ -714,80 +625,32 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                  {/* Area Details */}
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-gray-900">Area Information</h4>
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-gray-600">Type:</span>
-                        <span className="ml-2 text-gray-900 font-medium">
-                          {selectedCTU.ctuData?.ctu_class === 'CITY' ? 'City' : 
-                           selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? 'Township' : 
-                           'Unorganized Territory'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">County:</span>
-                        <span className="ml-2 text-gray-900 font-medium">
-                          {selectedCTU.ctuData?.county_name || selectedCTU.properties?.county_name || 'Unknown'}
-                        </span>
-                      </div>
-                      {selectedCTU.ctuData?.population && (
-                        <div>
-                          <span className="text-gray-600">Population:</span>
-                          <span className="ml-2 text-gray-900 font-medium">
-                            {selectedCTU.ctuData.population.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      {selectedCTU.ctuData?.acres && (
-                        <div>
-                          <span className="text-gray-600">Area:</span>
-                          <span className="ml-2 text-gray-900 font-medium">
-                            {selectedCTU.ctuData.acres.toLocaleString()} acres
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Map */}
-                  {selectedCTU.geometry && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold text-gray-900">Boundary Map</h4>
-                      <div className="rounded-md border border-gray-200 overflow-hidden">
-                        <LayerGeometryMap
-                          geometry={selectedCTU.geometry}
-                          height="300px"
-                          fillColor={
-                            selectedCTU.ctuData?.ctu_class === 'CITY' ? '#4A90E2' :
-                            selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? '#7ED321' :
-                            '#F5A623'
-                          }
-                          outlineColor={
-                            selectedCTU.ctuData?.ctu_class === 'CITY' ? '#4A90E2' :
-                            selectedCTU.ctuData?.ctu_class === 'TOWNSHIP' ? '#7ED321' :
-                            '#F5A623'
-                          }
-                        />
-                      </div>
-                    </div>
-                  )}
-
+                <div className="flex-1 overflow-y-auto px-6 py-4">
                   {/* Mark as Primary Button */}
-                  <div className="pt-4 border-t border-gray-200">
+                  <div className="pt-2">
                     <button
                       onClick={() => {
-                        // TODO: Implement mark as primary functionality
-                        console.log('Mark as primary:', selectedCTU);
+                        // Save selected location to localStorage
+                        if (selectedCTU) {
+                          const locationData = {
+                            ctu_id: selectedCTU.ctuData?.id || selectedCTU.properties?.ctu_id,
+                            feature_name: selectedCTU.ctuData?.feature_name || selectedCTU.properties?.feature_name,
+                            ctu_class: selectedCTU.ctuData?.ctu_class || selectedCTU.properties?.ctu_class,
+                            county_name: selectedCTU.ctuData?.county_name || selectedCTU.properties?.county_name,
+                            geometry: selectedCTU.geometry,
+                            savedAt: Date.now(),
+                          };
+                          localStorage.setItem(PRIMARY_LOCATION_STORAGE_KEY, JSON.stringify(locationData));
+                        }
+                        
                         setShowCTUDetailsPopup(false);
                         setSelectedCTU(null);
+                        setHoveredCTU(null);
                         onClose();
-                        setStep(1);
                       }}
-                      className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-900 font-medium py-2.5 px-4 rounded-md transition-colors"
+                      className="w-full bg-white border border-gray-300 hover:bg-green-50 hover:border-green-500 text-gray-900 hover:text-green-700 font-medium py-3 px-4 rounded-md transition-colors flex items-center justify-center gap-2"
                     >
+                      <CheckIcon className="w-5 h-5" />
                       Mark as Primary
                     </button>
                   </div>

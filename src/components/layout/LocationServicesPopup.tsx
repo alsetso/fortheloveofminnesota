@@ -25,9 +25,15 @@ export default function LocationServicesPopup({
   mapLoaded,
   onLocationSet,
 }: LocationServicesPopupProps) {
-  const { location, error, errorMessage, isLoading, isSupported, requestLocation, clearLocation, setManualLocation } = useLocation();
+  const { location, error, errorMessage, isLoading, isSupported: isSupportedFromHook, requestLocation, clearLocation, setManualLocation } = useLocation();
   const [isExpanded, setIsExpanded] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [isSupported, setIsSupported] = useState(false);
+  
+  // Set isSupported after mount to avoid hydration mismatch
+  useEffect(() => {
+    setIsSupported(isSupportedFromHook);
+  }, [isSupportedFromHook]);
 
   // Listen for map click events to set manual location
   // Only update if popup is expanded (user has interacted with it)
@@ -101,6 +107,7 @@ export default function LocationServicesPopup({
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <button
+          data-user-location-button
           onClick={handleRequestLocation}
           disabled={!isSupported || isLoading}
           className="bg-white border border-gray-200 rounded-md p-3 shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
@@ -115,10 +122,10 @@ export default function LocationServicesPopup({
   // Expanded popup state
   return (
     <div
-      className="fixed bottom-4 right-4 z-[54] bg-white border border-gray-200 rounded-md shadow-sm max-w-[280px]"
+      className="fixed bottom-4 right-4 z-[54] bg-white border border-gray-200 rounded-md shadow-lg max-w-[280px]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="p-[10px] space-y-3">
+      <div className="p-3 space-y-2">
         {/* Header */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -127,10 +134,10 @@ export default function LocationServicesPopup({
           </div>
           <button
             onClick={handleClose}
-            className="p-1 text-gray-500 hover:text-gray-900 transition-colors"
+            className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors rounded-md hover:bg-gray-100"
             aria-label="Close"
           >
-            <XMarkIcon className="w-3 h-3" />
+            <XMarkIcon className="w-4 h-4" />
           </button>
         </div>
 
@@ -138,7 +145,7 @@ export default function LocationServicesPopup({
         <div className="space-y-2">
           {/* Loading state */}
           {isLoading && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 py-1">
               <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
               <p className="text-xs text-gray-600">Getting location...</p>
             </div>
@@ -147,13 +154,17 @@ export default function LocationServicesPopup({
           {/* Success state */}
           {location && !isLoading && (
             <div className="space-y-2">
-              <div className="space-y-0.5">
-                <p className="text-xs text-gray-600">
-                  {location.source === 'gps' ? 'GPS Location' : 'Manual Location'}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-                </p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-gray-900">
+                    {location.source === 'gps' ? 'GPS Location' : 'Manual Location'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-600 font-mono">
+                  <span>{location.latitude.toFixed(6)}</span>
+                  <span className="text-gray-400">,</span>
+                  <span>{location.longitude.toFixed(6)}</span>
+                </div>
                 {location.accuracy > 0 && (
                   <p className="text-xs text-gray-500">
                     Accuracy: {Math.round(location.accuracy)}m
@@ -162,7 +173,7 @@ export default function LocationServicesPopup({
               </div>
               <button
                 onClick={() => handleLocationReceived(location)}
-                className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
+                className="w-full text-xs font-medium text-gray-900 bg-gray-900 hover:bg-gray-800 text-white py-2 px-3 rounded-md transition-colors"
               >
                 Center Map
               </button>
@@ -173,9 +184,9 @@ export default function LocationServicesPopup({
           {error && !isLoading && (
             <div className="space-y-2">
               <div className="flex items-start gap-1.5">
-                <ExclamationTriangleIcon className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 space-y-0.5">
-                  <p className="text-xs text-gray-600">{errorMessage}</p>
+                <ExclamationTriangleIcon className="w-3.5 h-3.5 text-gray-500 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <p className="text-xs text-gray-900 font-medium">{errorMessage}</p>
                   {error.type === 'permission_denied' && (
                     <p className="text-xs text-gray-500">
                       You can set location manually by clicking on the map.
@@ -187,7 +198,7 @@ export default function LocationServicesPopup({
               {error.type === 'permission_denied' && (
                 <button
                   onClick={() => setShowManualInput(true)}
-                  className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
+                  className="w-full text-xs font-medium text-gray-900 bg-gray-900 hover:bg-gray-800 text-white py-2 px-3 rounded-md transition-colors"
                 >
                   Use Map Click
                 </button>
@@ -196,7 +207,7 @@ export default function LocationServicesPopup({
               {error.type !== 'permission_denied' && (
                 <button
                   onClick={handleRequestLocation}
-                  className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
+                  className="w-full text-xs font-medium text-gray-900 bg-gray-900 hover:bg-gray-800 text-white py-2 px-3 rounded-md transition-colors"
                 >
                   Try Again
                 </button>
@@ -212,7 +223,7 @@ export default function LocationServicesPopup({
               </p>
               <button
                 onClick={handleUseMapClick}
-                className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
+                className="w-full text-xs font-medium text-gray-900 bg-gray-900 hover:bg-gray-800 text-white py-2 px-3 rounded-md transition-colors"
               >
                 Got It
               </button>
@@ -228,7 +239,7 @@ export default function LocationServicesPopup({
               <button
                 onClick={handleRequestLocation}
                 disabled={!isSupported}
-                className="w-full text-xs font-medium text-gray-700 hover:text-gray-900 py-1.5 px-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-xs font-medium text-gray-900 bg-gray-900 hover:bg-gray-800 text-white py-2 px-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:hover:bg-gray-300"
               >
                 Get My Location
               </button>

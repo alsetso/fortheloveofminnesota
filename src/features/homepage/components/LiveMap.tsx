@@ -34,6 +34,7 @@ import BuildingDetailView from '@/features/admin/components/BuildingDetailView';
 import LocationServicesPopup from '@/components/layout/LocationServicesPopup';
 import LayerRecordPopup from '@/components/layout/LayerRecordPopup';
 import LocationStepperOverlay from '@/components/layout/LocationStepperOverlay';
+import OnboardingDemo from '@/components/layout/OnboardingDemo';
 
 interface LiveMapProps {
   cities: Array<{
@@ -233,14 +234,23 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   }, []);
 
   // Check if location stepper should be shown
-  // - If user is not logged in: show on every load
-  // - If user is logged in: show every 15 minutes
+  // - Don't show if user has already set a primary location
+  // - If user is not logged in: show on every load (unless they've set primary location)
+  // - If user is logged in: show every 15 minutes (unless they've set primary location)
   useEffect(() => {
     // Wait for auth to finish loading
     if (authLoading) return;
 
+    const PRIMARY_LOCATION_STORAGE_KEY = 'PRIMARY_LOCATION_AREA_ONBOARDING';
     const STORAGE_KEY = 'location-stepper-last-shown';
     const OVERLAY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+
+    // Check if user has already set a primary location
+    const hasPrimaryLocation = localStorage.getItem(PRIMARY_LOCATION_STORAGE_KEY);
+    if (hasPrimaryLocation) {
+      setShowLocationStepper(false);
+      return;
+    }
 
     // If user is not logged in, show on every load
     if (!user) {
@@ -250,6 +260,13 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
 
     // If user is logged in, use 15-minute timer logic
     const checkShouldShow = () => {
+      // Check again if primary location was set
+      const hasPrimaryLocation = localStorage.getItem(PRIMARY_LOCATION_STORAGE_KEY);
+      if (hasPrimaryLocation) {
+        setShowLocationStepper(false);
+        return;
+      }
+
       const lastShown = localStorage.getItem(STORAGE_KEY);
       const now = Date.now();
 
@@ -1515,6 +1532,12 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
       <LocationStepperOverlay
         isOpen={showLocationStepper}
         onClose={handleLocationStepperClose}
+      />
+
+      {/* Onboarding Demo - 3-step walkthrough */}
+      <OnboardingDemo
+        map={mapInstanceRef.current}
+        mapLoaded={mapLoaded}
       />
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}

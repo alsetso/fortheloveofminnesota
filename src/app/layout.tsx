@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import './globals.css'
 import { ToastContainer } from '@/features/ui/components/Toast'
 import { Providers } from '@/components/providers/Providers'
@@ -86,6 +87,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full w-full">
       <body className="min-h-screen w-full" style={{ display: 'flex', flexDirection: 'column' }}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-SWNED81F4V"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-SWNED81F4V');
+          `}
+        </Script>
         <Providers>
           <ErrorBoundary>
             <LocalStorageCleanup />

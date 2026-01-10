@@ -15,6 +15,7 @@ export default function CameraCircleButton({ onClick, isHidden = false }: Camera
   return (
     <button
       onClick={onClick}
+      data-camera-button
       className={`fixed bottom-4 left-1/2 z-[50] transition-all duration-300 ease-out ${
         isHidden
           ? 'opacity-0 pointer-events-none'

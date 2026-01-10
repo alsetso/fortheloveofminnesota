@@ -239,13 +239,27 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
           data: featureCollection,
         });
 
+        // Color scheme by CTU class (same as CTUBoundariesLayer)
+        const colorMap = {
+          'CITY': '#4A90E2',           // Blue
+          'TOWNSHIP': '#7ED321',       // Green
+          'UNORGANIZED TERRITORY': '#F5A623', // Orange
+        };
+
         // Add fill layer
         mapboxMap.addLayer({
           id: fillLayerId,
           type: 'fill',
           source: sourceId,
           paint: {
-            'fill-color': '#10b981',
+            'fill-color': [
+              'match',
+              ['get', 'ctu_class'],
+              'CITY', colorMap['CITY'],
+              'TOWNSHIP', colorMap['TOWNSHIP'],
+              'UNORGANIZED TERRITORY', colorMap['UNORGANIZED TERRITORY'],
+              '#888888', // Default gray
+            ],
             'fill-opacity': 0.3,
           },
         });
@@ -256,7 +270,14 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
           type: 'line',
           source: sourceId,
           paint: {
-            'line-color': '#10b981',
+            'line-color': [
+              'match',
+              ['get', 'ctu_class'],
+              'CITY', colorMap['CITY'],
+              'TOWNSHIP', colorMap['TOWNSHIP'],
+              'UNORGANIZED TERRITORY', colorMap['UNORGANIZED TERRITORY'],
+              '#888888', // Default gray
+            ],
             'line-width': 1,
           },
         });
@@ -348,39 +369,39 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" style={{ width: '100vw', height: '100vh' }}>
-      <div className="absolute inset-0 flex items-center justify-center" style={{ width: '100vw', height: '100vh' }}>
-        <div className="relative bg-white overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
+      <div className="absolute inset-0" style={{ width: '100vw', height: '100vh' }}>
+        <div className="relative overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+            className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg hover:bg-white transition-colors"
             aria-label="Close"
           >
             <XMarkIcon className="w-5 h-5 text-gray-600" />
           </button>
 
-          {/* Header */}
-          <div className="absolute top-0 left-0 right-0 z-10 bg-white/95 backdrop-blur-sm border-b border-gray-200 px-6 py-4">
+          {/* Header - Overlay white text */}
+          <div className="absolute top-0 left-0 right-0 z-10 px-6 py-4 pointer-events-none">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-white drop-shadow-lg">
                   {step === 1 ? 'Select Your State' : 'Select Your CTU'}
                 </h2>
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-white/90 drop-shadow-md mt-1">
                   {step === 1
                     ? 'Click on Minnesota to continue'
                     : 'Click on your City, Township, or Unorganized Territory to continue'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${step >= 1 ? 'bg-blue-600' : 'bg-gray-300'}`} />
-                <div className={`w-2 h-2 rounded-full ${step >= 2 ? 'bg-blue-600' : 'bg-gray-300'}`} />
+                <div className={`w-2 h-2 rounded-full ${step >= 1 ? 'bg-white' : 'bg-white/40'}`} />
+                <div className={`w-2 h-2 rounded-full ${step >= 2 ? 'bg-white' : 'bg-white/40'}`} />
               </div>
             </div>
           </div>
 
           {/* Map container */}
-          <div ref={mapContainerRef} className="w-full h-full" style={{ marginTop: '80px' }} />
+          <div ref={mapContainerRef} className="w-full h-full" />
 
           {/* Loading overlay */}
           {!mapLoaded && (

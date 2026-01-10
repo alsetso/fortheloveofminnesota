@@ -26,6 +26,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
   const [selectedCTU, setSelectedCTU] = useState<any>(null);
   const [hoveredCTU, setHoveredCTU] = useState<any>(null);
   const [showCTUDetailsPopup, setShowCTUDetailsPopup] = useState(false);
+  const ctuDetailsPopupRef = useRef<HTMLDivElement>(null);
 
   // Initialize map
   useEffect(() => {
@@ -517,7 +518,22 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     return () => {
       mapboxMap.off('click', handleClick);
     };
-  }, [mapLoaded, step, onClose]);
+  }, [mapLoaded, step, onClose, ctus]);
+
+  // Animate CTU details popup slide up
+  useEffect(() => {
+    if (showCTUDetailsPopup && ctuDetailsPopupRef.current) {
+      // Trigger animation on next frame
+      requestAnimationFrame(() => {
+        if (ctuDetailsPopupRef.current) {
+          ctuDetailsPopupRef.current.style.transform = 'translateY(0)';
+        }
+      });
+    } else if (!showCTUDetailsPopup && ctuDetailsPopupRef.current) {
+      // Reset transform when closing
+      ctuDetailsPopupRef.current.style.transform = 'translateY(100%)';
+    }
+  }, [showCTUDetailsPopup]);
 
   if (!isOpen) return null;
 
@@ -581,10 +597,38 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
 
           {/* CTU Details Popup */}
           {showCTUDetailsPopup && selectedCTU && (
-            <div className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <>
+              {/* Backdrop - hidden on desktop */}
+              <div
+                className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm transition-opacity duration-300 xl:hidden"
+                onClick={() => {
+                  setShowCTUDetailsPopup(false);
+                  setSelectedCTU(null);
+                }}
+              />
+              
+              {/* Popup - slide up from bottom on mobile, left side on desktop */}
+              <div
+                ref={ctuDetailsPopupRef}
+                className="fixed z-[110] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col
+                  /* Mobile: bottom sheet */
+                  bottom-0 left-0 right-0 rounded-t-3xl
+                  /* Desktop: bottom sheet with 500px width, left side, squared bottom corners */
+                  xl:bottom-0 xl:left-4 xl:right-auto xl:w-[500px] xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]"
+                style={{
+                  transform: 'translateY(100%)',
+                  minHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
+                  maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '80vh',
+                  paddingBottom: 'env(safe-area-inset-bottom)',
+                }}
+              >
+                {/* Handle bar - hidden on desktop */}
+                <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
+                  <div className="w-12 h-1 rounded-full bg-gray-300" />
+                </div>
+
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       {selectedCTU.ctuData?.feature_name || selectedCTU.properties?.feature_name || 'Area Details'}
@@ -608,7 +652,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
                 </div>
 
                 {/* Content */}
-                <div className="px-6 py-4 space-y-4">
+                <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                   {/* Area Details */}
                   <div className="space-y-2">
                     <h4 className="text-sm font-semibold text-gray-900">Area Information</h4>
@@ -687,7 +731,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>

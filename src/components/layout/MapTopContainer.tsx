@@ -182,7 +182,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('24h');
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('7d');
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     // Initialize from window state if available
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
@@ -209,10 +209,10 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const placeholderIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isProgrammaticUpdateRef = useRef(false);
 
-  // Initialize time filter to 24h on mount
+  // Initialize time filter to 7d on mount
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-      detail: { timeFilter: '24h' }
+      detail: { timeFilter: '7d' }
     }));
   }, []);
 

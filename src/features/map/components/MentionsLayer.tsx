@@ -43,10 +43,11 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
   const styleLoadHandlerRef = useRef<(() => void) | null>(null);
   const layersDataRef = useRef<{ geoJSON: any; iconExpression: any[]; accountImageIds: Map<string, string>; fallbackImageId: string } | null>(null);
   const loadMentionsRef = useRef<((showLoading?: boolean) => Promise<void>) | null>(null);
+  const hasFittedBoundsRef = useRef(false); // Track if we've done initial bounds fit
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>('24h');
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>('7d');
   const [isLoadingMentions, setIsLoadingMentions] = useState(false);
   const currentMentionRef = useRef<Mention | null>(null);
   const accountRef = useRef(account);
@@ -68,7 +69,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
       const customEvent = event as CustomEvent<{ timeFilter: '24h' | '7d' | 'all' }>;
       const filter = customEvent.detail?.timeFilter;
       // Convert 'all' to null for the service (no filter)
-      setTimeFilter(filter === 'all' ? null : filter || '24h');
+      setTimeFilter(filter === 'all' ? null : filter || '7d');
     };
 
     const handleReloadMentions = () => {
@@ -460,6 +461,49 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         }
 
         isAddingLayersRef.current = false;
+
+        // Fit map bounds to show all mentions on initial load only
+        if (!hasFittedBoundsRef.current && mentions.length > 0 && geoJSON.features.length > 0) {
+          try {
+            // Calculate bounds from all mention coordinates
+            let minLng = Infinity;
+            let maxLng = -Infinity;
+            let minLat = Infinity;
+            let maxLat = -Infinity;
+
+            geoJSON.features.forEach((feature: any) => {
+              if (feature.geometry && feature.geometry.coordinates) {
+                const [lng, lat] = feature.geometry.coordinates;
+                minLng = Math.min(minLng, lng);
+                maxLng = Math.max(maxLng, lng);
+                minLat = Math.min(minLat, lat);
+                maxLat = Math.max(maxLat, lat);
+              }
+            });
+
+            // Only fit bounds if we have valid coordinates
+            if (minLng !== Infinity && maxLng !== -Infinity && minLat !== Infinity && maxLat !== -Infinity) {
+              // Add padding around the bounds
+              const padding = 50; // pixels
+              
+              mapboxMap.fitBounds(
+                [[minLng, minLat], [maxLng, maxLat]],
+                {
+                  padding: { top: padding, bottom: padding, left: padding, right: padding },
+                  maxZoom: 12, // Don't zoom in too much, keep overview
+                  duration: 1000, // Smooth animation
+                }
+              );
+              
+              hasFittedBoundsRef.current = true; // Mark as done
+            }
+          } catch (e) {
+            // Silently fail if fitBounds fails
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[MentionsLayer] Error fitting bounds to mentions:', e);
+            }
+          }
+        }
 
         // Ensure layers are visible after adding
         try {

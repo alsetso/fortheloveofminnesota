@@ -598,9 +598,9 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
           style: MAP_CONFIG.STRATEGIC_STYLES.streets,
-          center: [-93.1022, 44.9553], // Minnesota State Capitol, St. Paul, MN
-          zoom: 14, // Zoom level 14 for detailed view
-          pitch: 60, // Start at 60 degrees
+          center: MAP_CONFIG.DEFAULT_CENTER, // Center of Minnesota
+          zoom: 7, // Zoomed out to show all of Minnesota
+          pitch: 0, // Start at 0 degrees (flat view)
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],

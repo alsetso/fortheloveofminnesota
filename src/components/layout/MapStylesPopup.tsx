@@ -43,7 +43,7 @@ interface MapStylesPopupProps {
  * Slide-up popup for map styles/layers selection
  * Appears from the bottom of the screen, positioned in front of mobile nav (z-[60])
  */
-export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '24h', onTimeFilterChange, account, onUpgrade, onProToast, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
+export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d', onTimeFilterChange, account, onUpgrade, onProToast, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [selectedStyle, setSelectedStyle] = useState<MapStyle>('streets');
   const [mounted, setMounted] = useState(false);

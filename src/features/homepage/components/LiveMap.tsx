@@ -232,11 +232,23 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     };
   }, []);
 
-  // Check if location stepper should be shown (every 15 minutes)
+  // Check if location stepper should be shown
+  // - If user is not logged in: show on every load
+  // - If user is logged in: show every 15 minutes
   useEffect(() => {
+    // Wait for auth to finish loading
+    if (authLoading) return;
+
     const STORAGE_KEY = 'location-stepper-last-shown';
     const OVERLAY_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 
+    // If user is not logged in, show on every load
+    if (!user) {
+      setShowLocationStepper(true);
+      return;
+    }
+
+    // If user is logged in, use 15-minute timer logic
     const checkShouldShow = () => {
       const lastShown = localStorage.getItem(STORAGE_KEY);
       const now = Date.now();
@@ -254,7 +266,7 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     const interval = setInterval(checkShouldShow, 60 * 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user, authLoading]);
 
   const handleLocationStepperClose = () => {
     setShowLocationStepper(false);

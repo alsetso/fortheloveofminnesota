@@ -151,13 +151,27 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
 
         // Fit bounds to state boundary
         const mapboxgl = await loadMapboxGL();
-        if (mapboxgl) {
+        if (mapboxgl && stateBoundary.geometry && stateBoundary.geometry.type === 'FeatureCollection') {
           const bounds = new mapboxgl.LngLatBounds();
-          const coordinates = stateBoundary.geometry.coordinates[0];
-          coordinates.forEach((coord: [number, number]) => {
-            bounds.extend(coord);
+          // Extract coordinates from FeatureCollection features
+          stateBoundary.geometry.features.forEach((feature: any) => {
+            if (feature.geometry && feature.geometry.coordinates) {
+              if (feature.geometry.type === 'Polygon') {
+                feature.geometry.coordinates[0].forEach((coord: [number, number]) => {
+                  bounds.extend(coord);
+                });
+              } else if (feature.geometry.type === 'MultiPolygon') {
+                feature.geometry.coordinates.forEach((polygon: any) => {
+                  polygon[0].forEach((coord: [number, number]) => {
+                    bounds.extend(coord);
+                  });
+                });
+              }
+            }
           });
-          mapboxMap.fitBounds(bounds, { padding: 50, duration: 1000 });
+          if (bounds.getNorth() && bounds.getSouth() && bounds.getEast() && bounds.getWest()) {
+            mapboxMap.fitBounds(bounds, { padding: 50, duration: 1000 });
+          }
         }
       } catch (error) {
         console.error('[LocationStepperOverlay] Failed to render state boundary:', error);
@@ -333,9 +347,9 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="relative w-full h-full max-w-4xl max-h-[80vh] bg-white rounded-lg shadow-2xl overflow-hidden m-4">
+    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" style={{ width: '100vw', height: '100vh' }}>
+      <div className="absolute inset-0 flex items-center justify-center" style={{ width: '100vw', height: '100vh' }}>
+        <div className="relative bg-white overflow-hidden" style={{ width: '100vw', height: '100vh' }}>
           {/* Close button */}
           <button
             onClick={onClose}

@@ -190,6 +190,10 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
     return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
   });
+  const [showNews, setShowNews] = useState(() => {
+    // Initialize from window state if available, default to true
+    return typeof window !== 'undefined' ? (window as any).__showNews !== false : true;
+  });
   
   // Use white text when transparent blur + satellite map
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
@@ -216,7 +220,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     }));
   }, []);
 
-  // Listen for blur style and map style changes
+  // Listen for blur style, map style, and news visibility changes
   useEffect(() => {
     const handleBlurStyleChange = (e: CustomEvent) => {
       const newValue = e.detail.useBlurStyle;
@@ -231,11 +235,22 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
       setCurrentMapStyle(e.detail.mapStyle);
     };
 
+    const handleNewsVisibilityChange = (e: CustomEvent) => {
+      const newValue = e.detail.showNews;
+      setShowNews(newValue);
+      // Store in window for session persistence
+      if (typeof window !== 'undefined') {
+        (window as any).__showNews = newValue;
+      }
+    };
+
     window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
     window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
+    window.addEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
     return () => {
       window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
       window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
+      window.removeEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
     };
   }, []);
 
@@ -723,7 +738,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     <div className="fixed top-3 left-3 right-3 z-[45] pointer-events-none">
       <div ref={containerRef} className="pointer-events-auto space-y-1.5 relative">
         {/* News Stream - Positioned in upper right below search input */}
-        <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />
+        {showNews && <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />}
         {/* Search Bar */}
         <div 
           className={`rounded-xl shadow-lg px-2.5 py-2 flex items-center gap-1.5 relative transition-all ${

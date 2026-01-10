@@ -59,6 +59,10 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
     // Initialize from window state if available
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
+  const [showNews, setShowNews] = useState(() => {
+    // Initialize from window state if available, default to true
+    return typeof window !== 'undefined' ? (window as any).__showNews !== false : true;
+  });
 
   // Listen for blur style changes (in case changed elsewhere)
   useEffect(() => {
@@ -68,6 +72,17 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
     window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
     return () => {
       window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
+    };
+  }, []);
+
+  // Listen for news visibility changes (in case changed elsewhere)
+  useEffect(() => {
+    const handleNewsVisibilityChange = (e: CustomEvent) => {
+      setShowNews(e.detail.showNews);
+    };
+    window.addEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
+    return () => {
+      window.removeEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
     };
   }, []);
 
@@ -689,7 +704,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">UI Style</span>
-                    <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(2)</span>
+                    <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(3)</span>
                   </div>
                   {isUIStyleOpen ? (
                     <ChevronUpIcon className="w-4 h-4" />
@@ -751,6 +766,40 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
                       }`}>
                         <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
                           useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
+                        }`} />
+                      </div>
+                    </button>
+
+                    {/* News Toggle */}
+                    <button
+                      onClick={() => {
+                        const newValue = !showNews;
+                        setShowNews(newValue);
+                        // Store in window for session persistence
+                        if (typeof window !== 'undefined') {
+                          (window as any).__showNews = newValue;
+                        }
+                        // Dispatch event to update all components
+                        window.dispatchEvent(new CustomEvent('news-visibility-change', {
+                          detail: { showNews: newValue }
+                        }));
+                      }}
+                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                        showNews
+                          ? useBlurStyle
+                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                          : 'bg-gray-100 border-gray-200'
+                          : useBlurStyle
+                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                    >
+                      <span>News</span>
+                      <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                        showNews ? 'bg-gray-900' : 'bg-gray-300'
+                      }`}>
+                        <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                          showNews ? 'translate-x-3.5' : 'translate-x-0'
                         }`} />
                       </div>
                     </button>

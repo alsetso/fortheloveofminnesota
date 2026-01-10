@@ -199,13 +199,19 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
     const sourceId = 'stepper-ctu-boundaries-source';
     const fillLayerId = 'stepper-ctu-boundaries-fill';
     const outlineLayerId = 'stepper-ctu-boundaries-outline';
+    const highlightFillLayerId = 'stepper-ctu-boundaries-highlight-fill';
+    const highlightOutlineLayerId = 'stepper-ctu-boundaries-highlight-outline';
+    const highlightSourceId = 'stepper-ctu-boundaries-highlight-source';
 
     const setupCTUBoundaries = async () => {
       try {
         // Remove existing layers/sources if they exist
         if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
         if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
+        if (mapboxMap.getLayer(highlightFillLayerId)) mapboxMap.removeLayer(highlightFillLayerId);
+        if (mapboxMap.getLayer(highlightOutlineLayerId)) mapboxMap.removeLayer(highlightOutlineLayerId);
         if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+        if (mapboxMap.getSource(highlightSourceId)) mapboxMap.removeSource(highlightSourceId);
 
         // Combine all CTU geometries into a single FeatureCollection
         const allFeatures: any[] = [];
@@ -282,6 +288,52 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
           },
         });
 
+        // Add highlight source (empty initially)
+        mapboxMap.addSource(highlightSourceId, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: [],
+          },
+        });
+
+        // Add highlight fill layer (darker overlay)
+        mapboxMap.addLayer({
+          id: highlightFillLayerId,
+          type: 'fill',
+          source: highlightSourceId,
+          paint: {
+            'fill-color': [
+              'match',
+              ['get', 'ctu_class'],
+              'CITY', colorMap['CITY'],
+              'TOWNSHIP', colorMap['TOWNSHIP'],
+              'UNORGANIZED TERRITORY', colorMap['UNORGANIZED TERRITORY'],
+              '#888888', // Default gray
+            ],
+            'fill-opacity': 0.5, // Darker than regular CTUs (0.3)
+          },
+        });
+
+        // Add highlight outline layer
+        mapboxMap.addLayer({
+          id: highlightOutlineLayerId,
+          type: 'line',
+          source: highlightSourceId,
+          paint: {
+            'line-color': [
+              'match',
+              ['get', 'ctu_class'],
+              'CITY', colorMap['CITY'],
+              'TOWNSHIP', colorMap['TOWNSHIP'],
+              'UNORGANIZED TERRITORY', colorMap['UNORGANIZED TERRITORY'],
+              '#888888', // Default gray
+            ],
+            'line-width': 2,
+            'line-opacity': 1,
+          },
+        });
+
         // Fit bounds to CTUs
         const mapboxgl = await loadMapboxGL();
         if (mapboxgl) {
@@ -312,12 +364,76 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
       try {
         if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
         if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);
+        if (mapboxMap.getLayer(highlightFillLayerId)) mapboxMap.removeLayer(highlightFillLayerId);
+        if (mapboxMap.getLayer(highlightOutlineLayerId)) mapboxMap.removeLayer(highlightOutlineLayerId);
         if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+        if (mapboxMap.getSource(highlightSourceId)) mapboxMap.removeSource(highlightSourceId);
       } catch {
         // Ignore cleanup errors
       }
     };
   }, [mapLoaded, ctus, step]);
+
+  // Handle CTU hover (step 2 only)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !mapLoaded || step !== 2) return;
+
+    const mapboxMap = mapInstanceRef.current as any;
+    const fillLayerId = 'stepper-ctu-boundaries-fill';
+    const highlightSourceId = 'stepper-ctu-boundaries-highlight-source';
+
+    const handleMouseMove = (e: any) => {
+      mapboxMap.getCanvas().style.cursor = 'pointer';
+
+      // Query the exact feature at the cursor position
+      const features = mapboxMap.queryRenderedFeatures(e.point, {
+        layers: [fillLayerId],
+      });
+
+      if (features.length > 0) {
+        const feature = features[0];
+
+        // Highlight this specific CTU feature (darker overlay)
+        const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+        if (highlightSource && highlightSource.setData) {
+          highlightSource.setData({
+            type: 'FeatureCollection',
+            features: [feature],
+          });
+        }
+      } else {
+        // Clear highlight when not hovering over a CTU
+        const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+        if (highlightSource && highlightSource.setData) {
+          highlightSource.setData({
+            type: 'FeatureCollection',
+            features: [],
+          });
+        }
+        mapboxMap.getCanvas().style.cursor = '';
+      }
+    };
+
+    const handleMouseLeave = () => {
+      // Clear highlight when mouse leaves the map
+      const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+      if (highlightSource && highlightSource.setData) {
+        highlightSource.setData({
+          type: 'FeatureCollection',
+          features: [],
+        });
+      }
+      mapboxMap.getCanvas().style.cursor = '';
+    };
+
+    mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
+    mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
+
+    return () => {
+      mapboxMap.off('mousemove', fillLayerId, handleMouseMove);
+      mapboxMap.off('mouseleave', fillLayerId, handleMouseLeave);
+    };
+  }, [mapLoaded, step]);
 
   // Handle map clicks
   useEffect(() => {

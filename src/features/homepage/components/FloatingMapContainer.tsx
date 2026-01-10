@@ -1585,29 +1585,6 @@ export default function LocationSidebar({
     
     const { lng, lat } = e.lngLat;
     
-    // Check if click hit an atlas layer - if so, don't clear atlas entity data
-    // (atlas-entity-click event will handle it)
-    let clickedOnAtlasLayer = false;
-    try {
-      const atlasLayers = ['atlas-layer-point', 'atlas-layer-label'];
-      const existingAtlasLayers = atlasLayers.filter(layerId => {
-        try {
-          return mapboxMap.getLayer(layerId) !== undefined;
-        } catch {
-          return false;
-        }
-      });
-      
-      if (existingAtlasLayers.length > 0) {
-        const atlasFeatures = mapboxMap.queryRenderedFeatures(e.point, {
-          layers: existingAtlasLayers,
-        });
-        clickedOnAtlasLayer = atlasFeatures.length > 0;
-      }
-    } catch (queryError) {
-      // Continue if query fails
-    }
-    
     // Normal mode: Check if click hit a mention or pin - if so, don't show map click data
     try {
       const mapboxMap = map as any;
@@ -1642,22 +1619,19 @@ export default function LocationSidebar({
       // Continue with map click if query fails
     }
     
-    // Clear atlas entity data if clicking on map (not on an atlas layer)
-    // The atlas-entity-click event will handle setting it when an atlas pin is clicked
-    if (!clickedOnAtlasLayer) {
-      // Cancel any in-flight fetch
-      if (atlasEntityAbortControllerRef.current) {
-        atlasEntityAbortControllerRef.current.abort();
-        atlasEntityAbortControllerRef.current = null;
-      }
-      setAtlasEntityData(null);
-      setAtlasEntityTableName(null);
-      setAtlasEntityTypeData(null);
-      setAtlasEntityError(null);
-      setIsAtlasEntityOpen(false);
-      setIsAtlasEntityRawOpen(false);
-      atlasEntityCoordinatesRef.current = null;
+    // Clear atlas entity data if clicking on map
+    // Cancel any in-flight fetch
+    if (atlasEntityAbortControllerRef.current) {
+      atlasEntityAbortControllerRef.current.abort();
+      atlasEntityAbortControllerRef.current = null;
     }
+    setAtlasEntityData(null);
+    setAtlasEntityTableName(null);
+    setAtlasEntityTypeData(null);
+    setAtlasEntityError(null);
+    setIsAtlasEntityOpen(false);
+    setIsAtlasEntityRawOpen(false);
+    atlasEntityCoordinatesRef.current = null;
 
     // Incrementally zoom in on click
     if (map) {

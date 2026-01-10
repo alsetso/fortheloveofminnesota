@@ -35,7 +35,7 @@ export default function CameraImagePreview({
         />
         <button
           onClick={onRemove}
-          className="absolute top-1 right-1 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+          className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
           aria-label="Remove image"
         >
           <XMarkIcon className="w-3 h-3" />

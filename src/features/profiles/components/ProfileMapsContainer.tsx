@@ -87,7 +87,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
     
     if (!currentUserIsPro) {
       // Open upgrade modal if not pro
-      openUpgrade('Maps creation');
+      openUpgrade('Maps Creation');
       return;
     }
     

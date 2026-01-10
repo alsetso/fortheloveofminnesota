@@ -6,7 +6,6 @@ import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
-import AtlasLayer from '@/features/atlas/components/AtlasLayer';
 import { useAuthStateSafe } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -86,9 +85,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
   
-  // Atlas layer visibility state (disabled - hiding all atlas entities)
-  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(false);
-  
   // Congressional districts visibility state
   const [showDistricts, setShowDistricts] = useState(false);
   const [hoveredDistrict, setHoveredDistrict] = useState<any | null>(null);
@@ -132,15 +128,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     closeAll,
     isModalOpen,
   } = useLivePageModals();
-  
-  // Atlas entity state (managed at parent level)
-  const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<{
-    id: string;
-    name: string;
-    table_name: string;
-    lat: number;
-    lng: number;
-  } | null>(null);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { openWelcome, closeModal, modal } = useAppModalContextSafe();
@@ -419,60 +406,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     }
   }, [isModalOpen('create'), createTabSelectedLocation, account]);
 
-  // Handle atlas entity click
-  const handleAtlasEntityClick = useCallback(async (entity: {
-    id: string;
-    name: string;
-    table_name: string;
-    lat: number;
-    lng: number;
-    icon_path?: string | null;
-  }) => {
-    setSelectedAtlasEntity(entity);
-    
-    // Remove red pin marker when clicking on an atlas entity
-    if (temporaryMarkerRef.current) {
-      temporaryMarkerRef.current.remove();
-      temporaryMarkerRef.current = null;
-    }
-    
-    // Fly to location
-    if (mapInstanceRef.current && mapLoaded && entity.lat && entity.lng) {
-      const mapboxMap = mapInstanceRef.current as any;
-      const currentZoom = mapboxMap.getZoom();
-      const targetZoom = Math.max(currentZoom, 14); // Ensure we zoom in at least to level 14
-      
-      mapboxMap.flyTo({
-        center: [entity.lng, entity.lat],
-        zoom: targetZoom,
-        duration: 800,
-        essential: true,
-      });
-    }
-    
-    // Fetch atlas type for icon
-    try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data } = await (supabase as any)
-        .schema('atlas')
-        .from('atlas_types')
-        .select('icon_path')
-        .eq('slug', entity.table_name)
-        .single();
-      
-      openPopup('atlas', {
-        ...entity,
-        icon_path: data?.icon_path || null,
-        coordinates: { lat: entity.lat, lng: entity.lng },
-      });
-    } catch (error) {
-      console.error('Error fetching atlas type:', error);
-      openPopup('atlas', {
-        ...entity,
-        coordinates: { lat: entity.lat, lng: entity.lng },
-      });
-    }
-  }, [mapLoaded, openPopup]);
 
   // Listen for mention click events to show popup
   useEffect(() => {
@@ -504,27 +437,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     };
   }, [openPopup]);
 
-  // Listen for atlas entity click events from search
-  useEffect(() => {
-    const handleAtlasEntityClickEvent = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        id: string;
-        name: string;
-        table_name: string;
-        lat: number;
-        lng: number;
-      }>;
-      const entity = customEvent.detail;
-      if (entity) {
-        handleAtlasEntityClick(entity);
-      }
-    };
-
-    window.addEventListener('atlas-entity-click', handleAtlasEntityClickEvent);
-    return () => {
-      window.removeEventListener('atlas-entity-click', handleAtlasEntityClickEvent);
-    };
-  }, [handleAtlasEntityClick]);
 
   // Unified handler for opening create form with location
   // Handles: single-click, "Add Mention" button, any show-location-for-mention event
@@ -709,9 +621,8 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
         mapInstance.on('click', async (e: any) => {
           if (!mounted) return;
           
-          // Check if click hit a mention or atlas layer - those have their own handlers
+          // Check if click hit a mention layer - those have their own handlers
           const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
-          const atlasLayers = ['atlas-entities-point', 'atlas-entities-point-label'];
           const hitRadius = 20;
           const box: [[number, number], [number, number]] = [
             [e.point.x - hitRadius, e.point.y - hitRadius],
@@ -740,28 +651,8 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
             // Silently continue if query fails (layers don't exist)
           }
           
-          // Check if atlas layers exist before querying (they may not be loaded yet)
-          let atlasFeatures: any[] = [];
-          try {
-            const existingAtlasLayers = atlasLayers.filter(layerId => {
-              try {
-                return mapboxMap.getLayer(layerId) !== undefined;
-              } catch {
-                return false;
-              }
-            });
-            
-            if (existingAtlasLayers.length > 0) {
-              atlasFeatures = mapboxMap.queryRenderedFeatures(box, {
-                layers: existingAtlasLayers,
-              });
-            }
-          } catch (queryError) {
-            // Silently continue if query fails (layers don't exist)
-          }
-
-          // If clicked on a mention or atlas entity, don't show location popup
-          if (mentionFeatures.length > 0 || atlasFeatures.length > 0) {
+          // If clicked on a mention, don't show location popup
+          if (mentionFeatures.length > 0) {
             return;
           }
           
@@ -1108,16 +999,6 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
           {/* Mentions Layer */}
           {mapLoaded && mapInstanceRef.current && (
             <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
-          )}
-
-          {/* Atlas Layer - Cities, Schools, Parks */}
-          {mapLoaded && mapInstanceRef.current && (
-            <AtlasLayer 
-              map={mapInstanceRef.current} 
-              mapLoaded={mapLoaded} 
-              visible={isAtlasLayerVisible}
-              onEntityClick={handleAtlasEntityClick}
-            />
           )}
 
           {/* Points of Interest Layer */}

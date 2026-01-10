@@ -413,11 +413,11 @@ export default function HeroSignInForm() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="absolute right-[10px] top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute right-[10px] top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-900 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Send verification code"
                   >
                     {loading ? (
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3 h-3 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <PaperAirplaneIcon className="w-3 h-3" />
                     )}
@@ -505,11 +505,11 @@ export default function HeroSignInForm() {
               isSuccess ||
               otp.length !== 6
             }
-            className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex justify-center items-center gap-2 py-[10px] px-[10px] border border-gray-300 rounded-md text-xs font-medium text-gray-900 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading || isVerifying ? (
               <>
-                <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-4 w-4 text-gray-900" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>

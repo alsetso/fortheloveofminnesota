@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon, CubeIcon, EyeIcon, EyeSlashIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CubeIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { MAP_CONFIG } from '@/features/map/config';
 import { mapStylePreloader } from '@/features/map/services/mapStylePreloader';
-import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
+import { supabase } from '@/lib/supabase';
 
 type MapStyle = 'streets' | 'satellite';
 
@@ -13,6 +13,11 @@ interface MapStylesPopupProps {
   isOpen: boolean;
   onClose: () => void;
   map?: any;
+  timeFilter?: '24h' | '7d' | 'all';
+  onTimeFilterChange?: (filter: '24h' | '7d' | 'all') => void;
+  account?: any;
+  onUpgrade?: (feature?: string) => void;
+  onProToast?: (feature?: string) => void;
   districtsState?: {
     showDistricts: boolean;
     setShowDistricts: (show: boolean) => void;
@@ -39,15 +44,22 @@ interface MapStylesPopupProps {
  * Slide-up popup for map styles/layers selection
  * Appears from the bottom of the screen, positioned in front of mobile nav (z-[60])
  */
-export default function MapStylesPopup({ isOpen, onClose, map, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
+export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '24h', onTimeFilterChange, account, onUpgrade, onProToast, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [selectedStyle, setSelectedStyle] = useState<MapStyle>('streets');
   const [mounted, setMounted] = useState(false);
   
+  // Accordion state
+  const [isStateResourcesOpen, setIsStateResourcesOpen] = useState(false);
+  const [isLayersOpen, setIsLayersOpen] = useState(false);
+  const [isUIStyleOpen, setIsUIStyleOpen] = useState(false);
+  const [isAtlasOpen, setIsAtlasOpen] = useState(false);
+  
+  // Atlas state
+  const [atlasTypes, setAtlasTypes] = useState<Array<{ slug: string; name: string; icon_path: string | null; status: string }>>([]);
+  const [atlasEntityVisibility, setAtlasEntityVisibility] = useState<Record<string, boolean>>({});
+  
   // 3D controls state
-  const [buildingsEnabled, setBuildingsEnabled] = useState(false);
-  const [opacity, setOpacity] = useState(0.6);
-  const [castShadows, setCastShadows] = useState(false);
   const [pitch, setPitch] = useState(0);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     // Initialize from window state if available
@@ -121,26 +133,6 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
     try {
       const currentPitch = mapboxMap.getPitch?.() || 0;
       setPitch(currentPitch);
-
-      const layer = mapboxMap.getLayer('3d-buildings');
-      if (layer) {
-        const visibility = mapboxMap.getLayoutProperty('3d-buildings', 'visibility');
-        const isVisible = visibility !== 'none';
-        setBuildingsEnabled(isVisible);
-        
-        try {
-          const currentOpacity = mapboxMap.getPaintProperty('3d-buildings', 'fill-extrusion-opacity');
-          if (typeof currentOpacity === 'number') {
-            setOpacity(currentOpacity);
-          }
-          const currentShadows = mapboxMap.getPaintProperty('3d-buildings', 'fill-extrusion-cast-shadows');
-          if (typeof currentShadows === 'boolean') {
-            setCastShadows(currentShadows);
-          }
-        } catch (e) {
-          // Properties might not be accessible
-        }
-      }
     } catch (error) {
       console.debug('[MapStylesPopup] Error detecting 3D state:', error);
     }
@@ -160,6 +152,228 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
       mapboxMap.off('pitch', handlePitch);
     };
   }, [isOpen, map]);
+
+  // Fetch atlas types on mount and initialize visibility from current map state
+  useEffect(() => {
+    const fetchAtlasTypes = async () => {
+      try {
+        const { data: types, error } = await (supabase as any)
+          .schema('atlas')
+          .from('atlas_types')
+          .select('slug, name, icon_path, status')
+          .eq('is_visible', true)
+          .in('status', ['active', 'coming_soon'])
+          .order('display_order', { ascending: true });
+        
+        if (error) {
+          console.error('[MapStylesPopup] Error fetching atlas types:', error);
+          return;
+        }
+        
+        if (types && types.length > 0) {
+          setAtlasTypes(types);
+          
+          // Initialize visibility from current map layer state
+          const visibility: Record<string, boolean> = {};
+          const mapboxMap = map as any;
+          
+          try {
+            // Check current filter on atlas layers to determine what's visible
+            const pointLayerId = 'atlas-entities-point';
+            const pointLayer = mapboxMap?.getLayer?.(pointLayerId);
+            
+            if (pointLayer) {
+              const currentFilter = mapboxMap.getFilter(pointLayerId);
+              
+              // Extract visible table names from filter
+              // Filter format: ['any', ['==', ['get', 'table_name'], 'parks'], ...]
+              if (currentFilter && Array.isArray(currentFilter) && currentFilter[0] === 'any') {
+                const visibleTables = new Set<string>();
+                for (let i = 1; i < currentFilter.length; i++) {
+                  const condition = currentFilter[i];
+                  if (Array.isArray(condition) && condition[0] === '==' && 
+                      Array.isArray(condition[1]) && condition[1][0] === 'get' && condition[1][1] === 'table_name') {
+                    const tableName = condition[2];
+                    if (typeof tableName === 'string') {
+                      visibleTables.add(tableName);
+                    }
+                  }
+                }
+                
+                // Set visibility based on current filter
+                types.forEach((type: { slug: string; status: string }) => {
+                  if (type.status === 'active') {
+                    visibility[type.slug] = visibleTables.has(type.slug);
+                  }
+                });
+              } else if (currentFilter && Array.isArray(currentFilter) && currentFilter[0] === 'literal' && currentFilter[1] === false) {
+                // All hidden
+                types.forEach((type: { slug: string; status: string }) => {
+                  if (type.status === 'active') {
+                    visibility[type.slug] = false;
+                  }
+                });
+              } else {
+                // No filter means all visible (or check source data)
+                // Check if source exists and has data
+                const source = mapboxMap.getSource('atlas-entities');
+                if (source && (source as any).type === 'geojson') {
+                  const data = (source as any)._data;
+                  if (data && data.features && data.features.length > 0) {
+                    // If there's data and no filter, all are visible
+                    types.forEach((type: { slug: string; status: string }) => {
+                      if (type.status === 'active') {
+                        // Check if this type has features in the data
+                        const hasFeatures = data.features.some((f: any) => 
+                          f.properties && f.properties.table_name === type.slug
+                        );
+                        visibility[type.slug] = hasFeatures;
+                      }
+                    });
+                  } else {
+                    // No data - all false
+                    types.forEach((type: { slug: string; status: string }) => {
+                      if (type.status === 'active') {
+                        visibility[type.slug] = false;
+                      }
+                    });
+                  }
+                } else {
+                  // No source - all false
+                  types.forEach((type: { slug: string; status: string }) => {
+                    if (type.status === 'active') {
+                      visibility[type.slug] = false;
+                    }
+                  });
+                }
+              }
+            } else {
+              // Layer doesn't exist yet - all false
+              types.forEach((type: { slug: string; status: string }) => {
+                if (type.status === 'active') {
+                  visibility[type.slug] = false;
+                }
+              });
+            }
+          } catch (e) {
+            // Fallback: all false if we can't read map state
+            console.warn('[MapStylesPopup] Error reading atlas layer state:', e);
+            types.forEach((type: { slug: string; status: string }) => {
+              if (type.status === 'active') {
+                visibility[type.slug] = false;
+              }
+            });
+          }
+          
+          setAtlasEntityVisibility(visibility);
+        }
+      } catch (error) {
+        console.error('[MapStylesPopup] Error fetching atlas types:', error);
+      }
+    };
+
+    if (isOpen && map) {
+      fetchAtlasTypes();
+    }
+  }, [isOpen, map]);
+
+  // Listen for atlas visibility changes from other components
+  useEffect(() => {
+    const handleAtlasVisibilityChange = (event: CustomEvent) => {
+      const { visibleTables } = event.detail;
+      if (Array.isArray(visibleTables)) {
+        const visibility: Record<string, boolean> = {};
+        atlasTypes.forEach((type) => {
+          visibility[type.slug] = visibleTables.includes(type.slug);
+        });
+        setAtlasEntityVisibility(visibility);
+      }
+    };
+
+    window.addEventListener('atlas-visibility-change', handleAtlasVisibilityChange as EventListener);
+    return () => {
+      window.removeEventListener('atlas-visibility-change', handleAtlasVisibilityChange as EventListener);
+    };
+  }, [atlasTypes]);
+
+  // Toggle atlas entity visibility
+  const toggleAtlasEntityVisibility = (tableName: string) => {
+    if (!map) {
+      console.warn('[MapStylesPopup] Cannot toggle atlas layer - map not available');
+      return;
+    }
+    
+    const previousVisibility = atlasEntityVisibility[tableName] || false;
+    const newVisibility = !previousVisibility;
+    
+    console.log('[MapStylesPopup] Toggling atlas layer:', {
+      tableName,
+      previousState: previousVisibility ? 'ON' : 'OFF',
+      newState: newVisibility ? 'ON' : 'OFF',
+      action: newVisibility ? 'TURNING ON' : 'TURNING OFF',
+    });
+    
+    const updatedVisibility = {
+      ...atlasEntityVisibility,
+      [tableName]: newVisibility,
+    };
+    
+    setAtlasEntityVisibility(updatedVisibility);
+
+    // Dispatch event for AtlasLayer to sync visibility
+    const visibleTables = Object.entries(updatedVisibility)
+      .filter(([, visible]) => visible)
+      .map(([name]) => name);
+    
+    console.log('[MapStylesPopup] Dispatching atlas-visibility-change event:', {
+      visibleTables,
+      totalVisible: visibleTables.length,
+      allVisibility: updatedVisibility,
+    });
+    
+    window.dispatchEvent(new CustomEvent('atlas-visibility-change', {
+      detail: { visibleTables }
+    }));
+
+    const mapboxMap = map as any;
+    const pointLayerId = 'atlas-entities-point';
+    const labelLayerId = 'atlas-entities-point-label';
+
+    try {
+      const pointLayer = mapboxMap.getLayer(pointLayerId);
+      const labelLayer = mapboxMap.getLayer(labelLayerId);
+      
+      if (!pointLayer || !labelLayer) return;
+
+      const visibleEntities = Object.entries(updatedVisibility)
+        .filter(([, visible]) => visible)
+        .map(([name]) => name);
+
+      const newFilter = visibleEntities.length > 0
+        ? ['any', ...visibleEntities.map(name => ['==', ['get', 'table_name'], name])]
+        : ['literal', false];
+
+      console.log('[MapStylesPopup] Applying filter to map layers:', {
+        pointLayerId,
+        labelLayerId,
+        visibleEntities,
+        filterExpression: newFilter,
+        filterType: visibleEntities.length > 0 ? 'SHOW_ENTITIES' : 'HIDE_ALL',
+      });
+
+      mapboxMap.setFilter(pointLayerId, newFilter);
+      mapboxMap.setFilter(labelLayerId, newFilter);
+      
+      console.log('[MapStylesPopup] Filter applied successfully');
+    } catch (e) {
+      console.error('[MapStylesPopup] Error toggling atlas entity visibility:', {
+        error: e,
+        tableName,
+        newVisibility,
+        updatedVisibility,
+      });
+    }
+  };
 
   const handleClose = () => {
     if (popupRef.current) {
@@ -195,63 +409,6 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
   };
 
   // 3D controls handlers
-  const toggleBuildings = () => {
-    if (!map) return;
-    
-    const newEnabled = !buildingsEnabled;
-    setBuildingsEnabled(newEnabled);
-    const mapboxMap = map as any;
-    
-    if (newEnabled) {
-      if (!mapboxMap.getLayer('3d-buildings')) {
-        addBuildingExtrusions(map, {
-          opacity,
-          castShadows,
-          minzoom: 14,
-        });
-      } else {
-        try {
-          mapboxMap.setLayoutProperty('3d-buildings', 'visibility', 'visible');
-        } catch (e) {
-          // Ignore
-        }
-      }
-    } else {
-      try {
-        mapboxMap.setLayoutProperty('3d-buildings', 'visibility', 'none');
-      } catch (e) {
-        removeBuildingExtrusions(map);
-      }
-    }
-  };
-
-  const updateOpacity = (newOpacity: number) => {
-    if (!map) return;
-    setOpacity(newOpacity);
-    if (buildingsEnabled) {
-      const mapboxMap = map as any;
-      try {
-        mapboxMap.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', newOpacity);
-      } catch (e) {
-        // Layer might not exist yet
-      }
-    }
-  };
-
-  const toggleShadows = () => {
-    if (!map) return;
-    const newShadows = !castShadows;
-    setCastShadows(newShadows);
-    if (buildingsEnabled) {
-      const mapboxMap = map as any;
-      try {
-        mapboxMap.setPaintProperty('3d-buildings', 'fill-extrusion-cast-shadows', newShadows);
-      } catch (e) {
-        // Layer might not exist yet
-      }
-    }
-  };
-
   const setPitchValue = (newPitch: number) => {
     if (!map) return;
     setPitch(newPitch);
@@ -314,492 +471,615 @@ export default function MapStylesPopup({ isOpen, onClose, map, districtsState, b
         {/* Content - Always scrollable on desktop */}
         <div className="flex-1 overflow-y-auto xl:overflow-y-auto">
           <div className="p-3 space-y-3">
-            {/* 3D View Controls */}
-            <div>
-              <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>3D View</div>
-                <div className="flex gap-1">
+            {/* Time Filter - At the top */}
+            {onTimeFilterChange && (
+              <div>
+                <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Time Filter</div>
+                <div className={`flex gap-1 rounded-md px-1 py-1 items-center transition-all ${
+                  useBlurStyle 
+                    ? 'bg-white/10 border border-white/20' 
+                    : 'bg-white border border-gray-200'
+                }`}>
                   <button
-                    onClick={() => setPitchValue(0)}
-                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
-                      pitch === 0
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText && pitch !== 0 ? 'text-white' : pitch !== 0 ? 'text-gray-700' : ''}`}
+                    onClick={() => {
+                      onTimeFilterChange('24h');
+                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                        detail: { timeFilter: '24h' }
+                      }));
+                    }}
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+                      timeFilter === '24h'
+                        ? useWhiteText ? 'text-white bg-white/20' : 'text-gray-900 bg-gray-100'
+                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}
                   >
-                    {pitch === 0 && (
-                      <div className="w-1.5 h-1.5 bg-white rounded-full flex-shrink-0" />
-                    )}
-                    <span>0°</span>
+                    24h
                   </button>
                   <button
-                    onClick={() => setPitchValue(30)}
-                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
-                      Math.round(pitch) === 30
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText && Math.round(pitch) !== 30 ? 'text-white' : Math.round(pitch) !== 30 ? 'text-gray-700' : ''}`}
+                    onClick={() => {
+                      onTimeFilterChange('7d');
+                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                        detail: { timeFilter: '7d' }
+                      }));
+                    }}
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+                      timeFilter === '7d'
+                        ? useWhiteText ? 'text-white bg-white/20' : 'text-gray-900 bg-gray-100'
+                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}
                   >
-                    {Math.round(pitch) === 30 && (
-                      <div className="w-1.5 h-1.5 bg-white rounded-full flex-shrink-0" />
-                    )}
-                    <span>30°</span>
+                    7d
                   </button>
                   <button
-                    onClick={() => setPitchValue(60)}
-                    className={`flex-1 px-2 py-1 rounded text-[10px] font-medium transition-colors border flex items-center justify-center gap-1 ${
-                      Math.round(pitch) === 60
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText && Math.round(pitch) !== 60 ? 'text-white' : Math.round(pitch) !== 60 ? 'text-gray-700' : ''}`}
+                    onClick={() => {
+                      const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+                      if (!isPro && onUpgrade) {
+                        onUpgrade('All Time Filter');
+                        return;
+                      }
+                      if (onProToast) {
+                        onProToast('All time filter');
+                      }
+                      onTimeFilterChange('all');
+                      window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
+                        detail: { timeFilter: 'all' }
+                      }));
+                    }}
+                    className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+                      timeFilter === 'all'
+                        ? useWhiteText ? 'text-white bg-white/20' : 'text-gray-900 bg-gray-100'
+                        : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}
                   >
-                    {Math.round(pitch) === 60 && (
-                      <div className="w-1.5 h-1.5 bg-white rounded-full flex-shrink-0" />
-                    )}
-                    <span>60°</span>
+                    All time
                   </button>
                 </div>
               </div>
+            )}
 
-              {/* 3D Buildings Section */}
-              <div>
-                <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>3D Buildings</div>
-                <div className="space-y-1.5">
-                  {/* Toggle Buildings */}
+            {/* 3D View Controls */}
+            <div>
+              <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>3D View</div>
+              <div className={`flex gap-1 rounded-md px-1 py-1 items-center transition-all ${
+                useBlurStyle 
+                  ? 'bg-white/10 border border-white/20' 
+                  : 'bg-white border border-gray-200'
+              }`}>
+                <button
+                  onClick={() => setPitchValue(0)}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+                    pitch === 0
+                      ? useWhiteText ? 'text-white bg-white/20' : 'text-gray-900 bg-gray-100'
+                      : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  0°
+                </button>
+                <button
+                  onClick={() => setPitchValue(30)}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+                    Math.round(pitch) === 30
+                      ? useWhiteText ? 'text-white bg-white/20' : 'text-gray-900 bg-gray-100'
+                      : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  30°
+                </button>
+                <button
+                  onClick={() => setPitchValue(60)}
+                  className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+                    Math.round(pitch) === 60
+                      ? useWhiteText ? 'text-white bg-white/20' : 'text-gray-900 bg-gray-100'
+                      : useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  60°
+                </button>
+              </div>
+            </div>
+
+              {/* State Resources Section - Accordion */}
+              {buildingsState && (
+                <div>
                   <button
-                    onClick={toggleBuildings}
+                    onClick={() => setIsStateResourcesOpen(!isStateResourcesOpen)}
                     className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      buildingsEnabled
-                        ? useBlurStyle
-                        ? 'bg-white/10 border-white/20'
-                        : 'bg-gray-100 border-gray-200'
-                        : useBlurStyle
+                      useBlurStyle
                         ? 'bg-white/10 border-white/20 hover:bg-white/20'
                         : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${
-                      buildingsEnabled
-                        ? useWhiteText ? 'text-white' : 'text-gray-900'
-                        : useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
                   >
                     <div className="flex items-center gap-2">
-                      <CubeIcon className="w-3.5 h-3.5" />
-                      <span>Show Buildings</span>
+                      <span className="font-semibold">State Resources</span>
+                      <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(1)</span>
                     </div>
-                    {buildingsEnabled ? (
-                      <EyeIcon className="w-3.5 h-3.5" />
+                    {isStateResourcesOpen ? (
+                      <ChevronUpIcon className="w-4 h-4" />
                     ) : (
-                      <EyeSlashIcon className="w-3.5 h-3.5" />
+                      <ChevronDownIcon className="w-4 h-4" />
                     )}
                   </button>
-
-                  {/* Opacity Control */}
-                  {buildingsEnabled && (
-                    <div className="px-2 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[10px] ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>Opacity</span>
-                        <span className={`text-[10px] font-mono ${useWhiteText ? 'text-white/80' : 'text-gray-500'}`}>{Math.round(opacity * 100)}%</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={opacity}
-                        onChange={(e) => updateOpacity(parseFloat(e.target.value))}
-                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-900"
-                      />
+                  {isStateResourcesOpen && (
+                    <div className="mt-1.5 space-y-1.5 pl-2">
+                      <button
+                        onClick={() => {
+                          buildingsState.setShowBuildings(!buildingsState.showBuildings);
+                        }}
+                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                          useBlurStyle
+                            ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <CubeIcon className="w-3.5 h-3.5" />
+                          <span>Government Buildings</span>
+                        </div>
+                        <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                          buildingsState.showBuildings ? 'bg-gray-900' : 'bg-gray-300'
+                        }`}>
+                          <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                            buildingsState.showBuildings ? 'translate-x-3.5' : 'translate-x-0'
+                          }`} />
+                        </div>
+                      </button>
                     </div>
                   )}
+                </div>
+              )}
 
-                  {/* Shadows Toggle */}
-                  {buildingsEnabled && (
+              {/* Layers Section - Accordion */}
+              {(districtsState || ctuState || stateBoundaryState || countyBoundariesState) && (
+                <div>
+                  <button
+                    onClick={() => setIsLayersOpen(!isLayersOpen)}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Layers</span>
+                      <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        ({[
+                          districtsState,
+                          ctuState,
+                          stateBoundaryState,
+                          countyBoundariesState,
+                          true, // Water
+                          true, // Roads
+                          true, // Parcels
+                        ].filter(Boolean).length})
+                      </span>
+                    </div>
+                    {isLayersOpen ? (
+                      <ChevronUpIcon className="w-4 h-4" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4" />
+                    )}
+                  </button>
+                  {isLayersOpen && (
+                    <div className="mt-1 space-y-1 pl-2">
+                      {/* Congressional Districts */}
+                      {districtsState && (
+                        <button
+                          onClick={() => {
+                            districtsState.setShowDistricts(!districtsState.showDistricts);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs transition-colors border ${
+                            useBlurStyle
+                              ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                        >
+                          <div className="flex flex-col items-start text-left gap-0.5">
+                            <span className="text-left leading-tight">Congressional Districts</span>
+                            <a
+                              href="https://www.sos.mn.gov/election-administration-campaigns/data-maps/geojson-files/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                                useWhiteText ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                              aria-label="View Congressional Districts dataset"
+                            >
+                              6.1 MB
+                            </a>
+                          </div>
+                          <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                            districtsState.showDistricts ? 'bg-gray-900' : 'bg-gray-300'
+                          }`}>
+                            <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                              districtsState.showDistricts ? 'translate-x-3.5' : 'translate-x-0'
+                            }`} />
+                          </div>
+                        </button>
+                      )}
+
+                      {/* CTU Boundaries */}
+                      {ctuState && (
+                        <button
+                          onClick={() => {
+                            ctuState.setShowCTU(!ctuState.showCTU);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs transition-colors border ${
+                            useBlurStyle
+                              ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                        >
+                          <div className="flex flex-col items-start text-left gap-0.5">
+                            <span className="text-left leading-tight">CTU Boundaries</span>
+                            <a
+                              href="https://gisdata.mn.gov/dataset/bdry-mn-city-township-unorg"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                                useWhiteText ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                              aria-label="View CTU Boundaries dataset"
+                            >
+                              4.0 KB
+                            </a>
+                          </div>
+                          <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                            ctuState.showCTU ? 'bg-gray-900' : 'bg-gray-300'
+                          }`}>
+                            <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                              ctuState.showCTU ? 'translate-x-3.5' : 'translate-x-0'
+                            }`} />
+                          </div>
+                        </button>
+                      )}
+
+                      {/* County Boundaries */}
+                      {countyBoundariesState && (
+                        <button
+                          onClick={() => {
+                            countyBoundariesState.setShowCountyBoundaries(!countyBoundariesState.showCountyBoundaries);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs transition-colors border ${
+                            useBlurStyle
+                              ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                        >
+                          <div className="flex flex-col items-start text-left gap-0.5">
+                            <span className="text-left leading-tight">County Boundaries</span>
+                            <a
+                              href="https://gisdata.mn.gov/dataset/bdry-counties-in-minnesota"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                                useWhiteText ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                              aria-label="View County Boundaries dataset"
+                            >
+                              5.4 MB
+                            </a>
+                          </div>
+                          <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                            countyBoundariesState.showCountyBoundaries ? 'bg-gray-900' : 'bg-gray-300'
+                          }`}>
+                            <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                              countyBoundariesState.showCountyBoundaries ? 'translate-x-3.5' : 'translate-x-0'
+                            }`} />
+                          </div>
+                        </button>
+                      )}
+
+                      {/* State Boundary */}
+                      {stateBoundaryState && (
+                        <button
+                          onClick={() => {
+                            stateBoundaryState.setShowStateBoundary(!stateBoundaryState.showStateBoundary);
+                          }}
+                          className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs transition-colors border ${
+                            useBlurStyle
+                              ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                              : 'bg-white border-gray-200 hover:bg-gray-50'
+                          } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                        >
+                          <div className="flex flex-col items-start text-left gap-0.5">
+                            <span className="text-left leading-tight">State Boundary</span>
+                            <a
+                              href="https://gisdata.mn.gov/dataset/bdry-state-of-minnesota"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                                useWhiteText ? 'text-white/60 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                              aria-label="View State Boundary dataset"
+                            >
+                              4.7 MB
+                            </a>
+                          </div>
+                          <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                            stateBoundaryState.showStateBoundary ? 'bg-gray-900' : 'bg-gray-300'
+                          }`}>
+                            <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                              stateBoundaryState.showStateBoundary ? 'translate-x-3.5' : 'translate-x-0'
+                            }`} />
+                          </div>
+                        </button>
+                      )}
+
+                      {/* Divider between active and coming soon layers */}
+                      <div className={`border-t ${useBlurStyle ? 'border-white/10' : 'border-gray-200'} my-1`} />
+                      <div className={`text-[10px] font-medium ${useWhiteText ? 'text-white/50' : 'text-gray-400'} px-2 pb-0.5`}>
+                        Coming Soon
+                      </div>
+
+                      {/* Water (National Hydrography Data) - Coming Soon */}
+                      <div
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs border ${
+                          useBlurStyle
+                            ? 'bg-white/5 border-white/10'
+                            : 'bg-gray-50 border-gray-200'
+                        } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                      >
+                        <div className="flex flex-col items-start text-left gap-0.5">
+                          <span className="text-left leading-tight">Water</span>
+                          <a
+                            href="https://gisdata.mn.gov/dataset/water-national-hydrography-data"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                              useWhiteText ? 'text-white/40 hover:text-white/60' : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                            aria-label="View Water dataset"
+                          >
+                            1.8 GB
+                          </a>
+                        </div>
+                        <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                          <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                        </div>
+                      </div>
+
+                      {/* Roads (Route Centerlines) - Coming Soon */}
+                      <div
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs border ${
+                          useBlurStyle
+                            ? 'bg-white/5 border-white/10'
+                            : 'bg-gray-50 border-gray-200'
+                        } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                      >
+                        <div className="flex flex-col items-start text-left gap-0.5">
+                          <span className="text-left leading-tight">Roads</span>
+                          <a
+                            href="https://gisdata.mn.gov/dataset/trans-roads-centerlines"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                              useWhiteText ? 'text-white/40 hover:text-white/60' : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                            aria-label="View Roads dataset"
+                          >
+                            530 MB
+                          </a>
+                        </div>
+                        <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                          <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                        </div>
+                      </div>
+
+                      {/* Parcels - Coming Soon */}
+                      <div
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs border ${
+                          useBlurStyle
+                            ? 'bg-white/5 border-white/10'
+                            : 'bg-gray-50 border-gray-200'
+                        } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                      >
+                        <div className="flex flex-col items-start text-left gap-0.5">
+                          <span className="text-left leading-tight">Parcels</span>
+                          <a
+                            href="https://gisdata.mn.gov/dataset/plan-parcels-open"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className={`text-[10px] underline transition-colors text-left hover:font-medium ${
+                              useWhiteText ? 'text-white/40 hover:text-white/60' : 'text-gray-400 hover:text-gray-600'
+                            }`}
+                            aria-label="View Parcels dataset"
+                          >
+                            2.3 GB
+                          </a>
+                        </div>
+                        <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                          <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Atlas Section - Accordion */}
+              {atlasTypes.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setIsAtlasOpen(!isAtlasOpen)}
+                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                      useBlurStyle
+                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Atlas</span>
+                      <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        ({atlasTypes.filter(t => t.status === 'active').length})
+                      </span>
+                    </div>
+                    {isAtlasOpen ? (
+                      <ChevronUpIcon className="w-4 h-4" />
+                    ) : (
+                      <ChevronDownIcon className="w-4 h-4" />
+                    )}
+                  </button>
+                  {isAtlasOpen && (
+                    <div className="mt-1 space-y-1 pl-2">
+                      {atlasTypes.map((type) => {
+                        const isActive = type.status === 'active';
+                        const isVisible = atlasEntityVisibility[type.slug] ?? false;
+                        
+                        // Active items with toggles
+                        if (isActive) {
+                          return (
+                            <button
+                              key={type.slug}
+                              onClick={() => toggleAtlasEntityVisibility(type.slug)}
+                              className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs transition-colors border ${
+                                useBlurStyle
+                                  ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                                  : 'bg-white border-gray-200 hover:bg-gray-50'
+                              } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {type.icon_path && (
+                                  <img src={type.icon_path} alt="" className="w-3.5 h-3.5 flex-shrink-0" />
+                                )}
+                                <span className="leading-tight">{type.name}</span>
+                              </div>
+                              <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                                isVisible ? 'bg-gray-900' : 'bg-gray-300'
+                              }`}>
+                                <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                                  isVisible ? 'translate-x-3.5' : 'translate-x-0'
+                                }`} />
+                              </div>
+                            </button>
+                          );
+                        }
+                        
+                        return null; // Coming soon items handled below
+                      })}
+                      
+                      {/* Coming soon items */}
+                      {atlasTypes.some(t => t.status === 'coming_soon') && (
+                        <>
+                          <div className={`border-t ${useBlurStyle ? 'border-white/10' : 'border-gray-200'} my-1`} />
+                          <div className={`text-[10px] font-medium ${useWhiteText ? 'text-white/50' : 'text-gray-400'} px-2 pb-0.5`}>
+                            Coming Soon
+                          </div>
+                          {atlasTypes
+                            .filter(t => t.status === 'coming_soon')
+                            .map((type) => (
+                              <div
+                                key={type.slug}
+                                className={`w-full flex items-center justify-between px-2 py-1 rounded text-xs border ${
+                                  useBlurStyle
+                                    ? 'bg-white/5 border-white/10'
+                                    : 'bg-gray-50 border-gray-200'
+                                } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  {type.icon_path && (
+                                    <img src={type.icon_path} alt="" className="w-3.5 h-3.5 flex-shrink-0" />
+                                  )}
+                                  <span className="leading-tight">{type.name}</span>
+                                </div>
+                                <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
+                                  <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
+                                </div>
+                              </div>
+                            ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* UI Style Section - Accordion */}
+              <div>
+                <button
+                  onClick={() => setIsUIStyleOpen(!isUIStyleOpen)}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                    useBlurStyle
+                      ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                  } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">UI Style</span>
+                    <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(2)</span>
+                  </div>
+                  {isUIStyleOpen ? (
+                    <ChevronUpIcon className="w-4 h-4" />
+                  ) : (
+                    <ChevronDownIcon className="w-4 h-4" />
+                  )}
+                </button>
+                {isUIStyleOpen && (
+                  <div className="mt-1.5 space-y-1.5 pl-2">
+                    {/* Satellite Toggle */}
                     <button
-                      onClick={toggleShadows}
+                      onClick={() => {
+                        const newStyle = selectedStyle === 'satellite' ? 'streets' : 'satellite';
+                        handleStyleChange(newStyle);
+                      }}
                       className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                        castShadows
+                        selectedStyle === 'satellite'
                           ? useBlurStyle
                           ? 'bg-white/10 border-white/20'
                           : 'bg-gray-100 border-gray-200'
                           : useBlurStyle
                           ? 'bg-white/10 border-white/20 hover:bg-white/20'
                           : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } ${
-                        castShadows
-                          ? useWhiteText ? 'text-white' : 'text-gray-900'
-                          : useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'
-                      }`}
+                      } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
                     >
-                      <span>Cast Shadows</span>
+                      <span>Satellite</span>
                       <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                        castShadows ? 'bg-gray-900' : 'bg-gray-300'
+                        selectedStyle === 'satellite' ? 'bg-gray-900' : 'bg-gray-300'
                       }`}>
                         <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                          castShadows ? 'translate-x-3.5' : 'translate-x-0'
+                          selectedStyle === 'satellite' ? 'translate-x-3.5' : 'translate-x-0'
                         }`} />
                       </div>
                     </button>
-                  )}
-                </div>
-              </div>
 
-              {/* State Resources Section */}
-              {buildingsState && (
-                <div>
-                  <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>State Resources</div>
-                  <button
-                    onClick={() => {
-                      buildingsState.setShowBuildings(!buildingsState.showBuildings);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <CubeIcon className="w-3.5 h-3.5" />
-                      <span>Government Buildings</span>
-                    </div>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      buildingsState.showBuildings ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        buildingsState.showBuildings ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              {/* Congressional Districts Toggle */}
-              {districtsState && (
-                <div>
-                  <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
-                  <button
-                    onClick={() => {
-                      districtsState.setShowDistricts(!districtsState.showDistricts);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>Congressional Districts</span>
-                      <a
-                        href="https://www.sos.mn.gov/election-administration-campaigns/data-maps/geojson-files/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className={`transition-colors ${
-                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        aria-label="View Congressional Districts data source"
-                      >
-                        <InformationCircleIcon className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      districtsState.showDistricts ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        districtsState.showDistricts ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              {/* CTU Boundaries Toggle */}
-              {ctuState && (
-                <div>
-                  {!districtsState && (
-                    <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
-                  )}
-                  <button
-                    onClick={() => {
-                      ctuState.setShowCTU(!ctuState.showCTU);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>CTU Boundaries</span>
-                      <a
-                        href="https://gisdata.mn.gov/dataset/bdry-mn-city-township-unorg"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className={`transition-colors ${
-                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        aria-label="View CTU Boundaries data source"
-                      >
-                        <InformationCircleIcon className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      ctuState.showCTU ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        ctuState.showCTU ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              {/* Water (National Hydrography Data) - Coming Soon */}
-              <div>
-                {!districtsState && !ctuState && !stateBoundaryState && !countyBoundariesState && (
-                  <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
+                    {/* Transparent Blur Toggle */}
+                    <button
+                      onClick={() => {
+                        const newValue = !useBlurStyle;
+                        setUseBlurStyle(newValue);
+                        // Store in window for session persistence
+                        if (typeof window !== 'undefined') {
+                          (window as any).__useBlurStyle = newValue;
+                        }
+                        // Dispatch event to update all components
+                        window.dispatchEvent(new CustomEvent('blur-style-change', {
+                          detail: { useBlurStyle: newValue }
+                        }));
+                      }}
+                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                        useBlurStyle
+                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    >
+                      <span>Transparent Blur</span>
+                      <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                        useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
+                      }`}>
+                        <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                          useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
+                        }`} />
+                      </div>
+                    </button>
+                  </div>
                 )}
-                <div
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border ${
-                    useBlurStyle
-                      ? 'bg-white/5 border-white/10'
-                      : 'bg-gray-50 border-gray-200'
-                  } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Water</span>
-                    <a
-                      href="https://gisdata.mn.gov/dataset/water-national-hydrography-data"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className={`transition-colors ${
-                        useWhiteText ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                      aria-label="View Water (National Hydrography Data) data source"
-                    >
-                      <InformationCircleIcon className="w-3 h-3" />
-                    </a>
-                    <span className="text-[10px] text-gray-400">(Coming Soon)</span>
-                  </div>
-                  <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
-                    <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
-                  </div>
-                </div>
               </div>
-
-              {/* County Boundaries */}
-              {countyBoundariesState && (
-                <div>
-                  {!districtsState && !ctuState && (
-                    <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
-                  )}
-                  <button
-                    onClick={() => {
-                      countyBoundariesState.setShowCountyBoundaries(!countyBoundariesState.showCountyBoundaries);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>County Boundaries</span>
-                      <a
-                        href="https://gisdata.mn.gov/dataset/bdry-counties-in-minnesota"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className={`transition-colors ${
-                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        aria-label="View County Boundaries data source"
-                      >
-                        <InformationCircleIcon className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      countyBoundariesState.showCountyBoundaries ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        countyBoundariesState.showCountyBoundaries ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              {/* State Boundary */}
-              {stateBoundaryState && (
-                <div>
-                  {!districtsState && !ctuState && !countyBoundariesState && (
-                    <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Layers</div>
-                  )}
-                  <button
-                    onClick={() => {
-                      stateBoundaryState.setShowStateBoundary(!stateBoundaryState.showStateBoundary);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span>State Boundary</span>
-                      <a
-                        href="https://gisdata.mn.gov/dataset/bdry-state-of-minnesota"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className={`transition-colors ${
-                          useWhiteText ? 'text-gray-300 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                        aria-label="View State Boundary data source"
-                      >
-                        <InformationCircleIcon className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      stateBoundaryState.showStateBoundary ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        stateBoundaryState.showStateBoundary ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-                </div>
-              )}
-
-              {/* Roads (Route Centerlines) - Coming Soon */}
-              <div>
-                <div
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border ${
-                    useBlurStyle
-                      ? 'bg-white/5 border-white/10'
-                      : 'bg-gray-50 border-gray-200'
-                  } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Roads</span>
-                    <a
-                      href="https://gisdata.mn.gov/dataset/trans-roads-centerlines"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className={`transition-colors ${
-                        useWhiteText ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                      aria-label="View Roads (Route Centerlines) data source"
-                    >
-                      <InformationCircleIcon className="w-3 h-3" />
-                    </a>
-                    <span className="text-[10px] text-gray-400">(Coming Soon)</span>
-                  </div>
-                  <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
-                    <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parcels - Coming Soon */}
-              <div>
-                <div
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border ${
-                    useBlurStyle
-                      ? 'bg-white/5 border-white/10'
-                      : 'bg-gray-50 border-gray-200'
-                  } ${useWhiteText ? 'text-gray-400' : 'text-gray-500'} cursor-not-allowed opacity-60`}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span>Parcels</span>
-                    <a
-                      href="https://gisdata.mn.gov/dataset/plan-parcels-open"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className={`transition-colors ${
-                        useWhiteText ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                      aria-label="View Parcels data source"
-                    >
-                      <InformationCircleIcon className="w-3 h-3" />
-                    </a>
-                    <span className="text-[10px] text-gray-400">(Coming Soon)</span>
-                  </div>
-                  <div className="w-7 h-3.5 rounded-full bg-gray-200 relative">
-                    <div className="absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full" />
-                  </div>
-                </div>
-              </div>
-
-              {/* UI Style Section */}
-              <div>
-                <div className={`text-xs font-semibold mb-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>UI Style</div>
-                <div className="space-y-1.5">
-                  {/* Satellite Toggle */}
-                  <button
-                    onClick={() => {
-                      const newStyle = selectedStyle === 'satellite' ? 'streets' : 'satellite';
-                      handleStyleChange(newStyle);
-                    }}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      selectedStyle === 'satellite'
-                        ? useBlurStyle
-                        ? 'bg-white/10 border-white/20'
-                        : 'bg-gray-100 border-gray-200'
-                        : useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <span>Satellite</span>
-                    <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                      selectedStyle === 'satellite' ? 'bg-gray-900' : 'bg-gray-300'
-                    }`}>
-                      <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                        selectedStyle === 'satellite' ? 'translate-x-3.5' : 'translate-x-0'
-                      }`} />
-                    </div>
-                  </button>
-
-                  {/* Transparent Blur Toggle */}
-                <button
-                  onClick={() => {
-                    const newValue = !useBlurStyle;
-                    setUseBlurStyle(newValue);
-                    // Store in window for session persistence
-                    if (typeof window !== 'undefined') {
-                      (window as any).__useBlurStyle = newValue;
-                    }
-                    // Dispatch event to update all components
-                    window.dispatchEvent(new CustomEvent('blur-style-change', {
-                      detail: { useBlurStyle: newValue }
-                    }));
-                  }}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                    useBlurStyle
-                      ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
-                  } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                >
-                  <span>Transparent Blur</span>
-                  <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                    useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
-                  }`}>
-                    <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                      useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
-                    }`} />
-                  </div>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </div>

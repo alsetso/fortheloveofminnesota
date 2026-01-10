@@ -84,7 +84,7 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
     // For professional maps without access, show upgrade modal
     if (map.requiresPro && !canAccess) {
       e.preventDefault();
-      openUpgrade('professional-maps');
+      openUpgrade('Professional Maps');
       return;
     }
 

@@ -103,7 +103,7 @@ export default function LocationServicesPopup({
         <button
           onClick={handleRequestLocation}
           disabled={!isSupported || isLoading}
-          className="bg-white border border-gray-200 rounded-md p-[10px] shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-white border border-gray-200 rounded-md p-3 shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           aria-label="Get my location"
         >
           <MapPinIcon className="w-4 h-4 text-gray-600" />

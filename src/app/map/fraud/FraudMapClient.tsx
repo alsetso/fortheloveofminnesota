@@ -43,7 +43,7 @@ export default function FraudMapClient({ cities, counties }: FraudMapClientProps
                 Fraud maps are available for Pro subscribers. Upgrade to access this feature and more.
               </p>
               <button
-                onClick={() => openUpgrade()}
+                onClick={() => openUpgrade('Fraud Detection Maps')}
                 className="w-full text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md py-2 px-4 transition-colors"
               >
                 Upgrade to Pro

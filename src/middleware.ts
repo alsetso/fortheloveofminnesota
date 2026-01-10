@@ -157,7 +157,7 @@ export async function middleware(req: NextRequest) {
     "worker-src 'self' blob:", // Mapbox uses blob URLs for Web Workers
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts + Tailwind
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts stylesheets
-    "img-src 'self' data: https:",
+    "img-src 'self' data: https: blob:", // Allow blob URLs for camera previews
     "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts fonts
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com https://api.stripe.com", // Stripe API
     "frame-src 'self' https://js.stripe.com https://hooks.stripe.com", // Stripe Checkout and webhooks

@@ -270,11 +270,7 @@ export default function CreateMentionPopup({
       {isOpen && onCameraClick && (
         <button
           onClick={onCameraClick}
-          className={`fixed bottom-4 left-1/2 z-[65] -translate-x-1/2 transition-all duration-300 ease-out w-20 h-20 rounded-full flex items-center justify-center shadow-lg ${
-            useWhiteText
-              ? 'bg-transparent backdrop-blur-sm border-2 border-white/80 text-white hover:border-white'
-              : 'bg-white border-2 border-gray-900 text-gray-900 hover:bg-gray-50 hover:border-gray-800'
-          }`}
+          className="fixed bottom-4 left-1/2 z-[65] -translate-x-1/2 transition-all duration-300 ease-out w-20 h-20 rounded-full flex items-center justify-center shadow-lg bg-transparent backdrop-blur-sm border-2 border-white/80 text-white hover:border-white"
           style={{
             paddingBottom: 'env(safe-area-inset-bottom)',
           }}

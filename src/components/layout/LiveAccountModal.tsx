@@ -234,7 +234,7 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
                 onClose();
                 openWelcome();
               }}
-              className="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+              className="w-full px-4 py-2 text-sm font-medium text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 rounded-md transition-colors"
             >
               Sign In
             </button>

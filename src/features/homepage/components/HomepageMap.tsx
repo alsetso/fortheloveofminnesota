@@ -7,7 +7,6 @@ import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { addBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
-import AtlasLayer from '@/features/atlas/components/AtlasLayer';
 import HomepageStatsHandle from './HomepageStatsHandle';
 import { useAuthStateSafe } from '@/features/auth';
 import { usePageView } from '@/hooks/usePageView';
@@ -52,18 +51,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   
   // Points of Interest layer visibility state
   const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
-  
-  // Atlas layer visibility state (disabled - hiding all atlas entities)
-  const [isAtlasLayerVisible, setIsAtlasLayerVisible] = useState(false);
-  
-  // Atlas entity state (managed at parent level)
-  const [selectedAtlasEntity, setSelectedAtlasEntity] = useState<{
-    id: string;
-    name: string;
-    table_name: string;
-    lat: number;
-    lng: number;
-  } | null>(null);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -110,16 +97,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
     };
   }, []);
 
-  // Handle atlas entity click
-  const handleAtlasEntityClick = useCallback((entity: {
-    id: string;
-    name: string;
-    table_name: string;
-    lat: number;
-    lng: number;
-  }) => {
-    setSelectedAtlasEntity(entity);
-  }, []);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -261,11 +238,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           map={mapInstanceRef.current}
           pointsOfInterestVisible={isPointsOfInterestVisible}
           onPointsOfInterestVisibilityChange={setIsPointsOfInterestVisible}
-          atlasLayerVisible={isAtlasLayerVisible}
-          onAtlasLayerVisibilityChange={setIsAtlasLayerVisible}
           onLocationSelect={handleLocationSelect}
-          selectedAtlasEntity={selectedAtlasEntity}
-          onAtlasEntityClear={() => setSelectedAtlasEntity(null)}
         />
 
         {/* Map and other components */}
@@ -303,16 +276,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         {/* Mentions Layer */}
         {mapLoaded && mapInstanceRef.current && (
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
-        )}
-
-        {/* Atlas Layer - Cities, Schools, Parks */}
-        {mapLoaded && mapInstanceRef.current && (
-          <AtlasLayer 
-            map={mapInstanceRef.current} 
-            mapLoaded={mapLoaded} 
-            visible={isAtlasLayerVisible}
-            onEntityClick={handleAtlasEntityClick}
-          />
         )}
 
         {/* Points of Interest Layer */}

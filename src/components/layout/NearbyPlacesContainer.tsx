@@ -416,7 +416,7 @@ export default function NearbyPlacesContainer({
         </div>
         <button
           onClick={handleFindMeToggle}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
             isTrackingLocation
               ? 'bg-gray-900 text-white hover:bg-gray-800'
               : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'

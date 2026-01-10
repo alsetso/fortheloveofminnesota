@@ -53,7 +53,7 @@ export function PWAStatusIcon({
   return (
     <Link
       href="/download"
-      className={`flex items-center gap-1.5 transition-colors ${
+      className={`flex items-center justify-center gap-1.5 p-2 transition-colors ${
         isDark
           ? 'text-white hover:text-white/80'
           : 'text-gray-600 hover:text-gray-900'

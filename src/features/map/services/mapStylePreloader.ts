@@ -33,8 +33,9 @@ class MapStylePreloader {
     const preloadPromise = (async () => {
       try {
         // Extract style ID from Mapbox style URL
-        // Format: mapbox://styles/mapbox/streets-v12
-        const styleMatch = styleUrl.match(/mapbox\/styles\/mapbox\/([^/]+)/);
+        // Format: mapbox://styles/mapbox/streets-v12 or mapbox://styles/mapbox/satellite-streets-v12
+        // The URL format is: mapbox://styles/mapbox/STYLE_ID
+        const styleMatch = styleUrl.match(/mapbox:\/\/styles\/mapbox\/([^/]+)/);
         if (!styleMatch) {
           throw new Error(`Invalid style URL: ${styleUrl}`);
         }

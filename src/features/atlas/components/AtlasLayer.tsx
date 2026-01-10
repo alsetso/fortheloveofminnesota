@@ -23,11 +23,13 @@ export default function AtlasLayer({ map, mapLoaded, visible = true, onEntityCli
 
   useEffect(() => {
     if (!visible) {
+      console.log('[AtlasLayer] Layer hidden, clearing visible tables');
       setVisibleTables([]);
       return;
     }
 
     const fetchAtlasTypes = async () => {
+      console.log('[AtlasLayer] Fetching active atlas types...');
       try {
         const { data: types, error } = await (supabase as any)
           .schema('atlas')
@@ -44,16 +46,14 @@ export default function AtlasLayer({ map, mapLoaded, visible = true, onEntityCli
 
         if (types && types.length > 0) {
           const activeSlugs = types.map((type: { slug: string }) => type.slug);
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[AtlasLayer] Active atlas types:', activeSlugs);
-            const lakesType = types.find((t: { slug: string }) => t.slug === 'lakes');
-            if (lakesType) {
-              console.log('[AtlasLayer] Lakes type found:', lakesType);
-            } else {
-              console.warn('[AtlasLayer] Lakes type NOT found in active types');
-            }
-          }
+          console.log('[AtlasLayer] Active atlas types fetched:', {
+            count: activeSlugs.length,
+            tables: activeSlugs,
+            types: types,
+          });
           setVisibleTables(activeSlugs);
+        } else {
+          console.warn('[AtlasLayer] No active atlas types found');
         }
       } catch (error) {
         console.error('[AtlasLayer] Error fetching atlas types:', error);
@@ -69,7 +69,15 @@ export default function AtlasLayer({ map, mapLoaded, visible = true, onEntityCli
     const handleVisibilityChange = (event: CustomEvent) => {
       const { visibleTables: tables } = event.detail;
       if (Array.isArray(tables)) {
+        console.log('[AtlasLayer] Visibility changed via event:', {
+          previousTables: visibleTables,
+          newTables: tables,
+          turningOn: tables.filter(t => !visibleTables.includes(t)),
+          turningOff: visibleTables.filter(t => !tables.includes(t)),
+        });
         setVisibleTables(tables);
+      } else {
+        console.warn('[AtlasLayer] Invalid visibleTables in event:', event.detail);
       }
     };
 
@@ -78,7 +86,7 @@ export default function AtlasLayer({ map, mapLoaded, visible = true, onEntityCli
     return () => {
       window.removeEventListener('atlas-visibility-change', handleVisibilityChange as EventListener);
     };
-  }, [visible]);
+  }, [visible, visibleTables]);
 
   if (!map || !mapLoaded || !visible || visibleTables.length === 0) {
     return null;

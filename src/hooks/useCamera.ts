@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 export type CameraFacingMode = 'user' | 'environment';
 
@@ -59,11 +59,23 @@ export function useCamera(): UseCameraReturn {
   const camerasRef = useRef<{ front?: string; back?: string }>({});
   const currentDeviceIdRef = useRef<string | null>(null);
 
-  // Detect mobile vs desktop
-  const isMobile = typeof window !== 'undefined' && (
-    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
-    (window.innerWidth <= 768 && 'ontouchstart' in window)
-  );
+  // Detect mobile vs desktop - use state to avoid hydration mismatch
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  
+  // Initialize mobile detection after mount (client-side only)
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = typeof window !== 'undefined' && (
+        /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 768 && 'ontouchstart' in window)
+      );
+      setIsMobile(mobile);
+    };
+    checkMobile();
+    // Also check on resize
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Default facing mode: front camera on mobile, any on desktop
   const defaultFacingMode: CameraFacingMode = isMobile ? 'user' : 'user';
@@ -339,6 +351,16 @@ export function useCamera(): UseCameraReturn {
         throw new Error('Failed to get canvas context');
       }
 
+      // Un-mirror front camera captures (to match un-mirrored preview)
+      const isFrontCamera = facingMode === 'user';
+      if (isFrontCamera) {
+        // Save context state
+        ctx.save();
+        // Flip canvas horizontally for front camera
+        ctx.translate(outputWidth, 0);
+        ctx.scale(-1, 1);
+      }
+
       // If aspect ratio was applied, draw cropped region
       if (aspectRatio !== 'free' && (sourceX !== 0 || sourceY !== 0 || sourceWidth !== videoWidth || sourceHeight !== videoHeight)) {
         ctx.drawImage(
@@ -349,6 +371,11 @@ export function useCamera(): UseCameraReturn {
       } else {
         // Draw full frame, scaled to output dimensions
         ctx.drawImage(video, 0, 0, outputWidth, outputHeight);
+      }
+
+      // Restore context state if we flipped it
+      if (isFrontCamera) {
+        ctx.restore();
       }
 
       // Convert canvas to Blob

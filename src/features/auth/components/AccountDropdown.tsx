@@ -159,7 +159,7 @@ export default function AccountDropdown({
     return (
       <button
         onClick={handleSignIn}
-        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-md transition-colors"
+        className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 text-xs font-medium rounded-md transition-colors"
         aria-label="Sign in"
       >
         Sign In

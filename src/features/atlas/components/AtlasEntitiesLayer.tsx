@@ -5,6 +5,7 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { supabase } from '@/lib/supabase';
 import {
   buildAtlasIconLayout,
+  buildAtlasIconPaint,
   buildAtlasCirclePaint,
   buildAtlasLabelLayout,
   buildAtlasLabelPaint,
@@ -71,21 +72,33 @@ export default function AtlasEntitiesLayer({
 
   // Fetch atlas entities and add to map
   useEffect(() => {
+    console.log('[AtlasEntitiesLayer] Effect triggered:', {
+      hasMap: !!map,
+      mapLoaded,
+      visibleTablesCount: visibleTables.length,
+      visibleTables,
+    });
+
     if (!map || !mapLoaded || visibleTables.length === 0) {
       // Remove layers if no tables are visible
+      console.log('[AtlasEntitiesLayer] Removing layers - no visible tables or map not ready');
       const mapboxMap = map as any;
       try {
-        if (mapboxMap.getLayer(pointLabelLayerId)) {
+        if (mapboxMap?.getLayer(pointLabelLayerId)) {
+          console.log('[AtlasEntitiesLayer] Removing label layer');
           mapboxMap.removeLayer(pointLabelLayerId);
         }
-        if (mapboxMap.getLayer(pointLayerId)) {
+        if (mapboxMap?.getLayer(pointLayerId)) {
+          console.log('[AtlasEntitiesLayer] Removing point layer');
           mapboxMap.removeLayer(pointLayerId);
         }
-        if (mapboxMap.getSource(sourceId)) {
+        if (mapboxMap?.getSource(sourceId)) {
+          console.log('[AtlasEntitiesLayer] Removing source');
           mapboxMap.removeSource(sourceId);
         }
+        console.log('[AtlasEntitiesLayer] Layers removed successfully');
       } catch (e) {
-        // Ignore errors during cleanup
+        console.error('[AtlasEntitiesLayer] Error removing layers:', e);
       }
       return;
     }
@@ -93,10 +106,16 @@ export default function AtlasEntitiesLayer({
     let mounted = true;
 
     const loadEntities = async () => {
-      if (isAddingLayersRef.current) return;
+      if (isAddingLayersRef.current) {
+        console.log('[AtlasEntitiesLayer] Already adding layers, skipping');
+        return;
+      }
+      
+      console.log('[AtlasEntitiesLayer] Starting to load entities for tables:', visibleTables);
       
       try {
         // Fetch icon paths from atlas_types
+        console.log('[AtlasEntitiesLayer] Fetching icon paths for tables:', visibleTables);
         const { data: typesData, error: typesError } = await (supabase as any)
           .schema('atlas')
           .from('atlas_types')
@@ -104,46 +123,109 @@ export default function AtlasEntitiesLayer({
           .in('slug', visibleTables)
           .not('icon_path', 'is', null);
 
-        if (!typesError && typesData) {
+        if (typesError) {
+          console.error('[AtlasEntitiesLayer] Error fetching icon paths:', {
+            error: typesError,
+            visibleTables,
+          });
+        } else if (typesData) {
+          console.log('[AtlasEntitiesLayer] Icon paths response:', {
+            count: typesData.length,
+            data: typesData,
+          });
           typesData.forEach((type: { slug: string; icon_path: string }) => {
             iconPathsRef.current[type.slug] = type.icon_path;
           });
+          console.log('[AtlasEntitiesLayer] Loaded icon paths:', {
+            paths: Object.keys(iconPathsRef.current),
+            fullPaths: iconPathsRef.current,
+          });
+        } else {
+          console.warn('[AtlasEntitiesLayer] No icon paths data returned');
         }
 
-        // Try atlas_entities first (has lat/lng/table_name), fallback to all_entities if needed
-        // Supabase has a default 1000 row limit, so we need to paginate to get all entities
+        // Fetch from individual atlas tables for each visible table type
+        // Each table (parks, lakes, schools, etc.) is in the atlas schema
+        console.log('[AtlasEntitiesLayer] Fetching entities from individual atlas tables for:', visibleTables);
         let allEntities: AtlasEntity[] = [];
-        let page = 0;
-        const pageSize = 1000;
-        let hasMore = true;
+        
+        // Fetch from each table type separately
+        for (const tableName of visibleTables) {
+          console.log(`[AtlasEntitiesLayer] Fetching from atlas.${tableName}...`);
+          
+          let page = 0;
+          const pageSize = 1000;
+          let hasMore = true;
+          let tableEntities: any[] = [];
 
-        while (hasMore) {
-        const { data, error } = await supabase
-          .from('atlas_entities')
-          .select('id, name, city_id, emoji, lat, lng, table_name')
-          .in('table_name', visibleTables)
-          .not('lat', 'is', null)
-            .not('lng', 'is', null)
-            .range(page * pageSize, (page + 1) * pageSize - 1);
+          while (hasMore) {
+            console.log(`[AtlasEntitiesLayer] Fetching ${tableName} page ${page + 1} (range: ${page * pageSize} to ${(page + 1) * pageSize - 1})`);
+            
+            try {
+              // Fetch from the specific atlas table (e.g., atlas.parks, atlas.lakes)
+              const { data, error } = await (supabase as any)
+                .schema('atlas')
+                .from(tableName)
+                .select('id, name, city_id, lat, lng')
+                .not('lat', 'is', null)
+                .not('lng', 'is', null)
+                .range(page * pageSize, (page + 1) * pageSize - 1);
 
-        if (error) {
-          console.error('[AtlasEntitiesLayer] Error fetching entities:', error);
-            break;
+              if (error) {
+                console.error(`[AtlasEntitiesLayer] Error fetching from atlas.${tableName}:`, {
+                  error,
+                  page,
+                });
+                hasMore = false;
+                break;
+              }
+
+              if (!data || data.length === 0) {
+                console.log(`[AtlasEntitiesLayer] No more ${tableName} entities on page ${page + 1}`);
+                hasMore = false;
+              } else {
+                console.log(`[AtlasEntitiesLayer] Fetched ${data.length} ${tableName} entities on page ${page + 1}`);
+                
+                // Map to common format and add table_name
+                const mappedEntities = data.map((entity: any) => ({
+                  ...entity,
+                  table_name: tableName,
+                  emoji: ENTITY_ICONS[tableName] || '📍', // Add emoji from mapping
+                }));
+                
+                tableEntities = [...tableEntities, ...mappedEntities];
+                // If we got fewer than pageSize, we've reached the end
+                hasMore = data.length === pageSize;
+                page++;
+              }
+            } catch (error) {
+              console.error(`[AtlasEntitiesLayer] Exception fetching from atlas.${tableName}:`, {
+                error,
+                tableName,
+                page,
+              });
+              hasMore = false;
+              break;
+            }
           }
 
-          if (!data || data.length === 0) {
-            hasMore = false;
-          } else {
-            allEntities = [...allEntities, ...(data as AtlasEntity[])];
-            // If we got fewer than pageSize, we've reached the end
-            hasMore = data.length === pageSize;
-            page++;
-          }
+          console.log(`[AtlasEntitiesLayer] Total ${tableName} entities fetched:`, tableEntities.length);
+          allEntities = [...allEntities, ...tableEntities];
         }
 
-        if (!mounted) return;
+        if (!mounted) {
+          console.log('[AtlasEntitiesLayer] Component unmounted, aborting');
+          return;
+        }
 
         entitiesRef.current = allEntities;
+        console.log('[AtlasEntitiesLayer] Total entities loaded:', {
+          total: allEntities.length,
+          byTable: allEntities.reduce((acc: Record<string, number>, entity: AtlasEntity) => {
+            acc[entity.table_name] = (acc[entity.table_name] || 0) + 1;
+            return acc;
+          }, {}),
+        });
         
         // Debug logging for lakes
         if (process.env.NODE_ENV === 'development') {
@@ -217,15 +299,25 @@ export default function AtlasEntitiesLayer({
 
         // Load icons before adding layers
         const uniqueTables = [...new Set(entitiesRef.current.map(e => e.table_name))];
+        console.log('[AtlasEntitiesLayer] Loading icons for tables:', uniqueTables);
+        
         const iconLoadPromises = uniqueTables.map(async (tableName) => {
           const iconPath = iconPathsRef.current[tableName];
-          if (!iconPath) return;
+          if (!iconPath) {
+            console.warn(`[AtlasEntitiesLayer] No icon path for table: ${tableName}`);
+            return;
+          }
 
           const imageId = `atlas-icon-${tableName}`;
+          console.log(`[AtlasEntitiesLayer] Loading icon for ${tableName}:`, {
+            imageId,
+            iconPath,
+          });
           
           // Remove existing image if it exists (allows icon updates from admin)
           // This ensures we always load the latest icon_path from atlas_types
           if (mapboxMap.hasImage(imageId)) {
+            console.log(`[AtlasEntitiesLayer] Removing existing image: ${imageId}`);
             mapboxMap.removeImage(imageId);
           }
           
@@ -237,8 +329,14 @@ export default function AtlasEntitiesLayer({
             img.crossOrigin = 'anonymous';
             
             await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
+              img.onload = () => {
+                console.log(`[AtlasEntitiesLayer] Icon image loaded: ${tableName}`);
+                resolve(undefined);
+              };
+              img.onerror = (error) => {
+                console.error(`[AtlasEntitiesLayer] Icon image failed to load: ${tableName}`, error);
+                reject(error);
+              };
               img.src = iconPath;
             });
 
@@ -256,27 +354,41 @@ export default function AtlasEntitiesLayer({
               const imageData = ctx.getImageData(0, 0, 32, 32);
               mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
               iconsLoadedRef.current.add(tableName);
+              console.log(`[AtlasEntitiesLayer] Icon added to map: ${imageId} for ${tableName}`);
+            } else {
+              console.error(`[AtlasEntitiesLayer] Failed to get canvas context for ${tableName}`);
             }
           } catch (error) {
-            console.warn(`[AtlasEntitiesLayer] Failed to load icon for ${tableName}:`, error);
+            console.error(`[AtlasEntitiesLayer] Failed to load icon for ${tableName}:`, {
+              error,
+              iconPath,
+              imageId,
+            });
           }
         });
 
         await Promise.all(iconLoadPromises);
+        console.log('[AtlasEntitiesLayer] All icons loaded:', {
+          loaded: Array.from(iconsLoadedRef.current),
+          total: iconsLoadedRef.current.size,
+        });
 
         // Add source
+        console.log('[AtlasEntitiesLayer] Adding GeoJSON source:', {
+          sourceId,
+          featureCount: geoJSON.features.length,
+        });
         mapboxMap.addSource(sourceId, {
           type: 'geojson',
           data: geoJSON,
         });
+        console.log('[AtlasEntitiesLayer] Source added successfully');
 
         // Build icon-image expression based on available icons
         const tablesWithIcons = uniqueTables.filter(
           (tableName) => iconPathsRef.current[tableName] && iconsLoadedRef.current.has(tableName)
         );
 
-        let iconImageLayout: any = {};
-        
         if (tablesWithIcons.length > 0) {
           // Build case expression for icon selection
           const iconExpression: any[] = ['case'];
@@ -284,37 +396,98 @@ export default function AtlasEntitiesLayer({
             iconExpression.push(['==', ['get', 'table_name'], tableName]);
             iconExpression.push(`atlas-icon-${tableName}`);
           });
-          iconExpression.push(''); // Fallback to empty string
+          // Use a default marker icon as fallback instead of empty string
+          // If no default exists, Mapbox will show nothing, but at least the expression is valid
+          iconExpression.push(''); // Fallback - will be invisible if no icon
 
-          iconImageLayout = buildAtlasIconLayout(iconExpression);
+          const iconLayout = buildAtlasIconLayout(iconExpression);
+          const iconPaint = buildAtlasIconPaint();
+          
+          // Add point layer with icons
+          console.log('[AtlasEntitiesLayer] Adding symbol layer with icons:', {
+            pointLayerId,
+            tablesWithIcons,
+            iconExpression,
+            entityCount: entitiesRef.current.length,
+          });
+          try {
+            mapboxMap.addLayer({
+              id: pointLayerId,
+              type: 'symbol',
+              source: sourceId,
+              layout: iconLayout,
+              paint: iconPaint,
+            });
+            console.log('[AtlasEntitiesLayer] Symbol layer added successfully');
+          } catch (e) {
+            console.error('[AtlasEntitiesLayer] Error adding symbol layer:', {
+              error: e,
+              pointLayerId,
+              sourceId,
+              tablesWithIcons,
+            });
+            // Fallback to circle layer if symbol layer fails
+            console.log('[AtlasEntitiesLayer] Falling back to circle layer');
+            const circlePaint = buildAtlasCirclePaint();
+            mapboxMap.addLayer({
+              id: pointLayerId,
+              type: 'circle',
+              source: sourceId,
+              paint: circlePaint,
+            });
+            console.log('[AtlasEntitiesLayer] Circle layer added as fallback');
+          }
         } else {
           // Fallback to circle if no icons available
-          iconImageLayout = buildAtlasCirclePaint();
+          console.log('[AtlasEntitiesLayer] No icons available, using circle layer fallback');
+          const circlePaint = buildAtlasCirclePaint();
+          try {
+            mapboxMap.addLayer({
+              id: pointLayerId,
+              type: 'circle',
+              source: sourceId,
+              paint: circlePaint,
+            });
+            console.log('[AtlasEntitiesLayer] Circle layer added successfully');
+          } catch (e) {
+            console.error('[AtlasEntitiesLayer] Error adding circle layer:', {
+              error: e,
+              pointLayerId,
+              sourceId,
+            });
+          }
         }
 
-        // Add point layer with icons or circles
-        mapboxMap.addLayer({
-          id: pointLayerId,
-          type: tablesWithIcons.length > 0 ? 'symbol' : 'circle',
-          source: sourceId,
-          ...(tablesWithIcons.length > 0 ? { layout: iconImageLayout } : { paint: iconImageLayout }),
-        });
-
         // Add label layer with zoom-based visibility
-        const labelPaint = buildAtlasLabelPaint();
-        mapboxMap.addLayer({
-          id: pointLabelLayerId,
-          type: 'symbol',
-          source: sourceId,
-          layout: buildAtlasLabelLayout(),
-          paint: {
-            'text-color': labelPaint['text-color'],
-            'text-opacity': labelPaint['text-opacity'],
-            'text-halo-color': labelPaint['text-halo-color'],
-            'text-halo-width': labelPaint['text-halo-width'],
-            'text-halo-blur': labelPaint['text-halo-blur'],
-          },
+        console.log('[AtlasEntitiesLayer] Adding label layer:', {
+          pointLabelLayerId,
+          sourceId,
         });
+        try {
+          const labelLayout = buildAtlasLabelLayout();
+          const labelPaint = buildAtlasLabelPaint();
+          
+          mapboxMap.addLayer({
+            id: pointLabelLayerId,
+            type: 'symbol',
+            source: sourceId,
+            layout: labelLayout,
+            paint: {
+              'text-color': labelPaint['text-color'],
+              'text-opacity': labelPaint['text-opacity'],
+              'text-halo-color': labelPaint['text-halo-color'],
+              'text-halo-width': labelPaint['text-halo-width'],
+              'text-halo-blur': labelPaint['text-halo-blur'],
+            },
+          });
+          console.log('[AtlasEntitiesLayer] Label layer added successfully');
+        } catch (e) {
+          console.error('[AtlasEntitiesLayer] Error adding label layer:', {
+            error: e,
+            pointLabelLayerId,
+            sourceId,
+          });
+        }
 
         isAddingLayersRef.current = false;
 
@@ -350,9 +523,23 @@ export default function AtlasEntitiesLayer({
           });
 
           clickHandlersAddedRef.current = true;
+          console.log('[AtlasEntitiesLayer] Click handlers added');
         }
+        
+        console.log('[AtlasEntitiesLayer] All layers added successfully:', {
+          pointLayerId,
+          pointLabelLayerId,
+          sourceId,
+          entityCount: entitiesRef.current.length,
+          visibleTables,
+        });
+        isAddingLayersRef.current = false;
       } catch (error) {
-        console.error('[AtlasEntitiesLayer] Error loading entities:', error);
+        console.error('[AtlasEntitiesLayer] Error loading entities:', {
+          error,
+          visibleTables,
+          entityCount: entitiesRef.current.length,
+        });
         isAddingLayersRef.current = false;
       }
     };

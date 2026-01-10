@@ -4,6 +4,8 @@ import { ToastContainer } from '@/features/ui/components/Toast'
 import { Providers } from '@/components/providers/Providers'
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary'
 import LocalStorageCleanup from '@/components/utils/LocalStorageCleanup'
+import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration'
+import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 // Removed usage/billing context and modals after simplifying app
 // Footer moved to PageLayout component for consistent page structure
 
@@ -30,6 +32,13 @@ export const metadata: Metadata = {
     icon: '/fav.png',
     shortcut: '/fav.png',
     apple: '/fav.png',
+  },
+  manifest: '/manifest.json',
+  themeColor: '#dc2626',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Love of MN',
   },
   openGraph: {
     title: 'For the Love of Minnesota',
@@ -72,6 +81,8 @@ export default function RootLayout({
         <Providers>
           <ErrorBoundary>
             <LocalStorageCleanup />
+            <ServiceWorkerRegistration />
+            <InstallPrompt />
             {/* Pages handle their own header/footer via PageLayout component */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
               {children}

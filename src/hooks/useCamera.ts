@@ -54,6 +54,10 @@ export function useCamera(): UseCameraReturn {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  
+  // Store available camera devices for reliable switching
+  const camerasRef = useRef<{ front?: string; back?: string }>({});
+  const currentDeviceIdRef = useRef<string | null>(null);
 
   // Detect mobile vs desktop
   const isMobile = typeof window !== 'undefined' && (
@@ -63,6 +67,46 @@ export function useCamera(): UseCameraReturn {
 
   // Default facing mode: front camera on mobile, any on desktop
   const defaultFacingMode: CameraFacingMode = isMobile ? 'user' : 'user';
+  
+  /**
+   * Enumerate available camera devices and identify front/back cameras
+   * This provides more reliable camera switching on native smartphones
+   */
+  const enumerateCameras = useCallback(async (): Promise<void> => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        return;
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      
+      // Reset camera device IDs
+      camerasRef.current = {};
+      
+      for (const device of videoDevices) {
+        const label = device.label.toLowerCase();
+        // Identify front camera (user-facing)
+        if (label.includes('front') || label.includes('user') || label.includes('facing')) {
+          camerasRef.current.front = device.deviceId;
+        }
+        // Identify back camera (environment-facing)
+        else if (label.includes('back') || label.includes('rear') || label.includes('environment') || label.includes('world')) {
+          camerasRef.current.back = device.deviceId;
+        }
+      }
+      
+      // If we couldn't identify by label, try to infer from device count
+      // On mobile devices, if we have 2+ cameras, first is usually front, second is back
+      if (videoDevices.length >= 2 && !camerasRef.current.front && !camerasRef.current.back) {
+        camerasRef.current.front = videoDevices[0].deviceId;
+        camerasRef.current.back = videoDevices[1].deviceId;
+      }
+    } catch (err) {
+      // Silently fail - we'll fall back to facingMode constraint
+      console.warn('[useCamera] Failed to enumerate cameras:', err);
+    }
+  }, []);
 
   /**
    * Start camera stream
@@ -96,13 +140,33 @@ export function useCamera(): UseCameraReturn {
 
       const targetFacingMode = requestedFacingMode || defaultFacingMode;
 
+      // Enumerate cameras on first start to identify front/back devices
+      if (Object.keys(camerasRef.current).length === 0) {
+        await enumerateCameras();
+      }
+
+      // Build video constraints - prefer deviceId for reliable switching, fallback to facingMode
+      const videoConstraints: MediaTrackConstraints = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      };
+
+      // If we have identified camera devices, use deviceId for more reliable switching
+      if (targetFacingMode === 'user' && camerasRef.current.front) {
+        videoConstraints.deviceId = { exact: camerasRef.current.front };
+        currentDeviceIdRef.current = camerasRef.current.front;
+      } else if (targetFacingMode === 'environment' && camerasRef.current.back) {
+        videoConstraints.deviceId = { exact: camerasRef.current.back };
+        currentDeviceIdRef.current = camerasRef.current.back;
+      } else {
+        // Fallback to facingMode constraint (works on most devices)
+        videoConstraints.facingMode = targetFacingMode;
+        currentDeviceIdRef.current = null;
+      }
+
       // Request camera access
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: targetFacingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: videoConstraints,
         audio: false,
       });
 
@@ -127,7 +191,7 @@ export function useCamera(): UseCameraReturn {
         }
       }
     }
-  }, [stream, defaultFacingMode]);
+  }, [stream, defaultFacingMode, enumerateCameras]);
 
   /**
    * Stop camera stream
@@ -151,7 +215,8 @@ export function useCamera(): UseCameraReturn {
 
   /**
    * Switch between front and back cameras
-   * Restarts the stream with new facingMode
+   * Uses deviceId when available for reliable native smartphone camera switching
+   * Falls back to facingMode constraint if devices aren't enumerated
    */
   const switchCamera = useCallback(async () => {
     if (!isMobile) {
@@ -159,9 +224,29 @@ export function useCamera(): UseCameraReturn {
       return;
     }
 
+    // Determine which camera to switch to
     const newFacingMode: CameraFacingMode = facingMode === 'user' ? 'environment' : 'user';
-    await startCamera(newFacingMode);
-  }, [facingMode, isMobile, startCamera]);
+    
+    // If we have both cameras identified, switch directly
+    if (camerasRef.current.front && camerasRef.current.back) {
+      // Stop current stream first
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
+        streamRef.current = null;
+        hasStartedCameraRef.current = false;
+      }
+      
+      // Small delay to ensure previous stream is fully stopped
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Start with new camera
+      await startCamera(newFacingMode);
+    } else {
+      // Fallback: use facingMode constraint
+      await startCamera(newFacingMode);
+    }
+  }, [facingMode, isMobile, startCamera, stream]);
 
   /**
    * Capture photo from video stream

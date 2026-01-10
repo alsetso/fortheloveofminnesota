@@ -13,6 +13,7 @@ import LiveAccountModal from './LiveAccountModal';
 import MapStylesPopup from './MapStylesPopup';
 import DynamicSearchModal from './DynamicSearchModal';
 import NewsStream from './NewsStream';
+import { PWAStatusIcon } from '@/components/pwa/PWAStatusIcon';
 
 interface MapboxFeature {
   id: string;
@@ -869,6 +870,13 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             <MicrophoneIcon className="w-4 h-4" />
           </button>
           )}
+
+          {/* PWA Status Icon */}
+          <PWAStatusIcon 
+            variant={useWhiteText ? 'dark' : 'light'} 
+            size="sm"
+            showLabel={false}
+          />
 
           {/* Profile Icon */}
           {account ? (

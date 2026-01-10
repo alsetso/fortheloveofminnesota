@@ -144,23 +144,19 @@ export default function LiveMap({ cities, counties }: LiveMapProps) {
     isLoading: authLoading,
   } = useAuthStateSafe();
 
-  // Show welcome modal for unauthenticated users and keep it open until authenticated
+  // Show welcome modal for unauthenticated users (suggestive, not forced)
+  // User can close it, but we'll suggest it again if they try to use authenticated features
   useEffect(() => {
     // Wait for auth to finish loading
     if (authLoading) return;
 
-    // If user is not authenticated, open welcome modal
-    if (!user) {
-      if (modal.type !== 'welcome') {
-        openWelcome();
-      }
-    } else {
-      // If user becomes authenticated, close welcome modal
-      if (modal.type === 'welcome') {
-        closeModal();
-      }
+    // If user becomes authenticated, close welcome modal
+    if (user && modal.type === 'welcome') {
+      closeModal();
     }
-  }, [user, authLoading, modal.type, openWelcome, closeModal]);
+    // Note: We don't force-open the modal for unauthenticated users
+    // It will be opened when user tries to use authenticated features
+  }, [user, authLoading, modal.type, closeModal]);
 
   const isAdmin = account?.role === 'admin';
   const [useBlurStyle, setUseBlurStyle] = useState(() => {

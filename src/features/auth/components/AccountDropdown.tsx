@@ -170,9 +170,9 @@ export default function AccountDropdown({
   // When authenticated or loading, show profile dropdown
   return (
     <div ref={containerRef} className="relative">
-      {/* Trigger Button */}
-      <button
-        onClick={(e) => {
+        {/* Trigger Button */}
+        <button
+          onClick={(e) => {
           e.stopPropagation();
           setIsOpen(!isOpen);
         }}

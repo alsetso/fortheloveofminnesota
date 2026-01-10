@@ -31,15 +31,11 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   // Check if we're on the live page
   const isLivePage = pathname === '/live';
   
-  // Custom close handler that prevents closing on live page if not authenticated
+  // Allow closing the modal - user can dismiss it and continue as guest
+  // We'll still be responsive and show it when needed for authenticated features
   const handleClose = useCallback(() => {
-    // If on live page and not authenticated, prevent closing
-    if (isLivePage && !user) {
-      return;
-    }
-    // Otherwise, allow closing
     onClose();
-  }, [isLivePage, user, onClose]);
+  }, [onClose]);
   
   // Getting started screen state
   const [showGettingStarted, setShowGettingStarted] = useState(true);

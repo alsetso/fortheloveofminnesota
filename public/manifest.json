@@ -1,0 +1,44 @@
+{
+  "name": "For the Love of Minnesota",
+  "short_name": "Love of MN",
+  "description": "Connect residents, neighbors, and professionals across Minnesota. Drop a pin to archive a special part of your life.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#dc2626",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/fav.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/fav.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["social", "community", "lifestyle"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Explore",
+      "short_name": "Explore",
+      "description": "Explore Minnesota locations",
+      "url": "/explore",
+      "icons": [{ "src": "/fav.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Map",
+      "short_name": "Map",
+      "description": "View map",
+      "url": "/map",
+      "icons": [{ "src": "/fav.png", "sizes": "192x192" }]
+    }
+  ]
+}
+

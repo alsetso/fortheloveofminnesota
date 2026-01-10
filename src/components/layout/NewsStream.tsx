@@ -145,10 +145,7 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <NewspaperIcon className={`w-3.5 h-3.5 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
-          <span className={`text-[10px] font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-            News
-          </span>
+          <NewspaperIcon className={`w-5 h-5 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
           {allArticles.length > 0 && (
             <span className={`text-[8px] px-1 py-0.5 rounded ${useWhiteText ? 'bg-white/20 text-white/80' : 'bg-gray-100 text-gray-600'}`}>
               {allArticles.length}

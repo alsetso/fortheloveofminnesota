@@ -42,6 +42,7 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
   const feedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isUserScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isHoveredRef = useRef(false);
   
   // Use white text when transparent blur + satellite map
   const useWhiteText = currentBlurStyle && currentMapStyle === 'satellite';
@@ -151,8 +152,19 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
       }
     }
 
+    // Random interval between 1-2 seconds
+    const getRandomInterval = () => Math.random() * 1000 + 1000; // 1000-2000ms
+
     // Feed articles one at a time every 1-2 seconds
     const feedNextArticle = () => {
+      // Don't feed if hovered - just reschedule to check again
+      if (isHoveredRef.current) {
+        feedIntervalRef.current = setTimeout(() => {
+          feedNextArticle();
+        }, getRandomInterval());
+        return;
+      }
+
       if (articleQueueRef.current.length === 0) {
         // Reset queue when empty
         articleQueueRef.current = [...allArticles];
@@ -180,22 +192,15 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
           }
         }
       }
-    };
 
-    // Random interval between 1-2 seconds
-    const getRandomInterval = () => Math.random() * 1000 + 1000; // 1000-2000ms
-
-    const scheduleNext = () => {
-      if (feedIntervalRef.current) {
-        clearTimeout(feedIntervalRef.current);
-      }
+      // Schedule next article
       feedIntervalRef.current = setTimeout(() => {
         feedNextArticle();
-        scheduleNext();
       }, getRandomInterval());
     };
 
-    scheduleNext();
+    // Start feeding
+    feedNextArticle();
 
     return () => {
       if (feedIntervalRef.current) {
@@ -239,12 +244,22 @@ export default function NewsStream({ useBlurStyle = false, maxItems = 5 }: NewsS
     return null;
   }
 
+  const handleMouseEnter = () => {
+    isHoveredRef.current = true;
+  };
+
+  const handleMouseLeave = () => {
+    isHoveredRef.current = false;
+  };
+
   return (
     <div 
       className="absolute top-14 right-0 z-10 max-w-xs pointer-events-auto"
       style={{
         maxHeight: 'calc(100vh - 200px)',
       }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div 
         ref={scrollContainerRef}

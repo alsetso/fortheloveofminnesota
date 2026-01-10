@@ -507,6 +507,68 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
             },
           });
           
+          // Fly to selected area and hide other CTUs
+          const flyToSelectedArea = async () => {
+            const mapboxgl = await loadMapboxGL();
+            if (mapboxgl && feature.geometry) {
+              const bounds = new mapboxgl.LngLatBounds();
+              
+              // Calculate bounds from geometry
+              if (feature.geometry.type === 'Polygon') {
+                feature.geometry.coordinates[0].forEach((coord: [number, number]) => {
+                  bounds.extend(coord);
+                });
+              } else if (feature.geometry.type === 'MultiPolygon') {
+                feature.geometry.coordinates.forEach((polygon: any) => {
+                  polygon[0].forEach((coord: [number, number]) => {
+                    bounds.extend(coord);
+                  });
+                });
+              }
+
+              // Fly to bounds
+              mapboxMap.flyTo({
+                bounds: bounds,
+                padding: 50,
+                duration: 1000,
+              });
+
+              // Hide all other CTU boundaries (set opacity to 0)
+              const fillLayerId = 'stepper-ctu-boundaries-fill';
+              const outlineLayerId = 'stepper-ctu-boundaries-outline';
+              
+              // Match by feature_name and county_name (more reliable than ctu_id)
+              const selectedFeatureName = properties.feature_name || '';
+              const selectedCountyName = properties.county_name || '';
+              
+              if (mapboxMap.getLayer(fillLayerId)) {
+                mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', [
+                  'case',
+                  ['all',
+                    ['==', ['get', 'feature_name'], selectedFeatureName],
+                    ['==', ['get', 'county_name'], selectedCountyName]
+                  ],
+                  0.3, // Keep selected visible
+                  0, // Hide all others
+                ]);
+              }
+              
+              if (mapboxMap.getLayer(outlineLayerId)) {
+                mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', [
+                  'case',
+                  ['all',
+                    ['==', ['get', 'feature_name'], selectedFeatureName],
+                    ['==', ['get', 'county_name'], selectedCountyName]
+                  ],
+                  1, // Keep selected visible
+                  0, // Hide all others
+                ]);
+              }
+            }
+          };
+
+          flyToSelectedArea();
+          
           // Open details popup
           setShowCTUDetailsPopup(true);
         }
@@ -628,7 +690,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
                 </div>
 
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0 xl:rounded-t-lg">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">
                       {selectedCTU.ctuData?.feature_name || selectedCTU.properties?.feature_name || 'Area Details'}
@@ -724,7 +786,7 @@ export default function LocationStepperOverlay({ isOpen, onClose }: LocationStep
                         onClose();
                         setStep(1);
                       }}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-md transition-colors"
+                      className="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-900 font-medium py-2.5 px-4 rounded-md transition-colors"
                     >
                       Mark as Primary
                     </button>

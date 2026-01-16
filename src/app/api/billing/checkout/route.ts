@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { stripe } from '@/lib/stripe';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 
 /**
  * Create Stripe Checkout Session
@@ -9,38 +10,69 @@ import { stripe } from '@/lib/stripe';
  * POST /api/billing/checkout
  * 
  * Creates a Stripe checkout session and returns the payment URL
+ * 
+ * Security:
+ * - Rate limited: 60 requests/minute (strict) - prevent abuse
+ * - Request size limit: 1MB
+ * - Requires authentication
+ * - Sensitive operation - payment processing
  */
 export async function POST(request: NextRequest) {
-  try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const cookieStore = await cookies();
+        const supabase = createServerClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            cookies: {
+              getAll() {
+                return cookieStore.getAll();
+              },
+            },
           },
-        },
-      },
-    );
+        );
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+        // userId is guaranteed from security middleware
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+        if (authError || !user || user.id !== userId) {
+          return NextResponse.json(
+            { error: 'Unauthorized' },
+            { status: 401 }
+          );
+        }
+
+    // Get active account ID from cookie (set by client when switching accounts)
+    // This ensures we use the account the user has selected, not just any account
+    const activeAccountIdCookie = request.cookies.get('active_account_id');
+    const activeAccountId = activeAccountIdCookie?.value || null;
+
+    let account, accountError;
+    
+    if (activeAccountId) {
+      // Verify the active account belongs to this user before using it
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, stripe_customer_id')
+        .eq('id', activeAccountId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      account = data;
+      accountError = error;
+    } else {
+      // Fallback to first account if no active account ID in cookie
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('id, stripe_customer_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      account = data;
+      accountError = error;
     }
-
-    // Find their account
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('id, stripe_customer_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
 
     if (accountError) {
       console.error('Error fetching account:', accountError);
@@ -136,14 +168,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      url: session.url,
-    });
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to create checkout session' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          url: session.url,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error creating checkout session:', error);
+        }
+        return NextResponse.json(
+          { error: 'Failed to create checkout session' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'strict', // 10 requests/minute - prevent abuse of payment endpoint
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }

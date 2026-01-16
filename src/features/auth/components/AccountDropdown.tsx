@@ -49,8 +49,13 @@ export default function AccountDropdown({
             credentials: 'include',
           });
           if (response.ok) {
-            const data = await response.json();
-            setAllAccounts(data.accounts || []);
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await response.json();
+              setAllAccounts(data.accounts || []);
+            } else {
+              console.error('Expected JSON response but got:', contentType);
+            }
           }
         } catch (error) {
           console.error('Error fetching accounts:', error);

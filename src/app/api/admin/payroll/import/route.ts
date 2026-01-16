@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminApiAccess } from '@/lib/adminHelpers';
 import { createServiceClient } from '@/lib/supabaseServer';
 import * as XLSX from 'xlsx';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
+import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiError';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateRequestBody } from '@/lib/security/validation';
+import { z } from 'zod';
+
+const payrollImportSchema = z.object({
+  fiscal_year: z.string().regex(/^\d{4}$/).transform(Number).pipe(z.number().int().min(2020).max(2025)),
+});
 
 const BATCH_SIZE = 1000;
 
@@ -172,66 +179,58 @@ function parseEarningsRow(row: any[], headers: string[]): any | null {
   }
 }
 
+/**
+ * POST /api/admin/payroll/import
+ * Import payroll data from Excel file
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (admin)
+ * - Request size limit: 1MB
+ * - Input validation with Zod
+ * - Requires admin role
+ */
 export async function POST(request: NextRequest) {
-  try {
-    const { auth, response } = await requireAdminApiAccess(request);
-    if (response) return response;
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        // Validate request body
+        const validation = await validateRequestBody(req, payrollImportSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { fiscal_year: fiscalYear } = validation.data;
 
-    const body = await request.json();
-    const fiscalYear = body.fiscal_year;
+        // Get file path
+        const excelDir = join(process.cwd(), 'minnesota_gov', 'State Payrole');
+        const filePath = join(excelDir, `fiscal-year-${fiscalYear}.xlsx`);
 
-    if (!fiscalYear || typeof fiscalYear !== 'string') {
-      return NextResponse.json(
-        { error: 'fiscal_year is required and must be a string' },
-        { status: 400 }
-      );
-    }
+        // Read Excel file
+        let workbook: XLSX.WorkBook;
+        try {
+          const fileBuffer = await readFile(filePath);
+          workbook = XLSX.read(fileBuffer, { type: 'buffer', cellDates: false });
+        } catch (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Payroll Import] Error reading file:', error);
+          }
+          return createErrorResponse(`File not found: fiscal-year-${fiscalYear}.xlsx`, 404);
+        }
 
-    // Validate fiscal year
-    const yearNum = parseInt(fiscalYear, 10);
-    if (isNaN(yearNum) || yearNum < 2020 || yearNum > 2025) {
-      return NextResponse.json(
-        { error: 'fiscal_year must be between 2020 and 2025' },
-        { status: 400 }
-      );
-    }
+        // Find sheets
+        const hrSheetName = findSheetByPattern(workbook, 'HR INFO');
+        const earningsSheetName = findSheetByPattern(workbook, 'EARNINGS');
 
-    // Get file path
-    const excelDir = join(process.cwd(), 'minnesota_gov', 'State Payrole');
-    const filePath = join(excelDir, `fiscal-year-${fiscalYear}.xlsx`);
+        if (!hrSheetName) {
+          return createErrorResponse('HR INFO sheet not found', 400);
+        }
+        if (!earningsSheetName) {
+          return createErrorResponse('EARNINGS sheet not found', 400);
+        }
 
-    // Read Excel file
-    let workbook: XLSX.WorkBook;
-    try {
-      const fileBuffer = await readFile(filePath);
-      workbook = XLSX.read(fileBuffer, { type: 'buffer', cellDates: false });
-    } catch (error) {
-      console.error('[Payroll Import] Error reading file:', error);
-      return NextResponse.json(
-        { error: `File not found: fiscal-year-${fiscalYear}.xlsx` },
-        { status: 404 }
-      );
-    }
-
-    // Find sheets
-    const hrSheetName = findSheetByPattern(workbook, 'HR INFO');
-    const earningsSheetName = findSheetByPattern(workbook, 'EARNINGS');
-
-    if (!hrSheetName) {
-      return NextResponse.json(
-        { error: 'HR INFO sheet not found' },
-        { status: 400 }
-      );
-    }
-    if (!earningsSheetName) {
-      return NextResponse.json(
-        { error: 'EARNINGS sheet not found' },
-        { status: 400 }
-      );
-    }
-
-    // Get active column name
-    const activeColName = getActiveColumnName(workbook, yearNum);
+        // Get active column name
+        const activeColName = getActiveColumnName(workbook, fiscalYear);
 
     // Read HR INFO sheet
     const hrSheet = workbook.Sheets[hrSheetName];
@@ -274,51 +273,58 @@ export async function POST(request: NextRequest) {
       records.push(combined);
     }
 
-    if (records.length === 0) {
-      return NextResponse.json(
-        { error: 'No valid records found' },
-        { status: 400 }
-      );
-    }
-
-    // Batch insert
-    const supabase = createServiceClient();
-    let totalInserted = 0;
-    let totalSkipped = 0;
-
-    for (let i = 0; i < records.length; i += BATCH_SIZE) {
-      const batch = records.slice(i, i + BATCH_SIZE);
-      try {
-        const { data, error } = await supabase
-          .from('payroll')
-          .insert(batch as any)
-          .select('id');
-
-        if (error) {
-          console.error(`[Payroll Import] Error inserting batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error);
-          totalSkipped += batch.length;
-        } else {
-          const inserted = data?.length || batch.length;
-          totalInserted += inserted;
+        if (records.length === 0) {
+          return createErrorResponse('No valid records found', 400);
         }
-      } catch (error) {
-        console.error(`[Payroll Import] Error inserting batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error);
-        totalSkipped += batch.length;
-      }
-    }
 
-    return NextResponse.json({
-      message: `Import completed for fiscal year ${fiscalYear}`,
-      recordsInserted: totalInserted,
-      recordsSkipped: totalSkipped,
-      totalRecords: records.length,
-    });
-  } catch (error) {
-    console.error('[Payroll Import API] Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
+        // Batch insert
+        const supabase = createServiceClient();
+        let totalInserted = 0;
+        let totalSkipped = 0;
+
+        for (let i = 0; i < records.length; i += BATCH_SIZE) {
+          const batch = records.slice(i, i + BATCH_SIZE);
+          try {
+            const { data, error } = await supabase
+              .from('payroll')
+              .insert(batch as any)
+              .select('id');
+
+            if (error) {
+              if (process.env.NODE_ENV === 'development') {
+                console.error(`[Payroll Import] Error inserting batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error);
+              }
+              totalSkipped += batch.length;
+            } else {
+              const inserted = data?.length || batch.length;
+              totalInserted += inserted;
+            }
+          } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+              console.error(`[Payroll Import] Error inserting batch ${Math.floor(i / BATCH_SIZE) + 1}:`, error);
+            }
+            totalSkipped += batch.length;
+          }
+        }
+
+        return createSuccessResponse({
+          message: `Import completed for fiscal year ${fiscalYear}`,
+          recordsInserted: totalInserted,
+          recordsSkipped: totalSkipped,
+          totalRecords: records.length,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Payroll Import API] Error:', error);
+        }
+        return createErrorResponse('Internal server error', 500);
+      }
+    },
+    {
+      rateLimit: 'admin',
+      requireAdmin: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

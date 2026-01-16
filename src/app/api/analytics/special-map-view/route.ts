@@ -2,22 +2,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateRequestBody } from '@/lib/security/validation';
+import { z } from 'zod';
 
 /**
  * POST /api/analytics/special-map-view
  * Records a view for a special hardcoded map (e.g., mention, fraud)
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Request size limit: 1MB
+ * - Input validation with Zod
+ * - Optional authentication (tracks anonymous views)
  */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { map_identifier, referrer_url, session_id, user_agent } = body;
+const specialMapViewSchema = z.object({
+  map_identifier: z.string().min(1).max(100),
+  referrer_url: z.string().url().max(2000).optional().nullable(),
+  session_id: z.string().max(200).optional().nullable(),
+  user_agent: z.string().max(500).optional().nullable(),
+});
 
-    if (!map_identifier || typeof map_identifier !== 'string') {
-      return NextResponse.json(
-        { error: 'map_identifier is required' },
-        { status: 400 }
-      );
-    }
+export async function POST(request: NextRequest) {
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        // Validate request body
+        const validation = await validateRequestBody(req, specialMapViewSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { map_identifier, referrer_url, session_id, user_agent } = validation.data;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -45,45 +62,47 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Get current user account (optional - for authenticated users)
-    let accountId: string | null = null;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: account } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle() as { data: { id: string } | null; error: any };
-      accountId = (account as { id: string } | null)?.id || null;
+        // Use accountId from security middleware context if available
+        let finalAccountId: string | null = accountId || null;
+
+        // Record special map view
+        const { data, error } = await supabase.rpc('record_special_map_view', {
+          p_map_identifier: map_identifier,
+          p_account_id: finalAccountId,
+          p_user_agent: user_agent || null,
+          p_referrer_url: referrer_url || null,
+          p_session_id: session_id || null,
+        } as any) as { data: string | null; error: any };
+
+        if (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Special Map View API] Error recording view:', error);
+          }
+          return NextResponse.json(
+            { error: 'Failed to record map view' },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({ 
+          success: true,
+          view_id: data 
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Special Map View API] Error:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    // Record special map view
-    const { data, error } = await supabase.rpc('record_special_map_view', {
-      p_map_identifier: map_identifier,
-      p_account_id: accountId,
-      p_user_agent: user_agent || null,
-      p_referrer_url: referrer_url || null,
-      p_session_id: session_id || null,
-    } as any) as { data: string | null; error: any };
-
-    if (error) {
-      console.error('[Special Map View API] Error recording view:', error);
-      return NextResponse.json(
-        { error: 'Failed to record map view', details: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      view_id: data 
-    });
-  } catch (error) {
-    console.error('[Special Map View API] Error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  );
 }
 

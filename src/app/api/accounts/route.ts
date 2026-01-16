@@ -2,28 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import type { Database } from '@/types/supabase';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
+import { commonSchemas } from '@/lib/security/validation';
 
 /**
  * GET /api/accounts
  * List all accounts for the current authenticated user
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated)
+ * - Query parameter validation
+ * - Requires authentication
  */
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createServerClientWithAuth(cookies());
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
+const accountsQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  offset: z.coerce.number().int().nonnegative().default(0),
+});
 
-    const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
+export async function GET(request: NextRequest) {
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const supabase = await createServerClientWithAuth(cookies());
+        
+        // userId is guaranteed from security middleware
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user || user.id !== userId) {
+          return NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 }
+          );
+        }
+
+        // Validate query parameters
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, accountsQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { limit, offset } = validation.data;
 
     // Fetch accounts for current user only
     const { data: accounts, error } = await supabase
@@ -65,46 +87,76 @@ export async function GET(request: NextRequest) {
       console.error('[Accounts API] Error counting accounts:', countError);
     }
 
-    return NextResponse.json({
-      accounts: accounts || [],
-      total: count || 0,
-      limit,
-      offset,
-    });
-  } catch (error) {
-    console.error('[Accounts API] Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          accounts: accounts || [],
+          total: count || 0,
+          limit,
+          offset,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Accounts API] Error:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 
 /**
  * POST /api/accounts
  * Create a new account for the current authenticated user
+ * 
+ * Security:
+ * - Rate limited: 60 requests/minute (strict) - prevent account spam
+ * - Input validation with Zod
+ * - Requires authentication
  */
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createServerClientWithAuth(cookies());
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
+const createAccountSchema = z.object({
+  username: z.string().min(3).max(50).regex(/^[a-z0-9_-]+$/i, 'Username can only contain letters, numbers, underscores, and hyphens').optional().nullable(),
+  first_name: z.string().max(100).optional().nullable(),
+  last_name: z.string().max(100).optional().nullable(),
+  phone: z.string().max(20).regex(/^\+?[\d\s()-]+$/, 'Invalid phone number format').optional().nullable(),
+});
 
-    const body = await request.json();
-    const {
-      username,
-      first_name,
-      last_name,
-      phone,
-    } = body;
+export async function POST(request: NextRequest) {
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const supabase = await createServerClientWithAuth(cookies());
+        
+        // userId is guaranteed from security middleware
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user || user.id !== userId) {
+          return NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 }
+          );
+        }
+
+        // Validate request body
+        const { validateRequestBody } = await import('@/lib/security/validation');
+        const validation = await validateRequestBody(req, createAccountSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const {
+          username,
+          first_name,
+          last_name,
+          phone,
+        } = validation.data;
 
     // Create account for current user (user_id is set from auth context)
     type AccountsInsert = Database['public']['Tables']['accounts']['Insert'];
@@ -132,13 +184,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(account, { status: 201 });
-  } catch (error) {
-    console.error('[Accounts API] Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json(account, { status: 201 });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Accounts API] Error:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'strict', // 10 requests/minute - prevent account spam
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

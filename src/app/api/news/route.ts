@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getApiKey } from '@/lib/security/apiKeys';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
 
 interface NewsArticle {
   article_id: string;
@@ -23,72 +27,71 @@ interface NewsResponse {
   data: NewsArticle[];
 }
 
+/**
+ * GET /api/news
+ * Search news articles from RapidAPI
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Query parameter validation
+ * - Server-only API key
+ * - Public endpoint - no authentication required
+ */
+const newsQuerySchema = z.object({
+  query: z.string().min(1).max(200),
+  limit: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(500)).optional(),
+  time_published: z.string().max(50).optional(),
+  source: z.string().max(100).optional(),
+  country: z.string().length(2).optional(),
+  lang: z.string().length(2).optional(),
+});
+
 export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('query');
-    const limit = searchParams.get('limit');
-    const timePublished = searchParams.get('time_published');
-    const source = searchParams.get('source');
-    const country = searchParams.get('country');
-    const lang = searchParams.get('lang');
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, newsQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { query, limit, time_published: timePublished, source, country, lang } = validation.data;
 
-    if (!query) {
-      return NextResponse.json(
-        { error: 'Query parameter is required' },
-        { status: 400 }
-      );
-    }
+        // Get server-only API key
+        let apiKey: string;
+        try {
+          apiKey = getApiKey('RAPIDAPI');
+        } catch (error) {
+          return NextResponse.json(
+            { error: 'RapidAPI key not configured' },
+            { status: 500 }
+          );
+        }
 
-    const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'RapidAPI key not configured' },
-        { status: 500 }
-      );
-    }
+        // Build URL with optional parameters
+        const baseUrl = 'https://real-time-news-data.p.rapidapi.com/search';
+        const urlParams = new URLSearchParams();
+        urlParams.append('query', query);
+        
+        const limitValue = limit || 50;
+        urlParams.append('limit', limitValue.toString());
+        
+        urlParams.append('time_published', timePublished || '1y');
+        
+        if (source) {
+          urlParams.append('source', source);
+        }
+        
+        urlParams.append('country', country || 'US');
+        urlParams.append('lang', lang || 'en');
+    
+        const apiUrl = `${baseUrl}?${urlParams.toString()}`;
 
-    // Build URL with optional parameters
-    const baseUrl = 'https://real-time-news-data.p.rapidapi.com/search';
-    const urlParams = new URLSearchParams();
-    urlParams.append('query', query);
-    
-    if (limit) {
-      const limitNum = parseInt(limit, 10);
-      if (limitNum >= 1 && limitNum <= 500) {
-        urlParams.append('limit', limit);
-      }
-    } else {
-      urlParams.append('limit', '50'); // Default limit
-    }
-    
-    if (timePublished) {
-      urlParams.append('time_published', timePublished);
-    } else {
-      urlParams.append('time_published', '1y'); // Default: 1 year
-    }
-    
-    if (source) {
-      urlParams.append('source', source);
-    }
-    
-    if (country) {
-      urlParams.append('country', country);
-    } else {
-      urlParams.append('country', 'US'); // Default: US
-    }
-    
-    if (lang) {
-      urlParams.append('lang', lang);
-    } else {
-      urlParams.append('lang', 'en'); // Default: English
-    }
-    
-    const url = `${baseUrl}?${urlParams.toString()}`;
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
+        let response: Response;
+        try {
+          response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'x-rapidapi-host': 'real-time-news-data.p.rapidapi.com',
@@ -162,18 +165,27 @@ export async function GET(request: NextRequest) {
   --header 'x-rapidapi-host: real-time-news-data.p.rapidapi.com' \\
   --header 'x-rapidapi-key: YOUR_RAPIDAPI_KEY'`;
 
-    return NextResponse.json({
-      requestId: data.request_id,
-      articles: formattedArticles,
-      count: formattedArticles.length,
-      curl: curlCommand,
-    });
-  } catch (error) {
-    console.error('Error in GET /api/news:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          requestId: data.request_id,
+          articles: formattedArticles,
+          count: formattedArticles.length,
+          curl: curlCommand,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/news:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

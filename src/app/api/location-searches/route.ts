@@ -2,78 +2,107 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
+import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiError';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateRequestBody } from '@/lib/security/validation';
+import { z } from 'zod';
+
+const locationSearchSchema = z.object({
+  place_name: z.string().min(1).max(500),
+  coordinates: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
+  mapbox_data: z.record(z.unknown()),
+  search_query: z.string().max(500).optional().nullable(),
+  page_source: z.string().max(100).default('map'),
+});
 
 /**
  * POST /api/location-searches
  * Save a location search (simple, non-blocking operation)
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated)
+ * - Request size limit: 1MB
+ * - Input validation with Zod
+ * - Requires authentication
  */
 export async function POST(request: NextRequest) {
-  try {
-    const cookieStore = await cookies();
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll() {
-            // Route handlers can set cookies, but this endpoint doesn't need to
-          },
-        },
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        if (!userId || !accountId) {
+          return createErrorResponse('Unauthorized', 401);
+        }
+
+        const cookieStore = await cookies();
+        
+        // Validate request body
+        const validation = await validateRequestBody(req, locationSearchSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { place_name, coordinates, mapbox_data, search_query, page_source } = validation.data;
+        
+        const supabase = createServerClient<Database>(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            cookies: {
+              getAll() {
+                return cookieStore.getAll();
+              },
+              setAll() {
+                // Route handlers can set cookies, but this endpoint doesn't need to
+              },
+            },
+          }
+        );
+        
+        // Get authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+          return createErrorResponse('Unauthorized', 401);
+        }
+
+        // Insert search record
+        const { error: insertError } = await supabase
+          .from('location_searches')
+          .insert({
+            user_id: user.id,
+            account_id: accountId,
+            place_name,
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            mapbox_data,
+            search_query: search_query || null,
+            page_source: page_source || 'map',
+          } as any);
+
+        if (insertError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error saving location search:', insertError);
+          }
+          // Still return success to not block the UI, but log the error
+          return createSuccessResponse({ success: false, error: insertError.message }, 201);
+        }
+
+        return createSuccessResponse({ success: true }, 201);
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Location search API error:', error);
+        }
+        return createErrorResponse('Internal server error', 500);
       }
-    );
-    
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    const body = await request.json();
-    const { place_name, coordinates, mapbox_data, search_query, page_source } = body;
-
-    // Validate required fields
-    if (!place_name || !coordinates?.lat || !coordinates?.lng || !mapbox_data) {
-      return NextResponse.json(
-        { error: 'Missing required fields: place_name, coordinates, mapbox_data' },
-        { status: 400 }
-      );
-    }
-
-    // Get user's account (optional)
-    const { data: account } = await supabase
-      .from('accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .single() as { data: { id: string } | null; error: any };
-
-    // Insert search record
-    // Use location_searches table (simplified structure)
-    const { error: insertError } = await supabase
-      .from('location_searches')
-      .insert({
-        user_id: user.id,
-        account_id: (account as { id: string } | null)?.id || null,
-        place_name,
-        lat: coordinates.lat,
-        lng: coordinates.lng,
-        mapbox_data,
-        search_query: search_query || null,
-        page_source: page_source || 'map',
-      } as any);
-
-    if (insertError) {
-      console.error('Error saving location search:', insertError);
-      // Still return success to not block the UI, but log the error
-      return NextResponse.json({ success: false, error: insertError.message }, { status: 201 });
-    }
-
-    return NextResponse.json({ success: true }, { status: 201 });
-  } catch (error) {
-    console.error('Location search API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
+  );
 }
 

@@ -1,36 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabaseServer';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
+
+/**
+ * GET /api/news/dates-with-news
+ * Get dates that have news articles
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Query parameter validation
+ * - Public endpoint - no authentication required
+ */
+const datesWithNewsQuerySchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const startDateParam = searchParams.get('startDate');
-    const endDateParam = searchParams.get('endDate');
-
-    if (!startDateParam) {
-      return NextResponse.json(
-        { error: 'startDate parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    const endDate = endDateParam || startDateParam;
-
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startDateParam)) {
-      return NextResponse.json(
-        { error: 'Invalid startDate format. Use YYYY-MM-DD' },
-        { status: 400 }
-      );
-    }
-
-    if (endDateParam && !dateRegex.test(endDateParam)) {
-      return NextResponse.json(
-        { error: 'Invalid endDate format. Use YYYY-MM-DD' },
-        { status: 400 }
-      );
-    }
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, datesWithNewsQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { startDate: startDateParam, endDate: endDateParam } = validation.data;
+        const endDate = endDateParam || startDateParam;
 
     const supabase = createServiceClient();
 
@@ -72,19 +72,28 @@ export async function GET(request: NextRequest) {
       dateList.push({ date, article_count: count });
     });
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        dates: dateMap,
-        dateList: dateList,
-      },
-    });
-  } catch (error) {
-    console.error('Error in GET /api/news/dates-with-news:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          success: true,
+          data: {
+            dates: dateMap,
+            dateList: dateList,
+          },
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/news/dates-with-news:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

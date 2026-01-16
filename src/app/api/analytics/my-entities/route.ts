@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
 
 type EntityType = 'account' | 'mention';
 
@@ -18,12 +21,41 @@ interface EntityWithViews {
   url: string;
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const entityType = searchParams.get('entity_type') as EntityType | null;
+/**
+ * GET /api/analytics/my-entities
+ * Get analytics for user's own entities (accounts, mentions)
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated)
+ * - Query parameter validation
+ * - Requires authentication
+ */
+const myEntitiesQuerySchema = z.object({
+  entity_type: z.enum(['account', 'mention']).optional(),
+  account_id: z.string().uuid().optional(),
+});
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+export async function GET(request: NextRequest) {
+  return withSecurity(
+    request,
+    async (req, { userId, accountId: contextAccountId }) => {
+      try {
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, myEntitiesQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { entity_type: entityType, account_id: requestedAccountId } = validation.data;
+
+        if (!userId) {
+          return NextResponse.json(
+            { error: 'Authentication required' },
+            { status: 401 }
+          );
+        }
+
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseAnonKey) {
@@ -67,51 +99,53 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get account_id from query params or fallback to first account
-    const requestedAccountId = searchParams.get('account_id');
-    
-    let accountId: string;
-    if (requestedAccountId) {
-      // Verify user owns this account
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
-        .select('id, username')
-        .eq('id', requestedAccountId)
-        .eq('user_id', user.id)
-        .single();
+        // Use accountId from context or validate requested one
+        let accountId: string;
+        if (requestedAccountId) {
+          // Verify user owns this account
+          const { data: account, error: accountError } = await supabase
+            .from('accounts')
+            .select('id, username')
+            .eq('id', requestedAccountId)
+            .eq('user_id', userId)
+            .single();
 
-      if (accountError || !account) {
-        return NextResponse.json(
-          { error: 'Account not found or you do not have access to it.' },
-          { status: 403 }
-        );
-      }
-      accountId = (account as { id: string; username: string | null }).id;
-    } else {
-      // Fallback to first account
-      const { data: account, error: accountError } = await supabase
-        .from('accounts')
-        .select('id, username')
-        .eq('user_id', user.id)
-        .maybeSingle();
+          if (accountError || !account) {
+            return NextResponse.json(
+              { error: 'Account not found or you do not have access to it.' },
+              { status: 403 }
+            );
+          }
+          accountId = (account as { id: string; username: string | null }).id;
+        } else if (contextAccountId) {
+          accountId = contextAccountId;
+        } else {
+          // Fallback to first account
+          const { data: account, error: accountError } = await supabase
+            .from('accounts')
+            .select('id, username')
+            .eq('user_id', userId)
+            .maybeSingle();
 
-      if (accountError) {
-        console.error('Error fetching account:', accountError);
-        return NextResponse.json(
-          { error: 'Failed to fetch account' },
-          { status: 500 }
-        );
-      }
+          if (accountError) {
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Error fetching account:', accountError);
+            }
+            return NextResponse.json(
+              { error: 'Failed to fetch account' },
+              { status: 500 }
+            );
+          }
 
-      if (!account) {
-        return NextResponse.json(
-          { error: 'Account not found. Please complete your profile setup.' },
-          { status: 404 }
-        );
-      }
+          if (!account) {
+            return NextResponse.json(
+              { error: 'Account not found. Please complete your profile setup.' },
+              { status: 404 }
+            );
+          }
 
-      accountId = (account as { id: string; username: string | null }).id;
-    }
+          accountId = (account as { id: string; username: string | null }).id;
+        }
     const entities: EntityWithViews[] = [];
 
     // Get user's account/profile with stats
@@ -205,15 +239,24 @@ export async function GET(request: NextRequest) {
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-    return NextResponse.json({
-      entities,
-      total: entities.length,
-    });
-  } catch (error) {
-    console.error('Error in GET /api/analytics/my-entities:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          entities,
+          total: entities.length,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/analytics/my-entities:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }

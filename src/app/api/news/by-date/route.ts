@@ -1,48 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabaseServer';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
+
+/**
+ * GET /api/news/by-date
+ * Get news articles by date range
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Query parameter validation
+ * - Public endpoint - no authentication required
+ */
+const newsByDateQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  limit: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(1000)).optional(),
+}).refine(
+  (data) => data.date || data.startDate,
+  { message: 'Either date or startDate parameter is required' }
+);
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const dateParam = searchParams.get('date');
-    const startDateParam = searchParams.get('startDate');
-    const endDateParam = searchParams.get('endDate');
-    const limitParam = searchParams.get('limit');
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, newsByDateQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { date: dateParam, startDate: startDateParam, endDate: endDateParam, limit: limitParam } = validation.data;
+        
+        let startDate: string;
+        let endDate: string | null = null;
 
-    if (!dateParam && !startDateParam) {
-      return NextResponse.json(
-        { error: 'Either date or startDate parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    let startDate: string;
-    let endDate: string | null = null;
-
-    if (dateParam) {
-      // Single date query
-      startDate = dateParam;
-      endDate = dateParam;
-    } else {
-      startDate = startDateParam!;
-      endDate = endDateParam || null;
-    }
-
-    // Validate date format (YYYY-MM-DD)
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(startDate)) {
-      return NextResponse.json(
-        { error: 'Invalid date format. Use YYYY-MM-DD' },
-        { status: 400 }
-      );
-    }
-
-    if (endDate && !dateRegex.test(endDate)) {
-      return NextResponse.json(
-        { error: 'Invalid endDate format. Use YYYY-MM-DD' },
-        { status: 400 }
-      );
-    }
+        if (dateParam) {
+          startDate = dateParam;
+          endDate = dateParam;
+        } else {
+          startDate = startDateParam!;
+          endDate = endDateParam || null;
+        }
 
     const supabase = createServiceClient();
 
@@ -97,29 +100,35 @@ export async function GET(request: NextRequest) {
       relatedTopics: article.related_topics || [],
     }));
 
-    // Apply limit if specified
-    if (limitParam) {
-      const limit = parseInt(limitParam, 10);
-      if (limit > 0) {
-        articles = articles.slice(0, limit);
-      }
-    }
+        // Apply limit if specified
+        if (limitParam) {
+          articles = articles.slice(0, limitParam);
+        }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        articles,
-        count: articles.length,
-        startDate,
-        endDate: endDate || startDate,
-      },
-    });
-  } catch (error) {
-    console.error('Error in GET /api/news/by-date:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          success: true,
+          data: {
+            articles,
+            count: articles.length,
+            startDate,
+            endDate: endDate || startDate,
+          },
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/news/by-date:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

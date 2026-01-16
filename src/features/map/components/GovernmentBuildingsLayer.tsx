@@ -41,7 +41,7 @@ export default function GovernmentBuildingsLayer({
     clickHandler?: (e: any) => void;
   } | null>(null);
   const iconsLoadedRef = useRef<Set<string>>(new Set<string>());
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasFetchedRef = useRef(false);
 
   // Load building type icons
   const loadBuildingIcons = useCallback(async (mapboxMap: any): Promise<void> => {
@@ -91,19 +91,12 @@ export default function GovernmentBuildingsLayer({
     await Promise.all(loadPromises);
   }, []);
 
-  // Fetch buildings based on map bounds (spatial query)
-  const fetchBuildingsInBounds = useCallback(async (bounds: { minLng: number; maxLng: number; minLat: number; maxLat: number }): Promise<void> => {
-    if (!visible) return;
+  // Fetch all buildings once (no bounds filtering needed)
+  const fetchAllBuildings = useCallback(async (): Promise<void> => {
+    if (!visible || hasFetchedRef.current) return;
 
     try {
-      const params = new URLSearchParams({
-        minLng: bounds.minLng.toString(),
-        maxLng: bounds.maxLng.toString(),
-        minLat: bounds.minLat.toString(),
-        maxLat: bounds.maxLat.toString(),
-      });
-      
-      const response = await fetch(`/api/civic/buildings?${params}`);
+      const response = await fetch(`/api/civic/buildings`);
       
       if (!response.ok) {
         console.error('[GovernmentBuildingsLayer] Failed to fetch buildings:', response.statusText);
@@ -113,6 +106,7 @@ export default function GovernmentBuildingsLayer({
       const data = await response.json();
       const newBuildings = Array.isArray(data) ? data : [];
       setBuildings(newBuildings);
+      hasFetchedRef.current = true;
     } catch (error) {
       console.error('[GovernmentBuildingsLayer] Error fetching buildings:', error);
     }
@@ -336,7 +330,7 @@ export default function GovernmentBuildingsLayer({
     }
   }, [map, mapLoaded, visible, loadBuildingIcons, onBuildingClick]);
 
-  // Fetch buildings on mount and when visible changes
+  // Fetch buildings once on mount when visible
   useEffect(() => {
     if (!map || !mapLoaded || !visible) {
       // Clean up if hiding buildings
@@ -369,17 +363,9 @@ export default function GovernmentBuildingsLayer({
       return;
     }
 
-    const mapboxMap = map as any;
-    const bounds = mapboxMap.getBounds();
-    if (bounds) {
-      fetchBuildingsInBounds({
-        minLng: bounds.getWest(),
-        maxLng: bounds.getEast(),
-        minLat: bounds.getSouth(),
-        maxLat: bounds.getNorth(),
-      });
-    }
-  }, [map, mapLoaded, visible, fetchBuildingsInBounds]);
+    // Fetch all buildings once
+    fetchAllBuildings();
+  }, [map, mapLoaded, visible, fetchAllBuildings]);
 
   // Update markers when buildings data changes
   useEffect(() => {
@@ -387,42 +373,6 @@ export default function GovernmentBuildingsLayer({
       updateBuildingMarkers(buildings);
     }
   }, [buildings, visible, updateBuildingMarkers]);
-
-  // Re-fetch on map move/zoom (debounced)
-  useEffect(() => {
-    if (!map || !mapLoaded || !visible) return;
-
-    const mapboxMap = map as any;
-    
-    const handleMapMove = () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-      
-      fetchTimeoutRef.current = setTimeout(() => {
-        const bounds = mapboxMap.getBounds();
-        if (bounds) {
-          fetchBuildingsInBounds({
-            minLng: bounds.getWest(),
-            maxLng: bounds.getEast(),
-            minLat: bounds.getSouth(),
-            maxLat: bounds.getNorth(),
-          });
-        }
-      }, 300);
-    };
-
-    mapboxMap.on('moveend', handleMapMove);
-    mapboxMap.on('zoomend', handleMapMove);
-
-    return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-      mapboxMap.off('moveend', handleMapMove);
-      mapboxMap.off('zoomend', handleMapMove);
-    };
-  }, [map, mapLoaded, visible, fetchBuildingsInBounds]);
 
   return null; // This component doesn't render any direct JSX
 }

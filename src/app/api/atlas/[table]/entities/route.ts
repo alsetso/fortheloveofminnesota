@@ -2,18 +2,54 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
 import { getAtlasTypeBySlug } from '@/features/atlas/services/atlasTypesService';
 import { handleQueryError } from '@/lib/utils/errorHandling';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams, validatePathParams } from '@/lib/security/validation';
+import { z } from 'zod';
 
 export const revalidate = 3600;
+
+/**
+ * GET /api/atlas/[table]/entities
+ * Get entities for an atlas table
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Query and path parameter validation
+ * - Public endpoint - no authentication required
+ */
+const atlasEntitiesQuerySchema = z.object({
+  search: z.string().max(200).optional(),
+  stats: z.enum(['true', 'false']).transform(val => val === 'true').optional(),
+});
+
+const atlasEntitiesPathSchema = z.object({
+  table: z.string().min(1).max(100),
+});
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ table: string }> }
 ) {
-  try {
-    const { table } = await params;
-    const searchParams = request.nextUrl.searchParams;
-    const search = searchParams.get('search');
-    const statsOnly = searchParams.get('stats') === 'true';
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
+        const { table } = await params;
+        
+        // Validate path parameters
+        const pathValidation = validatePathParams({ table }, atlasEntitiesPathSchema);
+        if (!pathValidation.success) {
+          return pathValidation.error;
+        }
+        
+        // Validate query parameters
+        const url = new URL(req.url);
+        const queryValidation = validateQueryParams(url.searchParams, atlasEntitiesQuerySchema);
+        if (!queryValidation.success) {
+          return queryValidation.error;
+        }
+        
+        const { search, stats: statsOnly } = queryValidation.data;
 
     // Validate table exists
     const atlasType = await getAtlasTypeBySlug(table);
@@ -101,17 +137,26 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({
-      entities,
-      total: allRecords.length,
-      withCoords: entities.length,
-    });
-  } catch (error) {
-    console.error('[AtlasEntitiesAPI] Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          entities,
+          total: allRecords.length,
+          withCoords: entities.length,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[AtlasEntitiesAPI] Error:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

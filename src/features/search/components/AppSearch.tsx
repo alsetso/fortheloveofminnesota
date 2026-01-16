@@ -42,6 +42,8 @@ export default function AppSearch({
   
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const [activeTab, setActiveTab] = useState<SearchTab>('address');
   const [activeSearchTypes, setActiveSearchTypes] = useState<SearchType[]>([]);
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
@@ -292,6 +294,7 @@ export default function AppSearch({
   };
 
   const handleInputClick = () => {
+    setIsFullScreen(true);
     // Only open if user has typed something
     if (query.length > 0) {
       setIsOpen(true);
@@ -299,11 +302,48 @@ export default function AppSearch({
   };
 
   const handleInputFocus = () => {
+    setIsFullScreen(true);
     // Only open if user has typed something
     if (query.length > 0) {
       setIsOpen(true);
     }
   };
+
+  const handleCloseFullScreen = () => {
+    setIsAnimating(false);
+    setTimeout(() => {
+      setIsFullScreen(false);
+      setIsOpen(false);
+      inputRef.current?.blur();
+    }, 300); // Match animation duration
+  };
+
+  // Trigger slide-in animation when full screen opens
+  useEffect(() => {
+    if (isFullScreen) {
+      // Small delay to ensure DOM is ready, then trigger animation
+      const timer = setTimeout(() => {
+        setIsAnimating(true);
+      }, 10);
+      return () => clearTimeout(timer);
+    } else {
+      setIsAnimating(false);
+    }
+  }, [isFullScreen]);
+
+  // Close full screen on ESC key
+  useEffect(() => {
+    if (!isFullScreen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseFullScreen();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFullScreen]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -328,48 +368,256 @@ export default function AppSearch({
   ] : [];
 
   return (
-    <form onSubmit={handleSubmit} className="w-full flex justify-center">
-      <div ref={containerRef} className="relative" style={{ maxWidth: '600px', width: '100%' }}>
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
-          <MagnifyingGlassIcon className="w-5 h-5 text-white/70" />
-        </div>
-        
-        {/* Search Type Tags - UI removed, logic preserved */}
-        
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => {
-            const newQuery = e.target.value;
-            setQuery(newQuery);
-            setSelectedSuggestionIndex(-1);
-            // Open dropdown when user starts typing
-            if (newQuery.length > 0) {
-              setIsOpen(true);
-            } else {
-              setIsOpen(false);
-            }
-          }}
-          onClick={handleInputClick}
-          onFocus={handleInputFocus}
-          placeholder={placeholder}
-          className="
-            w-full py-2 relative z-10
-            bg-transparent rounded-lg
-            text-sm text-white/90 placeholder-white/60
-            focus:outline-none focus:ring-2 focus:ring-gold-500/50
-            transition-all
-          "
-          style={{
-            borderWidth: '2px',
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            paddingLeft: '2.5rem',
-          }}
-        />
+    <>
+      {/* Full Screen Overlay */}
+      {isFullScreen && (
+        <div
+          className={`fixed inset-0 bg-white z-[9999] transition-transform duration-300 ease-out ${
+            isAnimating ? 'translate-y-0' : '-translate-y-full'
+          }`}
+          style={{ top: 0 }}
+        >
+          <div className="h-full flex flex-col">
+            {/* Header with close button */}
+            <div className="flex items-center justify-between p-3 border-b border-gray-200">
+              <form onSubmit={handleSubmit} className="flex-1 max-w-2xl mx-auto">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
+                    <MagnifyingGlassIcon className="w-5 h-5 text-gray-500" />
+                  </div>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => {
+                      const newQuery = e.target.value;
+                      setQuery(newQuery);
+                      setSelectedSuggestionIndex(-1);
+                      // Open dropdown when user starts typing
+                      if (newQuery.length > 0) {
+                        setIsOpen(true);
+                      } else {
+                        setIsOpen(false);
+                      }
+                    }}
+                    placeholder={placeholder}
+                    className="w-full py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-500 bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
+                    autoFocus
+                  />
+                </div>
+              </form>
+              <button
+                type="button"
+                onClick={handleCloseFullScreen}
+                className="ml-3 p-2 text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
 
-        {/* Search Overlay */}
-        {isOpen && (
+            {/* Search Results Container */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-2xl mx-auto p-3">
+                {isOpen && (
+                  <div className="space-y-3">
+                    {/* Tabs */}
+                    <div className="flex gap-1 border-b border-gray-200 pb-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('address');
+                          setSelectedSuggestionIndex(-1);
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                          activeTab === 'address'
+                            ? 'text-gray-900 border-b-2 border-gray-900'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('pins');
+                          setSelectedSuggestionIndex(-1);
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                          activeTab === 'pins'
+                            ? 'text-gray-900 border-b-2 border-gray-900'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Pins
+                      </button>
+                    </div>
+
+                    {/* Address Suggestions */}
+                    {activeTab === 'address' && isMapPage && activeSearchTypes.includes('locations') && (
+                      <div>
+                        {isLoadingSuggestions ? (
+                          <div className="px-3 py-2 text-xs text-gray-500">Searching...</div>
+                        ) : locationSuggestions.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {locationSuggestions.map((suggestion, index) => (
+                              <button
+                                key={suggestion.id}
+                                type="button"
+                                onClick={() => {
+                                  handleLocationSelect(suggestion);
+                                  handleCloseFullScreen();
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs rounded transition-all duration-150 ${
+                                  index === selectedSuggestionIndex
+                                    ? 'bg-gray-100 text-gray-900 border border-gray-300'
+                                    : 'text-gray-700 hover:bg-gray-50 border border-transparent'
+                                }`}
+                              >
+                                <div className="font-medium truncate">{suggestion.place_name}</div>
+                                {suggestion.context && suggestion.context.length > 0 && (
+                                  <div className="text-[10px] text-gray-500 mt-0.5 truncate">
+                                    {suggestion.context
+                                      .filter(ctx => ctx.id.startsWith('place') || ctx.id.startsWith('region'))
+                                      .map(ctx => ctx.text)
+                                      .join(', ')}
+                                  </div>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        ) : query.length >= 2 && !isLoadingSuggestions ? (
+                          <div className="px-3 py-2 text-xs text-gray-500">No locations found</div>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {/* Pin Suggestions */}
+                    {activeTab === 'pins' && (
+                      <div>
+                        {isLoadingSuggestions ? (
+                          <div className="px-3 py-2 text-xs text-gray-500">Searching...</div>
+                        ) : pinSuggestions.length > 0 ? (
+                          <div className="space-y-0.5">
+                            {pinSuggestions.map((pin, index) => (
+                              <button
+                                key={pin.id}
+                                type="button"
+                                onClick={() => {
+                                  handlePinSelect(pin);
+                                  handleCloseFullScreen();
+                                }}
+                                className={`w-full text-left px-3 py-2 text-xs rounded transition-all duration-150 ${
+                                  index === selectedSuggestionIndex
+                                    ? 'bg-gray-100 text-gray-900 border border-gray-300'
+                                    : 'text-gray-700 hover:bg-gray-50 border border-transparent'
+                                }`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <MapPinIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{pin.description || 'Untitled Pin'}</div>
+                                    {pin.account?.username && (
+                                      <div className="text-[10px] text-gray-500 mt-0.5 truncate">
+                                        by {pin.account.username}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : query.length >= 2 && !isLoadingSuggestions ? (
+                          <div className="px-3 py-2 text-xs text-gray-500">No pins found</div>
+                        ) : null}
+                      </div>
+                    )}
+
+                    {/* Recent Searches */}
+                    {recentSearches.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2 px-1">
+                          <p className="text-xs font-medium text-gray-600">Recent searches</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              // Clear recent searches logic here
+                            }}
+                            className="text-xs text-gray-600 hover:text-gray-700"
+                          >
+                            Clear history
+                          </button>
+                        </div>
+                        <div className="space-y-1">
+                          {recentSearches.map((search) => (
+                            <button
+                              key={search.id}
+                              type="button"
+                              onClick={() => {
+                                setQuery(search.query);
+                                setIsOpen(false);
+                                inputRef.current?.focus();
+                              }}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                            >
+                              <ClockIcon className="w-4 h-4 text-gray-500" />
+                              <span className="flex-1 text-left">{search.query}</span>
+                              <span className="text-xs text-gray-500">{search.type}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Original Search Input (shown when not full screen) */}
+      <form onSubmit={handleSubmit} className="w-full flex justify-center">
+        <div ref={containerRef} className="relative" style={{ maxWidth: '600px', width: '100%' }}>
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none z-10">
+            <MagnifyingGlassIcon className="w-5 h-5 text-white/70" />
+          </div>
+          
+          {/* Search Type Tags - UI removed, logic preserved */}
+          
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => {
+              const newQuery = e.target.value;
+              setQuery(newQuery);
+              setSelectedSuggestionIndex(-1);
+              // Open dropdown when user starts typing
+              if (newQuery.length > 0) {
+                setIsOpen(true);
+              } else {
+                setIsOpen(false);
+              }
+            }}
+            onClick={handleInputClick}
+            onFocus={handleInputFocus}
+            placeholder={placeholder}
+            className="
+              w-full py-2 relative z-10
+              bg-transparent rounded-lg
+              text-sm text-white/90 placeholder-white/60
+              focus:outline-none focus:ring-2 focus:ring-gold-500/50
+              transition-all
+            "
+            style={{
+              borderWidth: '2px',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              paddingLeft: '2.5rem',
+            }}
+          />
+
+        {/* Search Overlay - Only show when not in full screen mode */}
+        {isOpen && !isFullScreen && (
           <>
             {/* Backdrop overlay for mobile */}
             <div
@@ -533,6 +781,7 @@ export default function AppSearch({
         )}
       </div>
     </form>
+    </>
   );
 }
 

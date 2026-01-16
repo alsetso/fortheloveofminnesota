@@ -2,23 +2,41 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateRequestBody } from '@/lib/security/validation';
+import { z } from 'zod';
+import { commonSchemas } from '@/lib/security/validation';
 
 /**
  * POST /api/analytics/pin-view
  * Records a mention view (formerly pin view) using the pin_views system
  * Note: Parameter name is "pin_id" for backward compatibility, but it's actually a mention ID
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Request size limit: 1MB
+ * - Input validation with Zod
+ * - Optional authentication (tracks anonymous views)
  */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { pin_id, referrer_url, session_id, user_agent } = body;
+const pinViewSchema = z.object({
+  pin_id: commonSchemas.uuid,
+  referrer_url: z.string().url().max(2000).optional().nullable(),
+  session_id: z.string().max(200).optional().nullable(),
+  user_agent: z.string().max(500).optional().nullable(),
+});
 
-    if (!pin_id || typeof pin_id !== 'string') {
-      return NextResponse.json(
-        { error: 'pin_id is required' },
-        { status: 400 }
-      );
-    }
+export async function POST(request: NextRequest) {
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        // Validate request body
+        const validation = await validateRequestBody(req, pinViewSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { pin_id, referrer_url, session_id, user_agent } = validation.data;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -46,47 +64,49 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Get current user account (optional - for authenticated users)
-    let accountId: string | null = null;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: account } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle() as { data: { id: string } | null; error: any };
-      accountId = (account as { id: string } | null)?.id || null;
+        // Use accountId from security middleware context if available
+        const finalAccountId = accountId || null;
+
+        // Record mention view using record_pin_view function
+        // Note: pin_id is actually a mention ID (legacy naming)
+        const { data, error } = await supabase.rpc('record_pin_view', {
+          p_pin_id: pin_id,
+          p_account_id: finalAccountId,
+          p_user_agent: user_agent || null,
+          p_referrer_url: referrer_url || null,
+          p_session_id: session_id || null,
+        } as any) as { data: string | null; error: any };
+
+        if (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error recording mention view:', error);
+          }
+          return NextResponse.json(
+            { error: 'Failed to record mention view' },
+            { status: 500 }
+          );
+        }
+
+        return NextResponse.json({ 
+          success: true,
+          view_id: data 
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in POST /api/analytics/pin-view:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    // Record mention view using record_pin_view function
-    // Note: pin_id is actually a mention ID (legacy naming)
-    const { data, error } = await supabase.rpc('record_pin_view', {
-      p_pin_id: pin_id,
-      p_account_id: accountId,
-      p_user_agent: user_agent || null,
-      p_referrer_url: referrer_url || null,
-      p_session_id: session_id || null,
-    } as any) as { data: string | null; error: any };
-
-    if (error) {
-      console.error('Error recording mention view:', error);
-      return NextResponse.json(
-        { error: 'Failed to record mention view', details: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      view_id: data 
-    });
-  } catch (error) {
-    console.error('Error in POST /api/analytics/pin-view:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  );
 }
 
 

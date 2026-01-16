@@ -181,6 +181,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const [searchQuery, setSearchQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [micPermissionError, setMicPermissionError] = useState<'denied' | 'unavailable' | null>(null);
+  const micErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -404,6 +406,27 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     }
   }, [map]);
 
+  // Auto-hide microphone error message after 3 seconds
+  useEffect(() => {
+    if (micPermissionError) {
+      // Clear any existing timeout
+      if (micErrorTimeoutRef.current) {
+        clearTimeout(micErrorTimeoutRef.current);
+      }
+      
+      // Set new timeout to hide error after 3 seconds
+      micErrorTimeoutRef.current = setTimeout(() => {
+        setMicPermissionError(null);
+      }, 3000);
+    }
+
+    return () => {
+      if (micErrorTimeoutRef.current) {
+        clearTimeout(micErrorTimeoutRef.current);
+      }
+    };
+  }, [micPermissionError]);
+
   // Check for browser support and initialize Speech Recognition
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -419,6 +442,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
         const transcript = event.results[0][0].transcript;
         setSearchQuery(transcript);
         setIsRecording(false);
+        setMicPermissionError(null); // Clear error on successful recognition
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
@@ -428,13 +452,26 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
         // Handle common errors
         if (event.error === 'no-speech') {
           // User didn't speak, silently stop
+          setMicPermissionError(null);
         } else if (event.error === 'not-allowed') {
-          alert('Microphone access denied. Please allow microphone access to use voice search.');
+          setMicPermissionError('denied');
+        } else if (event.error === 'service-not-allowed' || event.error === 'aborted') {
+          setMicPermissionError('unavailable');
+        } else {
+          setMicPermissionError(null);
         }
       };
 
       recognition.onend = () => {
         setIsRecording(false);
+        // Don't clear error on end - let user see the message if permission was denied
+      };
+
+      // Clear error timeout on unmount
+      return () => {
+        if (micErrorTimeoutRef.current) {
+          clearTimeout(micErrorTimeoutRef.current);
+        }
       };
 
       recognitionRef.current = recognition;
@@ -694,9 +731,9 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleVoiceSearch = () => {
+  const handleVoiceSearch = async () => {
     if (!isSupported) {
-      alert('Voice search is not supported in your browser. Please use Chrome or Edge.');
+      setMicPermissionError('unavailable');
       return;
     }
 
@@ -705,12 +742,29 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     if (isRecording) {
       recognitionRef.current.stop();
       setIsRecording(false);
+      setMicPermissionError(null);
     } else {
+      // Try to request microphone permission first
       try {
-        recognitionRef.current.start();
-        setIsRecording(true);
-      } catch (error) {
-        console.error('Failed to start recognition:', error);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Permission granted, stop the stream and start recognition
+        stream.getTracks().forEach(track => track.stop());
+        setMicPermissionError(null);
+        
+        try {
+          recognitionRef.current.start();
+          setIsRecording(true);
+        } catch (error) {
+          console.error('Failed to start recognition:', error);
+          setIsRecording(false);
+        }
+      } catch (error: any) {
+        // Permission denied or unavailable
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          setMicPermissionError('denied');
+        } else {
+          setMicPermissionError('unavailable');
+        }
         setIsRecording(false);
       }
     }
@@ -875,26 +929,38 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
 
           {/* Microphone Icon */}
           {!hideMicrophone && (
-          <button
-            data-microphone-button
-            onClick={handleVoiceSearch}
-            disabled={!isSupported}
-            className={`flex-shrink-0 w-8 h-8 rounded-full transition-colors flex items-center justify-center ${
-              isRecording
-                ? 'bg-red-100 text-red-500 animate-pulse'
-                : isSupported
-                ? useWhiteText 
-                  ? 'bg-white/20 hover:bg-white/30 text-white/70 hover:text-white' 
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700'
-                : useWhiteText 
-                  ? 'bg-white/10 text-white/30 cursor-not-allowed' 
-                  : 'bg-gray-50 text-gray-300 cursor-not-allowed'
-            }`}
-            aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
-            title={isSupported ? (isRecording ? 'Stop recording' : 'Start voice search') : 'Voice search not supported'}
-          >
-            <MicrophoneIcon className="w-4 h-4" />
-          </button>
+          <div className="flex-shrink-0 flex items-center gap-1.5">
+            <button
+              data-microphone-button
+              onClick={handleVoiceSearch}
+              disabled={!isSupported}
+              className={`flex-shrink-0 w-8 h-8 rounded-full transition-colors flex items-center justify-center relative ${
+                isRecording
+                  ? 'bg-red-100 text-red-500 animate-pulse'
+                  : isSupported
+                  ? useWhiteText 
+                    ? 'bg-white/20 hover:bg-white/30 text-white/70 hover:text-white' 
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700'
+                  : useWhiteText 
+                    ? 'bg-white/10 text-white/30 cursor-not-allowed' 
+                    : 'bg-gray-50 text-gray-300 cursor-not-allowed'
+              }`}
+              aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
+              title={isSupported ? (isRecording ? 'Stop recording' : 'Start voice search') : 'Voice search not supported'}
+            >
+              <MicrophoneIcon className="w-4 h-4" />
+            </button>
+            {micPermissionError === 'denied' && (
+              <span className={`text-xs whitespace-nowrap ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                Allow mic access
+              </span>
+            )}
+            {micPermissionError === 'unavailable' && (
+              <span className={`text-xs whitespace-nowrap ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                Mic unavailable
+              </span>
+            )}
+          </div>
           )}
 
           {/* Profile Icon */}

@@ -2,43 +2,38 @@
 // API CONFIGURATION
 // ============================================================================
 // Centralized API configuration for external services
+// NOTE: API keys are now server-only. Client-side code uses proxy routes.
 
 export interface ApiConfig {
   skipTrace: {
     enabled: boolean;
     endpoint: string;
     host: string;
-    key: string;
     useMockData: boolean;
   };
   zillow: {
     enabled: boolean;
     endpoint: string;
     host: string;
-    key: string;
     useMockData: boolean;
   };
 }
 
-const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY || '';
-const hasApiKey = !!apiKey && 
-  apiKey !== 'your_rapidapi_key_here' &&
-  apiKey.trim() !== '';
+// Check if mock data should be used (no longer depends on API key presence)
+const useMockData = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 export const apiConfig: ApiConfig = {
   skipTrace: {
     enabled: true,
     endpoint: 'https://skip-tracing-working-api.p.rapidapi.com/search/byaddress',
     host: 'skip-tracing-working-api.p.rapidapi.com',
-    key: apiKey,
-    useMockData: process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || !hasApiKey
+    useMockData
   },
   zillow: {
     enabled: true,
     endpoint: 'https://zillow56.p.rapidapi.com/search_address',
     host: 'zillow56.p.rapidapi.com',
-    key: apiKey,
-    useMockData: process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' || !hasApiKey
+    useMockData
   }
 };
 
@@ -47,11 +42,9 @@ export const shouldUseMockData = (service: keyof ApiConfig): boolean => {
   return apiConfig[service].useMockData || !apiConfig[service].enabled;
 };
 
-// Helper function to get API headers
-export const getApiHeaders = (service: keyof ApiConfig): Record<string, string> => {
-  const config = apiConfig[service];
-  return {
-    [`x-rapidapi-host`]: config.host,
-    [`x-rapidapi-key`]: config.key
-  };
+// DEPRECATED: getApiHeaders is no longer used (client-side code uses proxy routes)
+// Kept for backward compatibility but returns empty headers
+export const getApiHeaders = (_service: keyof ApiConfig): Record<string, string> => {
+  console.warn('getApiHeaders is deprecated. Client-side code should use proxy routes instead.');
+  return {};
 };

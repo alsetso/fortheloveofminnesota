@@ -5,308 +5,351 @@ import { getServerAuth } from '@/lib/authServer';
 import { getAccountIdForUser } from '@/lib/server/getAccountId';
 import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiError';
 import { Database } from '@/types/supabase';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validatePathParams, validateRequestBody } from '@/lib/security/validation';
+import { z } from 'zod';
+import { commonSchemas } from '@/lib/security/validation';
 
 /**
  * GET /api/maps/[id]
  * Get a single map with point count
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated) or 100/min (public)
+ * - Path parameter validation
+ * - Optional authentication (RLS handles permissions)
  */
+const mapIdPathSchema = z.object({
+  id: commonSchemas.uuid,
+});
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const auth = await getServerAuth();
-    const supabase = auth 
-      ? await createServerClientWithAuth(cookies())
-      : createServerClient();
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const { id } = await params;
+        
+        // Validate path parameters
+        const pathValidation = validatePathParams({ id }, mapIdPathSchema);
+        if (!pathValidation.success) {
+          return pathValidation.error;
+        }
+        
+        const { id: validatedId } = pathValidation.data;
+        
+        const auth = await getServerAuth();
+        const supabase = auth 
+          ? await createServerClientWithAuth(cookies())
+          : createServerClient();
 
-    // Fetch map (RLS will filter based on permissions)
-    const { data: map, error } = await supabase
-      .from('map')
-      .select(`
-        id,
-        account_id,
-        title,
-        description,
-        visibility,
-        map_style,
-        type,
-        custom_slug,
-        tags,
-        meta,
-        created_at,
-        updated_at,
-        account:accounts!inner(
-          id,
-          username,
-          first_name,
-          last_name,
-          image_url
-        )
-      `)
-      .eq('id', id)
-      .single();
+        // Fetch map (RLS will filter based on permissions)
+        const { data: map, error } = await supabase
+          .from('map')
+          .select(`
+            id,
+            account_id,
+            title,
+            description,
+            visibility,
+            map_style,
+            type,
+            custom_slug,
+            tags,
+            meta,
+            created_at,
+            updated_at,
+            account:accounts!inner(
+              id,
+              username,
+              first_name,
+              last_name,
+              image_url
+            )
+          `)
+          .eq('id', validatedId)
+          .single();
 
-    if (error || !map) {
-      // Check if it's a permission error (RLS blocked access)
-      if (error?.code === 'PGRST116' || error?.message?.includes('row-level security')) {
-        return createErrorResponse('You do not have access to this map', 403);
+        if (error || !map) {
+          // Check if it's a permission error (RLS blocked access)
+          if (error?.code === 'PGRST116' || error?.message?.includes('row-level security')) {
+            return createErrorResponse('You do not have access to this map', 403);
+          }
+          return createErrorResponse('Map not found', 404);
+        }
+
+        // RLS already handles permission checks, so if we get here, user has access
+        return createSuccessResponse(map);
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Maps API] Error:', error);
+        }
+        return createErrorResponse('Internal server error', 500);
       }
-      return createErrorResponse('Map not found', 404);
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    // RLS already handles permission checks, so if we get here, user has access
-    return createSuccessResponse(map);
-  } catch (error) {
-    console.error('[Maps API] Error:', error);
-    return createErrorResponse(
-      'Internal server error',
-      500,
-      error instanceof Error ? error.message : undefined
-    );
-  }
+  );
 }
 
 /**
  * PUT /api/maps/[id]
  * Update a map (owner only)
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated)
+ * - Request size limit: 1MB
+ * - Input validation with Zod
+ * - Requires authentication
+ * - Ownership check required
  */
+const updateMapSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  visibility: z.enum(['public', 'private', 'shared']).optional(),
+  map_style: z.enum(['street', 'satellite', 'light', 'dark']).optional(),
+  type: z.enum(['user', 'community', 'gov', 'professional', 'atlas', 'user-generated']).optional().nullable(),
+  custom_slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(100).optional().nullable(),
+  tags: z.array(z.object({
+    emoji: z.string(),
+    text: z.string(),
+  })).max(20).optional(),
+  meta: z.record(z.unknown()).optional(),
+});
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const auth = await getServerAuth();
-    
-    if (!auth) {
-      return createErrorResponse('Unauthorized - authentication required', 401);
-    }
-
-    const supabase = await createServerClientWithAuth(cookies());
-    const body = await request.json();
-
-    // Check if user owns the map
-    const { data: map, error: mapError } = await supabase
-      .from('map')
-      .select('account_id')
-      .eq('id', id)
-      .single();
-
-    if (mapError || !map) {
-      return createErrorResponse('Map not found', 404);
-    }
-
-    // Get user's account and verify ownership
-    let accountId: string;
-    try {
-      accountId = await getAccountIdForUser(auth, supabase);
-    } catch (error) {
-      return createErrorResponse(
-        error instanceof Error ? error.message : 'Account not found',
-        404
-      );
-    }
-
-    const mapData = map as { id: string; account_id: string };
-    if (accountId !== mapData.account_id) {
-      return createErrorResponse('Forbidden - you do not own this map', 403);
-    }
-
-    // Build update data
-    const updateData: Partial<Database['public']['Tables']['map']['Update']> = {};
-
-    if (body.title !== undefined) {
-      if (!body.title || body.title.trim().length === 0) {
-        return createErrorResponse('Title cannot be empty', 400);
-      }
-      updateData.title = body.title.trim();
-    }
-
-    if (body.description !== undefined) {
-      updateData.description = body.description?.trim() || null;
-    }
-
-    if (body.visibility !== undefined) {
-      if (!['public', 'private', 'shared'].includes(body.visibility)) {
-        return createErrorResponse('Invalid visibility. Must be public, private, or shared', 400);
-      }
-      updateData.visibility = body.visibility;
-    }
-
-    if (body.map_style !== undefined) {
-      if (!['street', 'satellite', 'light', 'dark'].includes(body.map_style)) {
-        return createErrorResponse('Invalid map_style. Must be street, satellite, light, or dark', 400);
-      }
-      updateData.map_style = body.map_style as 'street' | 'satellite' | 'light' | 'dark';
-    }
-
-    if (body.meta !== undefined) {
-      updateData.meta = body.meta;
-    }
-
-    if (body.type !== undefined) {
-      const validTypes = ['user', 'community', 'gov', 'professional', 'atlas', 'user-generated'];
-      if (body.type !== null && !validTypes.includes(body.type)) {
-        return createErrorResponse('Invalid type. Must be one of: user, community, gov, professional, atlas, user-generated', 400);
-      }
-      updateData.type = body.type || null;
-    }
-
-    if (body.custom_slug !== undefined) {
-      // Check if user has pro account for custom_slug
-      const { data: account } = await supabase
-        .from('accounts')
-        .select('plan')
-        .eq('id', accountId)
-        .single();
-
-      const accountData = account as { plan: string } | null;
-      if (body.custom_slug && accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
-        return createErrorResponse('Custom slugs are only available for pro accounts', 403);
-      }
-
-      if (body.custom_slug) {
-        // Validate slug format
-        const slugRegex = /^[a-z0-9-]+$/;
-        if (!slugRegex.test(body.custom_slug) || body.custom_slug.length < 3 || body.custom_slug.length > 100) {
-          return createErrorResponse('Invalid custom_slug format. Must be 3-100 characters, lowercase alphanumeric and hyphens only', 400);
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const { id } = await params;
+        
+        // Validate path parameters
+        const pathValidation = validatePathParams({ id }, mapIdPathSchema);
+        if (!pathValidation.success) {
+          return pathValidation.error;
+        }
+        
+        const { id: validatedId } = pathValidation.data;
+        
+        if (!userId || !accountId) {
+          return createErrorResponse('Unauthorized - authentication required', 401);
         }
 
-        // Check if slug is already taken
-        const { data: existingMap } = await supabase
+        const supabase = await createServerClientWithAuth(cookies());
+        
+        // Validate request body
+        const validation = await validateRequestBody(req, updateMapSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const body = validation.data;
+
+        // Check if user owns the map
+        const { data: map, error: mapError } = await supabase
           .from('map')
-          .select('id')
-          .eq('custom_slug', body.custom_slug)
-          .neq('id', id)
+          .select('account_id')
+          .eq('id', validatedId)
           .single();
 
-        if (existingMap) {
-          return createErrorResponse('Custom slug is already taken', 409);
+        if (mapError || !map) {
+          return createErrorResponse('Map not found', 404);
         }
-      }
-      updateData.custom_slug = body.custom_slug?.trim() || null;
-    }
 
-    if (body.tags !== undefined) {
-      // Validate tags structure - must be an array of objects with emoji and text
-      if (!Array.isArray(body.tags)) {
-        return createErrorResponse('Tags must be an array', 400);
-      }
-
-      for (const tag of body.tags) {
-        if (typeof tag !== 'object' || !tag.emoji || !tag.text) {
-          return createErrorResponse('Each tag must have emoji and text properties', 400);
+        const mapData = map as { id: string; account_id: string };
+        if (accountId !== mapData.account_id) {
+          return createErrorResponse('Forbidden - you do not own this map', 403);
         }
-        if (typeof tag.emoji !== 'string' || typeof tag.text !== 'string') {
-          return createErrorResponse('Tag emoji and text must be strings', 400);
+
+        // Build update data
+        const updateData: Partial<Database['public']['Tables']['map']['Update']> = {};
+
+        if (body.title !== undefined) {
+          updateData.title = body.title.trim();
         }
+
+        if (body.description !== undefined) {
+          updateData.description = body.description?.trim() || null;
+        }
+
+        if (body.visibility !== undefined) {
+          updateData.visibility = body.visibility;
+        }
+
+        if (body.map_style !== undefined) {
+          updateData.map_style = body.map_style;
+        }
+
+        if (body.meta !== undefined) {
+          updateData.meta = body.meta;
+        }
+
+        if (body.type !== undefined) {
+          updateData.type = body.type || null;
+        }
+
+        if (body.custom_slug !== undefined) {
+          // Check if user has pro account for custom_slug
+          const { data: account } = await supabase
+            .from('accounts')
+            .select('plan')
+            .eq('id', accountId)
+            .single();
+
+          const accountData = account as { plan: string } | null;
+          if (body.custom_slug && accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
+            return createErrorResponse('Custom slugs are only available for pro accounts', 403);
+          }
+
+          if (body.custom_slug) {
+            // Check if slug is already taken
+            const { data: existingMap } = await supabase
+              .from('map')
+              .select('id')
+              .eq('custom_slug', body.custom_slug)
+              .neq('id', validatedId)
+              .single();
+
+            if (existingMap) {
+              return createErrorResponse('Custom slug is already taken', 409);
+            }
+          }
+          updateData.custom_slug = body.custom_slug?.trim() || null;
+        }
+
+        if (body.tags !== undefined) {
+          updateData.tags = body.tags;
+        }
+
+        const { data: updatedMap, error: updateError } = await (supabase
+          .from('map') as any)
+          .update(updateData)
+          .eq('id', validatedId)
+          .select(`
+            id,
+            account_id,
+            title,
+            description,
+            visibility,
+            map_style,
+            type,
+            custom_slug,
+            tags,
+            meta,
+            created_at,
+            updated_at
+          `)
+          .single();
+
+        if (updateError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Maps API] Error updating map:', updateError);
+          }
+          return createErrorResponse('Failed to update map', 500);
+        }
+
+        return createSuccessResponse(updatedMap);
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Maps API] Error:', error);
+        }
+        return createErrorResponse('Internal server error', 500);
       }
-
-      updateData.tags = body.tags;
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    const { data: updatedMap, error: updateError } = await (supabase
-      .from('map') as any)
-      .update(updateData)
-      .eq('id', id)
-      .select(`
-        id,
-        account_id,
-        title,
-        description,
-        visibility,
-        map_style,
-        type,
-        custom_slug,
-        tags,
-        meta,
-        created_at,
-        updated_at
-      `)
-      .single();
-
-    if (updateError) {
-      console.error('[Maps API] Error updating map:', updateError);
-      return createErrorResponse('Failed to update map', 500, updateError.message);
-    }
-
-    return createSuccessResponse(updatedMap);
-  } catch (error) {
-    console.error('[Maps API] Error:', error);
-    return createErrorResponse(
-      'Internal server error',
-      500,
-      error instanceof Error ? error.message : undefined
-    );
-  }
+  );
 }
 
 /**
  * DELETE /api/maps/[id]
  * Delete a map (owner only)
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated)
+ * - Path parameter validation
+ * - Requires authentication
+ * - Ownership check required
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
-    const { id } = await params;
-    const auth = await getServerAuth();
-    
-    if (!auth) {
-      return createErrorResponse('Unauthorized - authentication required', 401);
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const { id } = await params;
+        
+        // Validate path parameters
+        const pathValidation = validatePathParams({ id }, mapIdPathSchema);
+        if (!pathValidation.success) {
+          return pathValidation.error;
+        }
+        
+        const { id: validatedId } = pathValidation.data;
+        
+        if (!userId || !accountId) {
+          return createErrorResponse('Unauthorized - authentication required', 401);
+        }
+
+        const supabase = await createServerClientWithAuth(cookies());
+
+        // Check if user owns the map
+        const { data: map, error: mapError } = await supabase
+          .from('map')
+          .select('account_id')
+          .eq('id', validatedId)
+          .single();
+
+        if (mapError || !map) {
+          return createErrorResponse('Map not found', 404);
+        }
+
+        const mapDataDelete = map as { id: string; account_id: string };
+        if (accountId !== mapDataDelete.account_id) {
+          return createErrorResponse('Forbidden - you do not own this map', 403);
+        }
+
+        // Delete map
+        const { error: deleteError } = await supabase
+          .from('map')
+          .delete()
+          .eq('id', validatedId);
+
+        if (deleteError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Maps API] Error deleting map:', deleteError);
+          }
+          return createErrorResponse('Failed to delete map', 500);
+        }
+
+        return createSuccessResponse({ success: true });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Maps API] Error:', error);
+        }
+        return createErrorResponse('Internal server error', 500);
+      }
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    const supabase = await createServerClientWithAuth(cookies());
-
-    // Check if user owns the map
-    const { data: map, error: mapError } = await supabase
-      .from('map')
-      .select('account_id')
-      .eq('id', id)
-      .single();
-
-    if (mapError || !map) {
-      return createErrorResponse('Map not found', 404);
-    }
-
-    // Get user's account and verify ownership
-    let accountId: string;
-    try {
-      accountId = await getAccountIdForUser(auth, supabase);
-    } catch (error) {
-      return createErrorResponse(
-        error instanceof Error ? error.message : 'Account not found',
-        404
-      );
-    }
-
-    const mapDataDelete = map as { id: string; account_id: string };
-    if (accountId !== mapDataDelete.account_id) {
-      return createErrorResponse('Forbidden - you do not own this map', 403);
-    }
-
-    // Delete map
-    const { error: deleteError } = await supabase
-      .from('map')
-      .delete()
-      .eq('id', id);
-
-    if (deleteError) {
-      console.error('[Maps API] Error deleting map:', deleteError);
-      return createErrorResponse('Failed to delete map', 500, deleteError.message);
-    }
-
-    return createSuccessResponse({ success: true });
-  } catch (error) {
-    console.error('[Maps API] Error:', error);
-    return createErrorResponse(
-      'Internal server error',
-      500,
-      error instanceof Error ? error.message : undefined
-    );
-  }
+  );
 }
 

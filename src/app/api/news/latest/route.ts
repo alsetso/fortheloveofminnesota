@@ -1,29 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLatestPrompt } from '@/features/news/services/newsService';
-import { checkRateLimit } from '@/lib/server/newsRateLimit';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 
+/**
+ * GET /api/news/latest
+ * Get latest news articles
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public) - increased from 10/min
+ * - Public endpoint - no authentication required
+ */
 export async function GET(request: NextRequest) {
-  try {
-    // Rate limiting: 10 requests per 60 seconds per IP (relaxed)
-    const rateLimit = checkRateLimit(request);
-    if (!rateLimit.allowed) {
-      const resetSeconds = Math.ceil((rateLimit.resetAt - Date.now()) / 1000);
-      return NextResponse.json(
-        { 
-          error: 'Rate limit exceeded. Please wait before making another request.',
-          retryAfter: resetSeconds,
-        },
-        { 
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': '10',
-            'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-            'X-RateLimit-Reset': new Date(rateLimit.resetAt).toISOString(),
-            'Retry-After': resetSeconds.toString(),
-          },
-        }
-      );
-    }
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
 
     let latestPrompt: Awaited<ReturnType<typeof getLatestPrompt>>;
     try {
@@ -130,12 +121,6 @@ export async function GET(request: NextRequest) {
               generatedAt: apiResponse.generatedAt || latestPrompt.created_at,
               createdAt: latestPrompt.created_at,
             },
-          }, {
-            headers: {
-              'X-RateLimit-Limit': '10',
-              'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-              'X-RateLimit-Reset': new Date(rateLimit.resetAt).toISOString(),
-            },
           });
     } else {
       console.warn('[News Latest] RPC query failed or empty:', {
@@ -157,29 +142,32 @@ export async function GET(request: NextRequest) {
 
     const fallbackArticles = (apiResponse.articles || []) as any[];
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        articles: fallbackArticles,
-        count: fallbackArticles.length,
-        requestId: apiResponse.requestId,
-        query: apiResponse.query || latestPrompt.user_input,
-        generatedAt: apiResponse.generatedAt || latestPrompt.created_at,
-        createdAt: latestPrompt.created_at,
-      },
-    }, {
-      headers: {
-        'X-RateLimit-Limit': '10',
-        'X-RateLimit-Remaining': rateLimit.remaining.toString(),
-        'X-RateLimit-Reset': new Date(rateLimit.resetAt).toISOString(),
-      },
-    });
-  } catch (error) {
-    console.error('Error in GET /api/news/latest:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          success: true,
+          data: {
+            articles: fallbackArticles,
+            count: fallbackArticles.length,
+            requestId: apiResponse.requestId,
+            query: apiResponse.query || latestPrompt.user_input,
+            generatedAt: apiResponse.generatedAt || latestPrompt.created_at,
+            createdAt: latestPrompt.created_at,
+          },
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/news/latest:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

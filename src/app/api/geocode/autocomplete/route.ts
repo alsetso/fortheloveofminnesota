@@ -1,20 +1,34 @@
 /**
  * Address autocomplete API endpoint for Minnesota properties
  * Uses Mapbox Geocoding API for reliable address suggestions
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Query parameter validation
+ * - Request size limit
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
+
+const autocompleteQuerySchema = z.object({
+  q: z.string().min(3).max(200),
+});
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
-
-  if (!query || query.length < 3) {
-    return NextResponse.json(
-      { suggestions: [] },
-      { status: 200 }
-    );
-  }
+  return withSecurity(
+    request,
+    async (req) => {
+      // Validate query parameters
+      const url = new URL(req.url);
+      const validation = validateQueryParams(url.searchParams, autocompleteQuerySchema);
+      if (!validation.success) {
+        return validation.error;
+      }
+      
+      const { q: query } = validation.data;
 
   try {
     // Use Mapbox Geocoding API (designed for autocomplete, has generous free tier)
@@ -85,58 +99,67 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, 8);
     
-    return NextResponse.json({ suggestions });
-  } catch (error) {
-    console.error('Error fetching address autocomplete:', error);
-    
-    // Fallback: Generate pattern-based suggestions for testing
-    const patterns = [
-      { prefix: '', cities: ['Minneapolis', 'Saint Paul', 'Rochester', 'Duluth', 'Bloomington'] },
-      { prefix: 'Main', cities: ['Minneapolis', 'Saint Paul'] },
-      { prefix: 'Oak', cities: ['Minneapolis', 'Rochester'] },
-      { prefix: 'Lake', cities: ['Duluth', 'Minneapolis'] },
-      { prefix: 'Park', cities: ['Saint Paul', 'Rochester'] }
-    ];
-    
-    const queryLower = query.toLowerCase();
-    const matchingPatterns = patterns.filter(p => 
-      queryLower.includes(p.prefix.toLowerCase()) || p.prefix === ''
-    );
-    
-    const fallbackSuggestions: Array<{
-      text: string;
-      address: string;
-      city: string;
-      state: string;
-      zipcode: string;
-      zpid: null;
-    }> = [];
-    
-    matchingPatterns.forEach(pattern => {
-      pattern.cities.forEach((city, idx) => {
-        if (fallbackSuggestions.length < 8) {
-          const streetNum = Math.floor(Math.random() * 9000) + 1000;
-          const streets = ['Main St', 'Oak Ave', 'Lake St', 'Park Ave', 'Elm St'];
-          const street = streets[idx % streets.length];
-          const zips = ['55401', '55102', '55904', '55802', '55420'];
-          const zip = zips[idx % zips.length];
-          
-          fallbackSuggestions.push({
-            text: `${streetNum} ${street}, ${city}, MN ${zip}`,
-            address: `${streetNum} ${street}, ${city}, MN ${zip}`,
-            city: city,
-            state: 'MN',
-            zipcode: zip,
-            zpid: null
-          });
-        }
+      return NextResponse.json({ suggestions });
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching address autocomplete:', error);
+      }
+      
+      // Fallback: Generate pattern-based suggestions for testing
+      const patterns = [
+        { prefix: '', cities: ['Minneapolis', 'Saint Paul', 'Rochester', 'Duluth', 'Bloomington'] },
+        { prefix: 'Main', cities: ['Minneapolis', 'Saint Paul'] },
+        { prefix: 'Oak', cities: ['Minneapolis', 'Rochester'] },
+        { prefix: 'Lake', cities: ['Duluth', 'Minneapolis'] },
+        { prefix: 'Park', cities: ['Saint Paul', 'Rochester'] }
+      ];
+      
+      const queryLower = query.toLowerCase();
+      const matchingPatterns = patterns.filter(p => 
+        queryLower.includes(p.prefix.toLowerCase()) || p.prefix === ''
+      );
+      
+      const fallbackSuggestions: Array<{
+        text: string;
+        address: string;
+        city: string;
+        state: string;
+        zipcode: string;
+        zpid: null;
+      }> = [];
+      
+      matchingPatterns.forEach(pattern => {
+        pattern.cities.forEach((city, idx) => {
+          if (fallbackSuggestions.length < 8) {
+            const streetNum = Math.floor(Math.random() * 9000) + 1000;
+            const streets = ['Main St', 'Oak Ave', 'Lake St', 'Park Ave', 'Elm St'];
+            const street = streets[idx % streets.length];
+            const zips = ['55401', '55102', '55904', '55802', '55420'];
+            const zip = zips[idx % zips.length];
+            
+            fallbackSuggestions.push({
+              text: `${streetNum} ${street}, ${city}, MN ${zip}`,
+              address: `${streetNum} ${street}, ${city}, MN ${zip}`,
+              city: city,
+              state: 'MN',
+              zipcode: zip,
+              zpid: null
+            });
+          }
+        });
       });
-    });
-    
-    return NextResponse.json({ 
-      suggestions: fallbackSuggestions.filter(s => 
-        s.text.toLowerCase().includes(queryLower)
-      ).slice(0, 8)
-    });
-  }
+      
+      return NextResponse.json({ 
+        suggestions: fallbackSuggestions.filter(s => 
+          s.text.toLowerCase().includes(queryLower)
+        ).slice(0, 8)
+      });
+    }
+    },
+    {
+      rateLimit: 'public', // 100 requests/minute
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }

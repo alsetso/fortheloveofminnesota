@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { XMarkIcon, ChevronDownIcon, ChevronUpIcon, ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronDownIcon, ChevronUpIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { 
   UserIcon, 
   ClockIcon, 
@@ -24,7 +24,6 @@ import { useAccountData } from '@/features/account/hooks/useAccountData';
 import type { AccountTabId } from '@/features/account/types';
 import AnalyticsClient from '@/features/account/components/AnalyticsClient';
 import SettingsClient from '@/features/account/components/SettingsClient';
-import ProfilesClient from '@/features/account/components/ProfilesClient';
 import OnboardingClient from '@/features/account/components/OnboardingClient';
 import { isAccountComplete } from '@/lib/accountCompleteness';
 import { checkOnboardingStatus } from '@/lib/onboardingCheck';
@@ -105,21 +104,9 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
       { id: 'settings', label: 'Settings', icon: UserIcon },
     ];
     
-    // Only include profiles tab if user is admin
-    if (currentAccount?.role === 'admin') {
-      baseTabs.push({ id: 'profiles', label: 'Profiles', icon: UserGroupIcon });
-    }
-    
     return baseTabs;
   }, [accountComplete, currentAccount?.role]);
   
-  // Redirect away from profiles tab if user is not admin
-  useEffect(() => {
-    if (activeTab === 'profiles' && currentAccount?.role !== 'admin') {
-      setActiveTab('settings');
-    }
-  }, [activeTab, currentAccount?.role, setActiveTab]);
-
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -142,8 +129,13 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
             credentials: 'include',
           });
           if (response.ok) {
-            const data = await response.json();
-            setAllAccounts(data.accounts || []);
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const data = await response.json();
+              setAllAccounts(data.accounts || []);
+            } else {
+              console.error('[LiveAccountModal] Expected JSON response but got:', contentType);
+            }
           }
         } catch (error) {
           console.error('[LiveAccountModal] Error fetching accounts:', error);
@@ -479,7 +471,6 @@ export default function LiveAccountModal({ isOpen, onClose, initialTab }: LiveAc
               <>
                 {activeTab === 'analytics' && <AnalyticsClient />}
                 {activeTab === 'settings' && currentAccount && <SettingsClient initialAccount={currentAccount} userEmail={currentUserEmail} />}
-                {activeTab === 'profiles' && <ProfilesClient />}
               </>
             )}
           </div>

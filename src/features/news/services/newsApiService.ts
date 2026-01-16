@@ -4,13 +4,17 @@
  */
 
 import type { NewsArticleRaw, NewsResponse, NewsApiParams, NewsArticle } from '@/types/news';
+import { getApiKey } from '@/lib/security/apiKeys';
 
 /**
  * Fetch news from RapidAPI
  */
 export async function fetchNewsFromRapidAPI(params: NewsApiParams): Promise<NewsResponse> {
-  const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-  if (!apiKey) {
+  // Get server-only API key
+  let apiKey: string;
+  try {
+    apiKey = getApiKey('RAPIDAPI');
+  } catch (error) {
     throw new Error('RapidAPI key not configured');
   }
 

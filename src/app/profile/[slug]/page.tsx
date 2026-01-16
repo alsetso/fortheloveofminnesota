@@ -119,7 +119,7 @@ export default async function ProfilePage({ params }: Props) {
   // For visitors, only show public mentions; for owners, show all non-archived mentions
   let mentionsQuery = supabase
     .from('mentions')
-    .select('id, lat, lng, description, visibility, city_id, collection_id, created_at, updated_at')
+    .select('id, lat, lng, description, visibility, city_id, collection_id, image_url, video_url, media_type, created_at, updated_at')
     .eq('account_id', accountData.id)
     .eq('archived', false)
     .order('created_at', { ascending: false });
@@ -139,6 +139,9 @@ export default async function ProfilePage({ params }: Props) {
     visibility: 'public' | 'only_me';
     city_id: string | null;
     collection_id: string | null;
+    image_url: string | null;
+    video_url: string | null;
+    media_type: 'image' | 'video' | 'none' | null;
     created_at: string;
     updated_at: string;
   }) => ({
@@ -148,6 +151,9 @@ export default async function ProfilePage({ params }: Props) {
     description: mention.description,
     collection_id: mention.collection_id,
     visibility: mention.visibility || 'public',
+    image_url: mention.image_url || null,
+    video_url: mention.video_url || null,
+    media_type: mention.media_type || 'none',
     created_at: mention.created_at,
     updated_at: mention.updated_at,
   }));

@@ -38,142 +38,61 @@ export interface SkipTraceSearchParams {
 export class SkipTraceService {
   private static readonly RAPIDAPI_HOST = 'skip-tracing-working-api.p.rapidapi.com';
   
-  private static getRapidApiKey(): string {
-    if (typeof window !== 'undefined') {
-      // Client-side: use public env var
-      return process.env.NEXT_PUBLIC_RAPIDAPI_KEY || '';
+  /**
+   * Call proxy API route (client-side)
+   */
+  private static async callProxyAPI(type: 'name' | 'address' | 'phone' | 'email' | 'person', params: Record<string, string | number>): Promise<Record<string, unknown>> {
+    const response = await fetch('/api/proxy/skip-trace/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ type, ...params }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `API error: ${response.status}`;
+      
+      // Check if it's a subscription error
+      if (errorData.isSubscriptionError || response.status === 403) {
+        const subscriptionError = new Error(errorMessage);
+        (subscriptionError as { isSubscriptionError?: boolean }).isSubscriptionError = true;
+        throw subscriptionError;
+      }
+      
+      throw new Error(errorMessage);
     }
-    // Server-side: also use public env var (since it's already public)
-    return process.env.NEXT_PUBLIC_RAPIDAPI_KEY || '';
+    
+    return response.json();
   }
 
   /**
    * Search by name
    */
   static async searchByName(name: string): Promise<Record<string, unknown>> {
-    const encodedName = encodeURIComponent(name);
-    const url = `https://${this.RAPIDAPI_HOST}/search/byname?name=${encodedName}&page=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': this.RAPIDAPI_HOST,
-        'x-rapidapi-key': this.getRapidApiKey(),
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      const errorMessage = `Name Search API error: ${response.status} - ${errorText}`;
-      
-      // Check if it's a subscription error
-      if (response.status === 403 || errorText.toLowerCase().includes('not subscribed')) {
-        const subscriptionError = new Error(errorMessage);
-        (subscriptionError as { isSubscriptionError?: boolean }).isSubscriptionError = true;
-        throw subscriptionError;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.callProxyAPI('name', { name, page: 1 });
   }
 
   /**
    * Search by address
    */
   static async searchByAddress(street: string, citystatezip: string): Promise<Record<string, unknown>> {
-    const encodedStreet = encodeURIComponent(street);
-    const encodedCityStateZip = encodeURIComponent(citystatezip);
-    const url = `https://${this.RAPIDAPI_HOST}/search/byaddress?street=${encodedStreet}&citystatezip=${encodedCityStateZip}&page=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': this.RAPIDAPI_HOST,
-        'x-rapidapi-key': this.getRapidApiKey(),
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      const errorMessage = `Address Search API error: ${response.status} - ${errorText}`;
-      
-      // Check if it's a subscription error
-      if (response.status === 403 || errorText.toLowerCase().includes('not subscribed')) {
-        const subscriptionError = new Error(errorMessage);
-        (subscriptionError as { isSubscriptionError?: boolean }).isSubscriptionError = true;
-        throw subscriptionError;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.callProxyAPI('address', { street, citystatezip, page: 1 });
   }
 
   /**
    * Search by phone
    */
   static async searchByPhone(phone: string): Promise<Record<string, unknown>> {
-    const encodedPhone = encodeURIComponent(phone);
-    const url = `https://${this.RAPIDAPI_HOST}/search/byphone?phoneno=${encodedPhone}&page=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': this.RAPIDAPI_HOST,
-        'x-rapidapi-key': this.getRapidApiKey(),
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      const errorMessage = `Phone Search API error: ${response.status} - ${errorText}`;
-      
-      // Check if it's a subscription error
-      if (response.status === 403 || errorText.toLowerCase().includes('not subscribed')) {
-        const subscriptionError = new Error(errorMessage);
-        (subscriptionError as { isSubscriptionError?: boolean }).isSubscriptionError = true;
-        throw subscriptionError;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.callProxyAPI('phone', { phone, page: 1 });
   }
 
   /**
    * Search by email
    */
   static async searchByEmail(email: string): Promise<Record<string, unknown>> {
-    const encodedEmail = encodeURIComponent(email);
-    const url = `https://${this.RAPIDAPI_HOST}/search/byemail?email=${encodedEmail}&phone=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-host': this.RAPIDAPI_HOST,
-        'x-rapidapi-key': this.getRapidApiKey(),
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      const errorMessage = `Email Search API error: ${response.status} - ${errorText}`;
-      
-      // Check if it's a subscription error
-      if (response.status === 403 || errorText.toLowerCase().includes('not subscribed')) {
-        const subscriptionError = new Error(errorMessage);
-        (subscriptionError as { isSubscriptionError?: boolean }).isSubscriptionError = true;
-        throw subscriptionError;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
+    return this.callProxyAPI('email', { email });
   }
 
   /**

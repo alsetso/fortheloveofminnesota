@@ -1,17 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabaseServer';
 import type { NewsArticle } from '@/types/news';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validatePathParams } from '@/lib/security/validation';
+import { z } from 'zod';
 
 /**
  * GET /api/news/[id]
  * Fetch a single news article by article_id
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Path parameter validation
+ * - Public endpoint - no authentication required
  */
+const newsIdPathSchema = z.object({
+  id: z.string().min(1).max(200),
+});
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  try {
-    const articleId = params.id;
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
+        // Validate path parameters
+        const pathValidation = validatePathParams(params, newsIdPathSchema);
+        if (!pathValidation.success) {
+          return pathValidation.error;
+        }
+        
+        const { id: articleId } = pathValidation.data;
     const supabase = createServiceClient();
 
     // Use RPC function to query by article_id
@@ -62,18 +83,27 @@ export async function GET(
       relatedTopics: article.related_topics || [],
     };
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        article: formattedArticle,
-      },
-    });
-  } catch (error) {
-    console.error('Error in GET /api/news/[id]:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          success: true,
+          data: {
+            article: formattedArticle,
+          },
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/news/[id]:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

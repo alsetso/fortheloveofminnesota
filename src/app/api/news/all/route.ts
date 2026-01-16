@@ -1,21 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabaseServer';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
+import { commonSchemas } from '@/lib/security/validation';
+
+/**
+ * GET /api/news/all
+ * Get all news articles with pagination
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (public)
+ * - Query parameter validation
+ * - Public endpoint - no authentication required
+ */
+const newsAllQuerySchema = z.object({
+  offset: z.coerce.number().int().nonnegative().default(0),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+});
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const offsetParam = searchParams.get('offset');
-    const limitParam = searchParams.get('limit');
-
-    const offset = offsetParam ? parseInt(offsetParam, 10) : 0;
-    const limit = limitParam ? parseInt(limitParam, 10) : 10;
-
-    if (offset < 0 || limit < 1 || limit > 100) {
-      return NextResponse.json(
-        { error: 'Invalid offset or limit. Limit must be between 1 and 100.' },
-        { status: 400 }
-      );
-    }
+  return withSecurity(
+    request,
+    async (req) => {
+      try {
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, newsAllQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { offset, limit } = validation.data;
 
     const supabase = createServerClient();
 
@@ -60,24 +75,33 @@ export async function GET(request: NextRequest) {
     const total = count || 0;
     const hasMore = offset + limit < total;
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        articles,
-        pagination: {
-          offset,
-          limit,
-          total,
-          hasMore,
-        },
-      },
-    });
-  } catch (error) {
-    console.error('Error in GET /api/news/all:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({
+          success: true,
+          data: {
+            articles,
+            pagination: {
+              offset,
+              limit,
+              total,
+              hasMore,
+            },
+          },
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/news/all:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'public',
+      requireAuth: false,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

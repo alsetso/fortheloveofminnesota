@@ -17,6 +17,9 @@ export interface ProfilePin {
   description: string | null;
   collection_id: string | null;
   visibility: PinVisibility;
+  image_url?: string | null;
+  video_url?: string | null;
+  media_type?: 'image' | 'video' | 'none';
   created_at: string;
   updated_at: string;
 }

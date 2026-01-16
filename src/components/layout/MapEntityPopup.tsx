@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { XMarkIcon, MapPinIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import Link from 'next/link';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -318,19 +319,14 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Handle bar - hidden on desktop */}
-        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
-          <div className={`w-12 h-1 rounded-full ${useBlurStyle ? 'bg-white/40' : 'bg-gray-300'}`} />
-        </div>
-
         {/* Header */}
-        <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
+        <div className={`flex items-center justify-between px-3 py-1.5 border-b flex-shrink-0 ${
           useBlurStyle ? 'border-white/20' : 'border-gray-200'
         }`}>
-          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+          <h2 className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
             {type === 'pin' ? 'Mention' : type === 'atlas' ? (data?.name || 'Location') : 'Location'}
           </h2>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {/* Three dots menu - only show for owner's mentions */}
             {isOwner && (
               <div className="relative" ref={menuRef}>
@@ -344,7 +340,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                   aria-label="More options"
                   disabled={isDeleting}
                 >
-                  <EllipsisVerticalIcon className="w-5 h-5" />
+                  <EllipsisVerticalIcon className="w-4 h-4" />
                 </button>
                 {showMenu && (
                   <div className={`absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[120px] ${
@@ -382,14 +378,14 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             )}
             <button
               onClick={handleClose}
-              className={`p-1 -mr-1 transition-colors ${
+              className={`p-1 transition-colors ${
                 useWhiteText 
                   ? 'text-white/80 hover:text-white' 
                   : 'text-gray-500 hover:text-gray-900'
               }`}
               aria-label="Close"
             >
-              <XMarkIcon className="w-5 h-5" />
+              <XMarkIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -402,59 +398,106 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             {type === 'pin' && (
               <>
                 {data.account && (
-                  <div className="flex items-center gap-2">
-                    {/* Profile image - always shown */}
-                    <div className={`w-8 h-8 rounded-full overflow-hidden ${
-                      (data.account.plan === 'pro' || data.account.plan === 'plus')
-                        ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-                        : useTransparentUI
-                        ? 'border border-white/30'
-                        : 'border border-gray-200'
-                    }`}>
-                      <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                        {data.account.image_url ? (
-                          <Image
-                            src={data.account.image_url}
-                            alt={data.account.username || 'User'}
-                            width={32}
-                            height={32}
-                            className="w-full h-full rounded-full object-cover"
-                            unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
-                          />
-                        ) : (
-                          <div className={`w-full h-full rounded-full flex items-center justify-center ${
-                            useTransparentUI ? 'bg-white/20' : 'bg-gray-100'
-                          }`}>
-                            <span className={`text-xs font-medium ${
-                              useWhiteText ? 'text-white' : 'text-gray-600'
-                            }`}>
-                              {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
-                            </span>
+                  <>
+                    {user && data.account.username ? (
+                      // Authenticated with username: clickable button container
+                      <Link
+                        href={`/profile/${encodeURIComponent(data.account.username)}`}
+                        onClick={onClose}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
+                          useTransparentUI
+                            ? 'bg-white/10 hover:bg-white/20 border border-white/20'
+                            : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
+                        }`}
+                      >
+                        {/* Profile image */}
+                        <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
+                          (data.account.plan === 'pro' || data.account.plan === 'plus')
+                            ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                            : 'border border-gray-200'
+                        }`}>
+                          <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                            {data.account.image_url ? (
+                              <Image
+                                src={data.account.image_url}
+                                alt={data.account.username || 'User'}
+                                width={28}
+                                height={28}
+                                className="w-full h-full rounded-full object-cover"
+                                unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
+                              />
+                            ) : (
+                              <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
+                                <span className="text-[10px] font-medium text-gray-600">
+                                  {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      {user ? (
-                        // Authenticated: show username
-                        <div className={`text-xs font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-                          {data.account.username || `${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
                         </div>
-                      ) : (
-                        // Unauthorized: show sign in prompt
-                        <button
-                          onClick={openWelcome}
-                          className={`text-xs font-medium transition-colors text-left ${
-                            useWhiteText 
-                              ? 'text-white/80 hover:text-white' 
-                              : 'text-gray-600 hover:text-gray-900'
-                          }`}
-                        >
-                          Sign in to see who posted
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                        {/* Username */}
+                        <span className={`text-xs font-medium truncate ${
+                          useWhiteText ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {data.account.username}
+                        </span>
+                      </Link>
+                    ) : user ? (
+                      // Authenticated without username: non-clickable container
+                      <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md ${
+                        useTransparentUI
+                          ? 'bg-white/10 border border-white/20'
+                          : 'bg-gray-50 border border-gray-200'
+                      }`}>
+                        {/* Profile image */}
+                        <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
+                          (data.account.plan === 'pro' || data.account.plan === 'plus')
+                            ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                            : 'border border-gray-200'
+                        }`}>
+                          <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                            {data.account.image_url ? (
+                              <Image
+                                src={data.account.image_url}
+                                alt="User"
+                                width={28}
+                                height={28}
+                                className="w-full h-full rounded-full object-cover"
+                                unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
+                              />
+                            ) : (
+                              <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
+                                <span className="text-[10px] font-medium text-gray-600">
+                                  {data.account.first_name?.[0]?.toUpperCase() || 'U'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {/* Name */}
+                        <span className={`text-xs font-medium truncate ${
+                          useWhiteText ? 'text-white' : 'text-gray-900'
+                        }`}>
+                          {`${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
+                        </span>
+                      </div>
+                    ) : (
+                      // Unauthenticated: sign in button
+                      <button
+                        onClick={openWelcome}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors w-full text-left ${
+                          useTransparentUI
+                            ? 'bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white'
+                            : 'bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] font-medium text-gray-500">?</span>
+                        </div>
+                        <span className="text-xs font-medium">Sign in to see who posted</span>
+                      </button>
+                    )}
+                  </>
                 )}
                 {isEditing ? (
                   <div className="space-y-2">

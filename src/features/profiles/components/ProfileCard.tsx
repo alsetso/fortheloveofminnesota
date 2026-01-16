@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserIcon, PhoneIcon, PencilIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import { UserIcon, PhoneIcon, PencilIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
 import { getDisplayName, formatJoinDate, TRAIT_OPTIONS } from '@/types/profile';
 import { AccountService } from '@/features/auth';
@@ -12,6 +12,7 @@ import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/features/auth';
 import ProfileEditModal from './ProfileEditModal';
+import SeeProfileImageModal from './SeeProfileImageModal';
 
 interface ProfileCardProps {
   account: ProfileAccount;
@@ -27,6 +28,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+  const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
   
   // Hide "View Profile" button if we're already on the profile page
   const isOnProfilePage = pathname?.startsWith('/profile/');
@@ -159,7 +161,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
             (account.plan === 'pro' || account.plan === 'plus')
               ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
               : 'border border-gray-200'
-          }`}>
+          } ${!isOwnProfile && account.image_url ? 'cursor-pointer' : ''}`}>
             <div className="w-full h-full rounded-full overflow-hidden bg-white">
               {account.image_url ? (
                 <Image
@@ -176,7 +178,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
                 </div>
               )}
             </div>
-            {isOwnProfile && (
+            {isOwnProfile ? (
               <>
                 <input
                   ref={profileInputRef}
@@ -200,7 +202,14 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
                   )}
                 </button>
               </>
-            )}
+            ) : account.image_url ? (
+              <button
+                onClick={() => setIsProfileImageModalOpen(true)}
+                className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors opacity-0 group-hover:opacity-100 rounded-full"
+              >
+                <EyeIcon className="w-4 h-4 text-white" />
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -298,6 +307,17 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
           onClose={() => setIsEditModalOpen(false)}
           account={account}
           onAccountUpdate={handleAccountUpdate}
+        />
+      )}
+
+      {/* Profile Image View Modal */}
+      {!isOwnProfile && account.image_url && (
+        <SeeProfileImageModal
+          isOpen={isProfileImageModalOpen}
+          onClose={() => setIsProfileImageModalOpen(false)}
+          imageUrl={account.image_url}
+          displayName={displayName}
+          username={account.username}
         />
       )}
     </>

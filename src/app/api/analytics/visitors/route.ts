@@ -3,22 +3,43 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
 import type { Visitor } from '@/types/analytics';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validateQueryParams } from '@/lib/security/validation';
+import { z } from 'zod';
+import { commonSchemas } from '@/lib/security/validation';
+
+/**
+ * GET /api/analytics/visitors
+ * Get visitors for a page or mention
+ * 
+ * Security:
+ * - Rate limited: 200 requests/minute (authenticated)
+ * - Requires authentication
+ * - Query parameter validation
+ */
+const visitorsQuerySchema = z.object({
+  page_url: z.string().url().max(2000).optional(),
+  mention_id: commonSchemas.uuid.optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  offset: z.coerce.number().int().nonnegative().default(0),
+}).refine(
+  (data) => data.page_url || data.mention_id,
+  { message: 'Either page_url or mention_id is required' }
+);
 
 export async function GET(request: NextRequest) {
-  try {
-    const cookieStore = await cookies();
-    const searchParams = request.nextUrl.searchParams;
-    const page_url = searchParams.get('page_url');
-    const mention_id = searchParams.get('mention_id');
-    const limit = parseInt(searchParams.get('limit') || '50', 10);
-    const offset = parseInt(searchParams.get('offset') || '0', 10);
-
-    if (!page_url && !mention_id) {
-      return NextResponse.json(
-        { error: 'Either page_url or mention_id is required' },
-        { status: 400 }
-      );
-    }
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const url = new URL(req.url);
+        const validation = validateQueryParams(url.searchParams, visitorsQuerySchema);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const { page_url, mention_id, limit, offset } = validation.data;
+        const cookieStore = await cookies();
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -120,17 +141,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const visitorsArray = (visitors || []) as Visitor[];
-    return NextResponse.json({
-      visitors: visitorsArray,
-      total: visitorsArray.length,
-    });
-  } catch (error) {
-    console.error('Error in GET /api/analytics/visitors:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+        const visitorsArray = (visitors || []) as Visitor[];
+        return NextResponse.json({
+          visitors: visitorsArray,
+          total: visitorsArray.length,
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error in GET /api/analytics/visitors:', error);
+        }
+        return NextResponse.json(
+          { error: 'Internal server error' },
+          { status: 500 }
+        );
+      }
+    },
+    {
+      rateLimit: 'authenticated',
+      requireAuth: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
+    }
+  );
 }
 

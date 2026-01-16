@@ -53,16 +53,19 @@ export class CreditsExhaustedError extends Error {
 export const apiService = {
   async callZillowAPI(address: { street: string; city: string; state: string; zip: string }): Promise<unknown> {
     const fullAddress = `${address.street} ${address.city} ${address.state} ${address.zip}`;
-    const encodedAddress = encodeURIComponent(fullAddress);
-    const url = `${apiConfig.zillow.endpoint}?address=${encodedAddress}`;
     
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getApiHeaders('zillow')
+    // Use proxy route instead of direct API call
+    const response = await fetch('/api/proxy/zillow/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ address: fullAddress }),
     });
 
     if (!response.ok) {
-      throw new Error(`Zillow API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || `Zillow API error: ${response.status}`);
     }
 
     return response.json();
@@ -75,20 +78,27 @@ export const apiService = {
     }
     
     const cityStateZip = `${address.city}, ${address.state} ${address.zip}`;
-    const encodedStreet = encodeURIComponent(address.street);
-    const encodedCityStateZip = encodeURIComponent(cityStateZip);
-    const url = `${apiConfig.skipTrace.endpoint}?street=${encodedStreet}&citystatezip=${encodedCityStateZip}&page=1`;
     
+    // Use proxy route instead of direct API call
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: getApiHeaders('skipTrace')
+      const response = await fetch('/api/proxy/skip-trace/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'address',
+          street: address.street,
+          citystatezip: cityStateZip,
+          page: 1,
+        }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`Skip Trace API error: ${response.status} - ${response.statusText}`, errorText);
-        throw new Error(`Skip Trace API error: ${response.status} - ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || errorData.error || `Skip Trace API error: ${response.status}`;
+        console.error(`Skip Trace API error: ${response.status}`, errorMessage);
+        throw new Error(errorMessage);
       }
 
       return response.json();
@@ -128,30 +138,39 @@ export const apiService = {
   },
 
   async callPersonAPI(personId: string, retryCount = 0): Promise<unknown> {
-    // Check and record API usage (only on first attempt, not retries)
-    if (retryCount === 0) {
-      // Usage tracking removed
-    }
-    const url = `https://skip-tracing-working-api.p.rapidapi.com/search/detailsbyID?peo_id=${personId}`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getApiHeaders('skipTrace')
-    });
+    // Use proxy route instead of direct API call
+    try {
+      const response = await fetch('/api/proxy/skip-trace/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'person',
+          personId,
+        }),
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        if (retryCount < 3) {
-          const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return this.callPersonAPI(personId, retryCount + 1);
+      if (!response.ok) {
+        if (response.status === 429) {
+          if (retryCount < 3) {
+            const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return this.callPersonAPI(personId, retryCount + 1);
+          }
+          throw new Error(`Person API rate limit exceeded (429). Please wait before making another request.`);
         }
-        throw new Error(`Person API rate limit exceeded (429). Please wait before making another request.`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || `Person API error: ${response.status}`);
       }
-      throw new Error(`Person API error: ${response.status}`);
-    }
 
-    return response.json();
+      return response.json();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('rate limit')) {
+        throw error; // Re-throw rate limit errors
+      }
+      throw error;
+    }
   },
 
   async callNameSearchAPI(name: { firstName: string; middleInitial?: string; lastName: string }): Promise<unknown> {
@@ -160,48 +179,65 @@ export const apiService = {
       ? `${name.firstName} ${name.middleInitial} ${name.lastName}`
       : `${name.firstName} ${name.lastName}`;
     
-    const encodedName = encodeURIComponent(fullName);
-    const url = `https://skip-tracing-working-api.p.rapidapi.com/search/byname?name=${encodedName}&page=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getApiHeaders('skipTrace')
+    // Use proxy route instead of direct API call
+    const response = await fetch('/api/proxy/skip-trace/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'name',
+        name: fullName,
+        page: 1,
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Name Search API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || `Name Search API error: ${response.status}`);
     }
 
     return response.json();
   },
 
   async callEmailSearchAPI(email: string): Promise<unknown> {
-    const encodedEmail = encodeURIComponent(email);
-    const url = `https://skip-tracing-working-api.p.rapidapi.com/search/byemail?email=${encodedEmail}&phone=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getApiHeaders('skipTrace')
+    // Use proxy route instead of direct API call
+    const response = await fetch('/api/proxy/skip-trace/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'email',
+        email,
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Email Search API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || `Email Search API error: ${response.status}`);
     }
 
     return response.json();
   },
 
   async callPhoneSearchAPI(phone: string): Promise<unknown> {
-    const encodedPhone = encodeURIComponent(phone);
-    const url = `https://skip-tracing-working-api.p.rapidapi.com/search/byphone?phoneno=${encodedPhone}&page=1`;
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getApiHeaders('skipTrace')
+    // Use proxy route instead of direct API call
+    const response = await fetch('/api/proxy/skip-trace/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'phone',
+        phone,
+        page: 1,
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Phone Search API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || errorData.error || `Phone Search API error: ${response.status}`);
     }
 
     return response.json();

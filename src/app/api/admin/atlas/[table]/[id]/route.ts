@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabaseServer';
-import { requireAdmin } from '@/lib/adminHelpers';
+import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiError';
+import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import { validatePathParams } from '@/lib/security/validation';
+import { z } from 'zod';
+import { commonSchemas } from '@/lib/security/validation';
 
 // Valid atlas table names (matching URL parameter)
 const VALID_TABLES = [
@@ -18,55 +22,70 @@ const VALID_TABLES = [
   'airports',
   'roads',
   'radio_and_news',
-];
+] as const;
 
+const atlasTableIdPathSchema = z.object({
+  table: z.enum(VALID_TABLES),
+  id: commonSchemas.uuid,
+});
+
+/**
+ * DELETE /api/admin/atlas/[table]/[id]
+ * Delete atlas entity
+ * 
+ * Security:
+ * - Rate limited: 100 requests/minute (admin)
+ * - Path parameter validation
+ * - Requires admin role
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ table: string; id: string }> }
 ) {
-  try {
-    await requireAdmin();
-    const { table, id } = await params;
+  return withSecurity(
+    request,
+    async (req, { userId, accountId }) => {
+      try {
+        const { table, id } = await params;
+        
+        // Validate path parameters
+        const pathValidation = validatePathParams({ table, id }, atlasTableIdPathSchema);
+        if (!pathValidation.success) {
+          return pathValidation.error;
+        }
+        
+        const { table: validatedTable, id: validatedId } = pathValidation.data;
 
-    if (!table || !id) {
-      return NextResponse.json(
-        { error: 'Table name and ID are required' },
-        { status: 400 }
-      );
+        // Use service role client to bypass RLS
+        const supabase = createServiceClient();
+
+        // Delete from atlas schema table
+        const { error } = await (supabase as any)
+          .schema('atlas')
+          .from(validatedTable)
+          .delete()
+          .eq('id', validatedId);
+
+        if (error) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error(`[Admin Atlas API] Error deleting ${validatedTable}:`, error);
+          }
+          return createErrorResponse(`Failed to delete ${validatedTable}`, 500);
+        }
+
+        return createSuccessResponse({ success: true });
+      } catch (error) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Admin Atlas API] Error:', error);
+        }
+        return createErrorResponse('Internal server error', 500);
+      }
+    },
+    {
+      rateLimit: 'admin',
+      requireAdmin: true,
+      maxRequestSize: REQUEST_SIZE_LIMITS.json,
     }
-
-    if (!VALID_TABLES.includes(table)) {
-      return NextResponse.json(
-        { error: `Invalid table: ${table}` },
-        { status: 400 }
-      );
-    }
-
-    // Use service role client to bypass RLS
-    const supabase = createServiceClient();
-
-    // Delete from atlas schema table
-    const { error } = await (supabase as any)
-      .schema('atlas')
-      .from(table)
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error(`[Admin Atlas API] Error deleting ${table}:`, error);
-      return NextResponse.json(
-        { error: error.message || `Failed to delete ${table}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('[Admin Atlas API] Error:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
-      { status: 500 }
-    );
-  }
+  );
 }
 

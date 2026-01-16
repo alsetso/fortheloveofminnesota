@@ -13,7 +13,7 @@ const locationSearchSchema = z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }),
-  mapbox_data: z.record(z.unknown()),
+  mapbox_data: z.record(z.string(), z.unknown()),
   search_query: z.string().max(500).optional().nullable(),
   page_source: z.string().max(100).default('map'),
 });

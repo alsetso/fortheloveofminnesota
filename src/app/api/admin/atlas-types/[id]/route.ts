@@ -10,7 +10,7 @@ const atlasTypeIdPathSchema = z.object({
   id: commonSchemas.uuid,
 });
 
-const updateAtlasTypeSchema = z.record(z.unknown());
+const updateAtlasTypeSchema = z.record(z.string(), z.unknown());
 
 /**
  * PUT /api/admin/atlas-types/[id]

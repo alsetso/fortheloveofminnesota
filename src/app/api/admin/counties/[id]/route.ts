@@ -11,7 +11,7 @@ const countyIdPathSchema = z.object({
   id: commonSchemas.uuid,
 });
 
-const updateCountySchema = z.record(z.unknown());
+const updateCountySchema = z.record(z.string(), z.unknown());
 
 /**
  * GET /api/admin/counties/[id]

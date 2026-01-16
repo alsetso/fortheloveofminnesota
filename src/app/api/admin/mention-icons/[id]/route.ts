@@ -10,7 +10,7 @@ const mentionIconIdPathSchema = z.object({
   id: commonSchemas.uuid,
 });
 
-const updateMentionIconSchema = z.record(z.unknown());
+const updateMentionIconSchema = z.record(z.string(), z.unknown());
 
 /**
  * PUT /api/admin/mention-icons/[id]

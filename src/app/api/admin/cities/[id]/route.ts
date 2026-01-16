@@ -11,7 +11,7 @@ const cityIdPathSchema = z.object({
   id: commonSchemas.uuid,
 });
 
-const updateCitySchema = z.record(z.unknown());
+const updateCitySchema = z.record(z.string(), z.unknown());
 
 /**
  * GET /api/admin/cities/[id]

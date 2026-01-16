@@ -5,7 +5,7 @@ import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validateRequestBody } from '@/lib/security/validation';
 import { z } from 'zod';
 
-const createMentionIconSchema = z.record(z.unknown());
+const createMentionIconSchema = z.record(z.string(), z.unknown());
 
 /**
  * GET /api/admin/mention-icons

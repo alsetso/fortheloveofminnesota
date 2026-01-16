@@ -120,7 +120,7 @@ const updateMapSchema = z.object({
     emoji: z.string(),
     text: z.string(),
   })).max(20).optional(),
-  meta: z.record(z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function PUT(

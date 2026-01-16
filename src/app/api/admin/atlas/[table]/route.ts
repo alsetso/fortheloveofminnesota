@@ -29,7 +29,7 @@ const atlasTablePathSchema = z.object({
   table: z.enum(VALID_TABLES as [string, ...string[]]),
 });
 
-const createAtlasEntitySchema = z.record(z.unknown());
+const createAtlasEntitySchema = z.record(z.string(), z.unknown());
 
 /**
  * POST /api/admin/atlas/[table]

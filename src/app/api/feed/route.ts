@@ -53,7 +53,7 @@ const createPostSchema = z.object({
   zip: z.string().max(20).optional().nullable(),
   county: z.string().max(200).optional().nullable(),
   full_address: z.string().max(500).optional().nullable(),
-  map_data: z.record(z.unknown()).optional().nullable(),
+  map_data: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {

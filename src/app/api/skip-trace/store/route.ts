@@ -12,7 +12,7 @@ const storeSkipTraceSchema = z.object({
   city: z.string().min(1).max(200),
   state: z.string().length(2),
   zip: z.string().regex(/^\d{5}(-\d{4})?$/),
-  rawResponse: z.record(z.unknown()),
+  rawResponse: z.record(z.string(), z.unknown()),
   searchQuery: z.string().max(500).optional(),
   profileId: commonSchemas.uuid.optional(),
   latitude: z.number().min(-90).max(90).optional(),

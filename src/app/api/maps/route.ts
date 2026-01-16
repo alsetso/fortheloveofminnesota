@@ -140,7 +140,7 @@ const createMapSchema = z.object({
     emoji: z.string(),
     text: z.string(),
   })).max(20).default([]),
-  meta: z.record(z.unknown()).default({}),
+  meta: z.record(z.string(), z.unknown()).default({}),
 });
 
 export async function POST(request: NextRequest) {

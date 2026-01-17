@@ -21,7 +21,7 @@ export interface Mention {
   media_type?: 'image' | 'video' | 'none'; // Type of media attached to this mention
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
-  atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details (parks, schools, cities, etc.) when mention is created on an atlas pin
+  view_count?: number; // Total number of views for this mention
   created_at: string;
   updated_at: string;
   account?: {
@@ -51,7 +51,6 @@ export interface CreateMentionData {
   media_type?: 'image' | 'video' | 'none'; // Type of media attached to this mention
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
-  atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details when mention is created on an atlas pin
 }
 
 export interface MentionFilters {
@@ -59,7 +58,6 @@ export interface MentionFilters {
   city_id?: string; // Filter by city ID
   collection_id?: string; // Filter by collection ID
   year?: number; // Filter by year of post_date
-  atlas_entity_id?: string; // Filter by atlas entity ID (from atlas_meta->>'id')
   timeFilter?: '24h' | '7d'; // Filter by time: last 24 hours or 7 days
   bbox?: {
     minLat: number;

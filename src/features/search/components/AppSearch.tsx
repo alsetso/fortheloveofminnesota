@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react';
 import { usePathname } from 'next/navigation';
 import { MagnifyingGlassIcon, ClockIcon, XMarkIcon, MapPinIcon } from '@heroicons/react/24/outline';
-import { saveLocationSearch } from '@/features/location-searches/services/locationSearchService';
 import type { MapPin } from '@/types/map-pin';
 import type { MapboxMetadata } from '@/types/mapbox';
 
@@ -243,17 +242,6 @@ export default function AppSearch({
     setLocationSuggestions([]);
     setSelectedSuggestionIndex(-1);
     
-    // Save location search (background, non-blocking) - only on map or my-homes page with locations tag
-    if (isMapPage && activeSearchTypes.includes('locations')) {
-      saveLocationSearch({
-        place_name: suggestion.place_name,
-        coordinates: { lat, lng },
-        mapbox_data: suggestion,
-        search_query: query,
-        page_source: isMapPage ? 'map' : 'my-homes',
-      });
-    }
-    
     if (onLocationSelect) {
       onLocationSelect({ lat, lng }, suggestion.place_name, suggestion as unknown as MapboxMetadata);
     }
@@ -328,6 +316,7 @@ export default function AppSearch({
       return () => clearTimeout(timer);
     } else {
       setIsAnimating(false);
+      return undefined;
     }
   }, [isFullScreen]);
 

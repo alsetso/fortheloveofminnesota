@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 interface LayerRecordPopupProps {
   isOpen: boolean;
@@ -16,14 +16,18 @@ interface LayerRecordPopupProps {
     color: string;
   } | null;
   onAddMention?: (coordinates: { lat: number; lng: number }) => void;
+  infoText?: string;
 }
 
 /**
  * Popup that displays layer record data with a map showing the geometry
  */
-export default function LayerRecordPopup({ isOpen, onClose, record, onAddMention }: LayerRecordPopupProps) {
+export default function LayerRecordPopup({ isOpen, onClose, record, onAddMention, infoText }: LayerRecordPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const infoRef = useRef<HTMLDivElement>(null);
+  const infoButtonRef = useRef<HTMLButtonElement>(null);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
@@ -69,6 +73,27 @@ export default function LayerRecordPopup({ isOpen, onClose, record, onAddMention
     };
   }, [isOpen]);
 
+  // Close info popup when clicking outside
+  useEffect(() => {
+    if (!showInfo) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const clickedButton = 
+        infoButtonRef.current && infoButtonRef.current.contains(e.target as Node);
+      
+      if (
+        infoRef.current &&
+        !infoRef.current.contains(e.target as Node) &&
+        !clickedButton
+      ) {
+        setShowInfo(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showInfo]);
+
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
 
@@ -105,9 +130,44 @@ export default function LayerRecordPopup({ isOpen, onClose, record, onAddMention
         <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
           useTransparentUI ? 'border-transparent' : 'border-gray-200'
         }`}>
-          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-            {record.layerName}
-          </h2>
+          <div className="flex items-center gap-1">
+            <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+              {record.layerName}
+            </h2>
+            {infoText && (
+              <div className="relative">
+                <button
+                  ref={infoButtonRef}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowInfo(!showInfo);
+                  }}
+                  className={`p-0.5 transition-colors flex items-center justify-center ${
+                    useWhiteText
+                      ? 'text-white/60 hover:text-white' 
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                  title="Information"
+                >
+                  <InformationCircleIcon className="w-3.5 h-3.5" />
+                </button>
+                {showInfo && (
+                  <div
+                    ref={infoRef}
+                    className={`absolute top-full left-0 mt-1 z-50 border rounded-md shadow-lg p-2 min-w-[200px] ${
+                      useTransparentUI && useWhiteText
+                        ? 'bg-white/90 backdrop-blur-md border-white/20'
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <p className={`text-xs ${useWhiteText && useTransparentUI ? 'text-gray-600' : 'text-gray-600'}`}>
+                      {infoText}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             className={`p-1 -mr-1 transition-colors ${

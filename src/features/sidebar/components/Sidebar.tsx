@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   AdjustmentsHorizontalIcon,
-  NewspaperIcon,
   BuildingOfficeIcon,
   CalendarIcon,
   UserIcon,
@@ -16,7 +15,6 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SecondarySidebar from './SecondarySidebar';
 import Map3DControlsSecondaryContent from './Map3DControlsSecondaryContent';
 import MapToolsSecondaryContent from './MapToolsSecondaryContent';
-import NewsSecondaryContent from './NewsSecondaryContent';
 import GovSecondaryContent from './GovSecondaryContent';
 import LocationSecondaryContent from './LocationSecondaryContent';
 import ProfileAccountsSecondaryContent from './ProfileAccountsSecondaryContent';
@@ -27,19 +25,7 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 interface SidebarProps {
   account: Account | null;
   map: MapboxMapInstance | null;
-  pointsOfInterestVisible?: boolean;
-  onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
-  atlasLayerVisible?: boolean;
-  onAtlasLayerVisibilityChange?: (visible: boolean) => void;
   onLocationSelect?: (coordinates: { lat: number; lng: number }) => void;
-  selectedAtlasEntity?: {
-    id: string;
-    name: string;
-    table_name: string;
-    lat: number;
-    lng: number;
-  } | null;
-  onAtlasEntityClear?: () => void;
 }
 
 interface NavItem {
@@ -69,7 +55,6 @@ const hrefToTab: Record<string, SidebarTab> = {
   '/gov': null as any,
   '#profile': 'profile' as SidebarTab,
   '#controls': 'controls' as SidebarTab,
-  '#news': 'news' as SidebarTab,
 };
 
 // Main navigation items (route-based)
@@ -81,12 +66,6 @@ const mainNavItems: NavItem[] = [
     secondaryContent: <LocationSecondaryContent />,
   },
   { 
-    href: '#news', 
-    label: 'News', 
-    icon: NewspaperIcon,
-    secondaryContent: <NewsSecondaryContent />,
-  },
-  { 
     href: '/gov', 
     label: 'Gov', 
     icon: BuildingOfficeIcon,
@@ -94,18 +73,12 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
-export default function Sidebar({ account, map, pointsOfInterestVisible, onPointsOfInterestVisibilityChange, atlasLayerVisible = true, onAtlasLayerVisibilityChange, onLocationSelect, selectedAtlasEntity, onAtlasEntityClear }: SidebarProps) {
+export default function Sidebar({ account, map, onLocationSelect }: SidebarProps) {
   const pathname = usePathname();
   const { openAccount, openWelcome, openUpgrade } = useAppModalContextSafe();
   const [clickedNavItem, setClickedNavItem] = useState<string | null>(null);
   const isHomepage = pathname === '/';
   
-  // Auto-open Location sidebar when atlas entity is selected
-  useEffect(() => {
-    if (selectedAtlasEntity && clickedNavItem !== '/location') {
-      setClickedNavItem('/location');
-    }
-  }, [selectedAtlasEntity, clickedNavItem]);
   
   // URL-based tab state (for all tabs on homepage)
   const { urlTab, updateUrl } = useSidebarTabState({
@@ -114,8 +87,6 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
       // Open tab when URL param is present
       if (tab === 'controls') {
         setClickedNavItem('#controls');
-      } else if (tab === 'news') {
-        setClickedNavItem('#news');
       } else if (tab === 'profile') {
         setClickedNavItem('#profile');
       }
@@ -182,14 +153,14 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
     const tabFromUrl = urlTab;
     // Hash-based tabs use # prefix, route-based use /
     const expectedHref = tabFromUrl 
-      ? (tabFromUrl === 'controls' || tabFromUrl === 'profile' || tabFromUrl === 'news'
+      ? (tabFromUrl === 'controls' || tabFromUrl === 'profile'
           ? `#${tabFromUrl}` 
           : `/${tabFromUrl}`)
       : null;
     
     if (tabFromUrl && clickedNavItem !== expectedHref) {
       setClickedNavItem(expectedHref);
-    } else if (!tabFromUrl && clickedNavItem && (clickedNavItem.startsWith('#') || clickedNavItem === '#controls' || clickedNavItem === '#profile' || clickedNavItem === '#news')) {
+    } else if (!tabFromUrl && clickedNavItem && (clickedNavItem.startsWith('#') || clickedNavItem === '#controls' || clickedNavItem === '#profile')) {
       // URL param was removed, close tab
       setClickedNavItem(null);
     }
@@ -329,7 +300,7 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
               }}
             >
               <div className="space-y-6">
-                {/* Map Tools - Mention Form, Map Meta, Atlas Meta */}
+                {/* Map Tools - Mention Form, Map Meta */}
                 <MapToolsSecondaryContent 
                   map={map} 
                   mapLoaded={!!map}
@@ -339,8 +310,6 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
                 <div className="border-t border-gray-200 pt-6">
                   <Map3DControlsSecondaryContent 
                     map={map} 
-                    pointsOfInterestVisible={pointsOfInterestVisible}
-                    onPointsOfInterestVisibilityChange={onPointsOfInterestVisibilityChange}
                   />
                 </div>
               </div>
@@ -360,10 +329,6 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
             onClose={() => {
               const tab = clickedNavItem ? hrefToTab[clickedNavItem] : null;
               setClickedNavItem(null);
-              // Clear selected atlas entity when closing Location sidebar
-              if (clickedNavItem === '/location' && onAtlasEntityClear) {
-                onAtlasEntityClear();
-              }
               // Remove URL param when closing tab on homepage
               if (isHomepage && tab) {
                 updateUrl(null);
@@ -375,8 +340,6 @@ export default function Sidebar({ account, map, pointsOfInterestVisible, onPoint
                   map, 
                   mapLoaded: !!map,
                   onLocationSelect: clickedNavItem === '/location' ? onLocationSelect : undefined,
-                  selectedAtlasEntity: clickedNavItem === '/location' ? selectedAtlasEntity : undefined,
-                  onAtlasEntityClear: clickedNavItem === '/location' ? onAtlasEntityClear : undefined,
                 })
               : content
             }

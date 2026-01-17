@@ -6,18 +6,12 @@ import Link from 'next/link';
 import { BuildingOfficeIcon, ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { format, addDays, subDays, isToday, isSameDay, startOfDay } from 'date-fns';
 import { useAccountData } from '@/features/account/hooks/useAccountData';
-import { EventService } from '@/features/events/services/eventService';
 import type { ProfileAccount } from '@/types/profile';
-import type { Event } from '@/types/event';
 import { getDisplayName } from '@/types/profile';
 
 export default function HomepageProfileColumn() {
   const { account, userEmail } = useAccountData(true, 'profile');
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const hasFetchedRef = useRef(false);
 
   const today = startOfDay(new Date());
 
@@ -66,55 +60,10 @@ export default function HomepageProfileColumn() {
     setCurrentDate(startOfDay(new Date()));
   };
 
-  // Fetch events (only once on mount)
-  useEffect(() => {
-    if (hasFetchedRef.current) {
-      return;
-    }
-
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const startDate = subDays(today, 30).toISOString();
-        const endDate = addDays(today, 30).toISOString();
-        
-        const fetchedEvents = await EventService.getEvents({
-          start_date: startDate,
-          end_date: endDate,
-          archived: false,
-          visibility: 'public',
-        });
-
-        setEvents(fetchedEvents);
-        hasFetchedRef.current = true;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load events');
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  // Get events for a specific day
+  // Get events for a specific day (empty for now)
   const getEventsForDay = (date: Date) => {
-    return events.filter(event => {
-      const eventStart = startOfDay(new Date(event.start_date));
-      const eventEnd = event.end_date ? startOfDay(new Date(event.end_date)) : null;
-      const dayStart = startOfDay(date);
-      
-      return isSameDay(eventStart, dayStart) ||
-             (eventEnd && isSameDay(eventEnd, dayStart)) ||
-             (eventStart <= dayStart && eventEnd && eventEnd >= dayStart);
-    });
+    return [];
   };
-
-  // Get selected day's events
-  const selectedDayEvents = getEventsForDay(currentDate);
 
   if (!profileAccount) {
     return (
@@ -269,13 +218,6 @@ export default function HomepageProfileColumn() {
                   }`}>
                     {format(date, 'd')}
                   </span>
-                  {dayEvents.length > 0 && (
-                    <span className={`text-[8px] mt-1 ${
-                      isSelected ? 'text-gray-700' : isTodayDate ? 'text-red-600' : 'text-gray-500'
-                    }`}>
-                      {dayEvents.length}
-                    </span>
-                  )}
                 </div>
               </button>
             );
@@ -294,11 +236,6 @@ export default function HomepageProfileColumn() {
               </span>
             )}
           </div>
-          {selectedDayEvents.length > 0 && (
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-500">
-                <span>{selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}</span>
-            </div>
-          )}
         </div>
       </div>
     </div>

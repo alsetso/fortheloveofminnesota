@@ -8,35 +8,14 @@ import { MentionService } from '@/features/mentions/services/mentionService';
 import type { CreateMentionData } from '@/types/mention';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { CollectionService } from '@/features/collections/services/collectionService';
+import type { Collection } from '@/types/collection';
 import {
   useFeatureTracking,
   FeatureCard,
   type ExtractedFeature,
 } from '@/features/map-metadata';
 
-const ATLAS_ICON_MAP: Record<string, string> = {
-  cities: '/city.png',
-  lakes: '/lakes.png',
-  parks: '/park_like.png',
-  schools: '/education.png',
-  neighborhoods: '/neighborhood.png',
-  churches: '/churches.png',
-  hospitals: '/hospital.png',
-  golf_courses: '/golf courses.png',
-  municipals: '/municiples.png',
-};
-
-const ATLAS_ENTITY_LABELS: Record<string, string> = {
-  cities: 'City',
-  lakes: 'Lake',
-  parks: 'Park',
-  schools: 'School',
-  neighborhoods: 'Neighborhood',
-  churches: 'Church',
-  hospitals: 'Hospital',
-  golf_courses: 'Golf Course',
-  municipals: 'Municipal',
-};
 
 interface MapToolsSecondaryContentProps {
   map?: MapboxMapInstance | null;
@@ -65,9 +44,6 @@ export default function MapToolsSecondaryContent({
 
   const [capturedFeature, setCapturedFeature] = useState<ExtractedFeature | null>(null);
 
-  // Atlas entity state
-  const [atlasEntityData, setAtlasEntityData] = useState<Record<string, any> | null>(null);
-  const [atlasEntityTableName, setAtlasEntityTableName] = useState<string | null>(null);
 
   // Mention form state
   const [isFormExpanded, setIsFormExpanded] = useState(false);
@@ -79,6 +55,9 @@ export default function MapToolsSecondaryContent({
   const [pinVisibility, setPinVisibility] = useState<'public' | 'only_me'>('public');
   const [isPinSubmitting, setIsPinSubmitting] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [loadingCollections, setLoadingCollections] = useState(false);
 
   // Sync hook's captured click feature
   useEffect(() => {
@@ -108,36 +87,29 @@ export default function MapToolsSecondaryContent({
   }, [map, mapLoaded, clearClickFeature]);
 
 
-  // Listen for atlas entity clicks
+  // Load collections when account is available
   useEffect(() => {
-    const handleAtlasEntityClick = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        id: string;
-        name: string;
-        table_name: string;
-        lat: number;
-        lng: number;
-      }>;
-      
-      if (customEvent.detail) {
-        setLocationData({
-          coordinates: {
-            lat: customEvent.detail.lat,
-            lng: customEvent.detail.lng,
-          },
-          placeName: customEvent.detail.name,
-        });
-        setAtlasEntityTableName(customEvent.detail.table_name);
-        // Fetch atlas entity data
-        // This would need to be implemented based on your atlas service
+    if (!activeAccountId) {
+      setCollections([]);
+      setSelectedCollectionId(null);
+      return;
+    }
+
+    const loadCollections = async () => {
+      setLoadingCollections(true);
+      try {
+        const data = await CollectionService.getCollections(activeAccountId);
+        setCollections(data);
+      } catch (err) {
+        console.error('[MapToolsSecondaryContent] Error loading collections:', err);
+      } finally {
+        setLoadingCollections(false);
       }
     };
 
-    window.addEventListener('atlas-entity-click', handleAtlasEntityClick);
-    return () => {
-      window.removeEventListener('atlas-entity-click', handleAtlasEntityClick);
-    };
-  }, []);
+    loadCollections();
+  }, [activeAccountId]);
+
 
   const pinFeature = useMemo(() => {
     if (locationData) {
@@ -155,6 +127,7 @@ export default function MapToolsSecondaryContent({
     setShowPostDateInput(false);
     setPinVisibility('public');
     setPinError(null);
+    setSelectedCollectionId(null);
   }, []);
 
   const handleSubmitMention = useCallback(async () => {
@@ -171,11 +144,6 @@ export default function MapToolsSecondaryContent({
         properties: pinFeature.properties,
       } : null;
 
-      // Build atlas meta
-      const atlasMeta = atlasEntityData && atlasEntityTableName ? {
-        ...atlasEntityData,
-        table_name: atlasEntityTableName,
-      } : null;
 
       // Build post date
       const postDate = pinEventMonth && pinEventDay && pinEventYear
@@ -187,9 +155,9 @@ export default function MapToolsSecondaryContent({
         lng: locationData.coordinates.lng,
         description: pinDescription.trim() || null,
         visibility: pinVisibility,
+        collection_id: selectedCollectionId || null,
         post_date: postDate,
         map_meta: mapMeta,
-        atlas_meta: atlasMeta,
       };
 
       const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
@@ -201,15 +169,13 @@ export default function MapToolsSecondaryContent({
 
       resetForm();
       setLocationData(null);
-      setAtlasEntityData(null);
-      setAtlasEntityTableName(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create mention';
       setPinError(errorMessage);
     } finally {
       setIsPinSubmitting(false);
     }
-  }, [locationData, pinDescription, pinFeature, atlasEntityData, atlasEntityTableName, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, user, activeAccountId, resetForm]);
+  }, [locationData, pinDescription, pinFeature, pinEventMonth, pinEventDay, pinEventYear, pinVisibility, user, activeAccountId, resetForm]);
 
   return (
     <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-120px)]">
@@ -223,34 +189,8 @@ export default function MapToolsSecondaryContent({
             </p>
           </div>
 
-          {/* Atlas Meta */}
-          {atlasEntityData && atlasEntityTableName && (
-            <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
-              <div className="flex items-center gap-1.5">
-                {ATLAS_ICON_MAP[atlasEntityTableName] && (
-                  <Image
-                    src={ATLAS_ICON_MAP[atlasEntityTableName]}
-                    alt={atlasEntityTableName}
-                    width={12}
-                    height={12}
-                    className="w-3 h-3 flex-shrink-0"
-                    unoptimized
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] text-gray-700 truncate">
-                    {atlasEntityData.name || atlasEntityTableName}
-                  </span>
-                  <span className="text-[9px] text-gray-500 ml-1">
-                    ({ATLAS_ENTITY_LABELS[atlasEntityTableName] || atlasEntityTableName})
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Map Meta */}
-          {!atlasEntityData && pinFeature && (pinFeature.name || pinFeature.properties?.class || pinFeature.label) && (
+          {pinFeature && (pinFeature.name || pinFeature.properties?.class || pinFeature.label) && (
             <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
               <div className="flex items-center gap-1.5">
                 {pinFeature.icon && (
@@ -300,6 +240,25 @@ export default function MapToolsSecondaryContent({
                   <span className="text-xs font-medium text-gray-900 truncate">
                     @{account.username}
                   </span>
+                </div>
+              )}
+
+              {/* Collection Selector */}
+              {activeAccountId && collections.length > 0 && (
+                <div>
+                  <select
+                    value={selectedCollectionId || ''}
+                    onChange={(e) => setSelectedCollectionId(e.target.value || null)}
+                    disabled={isPinSubmitting}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Unassigned</option>
+                    {collections.map((collection) => (
+                      <option key={collection.id} value={collection.id}>
+                        {collection.emoji} {collection.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
 

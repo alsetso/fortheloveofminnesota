@@ -9,7 +9,7 @@ import { commonSchemas } from '@/lib/security/validation';
 
 /**
  * POST /api/analytics/pin-view
- * Records a mention view (formerly pin view) using the pin_views system
+ * Records a mention view using the unified url_visits system
  * Note: Parameter name is "pin_id" for backward compatibility, but it's actually a mention ID
  * 
  * Security:
@@ -67,10 +67,11 @@ export async function POST(request: NextRequest) {
         // Use accountId from security middleware context if available
         const finalAccountId = accountId || null;
 
-        // Record mention view using record_pin_view function
-        // Note: pin_id is actually a mention ID (legacy naming)
-        const { data, error } = await supabase.rpc('record_pin_view', {
-          p_pin_id: pin_id,
+        // Record mention view using record_url_visit function
+        // Convert mention ID to URL format: /map?pin={mention_id}
+        const mentionUrl = `/map?pin=${pin_id}`;
+        const { data, error } = await supabase.rpc('record_url_visit', {
+          p_url: mentionUrl,
           p_account_id: finalAccountId,
           p_user_agent: user_agent || null,
           p_referrer_url: referrer_url || null,

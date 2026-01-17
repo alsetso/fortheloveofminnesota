@@ -51,19 +51,19 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   const [showSuccessStep, setShowSuccessStep] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check if user needs onboarding
+  // Always show onboarding when map is loaded (for UI testing)
   useEffect(() => {
-    if (account && !account.onboarded && mapLoaded) {
+    if (mapLoaded) {
       setIsVisible(true);
     } else {
       setIsVisible(false);
     }
-  }, [account, mapLoaded]);
+  }, [mapLoaded]);
 
   // Listen for custom event to show onboarding demo
   useEffect(() => {
     const handleShowOnboarding = () => {
-      if (account && !account.onboarded && mapLoaded) {
+      if (mapLoaded) {
         setIsVisible(true);
         setCurrentStep(0); // Reset to first step
       }
@@ -73,7 +73,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
     return () => {
       window.removeEventListener('show-onboarding-demo', handleShowOnboarding);
     };
-  }, [account, mapLoaded]);
+  }, [mapLoaded]);
 
   // Track map interactions (zoom/move) for step 1
   useEffect(() => {
@@ -124,13 +124,6 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
       title: 'Search Locations',
       description: 'Type in the search bar to find addresses, places, and people across Minnesota.',
       highlightSelector: '[data-search-container]',
-      highlightPosition: 'top-left',
-    },
-    {
-      id: 3,
-      title: 'Transcribe Audio',
-      description: 'Use the microphone icon to search by voice and transcribe audio for quick location searches.',
-      highlightSelector: '[data-microphone-button]',
       highlightPosition: 'top-left',
     },
     {
@@ -616,7 +609,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
     
     return (
       <div
-        className="fixed top-1/2 left-4 right-4 -translate-y-1/2 sm:top-auto sm:translate-y-0 sm:bottom-4 sm:left-4 sm:right-auto z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm mx-auto sm:mx-0"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm w-[calc(100%-2rem)]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="p-4 space-y-3">
@@ -684,7 +677,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
                   setIsVisible(false);
                   setShowSuccessStep(false);
                 }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
               >
                 <span>View Profile</span>
                 <ArrowRightIcon className="w-4 h-4" />
@@ -713,7 +706,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   if (isStep8) {
     return (
       <div
-        className="fixed top-1/2 left-4 right-4 -translate-y-1/2 sm:top-auto sm:translate-y-0 sm:bottom-4 sm:left-4 sm:right-auto z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm mx-auto sm:mx-0"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm w-[calc(100%-2rem)]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="p-4 space-y-3">
@@ -922,7 +915,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
                   (!account?.onboarded && !account?.image_url) ||
                   (!account?.onboarded && !firstName.trim() && !lastName.trim())
                 }
-                className="w-full text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5"
+                className="w-full text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5"
               >
                 {savingProfile ? (
                   'Saving...'
@@ -957,7 +950,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
     <>
       {/* Step card - Centered on mobile, bottom left on desktop */}
       <div
-        className="fixed top-1/2 left-4 right-4 -translate-y-1/2 sm:top-auto sm:translate-y-0 sm:bottom-4 sm:left-4 sm:right-auto z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm mx-auto sm:mx-0"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm w-[calc(100%-2rem)]"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="p-4 space-y-3">
@@ -1032,7 +1025,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
               disabled={
                 (currentStep === 0 && !hasInteractedWithMap)
               }
-              className={`text-xs font-medium text-gray-900 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+              className={`text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5 ${
                 currentStep > 0 ? 'flex-1' : 'w-full'
               }`}
             >

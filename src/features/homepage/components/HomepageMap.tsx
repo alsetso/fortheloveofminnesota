@@ -13,7 +13,6 @@ import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useUrlMapState } from '../hooks/useUrlMapState';
 import Sidebar from '@/features/sidebar/components/Sidebar';
-import PointsOfInterestLayer from '@/features/map/components/PointsOfInterestLayer';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import MapScreenshotEditor from './MapScreenshotEditor';
 
@@ -49,8 +48,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
   
-  // Points of Interest layer visibility state
-  const [isPointsOfInterestVisible, setIsPointsOfInterestVisible] = useState(false);
   
   // Modal controls (modals rendered globally, but we need access to open functions)
   const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
@@ -88,7 +85,9 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   // Listen for mention-created event from inline form to refresh mentions layer
   useEffect(() => {
     const handleMentionCreatedEvent = () => {
-      setMentionsRefreshKey(prev => prev + 1);
+      // Don't increment refresh key - this causes component remount and fitBounds to run again
+      // Instead, dispatch a reload event that MentionsLayer listens to
+      window.dispatchEvent(new CustomEvent('reload-mentions'));
     };
 
     window.addEventListener('mention-created', handleMentionCreatedEvent);
@@ -157,7 +156,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           style: MAP_CONFIG.MAPBOX_STYLE,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
-          pitch: 0, // Start at 0% angle
+          pitch: 60, // Start at 60 degrees
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
@@ -236,8 +235,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
         <Sidebar 
           account={account} 
           map={mapInstanceRef.current}
-          pointsOfInterestVisible={isPointsOfInterestVisible}
-          onPointsOfInterestVisibilityChange={setIsPointsOfInterestVisible}
           onLocationSelect={handleLocationSelect}
         />
 
@@ -278,14 +275,6 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
         )}
 
-        {/* Points of Interest Layer */}
-        {mapLoaded && mapInstanceRef.current && (
-          <PointsOfInterestLayer 
-            map={mapInstanceRef.current} 
-            mapLoaded={mapLoaded} 
-            visible={isPointsOfInterestVisible} 
-          />
-        )}
 
         {/* Homepage Stats Handle */}
         <HomepageStatsHandle />

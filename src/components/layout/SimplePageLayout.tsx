@@ -70,10 +70,14 @@ export default function SimplePageLayout({
       {toolbar}
 
       {/* Main Content */}
-      <main className={`flex-1 ${maxWidthClass !== 'max-w-full' ? `${maxWidthClass} mx-auto w-full` : 'w-full'}`}>
-        <div className={contentPadding}>
-          {children}
-        </div>
+      <main className={`flex-1 ${maxWidthClass !== 'max-w-full' ? `${maxWidthClass} mx-auto w-full` : 'w-full'} ${contentPadding ? '' : 'h-full'}`}>
+        {contentPadding ? (
+          <div className={contentPadding}>
+            {children}
+          </div>
+        ) : (
+          children
+        )}
       </main>
 
       {/* Footer */}

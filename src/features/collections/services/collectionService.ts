@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { AccountService } from '@/features/auth/services/memberService';
 import type { Collection, CreateCollectionData, UpdateCollectionData } from '@/types/collection';
 
 /**
@@ -34,16 +35,8 @@ export class CollectionService {
       throw new Error('You must be signed in to create collections');
     }
 
-    // Get account with plan info
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('id, plan')
-      .eq('user_id', user.id)
-      .single();
-
-    if (accountError || !account) {
-      throw new Error('Account not found. Please complete your profile setup.');
-    }
+    // Ensure account exists (creates if needed)
+    const account = await AccountService.ensureAccountExists();
 
     // Check current collection count
     const { count, error: countError } = await supabase

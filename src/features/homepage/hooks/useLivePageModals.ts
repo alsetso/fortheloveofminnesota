@@ -8,21 +8,35 @@ import { PopupType } from './useMapOverlayState';
  * All modal/popup types on the /live page
  * Priority order (highest to lowest):
  * 1. Top-level modals (account, mapStyles, dynamicSearch) - highest priority
- * 2. Entity popups (pin, atlas, location) - high priority
- * 3. Create sheet - medium priority
- * 4. Mobile nav tabs (contribute, tools) - lowest priority
+ * 2. Camera modal - high priority (blocks other interactions)
+ * 3. Entity popups (pin, location) - high priority
+ * 4. Location permission - medium-high priority
+ * 5. Layer record - medium priority
+ * 6. Create sheet - medium priority
+ * 7. Bottom button popups - low priority
+ * 8. Mobile nav tabs (contribute, tools) - lowest priority
  */
+export type ModalMode = 'create' | 'edit' | 'view';
+
 export type LivePageModalType =
   | 'account'           // LiveAccountModal
   | 'mapStyles'         // MapStylesPopup
   | 'dynamicSearch'     // DynamicSearchModal
-  | `popup-${PopupType}` // 'popup-pin' | 'popup-atlas' | 'popup-location'
+  | 'camera'            // CameraModal
+  | 'locationPermission' // LocationPermissionModal
+  | 'layerRecord'       // LayerRecordPopup
+  | `popup-${PopupType}` // 'popup-pin' | 'popup-location'
   | 'create'            // CreateMentionPopup
+  | 'bottomButton-settings'    // BottomButtonsPopup with settings
+  | 'bottomButton-analytics'   // BottomButtonsPopup with analytics
+  | 'bottomButton-collections' // BottomButtonsPopup with collections
+  | 'bottomButton-create'      // BottomButtonsPopup create placeholder
   | MobileNavTab        // 'contribute' | 'tools'
   | null;
 
 export interface LivePageModalState {
   type: LivePageModalType;
+  mode?: ModalMode;  // Optional mode for modals that support it
   data?: any;  // Data for popups/modals
 }
 
@@ -38,6 +52,7 @@ export interface LivePageModalState {
 export function useLivePageModals() {
   const [modal, setModal] = useState<LivePageModalState>({
     type: null,
+    mode: undefined,
     data: null,
   });
 
@@ -74,46 +89,149 @@ export function useLivePageModals() {
     });
   }, []);
 
-  // Open entity popup (closes everything except top-level modals)
-  const openPopup = useCallback((type: PopupType, data: any) => {
+  // Open camera modal (closes everything except top-level modals)
+  const openCamera = useCallback((mode: 'create' | 'edit' = 'create') => {
     setModal(prev => {
       // Don't close top-level modals
       if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch') {
+        return prev;
+      }
+      if (prev.type === 'camera') {
+        return { type: null, mode: undefined, data: null };
+      }
+      return { type: 'camera', mode, data: null };
+    });
+  }, []);
+
+  // Close camera modal
+  const closeCamera = useCallback(() => {
+    setModal(prev => {
+      if (prev.type === 'camera') {
+        return { type: null, mode: undefined, data: null };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Open location permission modal (doesn't close top-level modals)
+  const openLocationPermission = useCallback(() => {
+    setModal(prev => {
+      // Don't close top-level modals
+      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch') {
+        return prev;
+      }
+      if (prev.type === 'locationPermission') {
+        return { type: null, mode: undefined, data: null };
+      }
+      return { type: 'locationPermission', mode: undefined, data: null };
+    });
+  }, []);
+
+  // Close location permission modal
+  const closeLocationPermission = useCallback(() => {
+    setModal(prev => {
+      if (prev.type === 'locationPermission') {
+        return { type: null, mode: undefined, data: null };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Open layer record popup (closes bottom buttons and lower priority modals)
+  const openLayerRecord = useCallback((data: any) => {
+    setModal(prev => {
+      // Don't close top-level modals or camera
+      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch' || prev.type === 'camera') {
+        return prev;
+      }
+      if (prev.type === 'layerRecord') {
+        return { type: null, mode: undefined, data: null };
+      }
+      return { type: 'layerRecord', mode: undefined, data };
+    });
+  }, []);
+
+  // Close layer record popup
+  const closeLayerRecord = useCallback(() => {
+    setModal(prev => {
+      if (prev.type === 'layerRecord') {
+        return { type: null, mode: undefined, data: null };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Open entity popup (closes everything except top-level modals and camera)
+  const openPopup = useCallback((type: PopupType, data: any) => {
+    setModal(prev => {
+      // Don't close top-level modals or camera
+      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch' || prev.type === 'camera') {
         return prev;
       }
       const popupType = `popup-${type}` as LivePageModalType;
       if (prev.type === popupType) {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
-      return { type: popupType, data };
+      return { type: popupType, mode: undefined, data };
     });
   }, []);
 
-  // Open create sheet (closes tabs and popups, but not top-level modals)
+  // Open create sheet (closes tabs and popups, but not top-level modals or camera)
   const openCreate = useCallback((data?: any) => {
     setModal(prev => {
-      // Don't close top-level modals
-      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch') {
+      // Don't close top-level modals or camera
+      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch' || prev.type === 'camera') {
         return prev;
       }
       if (prev.type === 'create') {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
-      return { type: 'create', data };
+      return { type: 'create', mode: undefined, data };
     });
   }, []);
 
-  // Open mobile nav tab (closes other tabs, popups, create, but not top-level modals)
+  // Open bottom button popup (closes other bottom buttons and lower priority modals)
+  const openBottomButton = useCallback((type: 'settings' | 'analytics' | 'collections' | 'create') => {
+    setModal(prev => {
+      // Don't close top-level modals, camera, or entity popups
+      if (
+        prev.type === 'account' || 
+        prev.type === 'mapStyles' || 
+        prev.type === 'dynamicSearch' || 
+        prev.type === 'camera' ||
+        prev.type?.startsWith('popup-')
+      ) {
+        return prev;
+      }
+      const bottomButtonType = `bottomButton-${type}` as LivePageModalType;
+      if (prev.type === bottomButtonType) {
+        return { type: null, mode: undefined, data: null };
+      }
+      return { type: bottomButtonType, mode: undefined, data: null };
+    });
+  }, []);
+
+  // Close bottom button popup
+  const closeBottomButton = useCallback(() => {
+    setModal(prev => {
+      if (prev.type?.startsWith('bottomButton-')) {
+        return { type: null, mode: undefined, data: null };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Open mobile nav tab (closes other tabs, popups, create, but not top-level modals or camera)
   const openTab = useCallback((tab: MobileNavTab) => {
     setModal(prev => {
-      // Don't close top-level modals
-      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch') {
+      // Don't close top-level modals or camera
+      if (prev.type === 'account' || prev.type === 'mapStyles' || prev.type === 'dynamicSearch' || prev.type === 'camera') {
         return prev;
       }
       if (prev.type === tab) {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
-      return { type: tab, data: null };
+      return { type: tab, mode: undefined, data: null };
     });
   }, []);
 
@@ -121,7 +239,7 @@ export function useLivePageModals() {
   const closeAccount = useCallback(() => {
     setModal(prev => {
       if (prev.type === 'account') {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
       return prev;
     });
@@ -130,7 +248,7 @@ export function useLivePageModals() {
   const closeMapStyles = useCallback(() => {
     setModal(prev => {
       if (prev.type === 'mapStyles') {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
       return prev;
     });
@@ -139,7 +257,7 @@ export function useLivePageModals() {
   const closeDynamicSearch = useCallback(() => {
     setModal(prev => {
       if (prev.type === 'dynamicSearch') {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
       return prev;
     });
@@ -148,7 +266,7 @@ export function useLivePageModals() {
   const closePopup = useCallback(() => {
     setModal(prev => {
       if (prev.type?.startsWith('popup-')) {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
       return prev;
     });
@@ -157,7 +275,7 @@ export function useLivePageModals() {
   const closeCreate = useCallback(() => {
     setModal(prev => {
       if (prev.type === 'create') {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
       return prev;
     });
@@ -166,7 +284,7 @@ export function useLivePageModals() {
   const closeTab = useCallback(() => {
     setModal(prev => {
       if (prev.type === 'contribute' || prev.type === 'tools') {
-        return { type: null, data: null };
+        return { type: null, mode: undefined, data: null };
       }
       return prev;
     });
@@ -174,7 +292,7 @@ export function useLivePageModals() {
 
   // Close all modals
   const closeAll = useCallback(() => {
-    setModal({ type: null, data: null });
+    setModal({ type: null, mode: undefined, data: null });
   }, []);
 
   // Helper: Check if specific modal is open
@@ -202,6 +320,19 @@ export function useLivePageModals() {
   // Helper: Check if account modal is open
   const isAccountModalOpen = modal.type === 'account';
 
+  // Helper: Check if bottom button is open
+  const isBottomButtonOpen = useCallback((type: string) => {
+    return modal.type === `bottomButton-${type}`;
+  }, [modal.type]);
+
+  // Helper: Get current bottom button type
+  const getBottomButtonType = useCallback((): string | null => {
+    if (modal.type?.startsWith('bottomButton-')) {
+      return modal.type.replace('bottomButton-', '');
+    }
+    return null;
+  }, [modal.type]);
+
   return {
     modal,
     activeTab,
@@ -212,19 +343,29 @@ export function useLivePageModals() {
     openAccount,
     openMapStyles,
     openDynamicSearch,
+    openCamera,
+    openLocationPermission,
+    openLayerRecord,
     openPopup,
     openCreate,
+    openBottomButton,
     openTab,
     // Close functions
     closeAccount,
     closeMapStyles,
     closeDynamicSearch,
+    closeCamera,
+    closeLocationPermission,
+    closeLayerRecord,
     closePopup,
     closeCreate,
+    closeBottomButton,
     closeTab,
     closeAll,
     // Check functions
     isModalOpen,
+    isBottomButtonOpen,
+    getBottomButtonType,
   };
 }
 

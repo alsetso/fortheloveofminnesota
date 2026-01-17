@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, MapPinIcon, NewspaperIcon } from '@heroicons/react/24/outline';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
@@ -27,15 +27,6 @@ interface MapboxFeature {
   }>;
 }
 
-interface AtlasEntitySuggestion {
-  id: string;
-  name: string;
-  table_name: string;
-  lat: number;
-  lng: number;
-  type: 'atlas';
-}
-
 interface NewsArticleSuggestion {
   id: string;
   article_id: string;
@@ -46,59 +37,7 @@ interface NewsArticleSuggestion {
   type: 'news';
 }
 
-type SearchSuggestion = MapboxFeature | AtlasEntitySuggestion | NewsArticleSuggestion;
-
-// Type definitions for Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-    webkitSpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-  }
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
+type SearchSuggestion = MapboxFeature | NewsArticleSuggestion;
 
 interface SheetSearchInputProps {
   map?: MapboxMapInstance | null;
@@ -107,13 +46,10 @@ interface SheetSearchInputProps {
 
 export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchInputProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
@@ -131,44 +67,8 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
     };
   }, []);
 
-  // Check for browser support and initialize Speech Recognition
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognition) {
-      setIsSupported(true);
-      const recognition = new SpeechRecognition() as SpeechRecognition;
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
-        setSearchQuery(transcript);
-        setIsRecording(false);
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setIsRecording(false);
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        recognitionRef.current.abort();
-      }
-    };
-  }, []);
-
-  // Combined search: Mapbox geocoding + Atlas entities
+  // Combined search: Mapbox geocoding + News articles
   const searchLocations = useCallback(async (query: string) => {
     if (!query.trim() || query.length < 2) {
       setSuggestions([]);
@@ -180,7 +80,7 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
     try {
       const searchTerm = query.trim().toLowerCase();
       
-      const [mapboxResults, atlasResults, newsResults] = await Promise.allSettled([
+      const [mapboxResults, newsResults] = await Promise.allSettled([
         // Mapbox geocoding
         (async () => {
           const token = MAP_CONFIG.MAPBOX_TOKEN;
@@ -209,33 +109,6 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
               stateContext.text === 'Minnesota'
             );
           });
-        })(),
-        // Atlas entities search
-        (async () => {
-          try {
-            const { supabase } = await import('@/lib/supabase');
-            const { data, error } = await supabase
-              .from('atlas_entities')
-              .select('id, name, table_name, lat, lng')
-              .ilike('name', `%${searchTerm}%`)
-              .not('lat', 'is', null)
-              .not('lng', 'is', null)
-              .limit(5);
-            
-            if (error || !data) return [];
-            
-            return data.map((entity): AtlasEntitySuggestion => ({
-              id: entity.id,
-              name: entity.name,
-              table_name: entity.table_name,
-              lat: entity.lat,
-              lng: entity.lng,
-              type: 'atlas',
-            }));
-          } catch (error) {
-            console.error('Atlas search error:', error);
-            return [];
-          }
         })(),
         // News articles search
         (async () => {
@@ -268,11 +141,10 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
       ]);
 
       const mapboxFeatures = mapboxResults.status === 'fulfilled' ? mapboxResults.value : [];
-      const atlasEntities = atlasResults.status === 'fulfilled' ? atlasResults.value : [];
       const newsArticles = newsResults.status === 'fulfilled' ? newsResults.value : [];
       
-      // Combine results: addresses first, then atlas entities, then news articles
-      const combined = [...mapboxFeatures, ...atlasEntities, ...newsArticles];
+      // Combine results: addresses first, then news articles
+      const combined = [...mapboxFeatures, ...newsArticles];
       
       setSuggestions(combined);
       setShowSuggestions(combined.length > 0);
@@ -323,30 +195,6 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
       return;
     }
     
-    if ('type' in suggestion && suggestion.type === 'atlas') {
-      const entity = suggestion as AtlasEntitySuggestion;
-      setSearchQuery(entity.name);
-      
-      if (map && map.flyTo) {
-        map.flyTo({
-          center: [entity.lng, entity.lat],
-          zoom: 15,
-          duration: 1500,
-        });
-      }
-      
-      window.dispatchEvent(new CustomEvent('atlas-entity-click', {
-        detail: {
-          id: entity.id,
-          name: entity.name,
-          table_name: entity.table_name,
-          lat: entity.lat,
-          lng: entity.lng,
-        }
-      }));
-      return;
-    }
-    
     const feature = suggestion as MapboxFeature;
     const [lng, lat] = feature.center;
     setSearchQuery(feature.place_name);
@@ -364,17 +212,6 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
     }
   }, [map, onLocationSelect]);
 
-  const handleVoiceSearch = () => {
-    if (!recognitionRef.current) return;
-    
-    if (isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-    } else {
-      setIsRecording(true);
-      recognitionRef.current.start();
-    }
-  };
 
   return (
     <div className="relative">
@@ -413,24 +250,6 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
               : 'text-gray-900 placeholder:text-gray-500'
           }`}
         />
-        <button
-          onClick={handleVoiceSearch}
-          disabled={!isSupported}
-          className={`flex-shrink-0 p-1 transition-colors ${
-            isRecording
-              ? 'text-red-500 animate-pulse'
-              : isSupported
-              ? useBlurStyle
-              ? 'text-white/80 hover:text-white'
-              : 'text-gray-500 hover:text-gray-700'
-              : useBlurStyle
-              ? 'text-white/40 cursor-not-allowed'
-              : 'text-gray-300 cursor-not-allowed'
-          }`}
-          aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
-        >
-          <MicrophoneIcon className="w-4 h-4" />
-        </button>
       </div>
 
       {/* Suggestions Dropdown */}
@@ -441,11 +260,9 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
             : 'bg-white border-gray-200'
         }`}>
           {suggestions.map((suggestion, index) => {
-            const isAtlas = 'type' in suggestion && suggestion.type === 'atlas';
             const isNews = 'type' in suggestion && suggestion.type === 'news';
-            const entity = isAtlas ? (suggestion as AtlasEntitySuggestion) : null;
             const article = isNews ? (suggestion as NewsArticleSuggestion) : null;
-            const feature = !isAtlas && !isNews ? (suggestion as MapboxFeature) : null;
+            const feature = !isNews ? (suggestion as MapboxFeature) : null;
             
             return (
               <button
@@ -457,23 +274,7 @@ export default function SheetSearchInput({ map, onLocationSelect }: SheetSearchI
                     : useBlurStyle ? 'hover:bg-white/10' : 'hover:bg-gray-50'
                 }`}
               >
-                {isAtlas ? (
-                  <div className="flex items-start gap-2">
-                    <MapPinIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                      useBlurStyle ? 'text-white/60' : 'text-gray-400'
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-xs font-medium truncate ${
-                        useBlurStyle ? 'text-white' : 'text-gray-900'
-                      }`}>
-                        {entity!.name}
-                      </div>
-                      <div className={`text-[10px] ${
-                        useBlurStyle ? 'text-white/60' : 'text-gray-500'
-                      }`}>Atlas Entity</div>
-                    </div>
-                  </div>
-                ) : isNews ? (
+                {isNews ? (
                   <div className="flex items-start gap-2">
                     <NewspaperIcon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
                       useBlurStyle ? 'text-white/60' : 'text-gray-400'

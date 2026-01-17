@@ -61,10 +61,10 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Get stats using get_pin_stats function
+    // Get stats using get_mention_stats function (aggregates from url_visits)
     // Note: pin_id is actually a mention ID (legacy naming)
-    const { data, error } = await supabase.rpc('get_pin_stats', {
-      p_pin_id: pinId,
+    const { data, error } = await supabase.rpc('get_mention_stats', {
+      p_mention_id: pinId,
       p_hours: hours,
     } as any) as { data: Array<{ total_views: number; unique_viewers: number; accounts_viewed: number }> | null; error: any };
 

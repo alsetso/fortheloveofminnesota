@@ -6,6 +6,8 @@ import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
 import { useAuthStateSafe } from '@/features/auth';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { CollectionService } from '@/features/collections/services/collectionService';
+import type { Collection } from '@/types/collection';
 
 interface CreateMentionModalProps {
   isOpen: boolean;
@@ -30,6 +32,9 @@ export default function CreateMentionModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'public' | 'only_me'>('public');
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [loadingCollections, setLoadingCollections] = useState(false);
 
   // Notify parent when visibility changes
   useEffect(() => {
@@ -38,12 +43,36 @@ export default function CreateMentionModal({
     }
   }, [visibility, isOpen, onVisibilityChange]);
 
+  // Load collections when account is available
+  useEffect(() => {
+    if (!activeAccountId) {
+      setCollections([]);
+      setSelectedCollectionId(null);
+      return;
+    }
+
+    const loadCollections = async () => {
+      setLoadingCollections(true);
+      try {
+        const data = await CollectionService.getCollections(activeAccountId);
+        setCollections(data);
+      } catch (err) {
+        console.error('[CreateMentionModal] Error loading collections:', err);
+      } finally {
+        setLoadingCollections(false);
+      }
+    };
+
+    loadCollections();
+  }, [activeAccountId]);
+
   // Reset form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
       setDescription('');
       setError(null);
       setVisibility('public');
+      setSelectedCollectionId(null);
     }
   }, [isOpen]);
 
@@ -74,6 +103,7 @@ export default function CreateMentionModal({
         lng: coordinates.lng,
         description: description.trim() || null,
         visibility,
+        collection_id: selectedCollectionId || null,
       };
 
       const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
@@ -130,6 +160,25 @@ export default function CreateMentionModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 pb-6">
           <div className="space-y-3 py-4">
+            {/* Collection Selector */}
+            {activeAccountId && collections.length > 0 && (
+              <div>
+                <select
+                  value={selectedCollectionId || ''}
+                  onChange={(e) => setSelectedCollectionId(e.target.value || null)}
+                  disabled={isSubmitting}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-900 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">Unassigned</option>
+                  {collections.map((collection) => (
+                    <option key={collection.id} value={collection.id}>
+                      {collection.emoji} {collection.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Description */}
             <div>
               <textarea

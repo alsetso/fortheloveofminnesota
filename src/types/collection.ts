@@ -8,6 +8,7 @@ export interface Collection {
   emoji: string;
   title: string;
   description: string | null;
+  mention_count?: number; // Computed field - count of mentions in this collection
   created_at: string;
   updated_at: string;
 }

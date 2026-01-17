@@ -62,11 +62,13 @@ export async function GET(request: NextRequest) {
       }
     );
 
-        // Fetch stats for all maps in parallel
+        // Fetch stats for all maps in parallel using get_url_stats
+        // Maps are tracked as /map/{map_id} URLs
         const statsPromises = mapIds.map(async (mapId) => {
           try {
-            const { data, error } = await supabase.rpc('get_map_stats', {
-              p_map_id: mapId,
+            const mapUrl = `/map/${mapId}`;
+            const { data, error } = await supabase.rpc('get_url_stats', {
+              p_url: mapUrl,
               p_hours: hours,
             } as any) as { data: Array<{ total_views: number; unique_viewers: number; accounts_viewed: number }> | null; error: any };
 

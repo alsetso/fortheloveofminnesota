@@ -10,7 +10,7 @@ import MapCard from './components/MapCard';
 import { COMMUNITY_MAPS, PROFESSIONAL_MAPS } from './constants';
 import type { MapItem } from './types';
 
-type TabType = 'my-maps' | 'community' | 'professional' | 'atlas';
+type TabType = 'my-maps' | 'community' | 'professional';
 
 export default function MapsPage() {
   const router = useRouter();
@@ -36,7 +36,7 @@ export default function MapsPage() {
   // Get initial tab from URL or default
   const getInitialTab = (): TabType => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['my-maps', 'community', 'professional', 'atlas'].includes(tabParam)) {
+    if (tabParam && ['my-maps', 'community', 'professional'].includes(tabParam)) {
       return tabParam as TabType;
     }
     return account ? 'my-maps' : 'community';
@@ -48,7 +48,7 @@ export default function MapsPage() {
   // Update active tab when URL param or account changes
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['my-maps', 'community', 'professional', 'atlas'].includes(tabParam)) {
+    if (tabParam && ['my-maps', 'community', 'professional'].includes(tabParam)) {
       setActiveTab(tabParam as TabType);
     } else if (account) {
       setActiveTab('my-maps');
@@ -56,8 +56,6 @@ export default function MapsPage() {
       setActiveTab('community');
     }
   }, [searchParams, account?.id]);
-  const [atlasMaps, setAtlasMaps] = useState<MapItem[]>([]);
-  const [loadingAtlasMaps, setLoadingAtlasMaps] = useState(true);
   const [professionalMaps, setProfessionalMaps] = useState<MapItem[]>(() => 
     PROFESSIONAL_MAPS.map(m => ({ ...m, view_count: 0 }))
   );
@@ -100,14 +98,6 @@ export default function MapsPage() {
     );
   }, [accountMaps, searchQuery]);
 
-  const filteredAtlasMaps = useMemo(() => {
-    if (!searchQuery.trim()) return atlasMaps;
-    const query = searchQuery.toLowerCase();
-    return atlasMaps.filter(map => 
-      map.title.toLowerCase().includes(query) ||
-      (map.description && map.description.toLowerCase().includes(query))
-    );
-  }, [atlasMaps, searchQuery]);
 
 
   // Fetch user-generated maps and stats - only when 'community' tab is selected
@@ -261,74 +251,6 @@ export default function MapsPage() {
     fetchAccountMaps();
   }, [activeTab, account?.id]);
 
-  // Fetch atlas maps - only when 'atlas' tab is selected
-  useEffect(() => {
-    if (activeTab !== 'atlas' || fetchedTabsRef.current.has('atlas')) {
-      return;
-    }
-
-    fetchedTabsRef.current.add('atlas');
-
-    const fetchAtlasMaps = async () => {
-      setLoadingAtlasMaps(true);
-      try {
-        const response = await fetch('/api/atlas/types');
-        if (response.ok) {
-          const data = await response.json();
-          const types = data.types || [];
-          const maps: MapItem[] = types.map((type: any) => ({
-            id: `atlas-${type.slug}`,
-            title: type.name,
-            description: type.description,
-            visibility: 'public' as const,
-            map_style: 'street' as const,
-            map_type: 'atlas' as const,
-            href: `/map/atlas/${type.slug}`,
-            thumbnail: type.icon_path || undefined,
-            status: type.status || 'active',
-            view_count: 0, // Will be updated with stats
-          }));
-
-          // Fetch view stats for all atlas maps in parallel
-          try {
-            const statsPromises = maps.map(async (map) => {
-              const table = map.href?.replace('/map/atlas/', '');
-              if (!table) return map;
-              
-              try {
-                const statsResponse = await fetch(`/api/analytics/atlas-map-stats?table=${table}`);
-                if (statsResponse.ok) {
-                  const statsData = await statsResponse.json();
-                  return {
-                    ...map,
-                    view_count: statsData.stats?.total_views || 0,
-                  };
-                }
-              } catch (err) {
-                console.error(`Error fetching stats for ${table}:`, err);
-              }
-              return map;
-            });
-
-            const mapsWithStats = await Promise.all(statsPromises);
-            setAtlasMaps(mapsWithStats);
-          } catch (err) {
-            console.error('Error fetching atlas map stats:', err);
-            setAtlasMaps(maps); // Set maps without stats if stats fetch fails
-          }
-        } else {
-          setAtlasMaps([]);
-        }
-      } catch (err) {
-        console.error('Error fetching atlas maps:', err);
-        setAtlasMaps([]);
-      } finally {
-        setLoadingAtlasMaps(false);
-      }
-    };
-
-    fetchAtlasMaps();
-  }, [activeTab]);
 
   // Fetch professional map stats - only when 'professional' tab is selected
   useEffect(() => {
@@ -390,12 +312,6 @@ export default function MapsPage() {
           loading: loadingProfessionalMaps,
           emptyMessage: 'No professional maps found',
         };
-      case 'atlas':
-        return {
-          maps: filteredAtlasMaps,
-          loading: loadingAtlasMaps,
-          emptyMessage: searchQuery ? 'No atlas maps found' : 'No atlas maps available',
-        };
       default:
         return {
           maps: [],
@@ -416,8 +332,6 @@ export default function MapsPage() {
         return filteredCommunityMaps.length + filteredUserMaps.length;
       case 'professional':
         return filteredProfessionalMaps.length;
-      case 'atlas':
-        return filteredAtlasMaps.length;
       default:
         return 0;
     }
@@ -443,7 +357,7 @@ export default function MapsPage() {
                 <h1 className="text-lg font-semibold text-gray-900">Maps of Minnesota</h1>
               </div>
               <p className="text-xs text-gray-600 pl-7">
-                Create, explore, and share interactive maps across Minnesota. Browse community maps, professional tools, atlas layers, and user-generated content.
+                Create, explore, and share interactive maps across Minnesota. Browse community maps, professional tools, and user-generated content.
               </p>
             </div>
 
@@ -484,16 +398,6 @@ export default function MapsPage() {
                   >
                     Professional <span className="text-gray-500">({getTabCount('professional')})</span>
                   </button>
-                  <button
-                    onClick={() => setActiveTab('atlas')}
-                    className={`w-full text-left px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === 'atlas'
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    Atlas <span className="text-gray-500">({getTabCount('atlas')})</span>
-                  </button>
                 </div>
               </div>
 
@@ -505,7 +409,6 @@ export default function MapsPage() {
                     {activeTab === 'my-maps' && 'My Maps'}
                     {activeTab === 'community' && 'Community Maps'}
                     {activeTab === 'professional' && 'Professional Maps'}
-                    {activeTab === 'atlas' && 'Atlas Maps'}
                   </h2>
                   <span className="text-xs text-gray-500">
                     {activeTab === 'community' 

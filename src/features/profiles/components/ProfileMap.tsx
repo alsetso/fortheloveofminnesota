@@ -38,6 +38,7 @@ export default function ProfileMap({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [showCollectionToast, setShowCollectionToast] = useState(false);
   const [collectionToastData, setCollectionToastData] = useState<{ emoji: string; title: string; count: number } | null>(null);
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(selectedCollectionId);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const popupRef = useRef<any>(null);
   const clickHandlersAddedRef = useRef<boolean>(false);
@@ -86,7 +87,7 @@ export default function ProfileMap({
 
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
-          style: MAP_CONFIG.MAPBOX_STYLE,
+          style: MAP_CONFIG.STRATEGIC_STYLES.streets,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
@@ -180,12 +181,34 @@ export default function ProfileMap({
     pinsRef.current = pins;
   }, [pins]);
 
+  // Listen for filter-by-collection event
+  useEffect(() => {
+    const handleFilterByCollection = (event: Event) => {
+      const customEvent = event as CustomEvent<{ collectionId: string }>;
+      const collectionId = customEvent.detail?.collectionId;
+      if (collectionId) {
+        setActiveCollectionId(collectionId);
+      }
+    };
+
+    window.addEventListener('filter-by-collection', handleFilterByCollection);
+    return () => {
+      window.removeEventListener('filter-by-collection', handleFilterByCollection);
+    };
+  }, []);
+
   // Add pins to map
   useEffect(() => {
     if (!mapLoaded || !mapInstanceRef.current) return;
 
     const mapboxMap = mapInstanceRef.current as any;
-    const geoJSON = pinsToGeoJSON(pins);
+    
+    // Filter pins by collection if one is selected
+    const filteredPins = activeCollectionId 
+      ? pins.filter(pin => pin.collection_id === activeCollectionId)
+      : pins;
+    
+    const geoJSON = pinsToGeoJSON(filteredPins);
 
     const setupLayers = async () => {
       try {
@@ -691,14 +714,14 @@ export default function ProfileMap({
         popupRef.current = null;
       }
     };
-  }, [mapLoaded, pins, accountId, isOwnProfile, accountUsername, accountImageUrl, onPinSelect]);
+  }, [mapLoaded, pins, accountId, isOwnProfile, accountUsername, accountImageUrl, onPinSelect, activeCollectionId]); // Added activeCollectionId
 
   // Show toast when a collection is selected (not on initial load)
   useEffect(() => {
-    if (selectedCollectionId && collections.length > 0) {
-      const collection = collections.find(c => c.id === selectedCollectionId);
+    if (activeCollectionId && collections.length > 0) {
+      const collection = collections.find(c => c.id === activeCollectionId);
       if (collection) {
-        const count = pins.filter(pin => pin.collection_id === selectedCollectionId).length;
+        const count = pins.filter(pin => pin.collection_id === activeCollectionId).length;
         setCollectionToastData({
           emoji: collection.emoji,
           title: collection.title,
@@ -716,11 +739,11 @@ export default function ProfileMap({
     }
     setShowCollectionToast(false);
     return undefined;
-  }, [selectedCollectionId, collections, pins]);
+  }, [activeCollectionId, collections, pins]);
 
   return (
-    <div className="relative w-full h-full bg-gray-100 overflow-hidden">
-      <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+    <div className="relative w-full h-full bg-gray-100 overflow-hidden" style={{ height: '100%' }}>
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ height: '100%' }} />
       {/* Floating Collection Toast */}
       {showCollectionToast && collectionToastData && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-slate-500 text-white px-3 py-2 rounded-md shadow-lg border border-slate-400 flex items-center gap-2 text-xs">

@@ -20,8 +20,6 @@ export interface MobileNavItemConfig {
   getContent: (props: { 
     map?: MapboxMapInstance | null; 
     account?: Account | null;
-    pointsOfInterestVisible?: boolean;
-    onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
   }) => ReactNode;
 }
 
@@ -31,11 +29,9 @@ export const mobileNavConfig: MobileNavItemConfig[] = [
     label: 'Controls',
     icon: Cog6ToothIcon,
     iconSolid: Cog6ToothIconSolid,
-    getContent: ({ map, pointsOfInterestVisible, onPointsOfInterestVisibilityChange }) => (
+    getContent: ({ map }) => (
       <Map3DControlsSecondaryContent 
         map={map} 
-        pointsOfInterestVisible={pointsOfInterestVisible}
-        onPointsOfInterestVisibilityChange={onPointsOfInterestVisibilityChange}
       />
     ),
   },

@@ -95,7 +95,7 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad }: UseMap
           style,
           center: meta?.center || MAP_CONFIG.DEFAULT_CENTER,
           zoom: meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM,
-          pitch: meta?.pitch ?? 0,
+          pitch: meta?.pitch ?? 60,
           bearing: 0,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [

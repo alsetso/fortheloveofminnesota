@@ -14,14 +14,9 @@ export default function ProfileCollectionsContainer({
   onCollectionsUpdate,
 }: ProfileCollectionsContainerProps) {
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-        <h2 className="text-sm font-semibold text-gray-900">Collections</h2>
-      </div>
-
+    <div>
       {/* Collections List */}
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+      <div className="p-[10px]">
         <ProfileCollectionsList
           accountId={accountId}
           isOwnProfile={isOwnProfile}

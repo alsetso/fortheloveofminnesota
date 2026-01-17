@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { PlusIcon, PencilIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
+import { PlusIcon, PencilIcon, XMarkIcon, UserIcon } from '@heroicons/react/24/outline';
 import { CollectionService } from '@/features/collections/services/collectionService';
+import CompactActionButton from '@/components/ui/CompactActionButton';
 import type { Collection, CreateCollectionData, UpdateCollectionData } from '@/types/collection';
 import type { ProfilePin } from '@/types/profile';
 
@@ -17,6 +19,8 @@ interface CollectionsPanelProps {
   onPinUpdate: (pinId: string, collectionId: string | null) => Promise<void>;
   selectedPinId?: string | null;
   onPinSelect?: (pinId: string | null) => void;
+  accountUsername?: string | null;
+  accountImageUrl?: string | null;
 }
 
 export default function CollectionsPanel({
@@ -30,6 +34,8 @@ export default function CollectionsPanel({
   onPinUpdate,
   selectedPinId,
   onPinSelect,
+  accountUsername,
+  accountImageUrl,
 }: CollectionsPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -137,31 +143,57 @@ export default function CollectionsPanel({
 
   return (
     <div className="absolute top-2 left-2 z-20 bg-white border border-gray-200 rounded-md shadow-sm max-w-[280px] w-full max-h-[calc(100%-16px)] overflow-hidden flex flex-col">
-      {/* Header */}
-      <div className="px-2 py-1.5 border-b border-gray-200 flex items-center justify-between">
+      {/* Account Info */}
+      {(accountUsername || accountImageUrl) && (
+        <div className="px-1.5 py-1 border-b border-gray-200">
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 flex-shrink-0">
+              {accountImageUrl ? (
+                <Image
+                  src={accountImageUrl}
+                  alt={accountUsername || 'Account'}
+                  width={20}
+                  height={20}
+                  className="w-full h-full object-cover"
+                  unoptimized={accountImageUrl.startsWith('data:') || accountImageUrl.includes('supabase.co')}
+                />
+              ) : (
+                <UserIcon className="w-3 h-3 text-gray-500" />
+              )}
+            </div>
+            {accountUsername && (
+              <span className="text-xs font-medium text-gray-900 truncate">
+                @{accountUsername}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Header - Compact */}
+      <div className="px-1.5 py-0.5 border-b border-gray-200 flex items-center justify-between">
         <h3 className="text-xs font-semibold text-gray-900">Collections</h3>
         {isOwnProfile && (
-          <button
+          <CompactActionButton
             onClick={() => {
               setIsCreating(true);
               setNewCollectionTitle('');
               setNewCollectionEmoji('📍');
             }}
-            className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
             title="Add Collection"
           >
-            <PlusIcon className="w-3 h-3" />
-          </button>
+            <PlusIcon className="w-2.5 h-2.5 text-gray-600" />
+          </CompactActionButton>
         )}
       </div>
 
       {/* Content */}
       <div className="overflow-y-auto flex-1">
-        <div className="p-1.5 space-y-1">
-          {/* All Pins / Unassigned */}
+        <div className="p-0.5 space-y-0.5">
+          {/* All Pins */}
           <button
             onClick={() => onCollectionSelect(null)}
-            className={`w-full px-2 py-1.5 rounded text-left transition-colors ${
+            className={`w-full px-1.5 py-0.5 rounded text-left transition-colors ${
               selectedCollectionId === null
                 ? 'bg-gray-100 text-gray-900'
                 : 'hover:bg-gray-50 text-gray-600'
@@ -175,26 +207,9 @@ export default function CollectionsPanel({
             </div>
           </button>
 
-          {/* Unassigned */}
-          {unassignedCount > 0 && (
-            <button
-              onClick={() => onCollectionSelect('unassigned')}
-              className={`w-full px-2 py-1.5 rounded text-left transition-colors ${
-                selectedCollectionId === 'unassigned'
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'hover:bg-gray-50 text-gray-600'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs">Unassigned</span>
-                <span className="text-[10px] text-gray-500">{unassignedCount}</span>
-              </div>
-            </button>
-          )}
-
           {/* Assign Pin to Collection (for owners when pin is selected) */}
           {isOwnProfile && selectedPinId && (
-            <div className="px-2 py-1.5 border-t border-gray-200 bg-gray-50">
+            <div className="px-1.5 py-0.5 border-t border-gray-200 bg-gray-50">
               <div className="text-[10px] text-gray-500 mb-1">Assign to collection:</div>
               <div className="flex flex-wrap gap-1">
                 <button
@@ -239,7 +254,7 @@ export default function CollectionsPanel({
 
             if (isEditing && isOwnProfile) {
               return (
-                <div key={collection.id} className="px-2 py-1.5 border border-gray-200 rounded bg-gray-50">
+                <div key={collection.id} className="px-1.5 py-0.5 border border-gray-200 rounded bg-gray-50">
                   <div className="flex items-center gap-1 mb-1.5">
                     <input
                       type="text"
@@ -281,7 +296,7 @@ export default function CollectionsPanel({
             return (
               <div
                 key={collection.id}
-                className={`px-2 py-1.5 rounded transition-colors ${
+                className={`px-1.5 py-0.5 rounded transition-colors ${
                   isSelected ? 'bg-gray-100' : 'hover:bg-gray-50'
                 }`}
               >
@@ -329,7 +344,7 @@ export default function CollectionsPanel({
 
           {/* Create Collection Form */}
           {isCreating && isOwnProfile && (
-            <div className="px-2 py-1.5 border border-gray-200 rounded bg-gray-50">
+            <div className="px-1.5 py-0.5 border border-gray-200 rounded bg-gray-50">
               <div className="flex items-center gap-1 mb-1.5">
                 <input
                   type="text"

@@ -3,7 +3,6 @@
 import { useAppModalContext } from '@/contexts/AppModalContext';
 import WelcomeModal from '@/features/account/components/WelcomeModal';
 import CreateAccountModal from '@/features/account/components/CreateAccountModal';
-import LiveAccountModal from '@/components/layout/LiveAccountModal';
 import BillingModal from '@/components/modals/BillingModal';
 import ComingSoonModal from '@/components/modals/ComingSoonModal';
 
@@ -28,13 +27,6 @@ export default function GlobalModals() {
       <CreateAccountModal
         isOpen={modal.type === 'createAccount'}
         onClose={closeModal}
-      />
-
-      {/* Live Account Modal - works globally, includes tabs and onboarding */}
-      <LiveAccountModal
-        isOpen={modal.type === 'account'}
-        onClose={closeModal}
-        initialTab={modal.tab as 'settings' | 'analytics' | 'profile' | 'profiles' | undefined}
       />
 
       {/* Billing & Upgrade Modal */}

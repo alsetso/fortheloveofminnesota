@@ -31,6 +31,8 @@ interface BaseNavProps {
   textColor?: string;
   /** Active link color classes */
   activeColor?: string;
+  /** Left section content (custom nav items, etc.) - overrides navLinks if provided */
+  leftSection?: ReactNode;
   /** Right section content (auth buttons, etc.) */
   rightSection?: ReactNode;
   /** Search section (displayed between nav links and right section) */
@@ -61,6 +63,7 @@ export default function BaseNav({
   borderColor = 'border-gray-200',
   textColor = 'text-gray-600',
   activeColor = 'text-black',
+  leftSection,
   rightSection,
   searchSection,
   showScrollEffect = false,
@@ -102,8 +105,11 @@ export default function BaseNav({
         <div className="grid grid-cols-3 items-center h-full gap-2">
           {/* Left Column: Navigation Links (Desktop) / Hamburger (Mobile) */}
           <div className="flex items-center gap-0 min-w-0 h-full">
-            {/* Desktop: Show nav links */}
-            <div className="hidden md:flex items-center gap-0 min-w-0 justify-start h-full">
+            {/* Desktop: Show custom left section or nav links */}
+            {leftSection ? (
+              leftSection
+            ) : (
+              <div className="hidden md:flex items-center gap-0 min-w-0 justify-start h-full">
               {navLinks.map((link, index) => {
                 const Icon = link.icon;
                 const active = isActive(link.href);
@@ -153,7 +159,8 @@ export default function BaseNav({
                   </Link>
                 );
               })}
-            </div>
+              </div>
+            )}
             
             {/* Mobile: Show hamburger menu */}
             <button

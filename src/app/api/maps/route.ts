@@ -134,7 +134,7 @@ const createMapSchema = z.object({
   description: z.string().max(2000).optional().nullable(),
   visibility: z.enum(['public', 'private', 'shared']).default('private'),
   map_style: z.enum(['street', 'satellite', 'light', 'dark']).default('street'),
-  type: z.enum(['user', 'community', 'gov', 'professional', 'atlas', 'user-generated']).optional().nullable(),
+  type: z.enum(['user', 'community', 'gov', 'professional', 'user-generated']).optional().nullable(),
   custom_slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(100).optional().nullable(),
   tags: z.array(z.object({
     emoji: z.string(),

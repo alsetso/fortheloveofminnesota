@@ -12,7 +12,6 @@ import {
   EnvelopeIcon,
   UserIcon
 } from '@heroicons/react/24/outline';
-import AddAtlasLocationTool from './AddAtlasLocationTool';
 import AddPlaceModal from './AddPlaceModal';
 
 interface ContributeContentProps {
@@ -23,7 +22,6 @@ interface ContributeContentProps {
 export default function ContributeContent({ map, mapLoaded }: ContributeContentProps = {}) {
   const { account, isLoading } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
-  const [showAddAtlasTool, setShowAddAtlasTool] = useState(false);
   const [showAddPlaceModal, setShowAddPlaceModal] = useState(false);
   const router = useRouter();
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
@@ -193,25 +191,14 @@ export default function ContributeContent({ map, mapLoaded }: ContributeContentP
             <h4 className={`text-xs font-semibold uppercase tracking-wide ${useTransparentUI ? 'text-white' : 'text-gray-900'}`}>
               Admin Tools
             </h4>
-            {showAddAtlasTool ? (
-              <AddAtlasLocationTool
-                map={map}
-                mapLoaded={mapLoaded || false}
-                onClose={() => setShowAddAtlasTool(false)}
-              />
-            ) : (
-              <button
-                onClick={() => setShowAddAtlasTool(true)}
-                className={`w-full px-3 py-2 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-2 ${
-                  useTransparentUI
-                    ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
-                    : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <MapPinIcon className="w-4 h-4" />
-                Add Atlas Locations
-              </button>
-            )}
+            <div className={`w-full px-3 py-2 text-xs font-medium rounded-md flex items-center justify-center gap-2 ${
+              useTransparentUI
+                ? 'text-white/50 bg-white/5 border border-white/10'
+                : 'text-gray-400 bg-gray-50 border border-gray-200'
+            }`}>
+              <MapPinIcon className="w-4 h-4" />
+              Add Locations (Coming Soon)
+            </div>
           </div>
         </div>
       )}

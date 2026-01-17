@@ -48,9 +48,9 @@ export class MentionService {
           archived,
           post_date,
           map_meta,
-          atlas_meta,
           created_at,
           updated_at,
+          view_count,
           accounts(
             image_url
           )`
@@ -73,10 +73,6 @@ export class MentionService {
       query = query.eq('city_id', filters.city_id);
     }
 
-    // Atlas entity filter - filter by atlas_meta->>'id'
-    if (filters?.atlas_entity_id) {
-      query = query.eq('atlas_meta->>id', filters.atlas_entity_id);
-    }
 
     // Time filter - filter by created_at (last 24 hours or 7 days)
     if (filters?.timeFilter) {
@@ -230,7 +226,7 @@ export class MentionService {
         media_type: data.media_type || 'none',
         full_address: data.full_address || null,
         map_meta: data.map_meta || null,
-        atlas_meta: data.atlas_meta || null,
+        atlas_meta: null,
         collection_id: data.collection_id || null,
       })
       .select(`
@@ -261,7 +257,17 @@ export class MentionService {
    * Update an existing mention
    * User must own the mention
    */
-  static async updateMention(mentionId: string, data: { description?: string | null; archived?: boolean; collection_id?: string | null }): Promise<Mention> {
+  static async updateMention(
+    mentionId: string, 
+    data: { 
+      description?: string | null; 
+      archived?: boolean; 
+      collection_id?: string | null;
+      image_url?: string | null;
+      video_url?: string | null;
+      media_type?: 'image' | 'video' | 'none';
+    }
+  ): Promise<Mention> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('You must be signed in to update mentions');
@@ -280,6 +286,41 @@ export class MentionService {
     }
 
     return mention as Mention;
+  }
+
+  /**
+   * Delete a mention
+   * User must own the mention
+   */
+  static async deleteMention(mentionId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('You must be signed in to delete mentions');
+    }
+
+    // Get mention to verify ownership
+    const { data: mention } = await supabase
+      .from('mentions')
+      .select('account_id, accounts!inner(user_id)')
+      .eq('id', mentionId)
+      .single();
+
+    const mentionAccounts = mention?.accounts as { user_id: string } | { user_id: string }[] | null | undefined;
+    const accountUserId = Array.isArray(mentionAccounts) ? mentionAccounts[0]?.user_id : mentionAccounts?.user_id;
+
+    if (!mention || accountUserId !== user.id) {
+      throw new Error('You do not have permission to delete this mention');
+    }
+
+    const { error } = await supabase
+      .from('mentions')
+      .delete()
+      .eq('id', mentionId);
+
+    if (error) {
+      console.error('[MentionService] Error deleting mention:', error);
+      throw new Error(`Failed to delete mention: ${error.message}`);
+    }
   }
 
   /**

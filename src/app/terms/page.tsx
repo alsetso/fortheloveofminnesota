@@ -76,7 +76,6 @@ export default function TermsPage() {
             <p className="mb-3">Users may create and share the following content on the Platform:</p>
             <ul className="list-disc pl-6 space-y-2 mb-4">
               <li><strong>Mentions:</strong> Location-based posts with text, images, and videos</li>
-              <li><strong>Comments:</strong> Responses to news articles and other content</li>
               <li><strong>Profile Information:</strong> Personal details, biography, and profile images</li>
             </ul>
 

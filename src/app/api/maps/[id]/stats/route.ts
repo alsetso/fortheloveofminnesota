@@ -75,9 +75,11 @@ export async function GET(
       }
     );
 
-        // Get stats using public.get_map_stats function
-        const { data, error } = await supabase.rpc('get_map_stats', {
-          p_map_id: validatedId,
+        // Get stats using get_url_stats function
+        // Maps are tracked as /map/{map_id} URLs
+        const mapUrl = `/map/${validatedId}`;
+        const { data, error } = await supabase.rpc('get_url_stats', {
+          p_url: mapUrl,
           p_hours: hours,
         } as any) as { data: Array<{ total_views: number; unique_viewers: number; accounts_viewed: number }> | null; error: any };
 

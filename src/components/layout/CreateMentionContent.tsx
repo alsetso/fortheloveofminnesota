@@ -3,40 +3,42 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-import { InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { InformationCircleIcon, XMarkIcon, CameraIcon, PlusIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import FirstMentionModal from '@/components/modals/FirstMentionModal';
+import MentionCreatedModal from '@/components/modals/MentionCreatedModal';
 import { supabase } from '@/lib/supabase';
-import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
-import YouTubePreview from '@/features/mentions/components/YouTubePreview';
+import { CollectionService } from '@/features/collections/services/collectionService';
+import type { Collection } from '@/types/collection';
+import type { Mention } from '@/types/mention';
 
 
 interface CreateMentionContentProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
   initialCoordinates?: { lat: number; lng: number } | null;
-  initialAtlasMeta?: Record<string, any> | null;
   initialMapMeta?: Record<string, any> | null;
   initialFullAddress?: string | null;
   initialImageBlob?: Blob | null;
   onMentionCreated?: () => void;
-  onDescriptionChange?: (length: number, maxLength: number, isPro: boolean) => void;
+  useTransparentUI?: boolean;
+  useWhiteText?: boolean;
 }
 
 export default function CreateMentionContent({ 
   map, 
   mapLoaded,
   initialCoordinates,
-  initialAtlasMeta,
   initialMapMeta,
   initialFullAddress,
   initialImageBlob,
   onMentionCreated,
-  onDescriptionChange
+  useTransparentUI = false,
+  useWhiteText = false,
 }: CreateMentionContentProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -53,40 +55,22 @@ export default function CreateMentionContent({
   const [showFirstMentionModal, setShowFirstMentionModal] = useState(false);
   const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
   const mapMetaInfoRef = useRef<HTMLDivElement>(null);
-  const initialCoordinatesProcessedRef = useRef<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [useBlurStyle, setUseBlurStyle] = useState(() => {
-    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
-  });
-  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
-    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
-  });
-
-  // Listen for blur style and map style changes
-  useEffect(() => {
-    const handleBlurStyleChange = (e: CustomEvent) => {
-      setUseBlurStyle(e.detail.useBlurStyle);
-    };
-    const handleMapStyleChange = (e: CustomEvent) => {
-      setCurrentMapStyle(e.detail.mapStyle);
-    };
-    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
-    window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
-    return () => {
-      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
-      window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
-    };
-  }, []);
-
-  // Use transparent backgrounds and white text when satellite + blur
-  const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
-
-  // Detect YouTube URLs in description
-  const youtubeUrls = findYouTubeUrls(description);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [loadingCollections, setLoadingCollections] = useState(false);
+  const [showCollectionSelector, setShowCollectionSelector] = useState(false);
+  const [showCreateCollection, setShowCreateCollection] = useState(false);
+  const [newCollectionTitle, setNewCollectionTitle] = useState('');
+  const [newCollectionEmoji, setNewCollectionEmoji] = useState('📍');
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const collectionSelectorRef = useRef<HTMLDivElement>(null);
+  const [showMentionCreatedModal, setShowMentionCreatedModal] = useState(false);
+  const [createdMention, setCreatedMention] = useState<Mention | null>(null);
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -118,22 +102,52 @@ export default function CreateMentionContent({
     };
   }, [showMapMetaInfo]);
 
-  // Notify parent of description changes
+  // Close collection selector when clicking outside
   useEffect(() => {
-    onDescriptionChange?.(description.length, maxLength, isPro);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [description.length, maxLength, isPro]); // Only depend on values, not the callback function
+    if (!showCollectionSelector && !showCreateCollection) return;
 
-  // Handle initial image/video blob from camera
+    const handleClickOutside = (event: MouseEvent) => {
+      if (collectionSelectorRef.current && !collectionSelectorRef.current.contains(event.target as Node)) {
+        setShowCollectionSelector(false);
+        setShowCreateCollection(false);
+        setNewCollectionTitle('');
+        setNewCollectionEmoji('📍');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCollectionSelector, showCreateCollection]);
+
+  // Load collections when account is available
   useEffect(() => {
-    if (initialImageBlob) {
-      const isVideo = initialImageBlob.type.startsWith('video/');
-      console.log('[CreateMentionContent] Received initial blob from camera:', isVideo ? 'video' : 'image');
-      
-      // Convert Blob to File for consistency with file input handling
-      const fileName = isVideo 
-        ? `camera-capture-${Date.now()}.webm`
-        : `camera-capture-${Date.now()}.jpg`;
+    if (!activeAccountId) {
+      setCollections([]);
+      setSelectedCollectionId(null);
+      return;
+    }
+
+    const loadCollections = async () => {
+      setLoadingCollections(true);
+      try {
+        const data = await CollectionService.getCollections(activeAccountId);
+        setCollections(data);
+      } catch (err) {
+        console.error('[CreateMentionContent] Error loading collections:', err);
+      } finally {
+        setLoadingCollections(false);
+      }
+    };
+
+    loadCollections();
+  }, [activeAccountId]);
+
+  // Handle initial image blob from camera
+  useEffect(() => {
+    if (initialImageBlob && initialImageBlob.type.startsWith('image/')) {
+      const fileName = `camera-capture-${Date.now()}.jpg`;
       const file = new File([initialImageBlob], fileName, { type: initialImageBlob.type });
       setImageFile(file);
       
@@ -141,48 +155,32 @@ export default function CreateMentionContent({
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-        console.log('[CreateMentionContent] Preview created from camera blob');
       };
       reader.readAsDataURL(initialImageBlob);
     }
-    // Note: We don't clear imageFile/imagePreview when initialImageBlob becomes null
-    // because the user might have manually selected an image via file input
-    // The parent (LiveMap) handles clearing the blob state after mention creation
   }, [initialImageBlob]);
 
-  // Use initialCoordinates if provided, otherwise get map center coordinates
+  // Set coordinates from initialCoordinates or map center
   useEffect(() => {
     if (initialCoordinates) {
-      // Create a stable key to compare coordinates
-      const coordKey = `${initialCoordinates.lat},${initialCoordinates.lng}`;
-      // Only update if coordinates actually changed
-      if (initialCoordinatesProcessedRef.current !== coordKey) {
-        setCoordinates(initialCoordinates);
-        setError(null);
-        initialCoordinatesProcessedRef.current = coordKey;
-      }
-    } else {
-      // Reset processed ref when initialCoordinates is null
-      initialCoordinatesProcessedRef.current = null;
-      if (map && mapLoaded) {
-        const mapboxMap = map as any;
-        const center = mapboxMap.getCenter();
-        if (center) {
-          const lat = center.lat;
-          const lng = center.lng;
-          
-          // Check if within Minnesota bounds
-          if (MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
-            setCoordinates({ lat, lng });
-          } else {
-            setCoordinates(null);
-            setError('Map center is outside Minnesota');
-          }
+      setCoordinates(initialCoordinates);
+      setError(null);
+    } else if (map && mapLoaded) {
+      const mapboxMap = map as any;
+      const center = mapboxMap.getCenter();
+      if (center) {
+        const lat = center.lat;
+        const lng = center.lng;
+        
+        if (MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
+          setCoordinates({ lat, lng });
+        } else {
+          setCoordinates(null);
+          setError('Map center is outside Minnesota');
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, mapLoaded, initialCoordinates?.lat, initialCoordinates?.lng]); // Only depend on lat/lng values, not the object
+  }, [map, mapLoaded, initialCoordinates]);
 
   // Listen for map movement to update coordinates (only if no initialCoordinates provided)
   useEffect(() => {
@@ -210,8 +208,7 @@ export default function CreateMentionContent({
     return () => {
       mapboxMap.off('moveend', updateCoordinates);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, mapLoaded, initialCoordinates?.lat, initialCoordinates?.lng]); // Only depend on lat/lng values, not the object
+  }, [map, mapLoaded, initialCoordinates]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -222,19 +219,8 @@ export default function CreateMentionContent({
       return;
     }
 
-    // Validate file type - only images allowed for now
-    const isImage = file.type.startsWith('image/');
-    const isVideo = file.type.startsWith('video/');
-    
-    if (isVideo) {
-      setError('Video uploads are not available yet. Please upload an image instead.');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      return;
-    }
-    
-    if (!isImage) {
+    // Validate file type - only images allowed
+    if (!file.type.startsWith('image/')) {
       setError('Please select a valid image file');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -271,21 +257,12 @@ export default function CreateMentionContent({
     }
   };
 
-  const uploadMedia = async (): Promise<{ url: string; type: 'image' | 'video' } | null> => {
+  const uploadImage = async (): Promise<string | null> => {
     if (!imageFile || !user) return null;
 
     setIsUploadingImage(true);
     try {
-      const isVideo = imageFile.type.startsWith('video/');
-      const isImage = imageFile.type.startsWith('image/');
-      
-      // Allow images and videos from camera, but only images from file upload
-      // (file upload validation happens in handleImageSelect)
-      if (!isImage && !isVideo) {
-        throw new Error('Only image and video files are allowed');
-      }
-      
-      const fileExt = imageFile.name.split('.').pop() || (isVideo ? 'webm' : 'jpg');
+      const fileExt = imageFile.name.split('.').pop() || 'jpg';
       const fileName = `${user.id}/mentions/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
       // Upload to Supabase storage
@@ -306,18 +283,48 @@ export default function CreateMentionContent({
         .getPublicUrl(fileName);
 
       if (!urlData?.publicUrl) {
-        throw new Error('Failed to get media URL');
+        throw new Error('Failed to get image URL');
       }
 
-      return {
-        url: urlData.publicUrl,
-        type: isVideo ? 'video' : 'image',
-      };
+      return urlData.publicUrl;
     } catch (err) {
-      console.error('[CreateMentionContent] Error uploading media:', err);
+      console.error('[CreateMentionContent] Error uploading image:', err);
       throw err;
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+
+  const handleCreateCollection = async () => {
+    if (!newCollectionTitle.trim() || isCreatingCollection) return;
+
+    setIsCreatingCollection(true);
+    try {
+      const newCollection = await CollectionService.createCollection({
+        emoji: newCollectionEmoji || '📍',
+        title: newCollectionTitle.trim(),
+        description: null,
+      });
+      
+      // Refresh collections
+      if (activeAccountId) {
+        const data = await CollectionService.getCollections(activeAccountId);
+        setCollections(data);
+      }
+      
+      // Select the new collection
+      setSelectedCollectionId(newCollection.id);
+      
+      // Reset form
+      setShowCreateCollection(false);
+      setShowCollectionSelector(false);
+      setNewCollectionTitle('');
+      setNewCollectionEmoji('📍');
+    } catch (err) {
+      console.error('[CreateMentionContent] Error creating collection:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create collection');
+    } finally {
+      setIsCreatingCollection(false);
     }
   };
 
@@ -346,25 +353,14 @@ export default function CreateMentionContent({
     setError(null);
 
     try {
-      // Upload media first if one is selected
+      // Upload image first if one is selected
       let imageUrl: string | null = null;
-      let videoUrl: string | null = null;
-      let mediaType: 'image' | 'video' | 'none' = 'none';
       
       if (imageFile) {
         try {
-          const mediaResult = await uploadMedia();
-          if (mediaResult) {
-            if (mediaResult.type === 'video') {
-              videoUrl = mediaResult.url;
-              mediaType = 'video';
-            } else {
-              imageUrl = mediaResult.url;
-              mediaType = 'image';
-            }
-          }
+          imageUrl = await uploadImage();
         } catch (err) {
-          const errorMessage = err instanceof Error ? err.message : 'Failed to upload media';
+          const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
           setError(errorMessage);
           setIsSubmitting(false);
           return;
@@ -403,53 +399,68 @@ export default function CreateMentionContent({
         lng: coordinates.lng,
         description: description.trim() || null,
         visibility,
+        collection_id: selectedCollectionId || null,
         image_url: imageUrl,
-        video_url: videoUrl,
-        media_type: mediaType,
+        video_url: null,
+        media_type: (imageUrl ? 'image' : 'none') as 'image' | 'none',
         full_address: fullAddress,
-        atlas_meta: initialAtlasMeta || null,
+        atlas_meta: null,
         map_meta: initialMapMeta || null,
       };
 
       const createdMention = await MentionService.createMention(mentionData, activeAccountId || undefined);
       
+      // Trigger refresh IMMEDIATELY so pin appears on map
+      window.dispatchEvent(new CustomEvent('mention-created', {
+        detail: { mention: createdMention }
+      }));
+      
+      // Store created mention for success modal
+      setCreatedMention(createdMention);
+      
+      // Wait for map to refresh and render the new pin before showing modal
+      // This ensures the screenshot captures the newly created pin
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       // Check if this is the user's first mention
-      if (activeAccountId) {
+      if (activeAccountId && createdMention.id) {
         try {
-          const { count, error: countError } = await supabase
+          const { count } = await supabase
             .from('mentions')
             .select('*', { count: 'exact', head: true })
             .eq('account_id', activeAccountId)
             .eq('archived', false);
 
-          if (!countError && count === 1) {
-            // This is the first mention!
+          if (count === 1) {
             setShowFirstMentionModal(true);
+          } else {
+            // Show success modal for non-first mentions
+            setShowMentionCreatedModal(true);
           }
         } catch (err) {
-          console.error('[CreateMentionContent] Error checking mention count:', err);
-          // Continue even if check fails
+          // Continue even if check fails - show success modal
+          console.debug('[CreateMentionContent] Error checking mention count:', err);
+          setShowMentionCreatedModal(true);
         }
+      } else {
+        // Show success modal if no account ID
+        setShowMentionCreatedModal(true);
       }
       
       // Reset form
       setDescription('');
       setVisibility('public');
+      setSelectedCollectionId(null);
       setImageFile(null);
       setImagePreview(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       
-      // Trigger refresh
-      window.dispatchEvent(new CustomEvent('mention-created'));
-      
       // Dispatch event to remove temporary marker after mention is created
       window.dispatchEvent(new CustomEvent('mention-created-remove-temp-pin'));
       
-      if (onMentionCreated) {
-        onMentionCreated();
-      }
+      // Don't call onMentionCreated callback yet - let the modal handle closing
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create mention';
       console.error('[CreateMentionContent] Error creating mention:', errorMessage, err);
@@ -477,39 +488,9 @@ export default function CreateMentionContent({
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-3 px-4 py-4">
-      {/* Atlas Entity Label */}
-      {initialAtlasMeta && (
-        <div className={`flex items-center gap-2 p-2 border rounded-md ${
-          useTransparentUI
-            ? 'bg-white/10 border-white/20'
-            : 'bg-gray-50 border-gray-200'
-        }`}>
-          {initialAtlasMeta.icon_path && (
-            <Image
-              src={initialAtlasMeta.icon_path}
-              alt={initialAtlasMeta.name || 'Entity'}
-              width={20}
-              height={20}
-              className="w-5 h-5 object-contain flex-shrink-0"
-              unoptimized
-            />
-          )}
-          <div className="flex-1 min-w-0">
-            <div className={`text-xs font-semibold ${useTransparentUI ? 'text-white' : 'text-gray-900'}`}>
-              {initialAtlasMeta.name || 'Atlas Entity'}
-            </div>
-            {initialAtlasMeta.table_name && (
-              <div className={`text-[10px] capitalize ${useTransparentUI ? 'text-white/70' : 'text-gray-500'}`}>
-                {initialAtlasMeta.table_name.replace('_', ' ')}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Map Metadata Label */}
-      {initialMapMeta && !initialAtlasMeta && initialMapMeta.feature && (() => {
+      <form onSubmit={handleSubmit} className={`space-y-3 px-4 pt-4 ${imagePreview ? 'pb-4' : 'pb-0'}`}>
+      {/* Map Metadata Label - Only show for admins */}
+      {initialMapMeta && initialMapMeta.feature && account?.role === 'admin' && (() => {
         const feature = initialMapMeta.feature;
         const props = feature.properties || {};
         
@@ -604,22 +585,190 @@ export default function CreateMentionContent({
                 <p className={`text-xs ${useTransparentUI ? 'text-white/90' : 'text-gray-600'}`}>
                   By dropping a pin, hovering over labels on the map will reference these in the mention.
                 </p>
+                {account?.role === 'admin' && (
+                  <p className={`text-[10px] mt-1 ${useTransparentUI ? 'text-white/70' : 'text-gray-500'}`}>
+                    Admin: Metadata labels visible
+                  </p>
+                )}
               </div>
             )}
           </div>
         );
       })()}
 
+      {/* Collection Selector */}
+      {activeAccountId && (
+        <div className="relative" ref={collectionSelectorRef}>
+          {/* Selected Collection or +Assign Button */}
+          {!selectedCollectionId ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (collections.length === 0) {
+                  setShowCreateCollection(true);
+                } else {
+                  setShowCollectionSelector(!showCollectionSelector);
+                }
+              }}
+              disabled={isSubmitting}
+              className={`w-full px-2 py-1.5 text-xs border rounded-md text-left transition-colors ${
+                useTransparentUI
+                  ? 'bg-white/10 border-white/20 text-blue-400 hover:text-blue-300'
+                  : 'bg-white border-gray-200 text-blue-600 hover:text-blue-700'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              +Assign
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowCollectionSelector(!showCollectionSelector)}
+              disabled={isSubmitting}
+              className={`w-full px-2 py-1.5 text-xs border rounded-md text-left transition-colors ${
+                useTransparentUI
+                  ? 'bg-white/10 border-white/20 text-white'
+                  : 'bg-white border-gray-200 text-gray-900'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              {collections.find(c => c.id === selectedCollectionId)?.emoji} {collections.find(c => c.id === selectedCollectionId)?.title}
+            </button>
+          )}
+
+          {/* Collection Selector Dropdown */}
+          {showCollectionSelector && !showCreateCollection && (
+            <div className={`absolute top-full left-0 right-0 mt-1 border rounded-md shadow-lg max-h-48 overflow-y-auto z-50 ${
+              useTransparentUI
+                ? 'bg-white/90 backdrop-blur-md border-white/20'
+                : 'bg-white border-gray-200'
+            }`}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCollectionId(null);
+                  setShowCollectionSelector(false);
+                }}
+                className={`w-full px-2 py-1.5 text-xs text-left hover:bg-gray-100 transition-colors ${
+                  useTransparentUI ? 'text-white/80' : 'text-gray-600'
+                }`}
+              >
+                Unassigned
+              </button>
+              {collections.map((collection) => (
+                <button
+                  key={collection.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCollectionId(collection.id);
+                    setShowCollectionSelector(false);
+                  }}
+                  className={`w-full px-2 py-1.5 text-xs text-left hover:bg-gray-100 transition-colors ${
+                    useTransparentUI ? 'text-white/80' : 'text-gray-900'
+                  }`}
+                >
+                  {collection.emoji} {collection.title}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCollectionSelector(false);
+                  setShowCreateCollection(true);
+                }}
+                className={`w-full px-2 py-1.5 text-xs text-left border-t transition-colors ${
+                  useTransparentUI
+                    ? 'text-blue-400 hover:bg-white/10 border-white/20'
+                    : 'text-blue-600 hover:bg-gray-50 border-gray-200'
+                }`}
+              >
+                +Create Collection
+              </button>
+            </div>
+          )}
+
+          {/* Create Collection Form */}
+          {showCreateCollection && (
+            <div className={`absolute top-full left-0 right-0 mt-1 border rounded-md shadow-lg p-2 z-50 ${
+              useTransparentUI
+                ? 'bg-white/90 backdrop-blur-md border-white/20'
+                : 'bg-white border-gray-200'
+            }`}>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newCollectionEmoji}
+                    onChange={(e) => setNewCollectionEmoji(e.target.value)}
+                    placeholder="📍"
+                    className={`w-8 text-center text-xs border rounded px-1 py-0.5 focus:outline-none focus:ring-1 ${
+                      useTransparentUI
+                        ? 'bg-white/10 border-white/20 text-white focus:ring-white/40'
+                        : 'bg-white border-gray-200 text-gray-900 focus:ring-gray-400'
+                    }`}
+                    maxLength={2}
+                  />
+                  <input
+                    type="text"
+                    value={newCollectionTitle}
+                    onChange={(e) => setNewCollectionTitle(e.target.value)}
+                    placeholder="Collection title"
+                    className={`flex-1 text-xs border rounded px-2 py-1 focus:outline-none focus:ring-1 ${
+                      useTransparentUI
+                        ? 'bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:ring-white/40'
+                        : 'bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 focus:ring-gray-400'
+                    }`}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newCollectionTitle.trim()) {
+                        e.preventDefault();
+                        handleCreateCollection();
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleCreateCollection}
+                    disabled={isCreatingCollection || !newCollectionTitle.trim()}
+                    className={`p-0.5 rounded transition-colors disabled:opacity-50 ${
+                      useTransparentUI
+                        ? 'hover:bg-white/10 text-white'
+                        : 'hover:bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    <CheckIcon className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateCollection(false);
+                      setNewCollectionTitle('');
+                      setNewCollectionEmoji('📍');
+                    }}
+                    className={`p-0.5 rounded transition-colors ${
+                      useTransparentUI
+                        ? 'hover:bg-white/10 text-white'
+                        : 'hover:bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    <XMarkIcon className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Description */}
       <div>
         <textarea
           ref={textareaRef}
           value={description}
-          onChange={(e) => {
+            onChange={(e) => {
             const value = e.target.value;
             if (value.length <= maxLength) {
               setDescription(value);
-              onDescriptionChange?.(value.length, maxLength, isPro);
             }
           }}
           maxLength={maxLength}
@@ -630,8 +779,8 @@ export default function CreateMentionContent({
           style={{ minHeight: '60px', maxHeight: '200px' }}
           disabled={isSubmitting || !coordinates}
         />
-        <div className="flex items-center justify-end gap-2 mt-1.5">
-          {/* Hidden file input for image upload (still needed for image preview functionality) */}
+        <div className="flex items-center justify-between gap-2 mt-1.5">
+          {/* Hidden file input for image upload */}
           <input
             ref={fileInputRef}
             type="file"
@@ -641,43 +790,53 @@ export default function CreateMentionContent({
             disabled={isSubmitting || isUploadingImage}
           />
 
-          {/* Submit Button - Only show if description has at least 1 character or image is selected */}
-          {(description.trim().length > 0 || imageFile) && (
-            <button
-              type="submit"
-              disabled={isSubmitting || isUploadingImage || !coordinates || (!description.trim() && !imageFile)}
-              className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Create Mention"
-            >
-              {isSubmitting ? (
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <PaperAirplaneIcon className="w-3 h-3" />
-              )}
-            </button>
-          )}
+          {/* Left: Camera Icon Button - Upload image from device */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isSubmitting || isUploadingImage}
+            className="flex-shrink-0 w-5 h-5 text-gray-900 hover:text-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Upload image"
+          >
+            <CameraIcon className="w-5 h-5" />
+          </button>
+
+          {/* Right: Character count and submit button */}
+          <div className="flex items-center gap-2">
+            {/* Character Count */}
+            <span className={`text-[10px] ${description.length >= maxLength ? 'text-red-500' : useTransparentUI ? 'text-white/70' : 'text-gray-400'}`}>
+              {description.length}/{maxLength}
+            </span>
+
+            {/* Submit Button - Only show if description has at least 1 character or image is selected */}
+            {(description.trim().length > 0 || imageFile) && (
+              <button
+                type="submit"
+                disabled={isSubmitting || isUploadingImage || !coordinates || (!description.trim() && !imageFile)}
+                className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Create Mention"
+              >
+                {isSubmitting ? (
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <PaperAirplaneIcon className="w-3 h-3" />
+                )}
+              </button>
+            )}
+          </div>
         </div>
         
         {/* Image Preview */}
         {imagePreview && (
           <div className="relative mt-2">
             <div className="relative w-full h-32 rounded-md overflow-hidden border border-gray-200">
-              {imageFile?.type.startsWith('video/') ? (
-                <video
-                  src={imagePreview}
-                  controls
-                  className="w-full h-full object-cover"
-                  playsInline
-                />
-              ) : (
-                <Image
-                  src={imagePreview}
-                  alt="Preview"
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              )}
+              <Image
+                src={imagePreview}
+                alt="Preview"
+                fill
+                className="object-cover"
+                unoptimized
+              />
               <button
                 type="button"
                 onClick={handleRemoveImage}
@@ -690,19 +849,6 @@ export default function CreateMentionContent({
           </div>
         )}
         
-        {/* YouTube Preview */}
-        {youtubeUrls.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {youtubeUrls.map((youtubeData, index) => (
-              <YouTubePreview
-                key={index}
-                url={youtubeData.url}
-                compact={false}
-                useTransparentUI={useTransparentUI}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Error */}
@@ -718,7 +864,23 @@ export default function CreateMentionContent({
       </form>
       <FirstMentionModal
         isOpen={showFirstMentionModal}
-        onClose={() => setShowFirstMentionModal(false)}
+        onClose={() => {
+          setShowFirstMentionModal(false);
+          setShowMentionCreatedModal(true); // Show success modal after first mention modal
+        }}
+      />
+      <MentionCreatedModal
+        isOpen={showMentionCreatedModal}
+        onClose={() => {
+          setShowMentionCreatedModal(false);
+          setCreatedMention(null);
+          // Now call the callback to close the create popup
+          if (onMentionCreated) {
+            onMentionCreated();
+          }
+        }}
+        mention={createdMention}
+        map={map}
       />
     </>
   );

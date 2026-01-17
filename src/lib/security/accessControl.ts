@@ -24,9 +24,13 @@ export async function requireAuth(): Promise<
   | { success: false; error: Response }
 > {
   try {
-    const auth = await getServerAuth();
+    // Don't use getServerAuth() in API routes - it uses React cache()
+    // Instead, directly get the user from Supabase
+    const supabase = await createServerClientWithAuth(cookies());
     
-    if (!auth) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return {
         success: false,
         error: new Response(
@@ -40,18 +44,18 @@ export async function requireAuth(): Promise<
     }
     
     // Get account ID
-    const cookieStore = cookies();
-    const supabase = await createServerClientWithAuth(cookieStore);
-    const { data: account } = await supabase
+    const result = await supabase
       .from('accounts')
       .select('id')
-      .eq('user_id', auth.id)
+      .eq('user_id', user.id)
       .maybeSingle();
+    
+    const account = result.data as { id: string } | null;
     
     return {
       success: true,
-      userId: auth.id,
-      accountId: account?.id,
+      userId: user.id,
+      accountId: account?.id ?? undefined,
     };
   } catch (error) {
     return {
@@ -86,13 +90,15 @@ export async function requireAdmin(): Promise<
   try {
     const cookieStore = cookies();
     const supabase = await createServerClientWithAuth(cookieStore);
-    const { data: account } = await supabase
+    const result = await supabase
       .from('accounts')
       .select('id, role')
       .eq('user_id', authResult.userId)
       .maybeSingle();
     
-    if (!account) {
+    const account = result.data as { id: string; role: 'general' | 'admin' } | null;
+    
+    if (!account || !account.id || !account.role) {
       return {
         success: false,
         error: new Response(
@@ -166,7 +172,7 @@ export async function requireOwnership(
     
     // Get resource owner
     const { data: resource, error } = await supabase
-      .from(resourceTable)
+      .from(resourceTable as string)
       .select(ownerColumn)
       .eq('id', String(resourceId))
       .maybeSingle();
@@ -258,15 +264,17 @@ export async function optionalAuth(): Promise<{
     
     const cookieStore = cookies();
     const supabase = await createServerClientWithAuth(cookieStore);
-    const { data: account } = await supabase
+    const result = await supabase
       .from('accounts')
       .select('id')
       .eq('user_id', auth.id)
       .maybeSingle();
     
+    const account = result.data as { id: string } | null;
+    
     return {
       userId: auth.id,
-      accountId: account?.id || null,
+      accountId: account?.id ?? null,
     };
   } catch {
     return { userId: null, accountId: null };

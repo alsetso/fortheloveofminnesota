@@ -590,6 +590,18 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
               essential: true, // Animation is essential for accessibility
             });
             
+            // Optimistically increment view_count for immediate UI feedback
+            const updatedMention = {
+              ...mention,
+              view_count: (mention.view_count || 0) + 1
+            };
+            
+            // Update mention in refs
+            const mentionIndex = mentionsRef.current.findIndex(m => m.id === mentionId);
+            if (mentionIndex !== -1) {
+              mentionsRef.current[mentionIndex] = updatedMention;
+            }
+            
             // Track mention view (async, non-blocking)
             const trackMentionView = () => {
               const referrer = typeof document !== 'undefined' ? document.referrer : null;
@@ -631,8 +643,12 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
             }
             
             // Dispatch mention-click event for iOS-style popup (handled by LiveMap)
+            // Use the updated mention with incremented view_count
             window.dispatchEvent(new CustomEvent('mention-click', {
-              detail: { mention }
+              detail: { 
+                mention: updatedMention,
+                address: mention.full_address || mention.map_meta?.place_name || null
+              }
             }));
             
             // Don't create Mapbox popup - use iOS-style popup instead

@@ -2,7 +2,6 @@
 
 // Components
 export { default as HomepageMap } from './components/HomepageMap';
-export { default as FloatingMapContainer } from './components/FloatingMapContainer';
 export { default as HomepageStatsHandle } from './components/HomepageStatsHandle';
 export { default as HomepageStatsModal } from './components/HomepageStatsModal';
 

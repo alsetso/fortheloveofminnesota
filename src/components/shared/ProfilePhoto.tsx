@@ -136,7 +136,7 @@ export default function ProfilePhoto({
           ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
           : 'border border-gray-200'
       }`}>
-        <div className="w-full h-full rounded-full overflow-hidden bg-white">
+        <div className="w-full h-full rounded-full overflow-hidden bg-white relative">
           {avatarUrl && !imageError ? (
             <Image
               src={avatarUrl}

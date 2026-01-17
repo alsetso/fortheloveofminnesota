@@ -63,11 +63,13 @@ export async function POST(request: NextRequest) {
     );
 
         // Use accountId from security middleware context if available
-        let finalAccountId: string | null = accountId || null;
+        const finalAccountId: string | null = accountId || null;
 
-        // Record special map view
-        const { data, error } = await supabase.rpc('record_special_map_view', {
-          p_map_identifier: map_identifier,
+        // Record special map view using record_url_visit function
+        // Convert map identifier to URL format: /map/{identifier}
+        const mapUrl = `/map/${map_identifier}`;
+        const { data, error } = await supabase.rpc('record_url_visit', {
+          p_url: mapUrl,
           p_account_id: finalAccountId,
           p_user_agent: user_agent || null,
           p_referrer_url: referrer_url || null,

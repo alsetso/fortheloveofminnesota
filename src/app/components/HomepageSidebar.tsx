@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import { useAccountData } from '@/features/account/hooks/useAccountData';
 import ProfileCard from '@/features/profiles/components/ProfileCard';
-import NewsSecondaryContent from '@/features/sidebar/components/NewsSecondaryContent';
 import type { ProfileAccount } from '@/types/profile';
 
 export default function HomepageSidebar() {
@@ -45,10 +44,6 @@ export default function HomepageSidebar() {
         <div className="h-[100px] bg-white border border-gray-200 rounded-md"></div>
       )}
 
-      {/* News Section */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <NewsSecondaryContent />
-      </div>
     </div>
   );
 }

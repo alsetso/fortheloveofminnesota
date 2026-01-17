@@ -16,47 +16,16 @@ export default function ProfileMentionsList({ pins, isOwnProfile = false, onView
   
   if (filteredPins.length === 0) {
     return (
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">List</h2>
-            {onViewMap && (
-              <button
-                onClick={onViewMap}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-              >
-                View Map
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-          <p className="text-xs text-gray-500 text-center py-6">No mentions found</p>
-        </div>
+      <div className="p-[10px]">
+        <p className="text-xs text-gray-500 text-center py-6">No mentions found</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">List</h2>
-          {onViewMap && (
-            <button
-              onClick={onViewMap}
-              className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-            >
-              View Map
-            </button>
-          )}
-        </div>
-      </div>
-
+    <div>
       {/* List Content */}
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+      <div className="p-[10px]">
       <div className="relative">
         {/* Vertical Timeline */}
         {filteredPins.map((pin, index) => (

@@ -1,13 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { CalendarIcon, ClockIcon, MapPinIcon, UserIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, UserIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { format, addDays, isToday, isSameDay, startOfDay } from 'date-fns';
-import { EventService } from '@/features/events/services/eventService';
-import type { Event } from '@/types/event';
 import Link from 'next/link';
 import { isSameDayCentral } from '@/lib/timezone';
-import NewsSecondaryContent from '@/features/sidebar/components/NewsSecondaryContent';
 import { useAccountData } from '@/features/account/hooks/useAccountData';
 import ProfileCard from '@/features/profiles/components/ProfileCard';
 import type { ProfileAccount } from '@/types/profile';
@@ -28,10 +25,6 @@ export default function MapsSidebarContent() {
   const { account, userEmail } = useAccountData(true, 'profile');
   const { openWelcome } = useAppModalContextSafe();
   const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const hasFetchedRef = useRef(false);
   const [privateMaps, setPrivateMaps] = useState<Array<{ id: string; title: string }>>([]);
   const [loadingMaps, setLoadingMaps] = useState(false);
 
@@ -68,40 +61,6 @@ export default function MapsSidebarContent() {
     return days;
   }, [today]);
 
-  // Fetch events for the next 7 days (only once on mount)
-  useEffect(() => {
-    if (hasFetchedRef.current) {
-      return;
-    }
-
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const startDate = today.toISOString();
-        const endDate = addDays(today, 7).toISOString();
-        
-        const fetchedEvents = await EventService.getEvents({
-          start_date: startDate,
-          end_date: endDate,
-          archived: false,
-          visibility: 'public',
-        });
-
-        setEvents(fetchedEvents);
-        hasFetchedRef.current = true;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load events');
-        setEvents([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [today]);
-
   // Fetch private maps for authenticated users
   useEffect(() => {
     if (!account) {
@@ -130,31 +89,6 @@ export default function MapsSidebarContent() {
     fetchPrivateMaps();
   }, [account]);
 
-  // Get events for a specific day
-  const getEventsForDay = (date: Date) => {
-    return events.filter(event => {
-      const eventStart = startOfDay(new Date(event.start_date));
-      const eventEnd = event.end_date ? startOfDay(new Date(event.end_date)) : null;
-      const dayStart = startOfDay(date);
-      
-      return isSameDay(eventStart, dayStart) ||
-             (eventEnd && isSameDay(eventEnd, dayStart)) ||
-             (eventStart <= dayStart && eventEnd && eventEnd >= dayStart);
-    });
-  };
-
-  // Get selected day's events
-  const selectedDayEvents = getEventsForDay(selectedDate);
-  const todayEvents = getEventsForDay(today);
-
-  const formatEventTime = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return format(date, 'h:mm a');
-    } catch {
-      return '';
-    }
-  };
 
   return (
     <div className="space-y-3">
@@ -218,7 +152,6 @@ export default function MapsSidebarContent() {
         <div className="text-xs font-semibold text-gray-900 mb-2">Calendar</div>
         <div className="grid grid-cols-7 gap-1">
           {sevenDays.map((date) => {
-            const dayEvents = getEventsForDay(date);
             const isTodayDate = isToday(date);
             const isSelected = isSameDay(date, selectedDate);
             
@@ -245,12 +178,6 @@ export default function MapsSidebarContent() {
                   }`}>
                     {format(date, 'd')}
                   </span>
-                  {(dayEvents.length > 0) && (
-                    <div className="flex items-center gap-0.5 mt-0.5">
-                      <div className="w-1 h-1 rounded-full bg-indigo-500"></div>
-                      <span className="text-[8px] text-gray-500">{dayEvents.length}</span>
-                    </div>
-                  )}
                 </div>
               </button>
             );
@@ -258,65 +185,7 @@ export default function MapsSidebarContent() {
         </div>
       </div>
 
-      {/* Events Section */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs font-semibold text-gray-900">Events</div>
-        </div>
 
-        {loading && (
-          <div className="text-xs text-gray-600">Loading events...</div>
-        )}
-
-        {!loading && selectedDayEvents.length === 0 && (
-          <div className="text-xs text-gray-600">No events for this day.</div>
-        )}
-
-        {!loading && selectedDayEvents.length > 0 && (
-          <div className="space-y-1.5">
-            {selectedDayEvents.slice(0, 5).map((event) => (
-              <Link
-                key={event.id}
-                href={`/calendar/events/${event.id}`}
-                className="block p-1.5 rounded-md hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-200"
-              >
-                <div className="space-y-0.5">
-                  <div className="text-xs font-medium text-gray-900 line-clamp-2">
-                    {event.title}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                    {event.start_date && (
-                      <div className="flex items-center gap-0.5">
-                        <ClockIcon className="w-3 h-3" />
-                        <span>{formatEventTime(event.start_date)}</span>
-                      </div>
-                    )}
-                    {event.location_address && (
-                      <>
-                        <span>•</span>
-                        <div className="flex items-center gap-0.5">
-                          <MapPinIcon className="w-3 h-3" />
-                          <span className="truncate">{event.location_address}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-            {selectedDayEvents.length > 5 && (
-              <div className="text-[10px] text-gray-500 text-center pt-1">
-                +{selectedDayEvents.length - 5} more
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* News Section */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <NewsSecondaryContent />
-      </div>
     </div>
   );
 }

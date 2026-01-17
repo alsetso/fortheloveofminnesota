@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PencilIcon, CheckIcon, XMarkIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
+import { PencilIcon, CheckIcon, XMarkIcon, TrashIcon, PlusIcon, UserIcon } from '@heroicons/react/24/outline';
 import { CollectionService } from '@/features/collections/services/collectionService';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
@@ -34,14 +35,40 @@ export default function ProfileCollectionsList({
   const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [account, setAccount] = useState<{ image_url: string | null; username: string | null } | null>(null);
   const { success, error: showError } = useToast();
 
   useEffect(() => {
     loadCollections();
+    loadAccountInfo();
     if (isOwnProfile) {
       loadAccountPlan();
     }
   }, [accountId, isOwnProfile]);
+
+  const loadAccountInfo = async () => {
+    try {
+      const { data: accountData, error } = await supabase
+        .from('accounts')
+        .select('image_url, username')
+        .eq('id', accountId)
+        .single();
+
+      if (error) {
+        console.error('Error loading account info:', error);
+        return;
+      }
+
+      if (accountData) {
+        setAccount({
+          image_url: accountData.image_url,
+          username: accountData.username,
+        });
+      }
+    } catch (err) {
+      console.error('Error loading account info:', err);
+    }
+  };
 
   const loadAccountPlan = async () => {
     try {
@@ -216,18 +243,15 @@ export default function ProfileCollectionsList({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Collections</h3>
-          {isOwnProfile && maxCollections !== null && (
-            <div className="text-[10px] text-gray-500 mt-0.5">
-              {collections.length} / {maxCollections}
-            </div>
-          )}
-        </div>
+        {isOwnProfile && maxCollections !== null && (
+          <div className="text-[10px] text-gray-500">
+            {collections.length} / {maxCollections}
+          </div>
+        )}
         {isOwnProfile && canCreateMore && (
           <button
             onClick={startCreating}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
+            className="p-1 hover:bg-gray-100 rounded transition-colors flex items-center justify-center flex-shrink-0"
             title="Create collection"
           >
             <PlusIcon className="w-4 h-4 text-gray-600" />

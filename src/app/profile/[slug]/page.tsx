@@ -1,8 +1,6 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
-import ProfilePageClient from '@/features/profiles/components/ProfilePageClient';
-import OwnershipToast from '@/features/profiles/components/OwnershipToast';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
+import ProfilePageMapView from '@/features/profiles/components/ProfilePageMapView';
 import { Metadata } from 'next';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
@@ -177,17 +175,14 @@ export default async function ProfilePage({ params }: Props) {
   };
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3">
+    <>
       <PageViewTracker page_url={`/profile/${slug}`} />
-      <OwnershipToast isOwnProfile={isOwnProfile} />
-      <div className="max-w-7xl mx-auto">
-        <ProfilePageClient
-          account={profileAccountData}
-          pins={mentions}
-          collections={collections}
-          isOwnProfile={isOwnProfile}
-        />
-      </div>
-    </SimplePageLayout>
+      <ProfilePageMapView
+        account={profileAccountData}
+        pins={mentions}
+        collections={collections}
+        isOwnProfile={isOwnProfile}
+      />
+    </>
   );
 }

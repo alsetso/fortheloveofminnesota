@@ -23,7 +23,7 @@
  * ```
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   getCurrentLocation,
   isLocationSupported,
@@ -62,7 +62,12 @@ export function useLocation(): UseLocationReturn {
   const [location, setLocation] = useState<NormalizedLocation | null>(null);
   const [error, setError] = useState<LocationError | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const isSupported = isLocationSupported();
+  const [isSupported, setIsSupported] = useState(false);
+
+  // Initialize isSupported after mount to avoid hydration mismatch
+  useEffect(() => {
+    setIsSupported(isLocationSupported());
+  }, []);
 
   const requestLocation = useCallback(() => {
     if (!isSupported) {

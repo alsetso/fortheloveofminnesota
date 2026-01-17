@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MicrophoneIcon, MagnifyingGlassIcon, MapPinIcon, NewspaperIcon, Squares2X2Icon, UserIcon, ChevronDownIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, MapPinIcon, UserIcon, ChevronDownIcon, ArrowPathIcon, ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
@@ -9,11 +9,10 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMetadata } from '@/types/mapbox';
-import LiveAccountModal from './LiveAccountModal';
 import MapStylesPopup from './MapStylesPopup';
 import DynamicSearchModal from './DynamicSearchModal';
-import NewsStream from './NewsStream';
 import DailyWelcomeModal from './DailyWelcomeModal';
+import { useLocation } from '@/features/map/hooks/useLocation';
 
 interface MapboxFeature {
   id: string;
@@ -37,15 +36,6 @@ interface MapboxFeature {
   }>;
 }
 
-interface NewsArticleSuggestion {
-  id: string;
-  article_id: string;
-  title: string;
-  snippet?: string | null;
-  source_name?: string | null;
-  published_at: string;
-  type: 'news';
-}
 
 interface PeopleSuggestion {
   id: string;
@@ -53,59 +43,17 @@ interface PeopleSuggestion {
   type: 'people';
 }
 
-type SearchSuggestion = MapboxFeature | NewsArticleSuggestion | PeopleSuggestion;
-
-// Type definitions for Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-    webkitSpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-  }
+interface AccountSuggestion {
+  id: string;
+  username: string;
+  first_name: string | null;
+  last_name: string | null;
+  image_url: string | null;
+  plan: string | null;
+  type: 'account';
 }
 
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
+type SearchSuggestion = MapboxFeature | PeopleSuggestion | AccountSuggestion;
 
 interface MapTopContainerProps {
   map?: any;
@@ -123,10 +71,6 @@ interface MapTopContainerProps {
   districtsState?: {
     showDistricts: boolean;
     setShowDistricts: (show: boolean) => void;
-  };
-  buildingsState?: {
-    showBuildings: boolean;
-    setShowBuildings: (show: boolean) => void;
   };
   ctuState?: {
     showCTU: boolean;
@@ -173,46 +117,56 @@ const MAP_META_LAYERS = [
   { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
 ];
 
-export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
+export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
   const router = useRouter();
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
   const { info, pro: proToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
-  const [micPermissionError, setMicPermissionError] = useState<'denied' | 'unavailable' | null>(null);
-  const micErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('7d');
+  // Initialize with consistent defaults to avoid hydration mismatch
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
-    // Use prop if provided, otherwise initialize from window state
+    // Use prop if provided (server/client consistent)
     if (propUseBlurStyle !== undefined) return propUseBlurStyle;
-    return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
+    // Always return false on server, will be updated in useEffect
+    return false;
   });
-  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
-    return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
-  });
-  const [showNews, setShowNews] = useState(() => {
-    // Initialize from window state if available, default to false
-    return typeof window !== 'undefined' ? (window as any).__showNews === true : false;
-  });
+  const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>('streets');
+  
+  // Update from window state after mount to avoid hydration mismatch
+  useEffect(() => {
+    if (propUseBlurStyle === undefined && typeof window !== 'undefined') {
+      setUseBlurStyle((window as any).__useBlurStyle === true);
+    }
+    if (typeof window !== 'undefined') {
+      const mapStyle = (window as any).__currentMapStyle || 'streets';
+      setCurrentMapStyle(mapStyle);
+    }
+  }, [propUseBlurStyle]);
   
   // Use white text when transparent blur + satellite map
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
-  const [placeholderWord, setPlaceholderWord] = useState<'News' | 'Addresses' | 'People'>('News');
+  const [placeholderText, setPlaceholderText] = useState<'Search address' | 'Enter "@" for people'>('Search address');
   const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
-  const [dynamicSearchType, setDynamicSearchType] = useState<'news' | 'people'>('news');
+  const [dynamicSearchType, setDynamicSearchType] = useState<'people'>('people');
+  const [isAccountSearch, setIsAccountSearch] = useState(false);
+  const [showNoAccountResults, setShowNoAccountResults] = useState(false);
+  const [currentUserSearchVisibility, setCurrentUserSearchVisibility] = useState<boolean | null>(null);
+  
+  // User location dropdown state
+  const { location, error, errorMessage, isLoading: isLocationLoading, isSupported: isLocationSupported, requestLocation, clearLocation, setManualLocation } = useLocation();
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [showManualInput, setShowManualInput] = useState(false);
   
   // Use modal state from parent if provided
   const isAccountModalOpen = modalState?.isAccountModalOpen ?? false;
   const showMapStylesPopup = modalState ? false : false; // Will be checked via modalState.isModalOpen('mapStyles')
   const showDynamicSearchModal = modalState ? false : false; // Will be checked via modalState.isModalOpen('dynamicSearch')
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -241,22 +195,23 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
       setCurrentMapStyle(e.detail.mapStyle);
     };
 
-    const handleNewsVisibilityChange = (e: CustomEvent) => {
-      const newValue = e.detail.showNews;
-      setShowNews(newValue);
-      // Store in window for session persistence
-      if (typeof window !== 'undefined') {
-        (window as any).__showNews = newValue;
+    const handleUpdateSearchInput = (e: CustomEvent) => {
+      const query = e.detail?.query;
+      if (query) {
+        isProgrammaticUpdateRef.current = true;
+        setSearchQuery(query);
+        setSuggestions([]);
+        setShowSuggestions(false);
       }
     };
 
     window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
     window.addEventListener('map-style-change', handleMapStyleChange as EventListener);
-    window.addEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
+    window.addEventListener('update-search-input', handleUpdateSearchInput as EventListener);
     return () => {
       window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
       window.removeEventListener('map-style-change', handleMapStyleChange as EventListener);
-      window.removeEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
+      window.removeEventListener('update-search-input', handleUpdateSearchInput as EventListener);
     };
   }, []);
 
@@ -336,6 +291,63 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     };
   }, []);
 
+  // Listen for map click events to set manual location
+  // Only update if dropdown is open and manual input is shown
+  useEffect(() => {
+    const handleMapLocationClick = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        lat: number;
+        lng: number;
+      }>;
+      const { lat, lng } = customEvent.detail || {};
+      if (lat && lng && showLocationDropdown && showManualInput) {
+        // Set manual location when user clicks on map (if dropdown is open and manual input is shown)
+        setManualLocation(lat, lng, 0);
+        setShowManualInput(false);
+        setShowLocationDropdown(false);
+      }
+    };
+
+    window.addEventListener('map-location-click', handleMapLocationClick);
+    return () => {
+      window.removeEventListener('map-location-click', handleMapLocationClick);
+    };
+  }, [showLocationDropdown, showManualInput, setManualLocation]);
+
+  // Reverse geocode location to address when location is set
+  useEffect(() => {
+    if (location && !isLocationLoading) {
+      const reverseGeocode = async () => {
+        try {
+          const token = MAP_CONFIG.MAPBOX_TOKEN;
+          if (token) {
+            const url = `${MAP_CONFIG.GEOCODING_BASE_URL}/${location.longitude},${location.latitude}.json`;
+            const params = new URLSearchParams({
+              access_token: token,
+              types: 'address',
+              limit: '1',
+            });
+            
+            const response = await fetch(`${url}?${params}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.features && data.features.length > 0) {
+                const address = data.features[0].place_name || null;
+                if (address) {
+                  setSearchQuery(address);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.debug('[MapTopContainer] Error reverse geocoding:', err);
+        }
+      };
+      
+      reverseGeocode();
+    }
+  }, [location, isLocationLoading]);
+
   // Handle reload mentions button click
   const handleReloadMentions = () => {
     window.dispatchEvent(new CustomEvent('reload-mentions'));
@@ -406,88 +418,110 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     }
   }, [map]);
 
-  // Auto-hide microphone error message after 3 seconds
-  useEffect(() => {
-    if (micPermissionError) {
-      // Clear any existing timeout
-      if (micErrorTimeoutRef.current) {
-        clearTimeout(micErrorTimeoutRef.current);
+
+  // Combined search: Mapbox geocoding + Accounts (when @ is present)
+  const searchLocations = useCallback(async (query: string) => {
+    const trimmedQuery = query.trim();
+    const hasAtSymbol = trimmedQuery.startsWith('@');
+    
+    // If @ is present, only search accounts (even if just "@")
+    if (hasAtSymbol) {
+      setIsAccountSearch(true);
+      
+      // Check if user is authenticated - require login to search accounts
+      if (!account) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setShowNoAccountResults(false);
+        setIsSearching(false);
+        // Open login modal
+        openWelcome();
+        return;
       }
       
-      // Set new timeout to hide error after 3 seconds
-      micErrorTimeoutRef.current = setTimeout(() => {
-        setMicPermissionError(null);
-      }, 3000);
-    }
-
-    return () => {
-      if (micErrorTimeoutRef.current) {
-        clearTimeout(micErrorTimeoutRef.current);
-      }
-    };
-  }, [micPermissionError]);
-
-  // Check for browser support and initialize Speech Recognition
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (SpeechRecognition) {
-      setIsSupported(true);
-      const recognition = new SpeechRecognition() as SpeechRecognition;
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        const transcript = event.results[0][0].transcript;
-        setSearchQuery(transcript);
-        setIsRecording(false);
-        setMicPermissionError(null); // Clear error on successful recognition
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        setIsRecording(false);
+      const usernameQuery = trimmedQuery.slice(1).trim().toLowerCase();
+      
+      setIsSearching(true);
+      try {
+        const { supabase } = await import('@/lib/supabase');
         
-        // Handle common errors
-        if (event.error === 'no-speech') {
-          // User didn't speak, silently stop
-          setMicPermissionError(null);
-        } else if (event.error === 'not-allowed') {
-          setMicPermissionError('denied');
-        } else if (event.error === 'service-not-allowed' || event.error === 'aborted') {
-          setMicPermissionError('unavailable');
+        // Check current user's search_visibility
+        if (account.id) {
+          const { data: currentUserData } = await supabase
+            .from('accounts')
+            .select('search_visibility')
+            .eq('id', account.id)
+            .single();
+          
+          if (currentUserData) {
+            setCurrentUserSearchVisibility(currentUserData.search_visibility || false);
+          }
+        }
+        
+        // Build query - only show accounts with search_visibility = true
+        let accountsQuery = supabase
+          .from('accounts')
+          .select('id, username, first_name, last_name, image_url, plan')
+          .eq('search_visibility', true)
+          .not('username', 'is', null);
+        
+        if (usernameQuery.length > 0) {
+          // Fuzzy search: username contains the query (case-insensitive)
+          accountsQuery = accountsQuery.ilike('username', `%${usernameQuery}%`);
         } else {
-          setMicPermissionError(null);
+          // If just "@", show some accounts (ordered by view_count or created_at)
+          accountsQuery = accountsQuery.order('view_count', { ascending: false, nullsFirst: false });
         }
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-        // Don't clear error on end - let user see the message if permission was denied
-      };
-
-      // Clear error timeout on unmount
-      return () => {
-        if (micErrorTimeoutRef.current) {
-          clearTimeout(micErrorTimeoutRef.current);
+        
+        const { data, error } = await accountsQuery.limit(5);
+        
+        if (error) {
+          console.error('Account search error:', error);
+          setSuggestions([]);
+          setShowSuggestions(false);
+          setShowNoAccountResults(false);
+          return;
         }
-      };
-
-      recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-        recognitionRef.current.abort();
+        
+        if (!data || data.length === 0) {
+          setSuggestions([]);
+          setShowSuggestions(usernameQuery.length > 0); // Show message only if user typed something
+          setShowNoAccountResults(usernameQuery.length > 0); // Show message only if user typed something
+          setSelectedIndex(-1);
+          return;
+        }
+        
+        const accounts = data.map((account: any): AccountSuggestion => ({
+          id: account.id,
+          username: account.username,
+          first_name: account.first_name,
+          last_name: account.last_name,
+          image_url: account.image_url,
+          plan: account.plan,
+          type: 'account',
+        }));
+        
+        setSuggestions(accounts);
+        setShowSuggestions(accounts.length > 0);
+        setShowNoAccountResults(false);
+        setSelectedIndex(-1);
+      } catch (error) {
+        console.error('Account search error:', error);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        setShowNoAccountResults(false);
+      } finally {
+        setIsSearching(false);
       }
-    };
-  }, []);
+      return;
+    }
+    
+    // Reset account search state for normal searches
+    setIsAccountSearch(false);
+    setShowNoAccountResults(false);
 
-  // Combined search: Mapbox geocoding + News articles
-  const searchLocations = useCallback(async (query: string) => {
-    if (!query.trim() || query.length < 2) {
+    // Normal search requires at least 2 characters
+    if (!trimmedQuery || trimmedQuery.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -495,10 +529,11 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
 
     setIsSearching(true);
     try {
-      const searchTerm = query.trim().toLowerCase();
+
+      // Normal search: Mapbox geocoding and People
+      const searchTerm = trimmedQuery.toLowerCase();
       
-      // Search in parallel: Mapbox geocoding, News articles, and People
-      const [mapboxResults, newsResults, peopleResults] = await Promise.allSettled([
+      const [mapboxResults, peopleResults] = await Promise.allSettled([
         // Mapbox geocoding
         (async () => {
           const token = MAP_CONFIG.MAPBOX_TOKEN;
@@ -528,34 +563,6 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             );
           });
         })(),
-        // News articles search
-        (async () => {
-          try {
-            const { supabase } = await import('@/lib/supabase');
-            const { data, error } = await (supabase as any)
-              .schema('news')
-              .from('generated')
-              .select('article_id, title, snippet, source_name, published_at')
-              .or(`title.ilike.%${searchTerm}%,snippet.ilike.%${searchTerm}%`)
-              .order('published_at', { ascending: false })
-              .limit(5);
-            
-            if (error || !data) return [];
-            
-            return data.map((article: any): NewsArticleSuggestion => ({
-              id: article.article_id,
-              article_id: article.article_id,
-              title: article.title,
-              snippet: article.snippet,
-              source_name: article.source_name,
-              published_at: article.published_at,
-              type: 'news',
-            }));
-          } catch (error) {
-            console.error('News search error:', error);
-            return [];
-          }
-        })(),
         // People search
         (async () => {
           try {
@@ -582,11 +589,10 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
       ]);
 
       const mapboxFeatures = mapboxResults.status === 'fulfilled' ? mapboxResults.value : [];
-      const newsArticles = newsResults.status === 'fulfilled' ? newsResults.value : [];
       const people = peopleResults.status === 'fulfilled' ? peopleResults.value : [];
       
-      // Combine results: addresses first, then news articles, then people
-      const combined = [...mapboxFeatures, ...newsArticles, ...people];
+      // Combine results: addresses first, then people
+      const combined = [...mapboxFeatures, ...people];
       
       setSuggestions(combined);
       setShowSuggestions(combined.length > 0);
@@ -603,10 +609,9 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   // Rotating placeholder
   useEffect(() => {
     placeholderIntervalRef.current = setInterval(() => {
-      setPlaceholderWord(prev => {
-        if (prev === 'News') return 'Addresses';
-        if (prev === 'Addresses') return 'People';
-        return 'News';
+      setPlaceholderText((prev) => {
+        if (prev === 'Search address') return 'Enter "@" for people';
+        return 'Search address';
       });
     }, 3000); // Rotate every 3 seconds
 
@@ -629,7 +634,10 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
       clearTimeout(searchTimeoutRef.current);
     }
 
-    if (searchQuery.length >= 2) {
+    // If query starts with "@", search immediately (even if just "@")
+    // Otherwise, require at least 2 characters
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery.startsWith('@') || trimmedQuery.length >= 2) {
       searchTimeoutRef.current = setTimeout(() => {
         searchLocations(searchQuery);
       }, 300);
@@ -650,14 +658,13 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     setShowSuggestions(false);
     setSuggestions([]);
     
-    // Handle news article - show modal with raw data
-    if ('type' in suggestion && suggestion.type === 'news') {
-      const article = suggestion as NewsArticleSuggestion;
-      setSearchQuery(article.title);
-      setDynamicSearchData(article);
-      setDynamicSearchType('news');
-      if (modalState) {
-        modalState.openDynamicSearch(article, 'news');
+    // Handle account - navigate to profile
+    if ('type' in suggestion && suggestion.type === 'account') {
+      const account = suggestion as AccountSuggestion;
+      setSearchQuery(`@${account.username}`);
+      // Navigate to profile
+      if (account.username) {
+        window.location.href = `/profile/${account.username}`;
       }
       return;
     }
@@ -719,11 +726,13 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showSuggestions, suggestions, selectedIndex, handleSuggestionSelect]);
 
-  // Close suggestions and time dropdown when clicking outside
+  // Close suggestions and location dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowSuggestions(false);
+        setShowLocationDropdown(false);
+        setShowManualInput(false);
       }
     };
 
@@ -731,44 +740,6 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleVoiceSearch = async () => {
-    if (!isSupported) {
-      setMicPermissionError('unavailable');
-      return;
-    }
-
-    if (!recognitionRef.current) return;
-
-    if (isRecording) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-      setMicPermissionError(null);
-    } else {
-      // Try to request microphone permission first
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Permission granted, stop the stream and start recognition
-        stream.getTracks().forEach(track => track.stop());
-        setMicPermissionError(null);
-        
-        try {
-          recognitionRef.current.start();
-          setIsRecording(true);
-        } catch (error) {
-          console.error('Failed to start recognition:', error);
-          setIsRecording(false);
-        }
-      } catch (error: any) {
-        // Permission denied or unavailable
-        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-          setMicPermissionError('denied');
-        } else {
-          setMicPermissionError('unavailable');
-        }
-        setIsRecording(false);
-      }
-    }
-  };
 
   const handleLogoClick = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -793,10 +764,8 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   }, [router]);
 
   return (
-    <div className="fixed top-3 left-3 right-3 z-[45] pointer-events-none">
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[45] pointer-events-none" style={{ maxWidth: '600px', width: 'calc(100% - 2rem)' }}>
       <div ref={containerRef} className="pointer-events-auto space-y-1.5 relative">
-        {/* News Stream - Positioned in upper right below search input */}
-        {showNews && <NewsStream useBlurStyle={useBlurStyle} maxItems={5} />}
         {/* Search Bar */}
         <div 
           data-search-container
@@ -825,53 +794,76 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
 
           {/* Search Input */}
           <div className="flex-1 min-w-0 relative flex items-center gap-1.5">
-            <input
-              ref={inputRef}
-              data-search-input
-              type="text"
-              value={searchQuery || ''}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => {
-                if (suggestions.length > 0) {
+            <div className="flex-1 relative">
+              {/* Highlight overlay for @ mentions */}
+              {searchQuery && searchQuery.startsWith('@') && (
+                <div 
+                  className={`absolute inset-0 pointer-events-none text-sm py-0.5 flex items-center ${
+                    useWhiteText ? 'text-white' : 'text-gray-900'
+                  }`}
+                  style={{ 
+                    fontFamily: 'inherit',
+                    fontSize: 'inherit',
+                    lineHeight: 'inherit',
+                    paddingLeft: '0',
+                    paddingRight: '0',
+                  }}
+                >
+                  <span className={useWhiteText ? 'text-blue-300' : 'text-blue-600'}>@</span>
+                  <span className={useWhiteText ? 'text-blue-300' : 'text-blue-600'}>
+                    {searchQuery.slice(1)}
+                  </span>
+                </div>
+              )}
+              <input
+                ref={inputRef}
+                data-search-input
+                type="text"
+                value={searchQuery || ''}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
                   setShowSuggestions(true);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && searchQuery.trim() && suggestions.length > 0 && selectedIndex >= 0) {
-                  e.preventDefault();
-                  handleSuggestionSelect(suggestions[selectedIndex]);
-                } else if (e.key === 'Enter' && searchQuery.trim() && suggestions.length > 0) {
-                  // If Enter pressed with suggestions but none selected, select first
-                  e.preventDefault();
-                  handleSuggestionSelect(suggestions[0]);
-                }
-              }}
-              placeholder={`Search ${placeholderWord}`}
-              className={`flex-1 bg-transparent border-0 outline-none text-sm py-0.5 ${
-                useWhiteText 
-                  ? 'text-white placeholder:text-white/50' 
-                  : 'text-gray-900 placeholder:text-gray-500'
-              }`}
-            />
+                }}
+                onFocus={() => {
+                  if (suggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchQuery.trim() && suggestions.length > 0 && selectedIndex >= 0) {
+                    e.preventDefault();
+                    handleSuggestionSelect(suggestions[selectedIndex]);
+                  } else if (e.key === 'Enter' && searchQuery.trim() && suggestions.length > 0) {
+                    // If Enter pressed with suggestions but none selected, select first
+                    e.preventDefault();
+                    handleSuggestionSelect(suggestions[0]);
+                  }
+                }}
+                placeholder={placeholderText}
+                className={`w-full bg-transparent border-0 outline-none text-sm py-0.5 ${
+                  useWhiteText 
+                    ? 'text-white placeholder:text-white/50' 
+                    : 'text-gray-900 placeholder:text-gray-500'
+                } ${searchQuery && searchQuery.startsWith('@') ? 'text-transparent' : ''}`}
+              />
+            </div>
             {useBlurStyle && (
               <ChevronDownIcon className={`w-5 h-5 flex-shrink-0 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
             )}
             
             {/* Suggestions Dropdown */}
-            {showSuggestions && suggestions.length > 0 && (
+            {showSuggestions && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-64 overflow-y-auto z-50">
-                {suggestions.map((suggestion, index) => {
-                  const isNews = 'type' in suggestion && suggestion.type === 'news';
+                {suggestions.length > 0 ? (
+                  suggestions.map((suggestion, index) => {
+                  const isAccount = 'type' in suggestion && suggestion.type === 'account';
                   const isPeople = 'type' in suggestion && suggestion.type === 'people';
-                  const article = isNews ? (suggestion as NewsArticleSuggestion) : null;
+                  const account = isAccount ? (suggestion as AccountSuggestion) : null;
                   const person = isPeople ? (suggestion as PeopleSuggestion) : null;
-                  const feature = !isNews && !isPeople ? (suggestion as MapboxFeature) : null;
+                  const feature = !isAccount && !isPeople ? (suggestion as MapboxFeature) : null;
                   
                   // Create unique key combining type, id, and index to prevent duplicates
-                  const uniqueKey = `${suggestion.id || 'unknown'}-${index}-${isNews ? 'news' : isPeople ? 'people' : 'mapbox'}`;
+                  const uniqueKey = `${suggestion.id || 'unknown'}-${index}-${isAccount ? 'account' : isPeople ? 'people' : 'mapbox'}`;
                   
                   return (
                     <button
@@ -882,15 +874,34 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                       }`}
                     >
                       <div className="flex items-start gap-2">
-                        {isNews ? (
+                        {isAccount ? (
                           <>
-                            <NewspaperIcon className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                            {account!.image_url ? (
+                              <img 
+                                src={account!.image_url} 
+                                alt={account!.username}
+                                className="w-5 h-5 rounded-full mt-0.5 flex-shrink-0 object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gray-200 mt-0.5 flex-shrink-0 flex items-center justify-center">
+                                <UserIcon className="w-3 h-3 text-gray-400" />
+                              </div>
+                            )}
                             <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium text-gray-900 truncate">
-                                {article!.title}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-medium text-gray-900 truncate">
+                                  @{account!.username}
+                                </span>
+                                {(account!.plan === 'pro' || account!.plan === 'plus') && (
+                                  <span className="text-[10px] font-semibold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-200 flex-shrink-0">
+                                    Pro
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-gray-500 truncate">
-                                {article!.source_name || 'News Article'}
+                                {account!.first_name || account!.last_name 
+                                  ? `${account!.first_name || ''} ${account!.last_name || ''}`.trim()
+                                  : 'Account'}
                               </div>
                             </div>
                           </>
@@ -922,116 +933,245 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
                       </div>
                     </button>
                   );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Microphone Icon */}
-          {!hideMicrophone && (
-          <div className="flex-shrink-0 flex items-center gap-1.5">
-            <button
-              data-microphone-button
-              onClick={handleVoiceSearch}
-              disabled={!isSupported}
-              className={`flex-shrink-0 w-8 h-8 rounded-full transition-colors flex items-center justify-center relative ${
-                isRecording
-                  ? 'bg-red-100 text-red-500 animate-pulse'
-                  : isSupported
-                  ? useWhiteText 
-                    ? 'bg-white/20 hover:bg-white/30 text-white/70 hover:text-white' 
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700'
-                  : useWhiteText 
-                    ? 'bg-white/10 text-white/30 cursor-not-allowed' 
-                    : 'bg-gray-50 text-gray-300 cursor-not-allowed'
-              }`}
-              aria-label={isRecording ? 'Stop recording' : 'Start voice search'}
-              title={isSupported ? (isRecording ? 'Stop recording' : 'Start voice search') : 'Voice search not supported'}
-            >
-              <MicrophoneIcon className="w-4 h-4" />
-            </button>
-            {micPermissionError === 'denied' && (
-              <span className={`text-xs whitespace-nowrap ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                Allow mic access
-              </span>
-            )}
-            {micPermissionError === 'unavailable' && (
-              <span className={`text-xs whitespace-nowrap ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                Mic unavailable
-              </span>
-            )}
-          </div>
-          )}
-
-          {/* Profile Icon */}
-          {account ? (
-            <button
-              data-account-button
-              onClick={() => {
-                // Use global modal context to open LiveAccountModal
-                openAccount('settings');
-                // Also use local modalState if available (for live page)
-                if (modalState) {
-                  modalState.openAccount();
-                }
-                  // Dispatch event to hide mobile nav
-                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                    detail: { isOpen: true }
-                  }));
-              }}
-              className={`flex-shrink-0 w-11 h-11 rounded-full overflow-hidden transition-colors flex items-center justify-center ${
-                (account.plan === 'pro' || account.plan === 'plus')
-                  ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-                  : 'border border-gray-200 hover:border-gray-300'
-              }`}
-              aria-label="Account"
-            >
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-white flex items-center justify-center">
-                {account.image_url ? (
-                  <Image
-                    src={account.image_url}
-                    alt={account.username || 'Account'}
-                    width={40}
-                    height={40}
-                    className="w-full h-full object-cover"
-                    unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                    <span className="text-xs font-medium text-gray-600">
-                      {account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'A'}
-                    </span>
+                  })
+                ) : showNoAccountResults && isAccountSearch ? (
+                  <div className="px-3 py-3 space-y-2">
+                    <p className="text-xs text-gray-600">
+                      Can't find that user.
+                    </p>
+                    {currentUserSearchVisibility === false && (
+                      <button
+                        onClick={() => {
+                          if (modalState) {
+                            modalState.openMapStyles();
+                          }
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 underline"
+                      >
+                        Turn on search visibility in map settings
+                      </button>
+                    )}
                   </div>
-                )}
+                ) : null}
               </div>
-            </button>
-          ) : (
+            )}
+          </div>
+
+
+          {/* User Location Icon */}
+          <div className="relative flex-shrink-0">
             <button
+              data-user-location-button
               onClick={() => {
-                openWelcome();
-                  // Dispatch event to hide mobile nav
-                  window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-                    detail: { isOpen: true }
-                  }));
+                if (!showLocationDropdown) {
+                  setShowLocationDropdown(true);
+                  if (!location && !error) {
+                    requestLocation();
+                  }
+                } else {
+                  setShowLocationDropdown(false);
+                }
               }}
-              className={`flex-shrink-0 px-3 py-2 rounded-md text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
+              disabled={!isLocationSupported || isLocationLoading}
+              className={`w-8 h-8 rounded-full transition-colors flex items-center justify-center ${
                 useBlurStyle
-                  ? 'bg-white/90 backdrop-blur-sm border border-gray-300 text-gray-900 hover:bg-white'
-                  : 'bg-white border border-gray-300 text-gray-900 hover:bg-gray-50'
-              }`}
-              aria-label="Sign In"
+                  ? 'bg-white/20 hover:bg-white/30 text-white/70 hover:text-white'
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-700'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              aria-label="Location"
             >
-              Sign In
+              <MapPinIcon className="w-4 h-4" />
             </button>
-          )}
+
+            {/* Dropdown Menu */}
+            {showLocationDropdown && (
+              <div className={`absolute top-full right-0 mt-1 rounded-md shadow-lg border z-50 min-w-[240px] ${
+                useBlurStyle
+                  ? 'bg-transparent backdrop-blur-md border-2 border-transparent'
+                  : 'bg-white border-gray-200'
+              }`}>
+                <div className="p-3 space-y-2">
+                  {/* Header */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <MapPinIcon className={`w-4 h-4 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
+                      <h3 className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Location</h3>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowLocationDropdown(false);
+                        setShowManualInput(false);
+                      }}
+                      className={`w-5 h-5 flex items-center justify-center transition-colors rounded-md ${
+                        useWhiteText
+                          ? 'text-white/70 hover:text-white hover:bg-white/20'
+                          : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                      }`}
+                      aria-label="Close"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="space-y-2">
+                    {/* Loading state */}
+                    {isLocationLoading && (
+                      <div className="flex items-center gap-2 py-1">
+                        <div className={`w-3 h-3 border-2 rounded-full animate-spin ${
+                          useWhiteText ? 'border-white/30 border-t-white' : 'border-gray-300 border-t-gray-600'
+                        }`} />
+                        <p className={`text-xs ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>Getting location...</p>
+                      </div>
+                    )}
+
+                    {/* Success state */}
+                    {location && !isLocationLoading && (
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-xs font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                              {location.source === 'gps' ? 'GPS Location' : 'Manual Location'}
+                            </span>
+                          </div>
+                          <div className={`flex items-center gap-2 text-xs font-mono ${
+                            useWhiteText ? 'text-white/80' : 'text-gray-600'
+                          }`}>
+                            <span>{location.latitude.toFixed(6)}</span>
+                            <span className={useWhiteText ? 'text-white/50' : 'text-gray-400'}>,</span>
+                            <span>{location.longitude.toFixed(6)}</span>
+                          </div>
+                          {location.accuracy > 0 && (
+                            <p className={`text-xs ${useWhiteText ? 'text-white/60' : 'text-gray-500'}`}>
+                              Accuracy: {Math.round(location.accuracy)}m
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (location && map && map.flyTo) {
+                              const mapboxMap = map as any;
+                              mapboxMap.flyTo({
+                                center: [location.longitude, location.latitude],
+                                zoom: Math.max(mapboxMap.getZoom(), 15),
+                                duration: 1000,
+                              });
+                              if (onLocationSelect) {
+                                onLocationSelect({ lat: location.latitude, lng: location.longitude }, 'Current Location');
+                              }
+                            }
+                            setShowLocationDropdown(false);
+                          }}
+                          className={`w-full text-xs font-medium py-2 px-3 rounded-md transition-colors ${
+                            useBlurStyle
+                              ? 'bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30'
+                              : 'bg-gray-900 hover:bg-gray-800 text-white'
+                          }`}
+                        >
+                          Center Map
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Error state */}
+                    {error && !isLocationLoading && (
+                      <div className="space-y-2">
+                        <div className="flex items-start gap-1.5">
+                          <ExclamationTriangleIcon className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${
+                            useWhiteText ? 'text-white/70' : 'text-gray-500'
+                          }`} />
+                          <div className="flex-1 space-y-1">
+                            <p className={`text-xs font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>{errorMessage}</p>
+                            {error.type === 'permission_denied' && (
+                              <p className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                                You can set location manually by clicking on the map.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {error.type === 'permission_denied' && (
+                          <button
+                            onClick={() => setShowManualInput(true)}
+                            className={`w-full text-xs font-medium py-2 px-3 rounded-md transition-colors ${
+                              useBlurStyle
+                                ? 'bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30'
+                                : 'bg-gray-900 hover:bg-gray-800 text-white'
+                            }`}
+                          >
+                            Use Map Click
+                          </button>
+                        )}
+                        
+                        {error.type !== 'permission_denied' && (
+                          <button
+                            onClick={() => requestLocation()}
+                            className={`w-full text-xs font-medium py-2 px-3 rounded-md transition-colors ${
+                              useBlurStyle
+                                ? 'bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30'
+                                : 'bg-gray-900 hover:bg-gray-800 text-white'
+                            }`}
+                          >
+                            Try Again
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Manual input instructions */}
+                    {showManualInput && (
+                      <div className="space-y-2">
+                        <p className={`text-xs ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>
+                          Click anywhere on the map to set your location manually.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setShowManualInput(false);
+                            setShowLocationDropdown(false);
+                          }}
+                          className={`w-full text-xs font-medium py-2 px-3 rounded-md transition-colors ${
+                            useBlurStyle
+                              ? 'bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30'
+                              : 'bg-gray-900 hover:bg-gray-800 text-white'
+                          }`}
+                        >
+                          Got It
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Initial state (no location, no error, not loading) */}
+                    {!location && !error && !isLocationLoading && (
+                      <div className="space-y-2">
+                        <p className={`text-xs ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>
+                          Get your current location or click on the map to set it manually.
+                        </p>
+                        <button
+                          onClick={() => requestLocation()}
+                          disabled={!isLocationSupported}
+                          className={`w-full text-xs font-medium py-2 px-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                            useBlurStyle
+                              ? 'bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border border-white/30 disabled:bg-white/10 disabled:hover:bg-white/10'
+                              : 'bg-gray-900 hover:bg-gray-800 text-white disabled:bg-gray-300 disabled:hover:bg-gray-300'
+                          }`}
+                        >
+                          Get My Location
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Bottom Row: Reload Mentions or Map Settings on left */}
         <div className="flex items-start justify-between gap-1.5">
         {/* Reload Mentions or Map Settings Container */}
         <div className="flex items-center gap-1.5">
-          {/* Reload Mentions Button or Map Settings Button */}
-          {mentionsLayerHidden && currentMapStyle !== 'satellite' ? (
+          {/* Reload Mentions Button */}
+          {mentionsLayerHidden && currentMapStyle !== 'satellite' && (
             <button
               onClick={handleReloadMentions}
               className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 border-2 border-red-500 ${
@@ -1042,23 +1182,6 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             >
               <ArrowPathIcon className="w-4 h-4" />
               Reload mentions
-            </button>
-          ) : (
-            <button
-              data-map-settings-button
-              onClick={() => {
-                if (modalState) {
-                  modalState.openMapStyles();
-                }
-              }}
-              className={`rounded-md px-2 py-1.5 transition-colors flex items-center justify-center shadow-lg ${
-                useBlurStyle
-                  ? 'bg-transparent backdrop-blur-md border-2 border-transparent hover:backdrop-blur-lg'
-                  : 'bg-white hover:bg-gray-50 border border-gray-200'
-              }`}
-              aria-label="Map Layers"
-            >
-              <Squares2X2Icon className={`w-5 h-5 ${useWhiteText ? 'text-white' : 'text-gray-600'}`} />
             </button>
           )}
         </div>
@@ -1072,20 +1195,6 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           onClose={onCloseDailyWelcome}
           useBlurStyle={useBlurStyle}
           showTextOnly={true}
-        />
-      )}
-
-      {/* Live Account Modal */}
-      {modalState && (
-        <LiveAccountModal
-          isOpen={isAccountModalOpen}
-          onClose={() => {
-            modalState.closeAccount();
-            // Dispatch event to show mobile nav
-            window.dispatchEvent(new CustomEvent('live-account-modal-change', {
-              detail: { isOpen: false }
-            }));
-          }}
         />
       )}
 
@@ -1103,7 +1212,6 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
           onUpgrade={(feature?: string) => openUpgrade(feature)}
           onProToast={(feature?: string) => proToast(feature || '')}
           districtsState={districtsState}
-          buildingsState={buildingsState}
           ctuState={ctuState}
           stateBoundaryState={stateBoundaryState}
           countyBoundariesState={countyBoundariesState}

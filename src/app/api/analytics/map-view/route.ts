@@ -9,7 +9,7 @@ import { commonSchemas } from '@/lib/security/validation';
 
 /**
  * POST /api/analytics/map-view
- * Records a map view using the map_views system
+ * Records a map view using the unified url_visits system
  * 
  * Security:
  * - Rate limited: 100 requests/minute (public)
@@ -66,9 +66,11 @@ export async function POST(request: NextRequest) {
         // Use accountId from security middleware context if available
         const finalAccountId = accountId || null;
 
-        // Record map view using record_map_view function
-        const { data, error } = await supabase.rpc('record_map_view', {
-          p_map_id: map_id,
+        // Record map view using record_url_visit function
+        // Convert map ID to URL format: /map/{map_id}
+        const mapUrl = `/map/${map_id}`;
+        const { data, error } = await supabase.rpc('record_url_visit', {
+          p_url: mapUrl,
           p_account_id: finalAccountId,
           p_user_agent: user_agent || null,
           p_referrer_url: referrer_url || null,

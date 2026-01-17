@@ -45,6 +45,9 @@ export interface ProfileAccount {
   traits: string[] | null;
   user_id: string | null;
   plan?: string | null;
+  role?: string | null; // User role: 'user' | 'admin'
+  subscription_status?: string | null; // Stripe subscription status
+  billing_mode?: string | null; // Billing mode configuration
   created_at: string;
 }
 

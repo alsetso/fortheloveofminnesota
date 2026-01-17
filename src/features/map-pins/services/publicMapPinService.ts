@@ -505,33 +505,14 @@ export class PublicMapPinService {
   /**
    * Subscribe to real-time updates for map pins
    * Returns a subscription that can be unsubscribed
+   * NOTE: map_pins table has been removed - this function is deprecated
    */
   static subscribeToPins(
     callback: (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; new?: MapPin; old?: MapPin }) => void
   ) {
-    const channel = supabase
-      .channel('map_pins_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'map_pins',
-        },
-        (payload) => {
-          callback({
-            eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
-            new: payload.new as MapPin | undefined,
-            old: payload.old as MapPin | undefined,
-          });
-        }
-      )
-      .subscribe();
-
+    // map_pins table has been removed - return a no-op subscription
     return {
-      unsubscribe: () => {
-        supabase.removeChannel(channel);
-      },
+      unsubscribe: () => {},
     };
   }
 }

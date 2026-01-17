@@ -1,6 +1,7 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import './globals.css'
+import '@/styles/confetti.css'
 import { ToastContainer } from '@/features/ui/components/Toast'
 import { Providers } from '@/components/providers/Providers'
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary'
@@ -11,6 +12,15 @@ import { OfflineIndicator } from '@/components/pwa/OfflineIndicator'
 // Removed usage/billing context and modals after simplifying app
 // Footer moved to PageLayout component for consistent page structure
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
+  themeColor: '#dc2626',
+}
+
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'),
   title: 'For the Love of Minnesota',
@@ -19,13 +29,6 @@ export const metadata: Metadata = {
   authors: [{ name: 'For the Love of Minnesota' }],
   creator: 'For the Love of Minnesota',
   publisher: 'For the Love of Minnesota',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-    viewportFit: 'cover', // For iOS notch support
-  },
   robots: {
     index: true,
     follow: true,
@@ -43,7 +46,6 @@ export const metadata: Metadata = {
     apple: '/fav.png',
   },
   manifest: '/manifest.json',
-  themeColor: '#dc2626',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

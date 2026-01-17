@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { XMarkIcon, MapPinIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MapPinIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon, EyeIcon, CameraIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
@@ -14,7 +14,7 @@ import YouTubePreview from '@/features/mentions/components/YouTubePreview';
 interface MapEntityPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  type: 'pin' | 'atlas' | 'location' | null;
+  type: 'pin' | 'location' | null;
   data: {
     // Pin/Mention data
     id?: string;
@@ -30,11 +30,13 @@ interface MapEntityPopupProps {
       image_url?: string | null;
       plan?: string | null;
     } | null;
+    collection?: {
+      id: string;
+      emoji: string;
+      title: string;
+    } | null;
     created_at?: string;
-    // Atlas entity data
-    name?: string;
-    table_name?: string;
-    icon_path?: string | null;
+    view_count?: number;
     // Location data
     place_name?: string;
     address?: string;
@@ -44,7 +46,7 @@ interface MapEntityPopupProps {
 
 /**
  * iOS-style popup that appears above mobile nav (z-[60])
- * Shows pin, atlas entity, or location details
+ * Shows pin or location details
  */
 export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntityPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
@@ -94,7 +96,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
       // Trigger animation on next frame
       requestAnimationFrame(() => {
         if (popupRef.current) {
-          popupRef.current.style.transform = 'translateY(0)';
+          popupRef.current.style.transform = 'translate(-50%, 0)';
         }
       });
     } else {
@@ -106,7 +108,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, type]);
 
   // Check if content reaches max height
   useEffect(() => {
@@ -141,7 +143,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
 
   const handleClose = () => {
     if (popupRef.current) {
-      popupRef.current.style.transform = 'translateY(100%)';
+      popupRef.current.style.transform = 'translate(-50%, 100%)';
     }
     // Wait for animation to complete
     setTimeout(() => {
@@ -240,6 +242,38 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
     }
   };
 
+  const handleRemoveImage = async () => {
+    if (!data || !data.id) return;
+    
+    if (!confirm('Are you sure you want to remove the image from this mention?')) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await MentionService.updateMention(data.id, {
+        image_url: null,
+        video_url: null,
+        media_type: 'none',
+      });
+      
+      // Update local data
+      if (data) {
+        data.image_url = null;
+        data.video_url = null;
+        data.media_type = 'none';
+      }
+      
+      // Dispatch event to refresh mentions
+      window.dispatchEvent(new CustomEvent('mention-archived'));
+    } catch (err) {
+      console.error('[MapEntityPopup] Error removing image:', err);
+      alert('Failed to remove image. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!isOpen || !data) return null;
 
   const formatTimeAgo = (dateString?: string) => {
@@ -297,35 +331,142 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
 
   return (
     <>
-      {/* Backdrop - hidden on desktop */}
+      {/* Backdrop */}
       <div
         className="fixed inset-0 z-[60] bg-black/20 transition-opacity duration-300 xl:hidden"
         onClick={handleClose}
       />
       
-      {/* Popup - Covers mobile nav */}
+      {/* Popup - iOS-style bottom sheet */}
       <div
         ref={popupRef}
         className={`fixed z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
-          /* Mobile: bottom sheet */
-          bottom-0 left-0 right-0 rounded-t-3xl
-          /* Desktop: bottom sheet with 500px width, left side, squared bottom corners */
-          xl:bottom-0 xl:left-4 xl:right-auto xl:w-[500px] xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
+          bottom-0 left-1/2 -translate-x-1/2 rounded-t-3xl
+          xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
           ${useBlurStyle ? 'bg-transparent backdrop-blur-md' : 'bg-white'}`}
         style={{
-          transform: 'translateY(100%)',
+          transform: 'translate(-50%, 100%)',
+          maxWidth: '600px',
+          width: 'calc(100% - 2rem)',
           minHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
-          maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : 'calc(100vh - 4rem)',
+          maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '80vh',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
+        {/* Handle bar - hidden on desktop */}
+        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
+          <div className={`w-12 h-1 rounded-full ${useBlurStyle ? 'bg-white/40' : 'bg-gray-300'}`} />
+        </div>
+
         {/* Header */}
-        <div className={`flex items-center justify-between px-3 py-1.5 border-b flex-shrink-0 ${
-          useBlurStyle ? 'border-white/20' : 'border-gray-200'
+        <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
+          useBlurStyle 
+            ? 'border-transparent' 
+            : 'border-gray-200'
         }`}>
-          <h2 className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-            {type === 'pin' ? 'Mention' : type === 'atlas' ? (data?.name || 'Location') : 'Location'}
-          </h2>
+          {/* Account info on left - only for pin/mention type */}
+          {type === 'pin' && data.account ? (
+            <>
+              {user && data.account.username ? (
+                // Authenticated with username: clickable link
+                <Link
+                  href={`/profile/${encodeURIComponent(data.account.username)}`}
+                  onClick={onClose}
+                  className="flex items-center gap-2"
+                >
+                  {/* Profile image */}
+                  <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
+                    (data.account.plan === 'pro' || data.account.plan === 'plus')
+                      ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                      : 'border border-gray-200'
+                  }`}>
+                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                      {data.account.image_url ? (
+                        <Image
+                          src={data.account.image_url}
+                          alt={data.account.username || 'User'}
+                          width={28}
+                          height={28}
+                          className="w-full h-full rounded-full object-cover"
+                          unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
+                          <span className="text-[10px] font-medium text-gray-600">
+                            {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Username */}
+                  <span className={`text-xs font-medium truncate ${
+                    useWhiteText ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {data.account.username}
+                  </span>
+                </Link>
+              ) : user ? (
+                // Authenticated without username: non-clickable
+                <div className="flex items-center gap-2">
+                  {/* Profile image */}
+                  <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
+                    (data.account.plan === 'pro' || data.account.plan === 'plus')
+                      ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                      : 'border border-gray-200'
+                  }`}>
+                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                      {data.account.image_url ? (
+                        <Image
+                          src={data.account.image_url}
+                          alt="User"
+                          width={28}
+                          height={28}
+                          className="w-full h-full rounded-full object-cover"
+                          unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
+                          <span className="text-[10px] font-medium text-gray-600">
+                            {data.account.first_name?.[0]?.toUpperCase() || 'U'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Name */}
+                  <span className={`text-xs font-medium truncate ${
+                    useWhiteText ? 'text-white' : 'text-gray-900'
+                  }`}>
+                    {`${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
+                  </span>
+                </div>
+              ) : (
+                // Unauthenticated: sign in button
+                <button
+                  onClick={openWelcome}
+                  className={`flex items-center gap-2 transition-colors ${
+                    useWhiteText
+                      ? 'text-white/80 hover:text-white'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-medium text-gray-500">?</span>
+                  </div>
+                  <span className="text-xs font-medium">Sign in to see who posted</span>
+                </button>
+              )}
+            </>
+          ) : (
+            <h2 className={`text-sm font-semibold ${
+              useWhiteText 
+                ? 'text-white' 
+                : 'text-gray-900'
+            }`}>
+              {type === 'location' ? 'Location' : ''}
+            </h2>
+          )}
           <div className="flex items-center gap-0.5">
             {/* Three dots menu - only show for owner's mentions */}
             {isOwner && (
@@ -378,127 +519,24 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             )}
             <button
               onClick={handleClose}
-              className={`p-1 transition-colors ${
+              className={`p-1 -mr-1 transition-colors ${
                 useWhiteText 
-                  ? 'text-white/80 hover:text-white' 
+                  ? 'text-gray-300 hover:text-white' 
                   : 'text-gray-500 hover:text-gray-900'
               }`}
               aria-label="Close"
             >
-              <XMarkIcon className="w-4 h-4" />
+              <XMarkIcon className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
         {/* Content - Always scrollable on desktop */}
         <div ref={contentRef} className="flex-1 overflow-y-auto xl:overflow-y-auto">
           <div className="p-4 space-y-4">
             {/* Pin/Mention Content */}
             {type === 'pin' && (
               <>
-                {data.account && (
-                  <>
-                    {user && data.account.username ? (
-                      // Authenticated with username: clickable button container
-                      <Link
-                        href={`/profile/${encodeURIComponent(data.account.username)}`}
-                        onClick={onClose}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${
-                          useTransparentUI
-                            ? 'bg-white/10 hover:bg-white/20 border border-white/20'
-                            : 'bg-gray-50 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        {/* Profile image */}
-                        <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
-                          (data.account.plan === 'pro' || data.account.plan === 'plus')
-                            ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-                            : 'border border-gray-200'
-                        }`}>
-                          <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                            {data.account.image_url ? (
-                              <Image
-                                src={data.account.image_url}
-                                alt={data.account.username || 'User'}
-                                width={28}
-                                height={28}
-                                className="w-full h-full rounded-full object-cover"
-                                unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
-                              />
-                            ) : (
-                              <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
-                                <span className="text-[10px] font-medium text-gray-600">
-                                  {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Username */}
-                        <span className={`text-xs font-medium truncate ${
-                          useWhiteText ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          {data.account.username}
-                        </span>
-                      </Link>
-                    ) : user ? (
-                      // Authenticated without username: non-clickable container
-                      <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md ${
-                        useTransparentUI
-                          ? 'bg-white/10 border border-white/20'
-                          : 'bg-gray-50 border border-gray-200'
-                      }`}>
-                        {/* Profile image */}
-                        <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
-                          (data.account.plan === 'pro' || data.account.plan === 'plus')
-                            ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-                            : 'border border-gray-200'
-                        }`}>
-                          <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                            {data.account.image_url ? (
-                              <Image
-                                src={data.account.image_url}
-                                alt="User"
-                                width={28}
-                                height={28}
-                                className="w-full h-full rounded-full object-cover"
-                                unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
-                              />
-                            ) : (
-                              <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
-                                <span className="text-[10px] font-medium text-gray-600">
-                                  {data.account.first_name?.[0]?.toUpperCase() || 'U'}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {/* Name */}
-                        <span className={`text-xs font-medium truncate ${
-                          useWhiteText ? 'text-white' : 'text-gray-900'
-                        }`}>
-                          {`${data.account.first_name || ''} ${data.account.last_name || ''}`.trim() || 'User'}
-                        </span>
-                      </div>
-                    ) : (
-                      // Unauthenticated: sign in button
-                      <button
-                        onClick={openWelcome}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors w-full text-left ${
-                          useTransparentUI
-                            ? 'bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 hover:text-white'
-                            : 'bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 hover:text-gray-900'
-                        }`}
-                      >
-                        <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] font-medium text-gray-500">?</span>
-                        </div>
-                        <span className="text-xs font-medium">Sign in to see who posted</span>
-                      </button>
-                    )}
-                  </>
-                )}
                 {isEditing ? (
                   <div className="space-y-2">
                     <textarea
@@ -514,6 +552,58 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                       disabled={isSaving}
                       autoFocus
                     />
+                    
+                    {/* Image Management within Edit */}
+                    {(data.image_url || data.video_url) ? (
+                      <div className="relative w-full rounded-md overflow-hidden border border-gray-200 bg-black">
+                        {data.video_url ? (
+                          <video
+                            src={data.video_url}
+                            controls
+                            playsInline
+                            preload="metadata"
+                            className="w-full h-auto max-h-64 object-contain"
+                          />
+                        ) : data.image_url ? (
+                          <Image
+                            src={data.image_url}
+                            alt="Mention media"
+                            width={400}
+                            height={300}
+                            className="w-full h-auto object-cover"
+                            unoptimized={data.image_url.includes('supabase.co')}
+                          />
+                        ) : null}
+                        {/* Remove image button - X in top right */}
+                        <button
+                          onClick={handleRemoveImage}
+                          disabled={isSaving}
+                          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center transition-colors"
+                          aria-label="Remove image"
+                        >
+                          <XMarkIcon className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          // Trigger file input or camera - placeholder for now
+                          alert('Image upload functionality coming soon. Use the create flow to add images.');
+                        }}
+                        disabled={isSaving}
+                        className={`w-full py-8 rounded-md border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 ${
+                          useTransparentUI
+                            ? 'border-white/30 hover:border-white/50 hover:bg-white/10'
+                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                        }`}
+                      >
+                        <CameraIcon className={`w-8 h-8 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+                        <span className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                          Add image or video
+                        </span>
+                      </button>
+                    )}
+                    
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={handleCancelEdit}
@@ -704,80 +794,30 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                     )}
                     </div>
                 )}
-                {data.created_at && (
-                  <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                    {formatTimeAgo(data.created_at)}
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Atlas Entity Content */}
-            {type === 'atlas' && (
-              <>
-                <div className="flex items-center gap-2">
-                  {data.icon_path && (
-                    <Image
-                      src={data.icon_path}
-                      alt={data.name || 'Entity'}
-                      width={24}
-                      height={24}
-                      className="w-6 h-6 object-contain"
-                      unoptimized
-                    />
-                  )}
-                  <div>
-                    <div className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-                      {data.name}
-                    </div>
-                    {data.table_name && (
-                      <div className={`text-xs capitalize ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                        {data.table_name.replace('_', ' ')}
+                {/* View count and timestamp row */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {data.view_count !== undefined && data.view_count > 0 && (
+                      <div className={`flex items-center gap-1 text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        <EyeIcon className="w-3 h-3" />
+                        <span>{data.view_count.toLocaleString()}</span>
                       </div>
                     )}
-                  </div>
-                </div>
-                
-                {/* Add Label Button for Atlas Entity */}
-                {data.coordinates && (
-                  <>
-                    {MinnesotaBoundsService.isWithinMinnesota(data.coordinates) ? (
-                      <button
-                        onClick={() => {
-                          // Dispatch event to show location for mention creation with atlas metadata
-                          window.dispatchEvent(new CustomEvent('show-location-for-mention', {
-                            detail: { 
-                              lat: data.coordinates!.lat, 
-                              lng: data.coordinates!.lng,
-                              atlas_meta: {
-                                id: data.id,
-                                name: data.name,
-                                table_name: data.table_name,
-                                icon_path: data.icon_path,
-                              }
-                            }
-                          }));
-                          handleClose();
-                        }}
-                        className={`mt-4 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          useTransparentUI
-                            ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
-                            : 'text-gray-900 bg-white border border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        Add Mention
-                      </button>
-                    ) : (
-                      <div className={`w-full mt-4 px-4 py-2.5 text-xs rounded-md text-center ${
-                        useTransparentUI
-                          ? 'text-white/80 bg-white/10'
-                          : 'text-gray-600 bg-gray-100'
+                    {data.collection && (
+                      <div className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${
+                        useWhiteText ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-600'
                       }`}>
-                        Location outside Minnesota
+                        <span>{data.collection.emoji}</span>
+                        <span>{data.collection.title}</span>
                       </div>
                     )}
-                  </>
-                )}
+                  </div>
+                  {data.created_at && (
+                    <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                      {formatTimeAgo(data.created_at)}
+                    </div>
+                  )}
+                </div>
               </>
             )}
 

@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import LandingPage from '@/components/landing/LandingPage';
 
-export default async function Home() {
-  redirect('/live');
+export default function Home() {
+  return <LandingPage />;
 }

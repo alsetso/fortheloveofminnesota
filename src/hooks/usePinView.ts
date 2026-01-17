@@ -8,7 +8,8 @@ interface UsePinViewOptions {
 }
 
 /**
- * Hook to track pin views using the simplified pin_views system
+ * Hook to track mention views using the unified url_visits system
+ * Tracks views via URL format: /map?pin={mention_id}
  */
 export function usePinView({ pin_id, enabled = true }: UsePinViewOptions) {
   const hasTracked = useRef(false);

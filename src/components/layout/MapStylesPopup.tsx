@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon, CubeIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, CubeIcon, ChevronDownIcon, ChevronUpIcon, UserIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 import { MAP_CONFIG } from '@/features/map/config';
 import { mapStylePreloader } from '@/features/map/services/mapStylePreloader';
 
@@ -20,10 +21,6 @@ interface MapStylesPopupProps {
   districtsState?: {
     showDistricts: boolean;
     setShowDistricts: (show: boolean) => void;
-  };
-  buildingsState?: {
-    showBuildings: boolean;
-    setShowBuildings: (show: boolean) => void;
   };
   ctuState?: {
     showCTU: boolean;
@@ -43,48 +40,23 @@ interface MapStylesPopupProps {
  * Slide-up popup for map styles/layers selection
  * Appears from the bottom of the screen, positioned in front of mobile nav (z-[60])
  */
-export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d', onTimeFilterChange, account, onUpgrade, onProToast, districtsState, buildingsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
+export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d', onTimeFilterChange, account, onUpgrade, onProToast, districtsState, ctuState, stateBoundaryState, countyBoundariesState }: MapStylesPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [selectedStyle, setSelectedStyle] = useState<MapStyle>('streets');
   const [mounted, setMounted] = useState(false);
+  const [searchVisibility, setSearchVisibility] = useState<boolean>(false);
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
   
   // Accordion state
-  const [isStateResourcesOpen, setIsStateResourcesOpen] = useState(false);
   const [isLayersOpen, setIsLayersOpen] = useState(false);
   const [isUIStyleOpen, setIsUIStyleOpen] = useState(false);
   
   // 3D controls state
   const [pitch, setPitch] = useState(0);
-  const [useBlurStyle, setUseBlurStyle] = useState(() => {
-    // Initialize from window state if available
+  const [useBlurStyle] = useState(() => {
+    // Initialize from window state if available (kept for styling compatibility)
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
-  const [showNews, setShowNews] = useState(() => {
-    // Initialize from window state if available, default to false
-    return typeof window !== 'undefined' ? (window as any).__showNews === true : false;
-  });
-
-  // Listen for blur style changes (in case changed elsewhere)
-  useEffect(() => {
-    const handleBlurStyleChange = (e: CustomEvent) => {
-      setUseBlurStyle(e.detail.useBlurStyle);
-    };
-    window.addEventListener('blur-style-change', handleBlurStyleChange as EventListener);
-    return () => {
-      window.removeEventListener('blur-style-change', handleBlurStyleChange as EventListener);
-    };
-  }, []);
-
-  // Listen for news visibility changes (in case changed elsewhere)
-  useEffect(() => {
-    const handleNewsVisibilityChange = (e: CustomEvent) => {
-      setShowNews(e.detail.showNews);
-    };
-    window.addEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
-    return () => {
-      window.removeEventListener('news-visibility-change', handleNewsVisibilityChange as EventListener);
-    };
-  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -99,7 +71,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
       // Trigger animation on next frame
       requestAnimationFrame(() => {
         if (popupRef.current) {
-          popupRef.current.style.transform = 'translateY(0)';
+          popupRef.current.style.transform = 'translate(-50%, 0)';
         }
       });
     } else {
@@ -162,10 +134,61 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
     };
   }, [isOpen, map]);
 
+  // Fetch user's search visibility
+  useEffect(() => {
+    const fetchSearchVisibility = async () => {
+      if (!account?.id) return;
+      
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('search_visibility')
+          .eq('id', account.id)
+          .single();
+        
+        if (!error && data) {
+          setSearchVisibility(data.search_visibility || false);
+        }
+      } catch (error) {
+        console.error('[MapStylesPopup] Error fetching search visibility:', error);
+      }
+    };
+    
+    if (account?.id) {
+      fetchSearchVisibility();
+    }
+  }, [account?.id]);
+
+  // Toggle search visibility
+  const handleToggleSearchVisibility = async () => {
+    if (!account?.id || isUpdatingVisibility) return;
+    
+    setIsUpdatingVisibility(true);
+    const newValue = !searchVisibility;
+    
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { error } = await supabase
+        .from('accounts')
+        .update({ search_visibility: newValue })
+        .eq('id', account.id);
+      
+      if (!error) {
+        setSearchVisibility(newValue);
+      } else {
+        console.error('[MapStylesPopup] Error updating search visibility:', error);
+      }
+    } catch (error) {
+      console.error('[MapStylesPopup] Error updating search visibility:', error);
+    } finally {
+      setIsUpdatingVisibility(false);
+    }
+  };
 
   const handleClose = () => {
     if (popupRef.current) {
-      popupRef.current.style.transform = 'translateY(100%)';
+      popupRef.current.style.transform = 'translate(-50%, 100%)';
     }
     setTimeout(() => {
       onClose();
@@ -206,8 +229,8 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
 
   if (!isOpen || !mounted) return null;
 
-  // Text color logic: white only when blur AND satellite, otherwise dark
-  const useWhiteText = useBlurStyle && selectedStyle === 'satellite';
+  // Text color logic: dark text (blur style removed from UI)
+  const useWhiteText = false;
 
   const popupContent = (
     <>
@@ -222,12 +245,14 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
         ref={popupRef}
         className={`fixed z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
           /* Mobile: bottom sheet */
-          bottom-0 left-0 right-0 rounded-t-3xl
-          /* Desktop: bottom sheet with 500px width, left side, squared bottom corners */
-          xl:bottom-0 xl:left-4 xl:right-auto xl:w-[500px] xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
+          bottom-0 left-1/2 -translate-x-1/2 rounded-t-3xl
+          /* Desktop: centered with max-width */
+          xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
           ${useBlurStyle ? 'bg-transparent backdrop-blur-md' : 'bg-white'}`}
         style={{
-          transform: 'translateY(100%)',
+          transform: 'translate(-50%, 100%)',
+          maxWidth: '600px',
+          width: 'calc(100% - 2rem)',
           minHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
           maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '80vh',
           paddingBottom: 'env(safe-area-inset-bottom)',
@@ -259,6 +284,49 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
         {/* Content - Always scrollable on desktop */}
         <div className="flex-1 overflow-y-auto xl:overflow-y-auto">
           <div className="p-3 space-y-3">
+            {/* Search Visibility - At the top */}
+            {account && (
+              <div className={`flex items-center justify-between px-2 py-2 rounded text-xs border ${
+                useBlurStyle
+                  ? 'bg-white/10 border-white/20'
+                  : 'bg-white border-gray-200'
+              }`}>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {account.image_url ? (
+                    <Image
+                      src={account.image_url}
+                      alt={account.username || 'Account'}
+                      width={20}
+                      height={20}
+                      className="w-5 h-5 rounded-full flex-shrink-0 object-cover"
+                    />
+                  ) : (
+                    <div className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center ${
+                      useBlurStyle ? 'bg-white/20' : 'bg-gray-200'
+                    }`}>
+                      <UserIcon className={`w-3 h-3 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
+                    </div>
+                  )}
+                  <span className={`truncate ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                    Your profile's {searchVisibility ? 'searchable' : 'Not searchable'}
+                  </span>
+                </div>
+                <button
+                  onClick={handleToggleSearchVisibility}
+                  disabled={isUpdatingVisibility}
+                  className="flex-shrink-0 ml-2"
+                >
+                  <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                    searchVisibility ? 'bg-gray-900' : 'bg-gray-300'
+                  } ${isUpdatingVisibility ? 'opacity-50' : ''}`}>
+                    <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                      searchVisibility ? 'translate-x-3.5' : 'translate-x-0'
+                    }`} />
+                  </div>
+                </button>
+              </div>
+            )}
+
             {/* Time Filter - At the top */}
             {onTimeFilterChange && (
               <div>
@@ -366,55 +434,6 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
               </div>
             </div>
 
-              {/* State Resources Section - Accordion */}
-              {buildingsState && (
-                <div>
-                  <button
-                    onClick={() => setIsStateResourcesOpen(!isStateResourcesOpen)}
-                    className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                      useBlurStyle
-                        ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                        : 'bg-white border-gray-200 hover:bg-gray-50'
-                    } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">State Resources</span>
-                      <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(1)</span>
-                    </div>
-                    {isStateResourcesOpen ? (
-                      <ChevronUpIcon className="w-4 h-4" />
-                    ) : (
-                      <ChevronDownIcon className="w-4 h-4" />
-                    )}
-                  </button>
-                  {isStateResourcesOpen && (
-                    <div className="mt-1.5 space-y-1.5 pl-2">
-                      <button
-                        onClick={() => {
-                          buildingsState.setShowBuildings(!buildingsState.showBuildings);
-                        }}
-                        className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                          useBlurStyle
-                            ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                            : 'bg-white border-gray-200 hover:bg-gray-50'
-                        } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <CubeIcon className="w-3.5 h-3.5" />
-                          <span>Government Buildings</span>
-                        </div>
-                        <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                          buildingsState.showBuildings ? 'bg-gray-900' : 'bg-gray-300'
-                        }`}>
-                          <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                            buildingsState.showBuildings ? 'translate-x-3.5' : 'translate-x-0'
-                          }`} />
-                        </div>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Layers Section - Accordion */}
               {(districtsState || ctuState || stateBoundaryState || countyBoundariesState) && (
@@ -704,7 +723,7 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
                 >
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">UI Style</span>
-                    <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(3)</span>
+                    <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>(1)</span>
                   </div>
                   {isUIStyleOpen ? (
                     <ChevronUpIcon className="w-4 h-4" />
@@ -715,94 +734,43 @@ export default function MapStylesPopup({ isOpen, onClose, map, timeFilter = '7d'
                 {isUIStyleOpen && (
                   <div className="mt-1.5 space-y-1.5 pl-2">
                     {/* Satellite Toggle */}
-                    <button
-                      onClick={() => {
-                        const newStyle = selectedStyle === 'satellite' ? 'streets' : 'satellite';
-                        handleStyleChange(newStyle);
-                      }}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                        selectedStyle === 'satellite'
-                          ? useBlurStyle
-                          ? 'bg-white/10 border-white/20'
-                          : 'bg-gray-100 border-gray-200'
-                          : useBlurStyle
-                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                    >
-                      <span>Satellite</span>
-                      <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                        selectedStyle === 'satellite' ? 'bg-gray-900' : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                          selectedStyle === 'satellite' ? 'translate-x-3.5' : 'translate-x-0'
-                        }`} />
-                      </div>
-                    </button>
-
-                    {/* Transparent Blur Toggle */}
-                    <button
-                      onClick={() => {
-                        const newValue = !useBlurStyle;
-                        setUseBlurStyle(newValue);
-                        // Store in window for session persistence
-                        if (typeof window !== 'undefined') {
-                          (window as any).__useBlurStyle = newValue;
-                        }
-                        // Dispatch event to update all components
-                        window.dispatchEvent(new CustomEvent('blur-style-change', {
-                          detail: { useBlurStyle: newValue }
-                        }));
-                      }}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                        useBlurStyle
-                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } ${useWhiteText ? 'text-white' : 'text-gray-600 hover:text-gray-900'}`}
-                    >
-                      <span>Transparent Blur</span>
-                      <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                        useBlurStyle ? 'bg-gray-900' : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                          useBlurStyle ? 'translate-x-3.5' : 'translate-x-0'
-                        }`} />
-                      </div>
-                    </button>
-
-                    {/* News Toggle */}
-                    <button
-                      onClick={() => {
-                        const newValue = !showNews;
-                        setShowNews(newValue);
-                        // Store in window for session persistence
-                        if (typeof window !== 'undefined') {
-                          (window as any).__showNews = newValue;
-                        }
-                        // Dispatch event to update all components
-                        window.dispatchEvent(new CustomEvent('news-visibility-change', {
-                          detail: { showNews: newValue }
-                        }));
-                      }}
-                      className={`w-full flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
-                        showNews
-                          ? useBlurStyle
-                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                          : 'bg-gray-100 border-gray-200'
-                          : useBlurStyle
-                          ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                          : 'bg-white border-gray-200 hover:bg-gray-50'
-                      } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
-                    >
-                      <span>News</span>
-                      <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
-                        showNews ? 'bg-gray-900' : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
-                          showNews ? 'translate-x-3.5' : 'translate-x-0'
-                        }`} />
-                      </div>
-                    </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => {
+                          const newStyle = selectedStyle === 'satellite' ? 'streets' : 'satellite';
+                          handleStyleChange(newStyle);
+                        }}
+                        className={`flex-1 flex items-center justify-between px-2 py-1.5 rounded text-xs transition-colors border ${
+                          selectedStyle === 'satellite'
+                            ? useBlurStyle
+                            ? 'bg-white/10 border-white/20'
+                            : 'bg-gray-100 border-gray-200'
+                            : useBlurStyle
+                            ? 'bg-white/10 border-white/20 hover:bg-white/20'
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        } ${useWhiteText ? 'text-white' : 'text-gray-900'}`}
+                      >
+                        <span>Satellite</span>
+                        <div className={`w-7 h-3.5 rounded-full transition-colors relative ${
+                          selectedStyle === 'satellite' ? 'bg-gray-900' : 'bg-gray-300'
+                        }`}>
+                          <div className={`absolute top-0.5 left-0.5 w-2.5 h-2.5 bg-white rounded-full transition-transform ${
+                            selectedStyle === 'satellite' ? 'translate-x-3.5' : 'translate-x-0'
+                          }`} />
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.dispatchEvent(new CustomEvent('reload-mentions'));
+                        }}
+                        className={`text-xs underline transition-colors whitespace-nowrap ${
+                          useWhiteText ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        Reload mentions
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

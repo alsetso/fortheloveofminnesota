@@ -34,7 +34,7 @@ export default function NewMapPage() {
     zoom?: number;
   }>({
     buildingsEnabled: false,
-    pitch: 0,
+    pitch: 60,
     terrainEnabled: false,
   });
 

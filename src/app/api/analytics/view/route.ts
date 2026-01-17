@@ -88,9 +88,9 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Record page view using the new simplified function
-        const { data, error } = await supabase.rpc('record_page_view', {
-          p_page_url: page_url,
+        // Record URL visit using the unified function
+        const { data, error } = await supabase.rpc('record_url_visit', {
+          p_url: page_url,
           p_account_id: finalAccountId,
           p_user_agent: user_agent || null,
           p_referrer_url: referrer_url || null,

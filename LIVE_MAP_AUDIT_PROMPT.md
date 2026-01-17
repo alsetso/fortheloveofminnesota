@@ -1,0 +1,3 @@
+# Live Map Page Audit Prompt
+
+Analyze the live map page (`/live` route and LiveMap component): systematically audit all components to categorize and understand each feature, assess every popup and user interaction flow, then review all code files for inconsistencies, duplicates, unnecessary abstractions, unused code, or over-engineered patterns—refactor to the simplest, most performant implementation by removing redundant state management, consolidating duplicate logic, eliminating dead code, optimizing re-renders, and standardizing component patterns while preserving all existing functionality.

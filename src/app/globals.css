@@ -178,6 +178,30 @@ body {
   display: none;  /* Chrome, Safari, Opera */
 }
 
+/* Transparent scrollbar */
+.scrollbar-transparent {
+  scrollbar-width: thin;  /* Firefox */
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;  /* Firefox */
+}
+
+.scrollbar-transparent::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-transparent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-transparent::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.scrollbar-transparent::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
 /* Scroll-snap utilities */
 .scroll-snap-container {
   scroll-snap-type: y mandatory;
@@ -297,6 +321,63 @@ body {
 
 .credit-shake {
   animation: credit-shake 0.6s ease-in-out;
+}
+
+/* Global Icon Button Utilities - Compact, properly centered icons */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon-button svg {
+  display: block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  margin: 0;
+  vertical-align: middle;
+}
+
+/* Ensure all buttons with flex centering properly center their SVG icons */
+button[class*="flex"][class*="items-center"][class*="justify-center"],
+button.flex.items-center.justify-center {
+  position: relative;
+}
+
+button[class*="flex"][class*="items-center"][class*="justify-center"] > svg,
+button.flex.items-center.justify-center > svg {
+  display: block;
+  flex-shrink: 0;
+  margin: 0;
+  position: relative;
+  top: 0;
+  left: 0;
+  transform: none;
+}
+
+/* Fix for circular icon buttons - ensures perfect centering */
+button[class*="rounded-full"] {
+  position: relative;
+}
+
+button[class*="rounded-full"] > svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: block;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+/* Fix for all icon buttons with flex centering */
+button.flex.items-center.justify-center > svg,
+button[class*="flex"][class*="items-center"][class*="justify-center"] > svg {
+  display: block;
+  flex-shrink: 0;
+  margin: 0;
 }
 
 /* Document Editor Styles */

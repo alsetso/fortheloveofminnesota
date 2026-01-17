@@ -15,13 +15,6 @@ export interface LocationMetadata {
   properties: Record<string, any>;
 }
 
-// Atlas entity metadata captured at pin creation
-export interface AtlasMetadata {
-  entityId: string;
-  entityType: string;
-  name: string;
-  emoji?: string;
-}
 
 export interface MapPin {
   id: string;
@@ -37,7 +30,6 @@ export interface MapPin {
   archived?: boolean; // Soft delete flag - true means pin is archived
   view_count?: number;
   location_metadata?: LocationMetadata | null;
-  atlas_metadata?: AtlasMetadata | null;
   event_date?: string | null; // Date when the event/memory happened (can be in the past)
   hide_location?: boolean; // When true, uses city coordinates instead of exact coordinates
   created_at: string;
@@ -60,7 +52,6 @@ export interface CreateMapPinData {
   visibility?: MapPinVisibility;
   tags?: string[]; // User-defined labels for organizing pins
   location_metadata?: LocationMetadata | null;
-  atlas_metadata?: AtlasMetadata | null;
   event_date?: string | null; // ISO date string - can be up to 100 years in the past
   hide_location?: boolean; // When true, uses city coordinates instead of exact coordinates
 }

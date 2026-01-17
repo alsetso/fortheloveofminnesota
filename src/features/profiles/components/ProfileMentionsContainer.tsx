@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import ProfileMap from './ProfileMap';
-import CollectionsPanel from './CollectionsPanel';
+import SimpleProfileCardWithCollections from './SimpleProfileCardWithCollections';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { CollectionService } from '@/features/collections/services/collectionService';
 import type { ProfilePin } from '@/types/profile';
@@ -85,28 +85,21 @@ export default function ProfileMentionsContainer({
 
   if (pins.length === 0 || (filteredPins.length === 0 && !isOwnProfile)) {
     return (
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-xs text-gray-500 mb-1">No public mentions yet</p>
-          <p className="text-[10px] text-gray-400">
-            {isOwnProfile 
-              ? 'Create mentions on maps to see them here'
-              : 'This user hasn\'t created any public mentions yet'}
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <p className="text-xs text-gray-500 mb-1">No public mentions yet</p>
+        <p className="text-[10px] text-gray-400">
+          {isOwnProfile 
+            ? 'Create mentions on maps to see them here'
+            : 'This user hasn\'t created any public mentions yet'}
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-        <h2 className="text-sm font-semibold text-gray-900">Mentions</h2>
-      </div>
-
+    <div>
       {/* Map with Collections Panel */}
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+      <div className="overflow-hidden">
         <div className="aspect-square w-full relative">
           <ProfileMap 
             pins={filteredPins} 
@@ -118,7 +111,9 @@ export default function ProfileMentionsContainer({
             collections={localCollections}
             onPinSelect={setSelectedPinId}
           />
-          <CollectionsPanel
+          <SimpleProfileCardWithCollections
+            accountUsername={accountUsername}
+            accountImageUrl={accountImageUrl}
             collections={localCollections}
             pins={localPins}
             isOwnProfile={isOwnProfile}

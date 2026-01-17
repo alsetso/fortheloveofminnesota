@@ -12,16 +12,12 @@ import { MAP_CONFIG } from '@/features/map/config';
 
 interface Map3DControlsSecondaryContentProps {
   map?: MapboxMapInstance | null;
-  pointsOfInterestVisible?: boolean;
-  onPointsOfInterestVisibilityChange?: (visible: boolean) => void;
 }
 
 type MapStyle = 'streets' | 'satellite' | 'light' | 'dark' | 'outdoors';
 
 export default function Map3DControlsSecondaryContent({ 
   map, 
-  onPointsOfInterestVisibilityChange,
-  pointsOfInterestVisible = false,
 }: Map3DControlsSecondaryContentProps = {}) {
   
   // Building controls

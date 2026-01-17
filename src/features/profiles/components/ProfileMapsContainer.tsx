@@ -96,7 +96,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
 
   if (loading) {
     return (
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+      <div className="p-[10px]">
         <div className="flex items-center justify-center py-6">
           <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
         </div>
@@ -108,7 +108,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
     const currentUserIsPro = isProPlan(account?.plan);
     
     return (
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+      <div className="p-[10px]">
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
             <MapIcon className="w-6 h-6 text-gray-400" />
@@ -146,23 +146,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-900">Maps</h2>
-          {isOwnProfile && (
-            <button
-              onClick={handleCreateMap}
-              className="flex items-center gap-1.5 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-            >
-              <PlusIcon className="w-3 h-3" />
-              New Map
-            </button>
-          )}
-        </div>
-      </div>
-
+    <div className="p-[10px]">
       {/* Maps Grid - Responsive grid with better spacing */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {maps.map((map) => (

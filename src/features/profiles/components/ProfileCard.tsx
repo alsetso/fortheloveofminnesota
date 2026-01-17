@@ -4,28 +4,27 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserIcon, PhoneIcon, PencilIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { UserIcon, Cog6ToothIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
 import { getDisplayName, formatJoinDate, TRAIT_OPTIONS } from '@/types/profile';
 import { AccountService } from '@/features/auth';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/features/auth';
-import ProfileEditModal from './ProfileEditModal';
 import SeeProfileImageModal from './SeeProfileImageModal';
 
 interface ProfileCardProps {
   account: ProfileAccount;
   isOwnProfile: boolean;
   showViewProfile?: boolean;
+  hideTopSection?: boolean;
 }
 
-export default function ProfileCard({ account: initialAccount, isOwnProfile, showViewProfile = true }: ProfileCardProps) {
+export default function ProfileCard({ account: initialAccount, isOwnProfile, showViewProfile = true, hideTopSection = false }: ProfileCardProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { success, error: showError } = useToast();
   const [account, setAccount] = useState<ProfileAccount>(initialAccount);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
@@ -117,6 +116,76 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
   return (
     <>
       <div className="space-y-3 relative">
+        {/* Profile Photo and Name/Username - Above Cover */}
+        {!hideTopSection && (
+          <div className="flex items-center gap-2">
+            <div className={`relative w-14 h-14 rounded-full bg-gray-100 overflow-hidden group flex-shrink-0 ${
+              (account.plan === 'pro' || account.plan === 'plus')
+                ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+                : 'border border-gray-200'
+            } ${!isOwnProfile && account.image_url ? 'cursor-pointer' : ''}`}>
+              <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                {account.image_url ? (
+                  <Image
+                    src={account.image_url}
+                    alt={displayName}
+                    width={56}
+                    height={56}
+                    className="w-full h-full object-cover rounded-full"
+                    unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-full">
+                    <UserIcon className="w-7 h-7 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              {isOwnProfile ? (
+                <>
+                  <input
+                    ref={profileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, 'image_url', setIsUploadingProfile);
+                    }}
+                  />
+                  <button
+                    onClick={() => profileInputRef.current?.click()}
+                    disabled={isUploadingProfile}
+                    className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors opacity-0 group-hover:opacity-100 rounded-full disabled:opacity-50"
+                  >
+                    {isUploadingProfile ? (
+                      <div className="text-[10px] text-white">...</div>
+                    ) : (
+                      <ArrowUpTrayIcon className="w-3 h-3 text-white" />
+                    )}
+                  </button>
+                </>
+              ) : account.image_url ? (
+                <button
+                  onClick={() => setIsProfileImageModalOpen(true)}
+                  className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors opacity-0 group-hover:opacity-100 rounded-full"
+                >
+                  <EyeIcon className="w-4 h-4 text-white" />
+                </button>
+              ) : null}
+            </div>
+            
+            {/* Name and Username - To the right of profile image */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-semibold text-gray-900 leading-tight truncate">
+                {displayName}
+              </h1>
+              {account.username && (
+                <p className="text-xs text-gray-500 truncate">@{account.username}</p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Cover Image */}
         <div className="relative h-32 bg-gradient-to-r from-gray-800 to-gray-900 rounded-md overflow-hidden group">
           {account.cover_image_url ? (
@@ -155,74 +224,6 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
           )}
         </div>
 
-        {/* Profile Photo - Overlapping Cover */}
-        <div className="relative -mt-12">
-          <div className={`relative w-14 h-14 rounded-full bg-gray-100 overflow-hidden group ${
-            (account.plan === 'pro' || account.plan === 'plus')
-              ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-              : 'border border-gray-200'
-          } ${!isOwnProfile && account.image_url ? 'cursor-pointer' : ''}`}>
-            <div className="w-full h-full rounded-full overflow-hidden bg-white">
-              {account.image_url ? (
-                <Image
-                  src={account.image_url}
-                  alt={displayName}
-                  width={56}
-                  height={56}
-                  className="w-full h-full object-cover rounded-full"
-                  unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-full">
-                  <UserIcon className="w-7 h-7 text-gray-400" />
-                </div>
-              )}
-            </div>
-            {isOwnProfile ? (
-              <>
-                <input
-                  ref={profileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageUpload(file, 'image_url', setIsUploadingProfile);
-                  }}
-                />
-                <button
-                  onClick={() => profileInputRef.current?.click()}
-                  disabled={isUploadingProfile}
-                  className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors opacity-0 group-hover:opacity-100 rounded-full disabled:opacity-50"
-                >
-                  {isUploadingProfile ? (
-                    <div className="text-[10px] text-white">...</div>
-                  ) : (
-                    <ArrowUpTrayIcon className="w-3 h-3 text-white" />
-                  )}
-                </button>
-              </>
-            ) : account.image_url ? (
-              <button
-                onClick={() => setIsProfileImageModalOpen(true)}
-                className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/30 transition-colors opacity-0 group-hover:opacity-100 rounded-full"
-              >
-                <EyeIcon className="w-4 h-4 text-white" />
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Name and Username */}
-        <div className="space-y-1">
-          <h1 className="text-sm font-semibold text-gray-900 leading-tight">
-            {displayName}
-          </h1>
-          {account.username && (
-            <p className="text-xs text-gray-500">@{account.username}</p>
-          )}
-        </div>
-
         {/* Bio */}
         {account.bio && (
           <p className="text-xs text-gray-600 leading-relaxed">{account.bio}</p>
@@ -244,12 +245,12 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
               isOwnProfile ? (
                 <div className="flex flex-wrap items-center gap-1">
                   <span className="text-[10px] text-gray-500">Let other Minnesotans know your vibe</span>
-                  <button
-                    onClick={() => setIsEditModalOpen(true)}
+                  <Link
+                    href="/settings"
                     className="px-1.5 py-0.5 text-[10px] font-medium text-gray-900 hover:bg-gray-100 rounded transition-colors border border-gray-300"
                   >
                     +add traits
-                  </button>
+                  </Link>
                 </div>
               ) : (
                 <span className="text-[10px] text-gray-400">No traits selected</span>
@@ -262,18 +263,6 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
         <div className="text-[10px] text-gray-500">
           Joined {joinDate}
         </div>
-
-        {/* Contact Info - Only for own profile */}
-        {isOwnProfile && (
-          <div className="space-y-1.5 pt-2">
-            {account.phone && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <PhoneIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                <span>{account.phone}</span>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* View Profile Button */}
         {showViewProfile && account.username && !isOnProfilePage && (
@@ -288,27 +277,17 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
           </div>
         )}
 
-        {/* Edit Button - Bottom Right */}
+        {/* Settings Button - Bottom Right */}
         {isOwnProfile && (
-          <button
-            onClick={() => setIsEditModalOpen(true)}
+          <Link
+            href="/settings"
             className="absolute bottom-2 right-2 p-1.5 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors z-10"
-            title="Edit Profile"
+            title="Settings"
           >
-            <PencilIcon className="w-3 h-3 text-gray-600" />
-          </button>
+            <Cog6ToothIcon className="w-3 h-3 text-gray-600" />
+          </Link>
         )}
       </div>
-
-      {/* Profile Edit Modal */}
-      {isOwnProfile && (
-        <ProfileEditModal
-          isOpen={isEditModalOpen}
-          onClose={() => setIsEditModalOpen(false)}
-          account={account}
-          onAccountUpdate={handleAccountUpdate}
-        />
-      )}
 
       {/* Profile Image View Modal */}
       {!isOwnProfile && account.image_url && (

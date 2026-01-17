@@ -76,7 +76,7 @@ export default function DynamicSearchModal({ isOpen, onClose, data, type }: Dyna
       document.body.style.overflow = 'hidden';
       requestAnimationFrame(() => {
         if (modalRef.current) {
-          modalRef.current.style.transform = 'translateY(0)';
+          modalRef.current.style.transform = 'translate(-50%, 0)';
         }
       });
     } else {
@@ -89,7 +89,7 @@ export default function DynamicSearchModal({ isOpen, onClose, data, type }: Dyna
 
   const handleClose = () => {
     if (modalRef.current) {
-      modalRef.current.style.transform = 'translateY(100%)';
+      modalRef.current.style.transform = 'translate(-50%, 100%)';
     }
     setTimeout(() => {
       onClose();
@@ -120,10 +120,12 @@ export default function DynamicSearchModal({ isOpen, onClose, data, type }: Dyna
       />
       <div
         ref={modalRef}
-        className="fixed bottom-0 left-0 right-0 z-[60] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col rounded-t-3xl"
+        className="fixed bottom-0 left-1/2 -translate-x-1/2 z-[60] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col rounded-t-3xl"
         style={{
-          transform: 'translateY(100%)',
+          transform: 'translate(-50%, 100%)',
           maxHeight: '80vh',
+          maxWidth: '600px',
+          width: 'calc(100% - 2rem)',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >

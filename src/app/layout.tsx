@@ -7,7 +7,6 @@ import { Providers } from '@/components/providers/Providers'
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary'
 import LocalStorageCleanup from '@/components/utils/LocalStorageCleanup'
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration'
-import { InstallPrompt } from '@/components/pwa/InstallPrompt'
 import { OfflineIndicator } from '@/components/pwa/OfflineIndicator'
 // Removed usage/billing context and modals after simplifying app
 // Footer moved to PageLayout component for consistent page structure
@@ -105,7 +104,6 @@ export default function RootLayout({
           <ErrorBoundary>
             <LocalStorageCleanup />
             <ServiceWorkerRegistration />
-            <InstallPrompt />
             <OfflineIndicator />
             {/* Pages handle their own header/footer via PageLayout component */}
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>

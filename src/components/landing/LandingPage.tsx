@@ -85,46 +85,55 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen">
-      {/* Homepage Screen Container - 100vh/100vw sticky hero section */}
-      <div className="homepageScreenContainer h-screen w-screen sticky top-0">
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex flex-col">
-          {/* Hero Section - Fixed Height, Centered */}
-          <div className="flex-shrink-0 flex flex-col items-center justify-center px-6 py-12 space-y-6 h-screen relative">
-            {/* Logo */}
-            <div className="relative w-20 h-20 mb-2 animate-fade-in">
+    <div className="relative">
+      {/* Homepage Screen Container - 100vh fixed height */}
+      <div className="homepageScreenContainer h-screen w-screen bg-black flex flex-col overflow-hidden">
+        {/* Header - Sticky, never moves */}
+        <div className="sticky top-0 z-10 bg-black px-6 h-[70px] flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10">
               <Image
-                src="/logo.png"
+                src="/white-logo.png"
                 alt="For the Love of Minnesota"
                 fill
                 className="object-contain"
                 unoptimized
               />
             </div>
+            <span className="text-white font-semibold text-sm">For the Love of Minnesota</span>
+          </div>
+          <div>
+            {user && account ? (
+              <button onClick={handleProfileClick} className="flex items-center gap-2">
+                <ProfilePhoto account={account} size="sm" />
+              </button>
+            ) : (
+              <button
+                onClick={handleGetStarted}
+                className="text-white text-sm font-medium hover:text-gray-300 transition-colors"
+              >
+                Sign In
+              </button>
+            )}
+          </div>
+        </div>
 
+        {/* Scrollable Content Area - calc(100vh - 70px) */}
+        <div className="flex-1 overflow-y-auto bg-black rounded-t-3xl scrollbar-hide">
+          {/* Hero Content Card - White background with rounded top corners */}
+          <div className="min-h-full flex flex-col justify-end pb-0">
+            <div className="bg-white rounded-t-3xl flex flex-col items-center justify-center px-6 py-12 space-y-6">
             {/* Main Heading */}
             <div className="text-center space-y-3 max-w-md">
               <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight">
-                For the Love of
-                <span className="block text-red-600">Minnesota</span>
-              </h1>
-              <p className="text-base sm:text-lg font-medium text-gray-700 leading-relaxed px-2">
                 Share what you love. Discover what others do.
-              </p>
-              <p className="text-sm text-gray-600 leading-relaxed px-2">
-                This is a map built on appreciation.
-              </p>
+              </h1>
             </div>
 
             {/* Core Message */}
-            <div className="w-full max-w-sm space-y-2 text-center">
+            <div className="w-full max-w-sm text-center">
               <p className="text-sm text-gray-700 leading-relaxed">
-                The places you go back to.<br />
-                The views you don't forget.<br />
-                The spots you tell friends about.
-              </p>
-              <p className="text-sm font-medium text-gray-900 leading-relaxed">
-                Drop them on the map — so other Minnesotans can find them too.
+                This is a map built on appreciation. The places you go back to. The views you don't forget. The spots you tell friends about. Drop them on the map — so other Minnesotans can find them too.
               </p>
             </div>
 
@@ -199,12 +208,10 @@ export default function LandingPage() {
               <ChevronDownIcon className="w-6 h-6 text-gray-400" />
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* About Section - Covers hero on scroll */}
-      <div className="relative z-10 bg-white border-t border-gray-200 py-5">
-        <div className="max-w-[600px] mx-auto px-6 space-y-4 text-left">
+          {/* About Section - Below hero, scrollable */}
+          <div className="relative z-10 bg-white py-5">
+            <div className="max-w-[600px] mx-auto px-6 space-y-4 text-left">
         {/* The Core Idea */}
         <section className="space-y-1">
           <h2 className="text-sm font-bold text-gray-900">The Core Idea</h2>
@@ -337,6 +344,9 @@ export default function LandingPage() {
             {' '}for business inquiries and customer support.
           </p>
         </section>
+            </div>
+          </div>
+          </div>
         </div>
       </div>
     </div>

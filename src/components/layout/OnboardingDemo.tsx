@@ -47,7 +47,6 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [hasInteractedWithMap, setHasInteractedWithMap] = useState(false);
   const [showSuccessStep, setShowSuccessStep] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,32 +74,6 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
     };
   }, [mapLoaded]);
 
-  // Track map interactions (zoom/move) for step 1
-  useEffect(() => {
-    if (!map || !isVisible || currentStep !== 0) return;
-
-    const handleMapMove = () => {
-      setHasInteractedWithMap(true);
-    };
-
-    // Listen to map move and zoom events
-    map.on('moveend', handleMapMove);
-    map.on('zoomend', handleMapMove);
-
-    return () => {
-      map.off('moveend', handleMapMove);
-      map.off('zoomend', handleMapMove);
-    };
-  }, [map, isVisible, currentStep]);
-
-  // Reset map interaction state when moving to step 1
-  useEffect(() => {
-    if (currentStep === 0) {
-      setHasInteractedWithMap(false);
-    }
-  }, [currentStep]);
-
-
   // Initialize form fields when account changes
   useEffect(() => {
     if (account) {
@@ -115,43 +88,44 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   const steps: OnboardingStep[] = [
     {
       id: 1,
-      title: 'Explore the Map',
-      description: 'Zoom or pan the map to explore Minnesota. Try moving around to get familiar with the interface.',
-      highlightPosition: 'center',
-    },
-    {
-      id: 2,
       title: 'Search Locations',
       description: 'Type in the search bar to find addresses, places, and people across Minnesota.',
       highlightSelector: '[data-search-container]',
       highlightPosition: 'top-left',
     },
     {
-      id: 4,
+      id: 2,
       title: 'Manage Account',
-      description: 'Access your account settings, profile, and preferences by clicking your account icon.',
-      highlightSelector: '[data-account-button]',
-      highlightPosition: 'top-right',
-    },
-    {
-      id: 5,
-      title: 'Map Settings',
-      description: 'Customize your map view with layers, styles, and filters using the settings icon.',
-      highlightSelector: '[data-map-settings-button]',
-      highlightPosition: 'top-left',
-    },
-    {
-      id: 6,
-      title: 'Find Your Location',
-      description: 'Use the location icon to center the map on your current position and explore nearby places.',
-      highlightSelector: '[data-user-location-button]',
+      description: 'Access your account settings and profile by clicking your profile photo on the bottom right.',
+      highlightSelector: '[aria-label="Settings"]',
       highlightPosition: 'bottom-right',
     },
     {
-      id: 7,
+      id: 3,
       title: 'Create Mentions',
-      description: 'Click the camera button at the bottom to create mentions and share your experiences on the map.',
-      highlightSelector: '[data-camera-button]',
+      description: 'Click the camera button to capture and share your favorite places on the map.',
+      highlightSelector: '[aria-label="Create"]',
+      highlightPosition: 'bottom-left',
+    },
+    {
+      id: 4,
+      title: 'View Collections',
+      description: 'Organize your mentions into collections using the folder icon.',
+      highlightSelector: '[aria-label="Collections"]',
+      highlightPosition: 'bottom-left',
+    },
+    {
+      id: 5,
+      title: 'Track Analytics',
+      description: 'See how many people view your profile and mentions with the analytics icon.',
+      highlightSelector: '[aria-label="Analytics"]',
+      highlightPosition: 'bottom-left',
+    },
+    {
+      id: 6,
+      title: 'Get Help',
+      description: 'Access information and help anytime using the info button.',
+      highlightSelector: '[aria-label="Information"]',
       highlightPosition: 'bottom-left',
     },
   ];
@@ -177,11 +151,12 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
         const element = document.querySelector(currentStepData.highlightSelector) as HTMLElement;
         if (element) {
           // Add glowing blue border to element
-          // Apply circular border-radius for account button, microphone button, user location button, and camera button
-          const isCircular = currentStepData.highlightSelector === '[data-account-button]' ||
-                            currentStepData.highlightSelector === '[data-microphone-button]' ||
-                            currentStepData.highlightSelector === '[data-user-location-button]' ||
-                            currentStepData.highlightSelector === '[data-camera-button]';
+          // Apply circular border-radius for circular buttons
+          const isCircular = currentStepData.highlightSelector === '[aria-label="Settings"]' ||
+                            currentStepData.highlightSelector === '[aria-label="Create"]' ||
+                            currentStepData.highlightSelector === '[aria-label="Collections"]' ||
+                            currentStepData.highlightSelector === '[aria-label="Analytics"]' ||
+                            currentStepData.highlightSelector === '[aria-label="Information"]';
           element.style.boxShadow = '0 0 0 5px rgba(59, 130, 246, 0.8), 0 0 20px rgba(59, 130, 246, 0.6)';
           if (isCircular) {
             element.style.borderRadius = '50%';
@@ -1022,7 +997,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-gray-500">
-                Step {currentStep + 1} of 9
+                Step {currentStep + 1} of 7
               </span>
             </div>
             <button
@@ -1061,7 +1036,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
                 }`}
               />
             ))}
-            {/* Step 8 dot */}
+            {/* Step 7 (profile) dot */}
             <div
               className={`h-1.5 rounded-full transition-all ${
                 isStep8
@@ -1086,24 +1061,17 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
             )}
             <button
               onClick={handleNext}
-              disabled={
-                (currentStep === 0 && !hasInteractedWithMap)
-              }
-              className={`text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+              className={`text-xs font-medium text-white bg-red-600 hover:bg-red-700 py-2 px-3 rounded-md transition-colors flex items-center justify-center gap-1.5 ${
                 currentStep > 0 ? 'flex-1' : 'w-full'
               }`}
             >
-              {currentStep === 0 && !hasInteractedWithMap ? (
-                'Zoom or move the map to continue'
-              ) : currentStep < steps.length - 1 ? (
+              {currentStep < steps.length - 1 ? (
                 <>
                   Next
                   <ChevronRightIcon className="w-4 h-4" />
                 </>
-              ) : currentStep === steps.length - 1 ? (
-                'Continue'
               ) : (
-                'Get Started'
+                'Continue to Profile Setup'
               )}
             </button>
           </div>

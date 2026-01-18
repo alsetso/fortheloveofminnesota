@@ -704,6 +704,70 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   const isStep8 = currentStep >= steps.length;
   
   if (isStep8) {
+    // If user is not authenticated, show sign-in prompt instead of profile form
+    if (!user) {
+      return (
+        <div
+          className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm w-[calc(100%-2rem)]"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="p-4 space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-gray-500">
+                  Step 8 of 9
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setIsVisible(false);
+                  setShowSuccessStep(false);
+                }}
+                className="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors rounded-md hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Sign-In Prompt */}
+            <div className="space-y-3">
+              <div className="text-center space-y-2">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Sign In to Continue
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Create an account or sign in to complete your profile and start adding mentions to the map.
+                </p>
+              </div>
+
+              {/* Sign In Button */}
+              <Link
+                href="/login"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors"
+              >
+                Sign In
+                <ArrowRightIcon className="w-4 h-4" />
+              </Link>
+
+              {/* Progress dots */}
+              <div className="flex items-center gap-1.5 pt-2">
+                {steps.map((step) => (
+                  <div
+                    key={step.id}
+                    className="h-1.5 w-1.5 rounded-full bg-gray-400"
+                  />
+                ))}
+                <div className="h-1.5 w-6 rounded-full bg-gray-900" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Authenticated user - show profile completion form
     return (
       <div
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[202] bg-white rounded-lg shadow-xl border border-gray-200 max-w-sm w-[calc(100%-2rem)]"

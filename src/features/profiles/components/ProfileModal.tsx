@@ -2,27 +2,35 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { ChevronUpIcon, ChevronDownIcon, UserIcon } from '@heroicons/react/24/outline';
-import type { ProfileAccount } from '@/types/profile';
+import { ChevronUpIcon, ChevronDownIcon, UserIcon, PencilIcon } from '@heroicons/react/24/outline';
+import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
-import { getDisplayName } from '@/types/profile';
+import { getDisplayName, formatPinDate } from '@/types/profile';
 import { useToast } from '@/features/ui/hooks/useToast';
 import ProfileCard from '@/components/profile/ProfileCard';
 import CollectionsManagement from '@/components/layout/CollectionsManagement';
 import CollectionsList from '@/components/layout/CollectionsList';
+import { MentionService } from '@/features/mentions/services/mentionService';
+import EditMentionModal from '@/components/modals/EditMentionModal';
+import ImagePreviewContainer from '@/components/modals/ImagePreviewContainer';
 
 interface ProfileModalProps {
   account: ProfileAccount;
   isOwnProfile: boolean;
   collections?: Collection[];
+  pins?: ProfilePin[];
   onAccountUpdate?: (account: ProfileAccount) => void;
 }
 
-export default function ProfileModal({ account: initialAccount, isOwnProfile, collections = [], onAccountUpdate }: ProfileModalProps) {
+export default function ProfileModal({ account: initialAccount, isOwnProfile, collections = [], pins: initialPins, onAccountUpdate }: ProfileModalProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [account, setAccount] = useState<ProfileAccount>(initialAccount);
   const [searchVisibility, setSearchVisibility] = useState<boolean>(false);
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
+  const [pins, setPins] = useState<ProfilePin[]>(initialPins || []);
+  const [loadingPins, setLoadingPins] = useState(false);
+  const [editingMentionId, setEditingMentionId] = useState<string | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
   const { success, error: showError } = useToast();
@@ -31,6 +39,55 @@ export default function ProfileModal({ account: initialAccount, isOwnProfile, co
   useEffect(() => {
     setAccount(initialAccount);
   }, [initialAccount]);
+
+  // Fetch mentions if not provided
+  useEffect(() => {
+    if (!initialPins && account?.id && isExpanded) {
+      fetchMentions();
+    } else if (initialPins) {
+      setPins(initialPins);
+    }
+  }, [account?.id, isExpanded, initialPins]);
+
+  const fetchMentions = async () => {
+    if (!account?.id) return;
+    
+    setLoadingPins(true);
+    try {
+      const mentions = await MentionService.getMentions({ account_id: account.id });
+      // Convert to ProfilePin format
+      const profilePins: ProfilePin[] = mentions.map(m => ({
+        id: m.id,
+        lat: m.lat,
+        lng: m.lng,
+        description: m.description,
+        collection_id: m.collection_id,
+        visibility: m.visibility,
+        image_url: m.image_url || null,
+        video_url: m.video_url || null,
+        media_type: m.media_type || 'none',
+        created_at: m.created_at,
+        updated_at: m.updated_at,
+      }));
+      setPins(profilePins);
+    } catch (error) {
+      console.error('[ProfileModal] Error fetching mentions:', error);
+    } finally {
+      setLoadingPins(false);
+    }
+  };
+
+  const handleEditMention = (mentionId: string) => {
+    if (!isOwnProfile) return;
+    setEditingMentionId(mentionId);
+  };
+
+  const handleMentionUpdated = () => {
+    // Refresh mentions after update
+    if (account?.id) {
+      fetchMentions();
+    }
+  };
 
   const displayName = getDisplayName(account);
 
@@ -251,10 +308,97 @@ export default function ProfileModal({ account: initialAccount, isOwnProfile, co
                   />
                 )}
               </div>
+
+              {/* Mentions List - Compact list with edit */}
+              <div>
+                <div className="text-xs font-semibold mb-2 text-gray-900">Mentions</div>
+                {loadingPins ? (
+                  <div className="text-xs text-gray-500 py-2">Loading mentions...</div>
+                ) : pins.length === 0 ? (
+                  <div className="text-xs text-gray-500 py-2">No mentions yet</div>
+                ) : (
+                  <div className="space-y-0.5">
+                    {pins
+                      .filter(pin => isOwnProfile || pin.visibility === 'public')
+                      .map((pin, index) => {
+                        const collection = collections.find(c => c.id === pin.collection_id);
+                        return (
+                          <div key={pin.id} className="flex items-start gap-2 p-1.5 hover:bg-gray-50 rounded-md transition-colors">
+                            {/* Circle indicator */}
+                            <div className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0 mt-1.5" />
+                            
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                                {collection && (
+                                  <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                                    {collection.emoji} {collection.title}
+                                  </span>
+                                )}
+                                <span className="text-[10px] text-gray-500">
+                                  {formatPinDate(pin.created_at)}
+                                </span>
+                              </div>
+                              {pin.description && (
+                                <p className="text-xs text-gray-700 break-words mt-0.5">
+                                  {pin.description}
+                                </p>
+                              )}
+                              {/* Image if uploaded - Compact and clickable */}
+                              {pin.image_url && pin.media_type === 'image' && (
+                                <button
+                                  onClick={() => setPreviewImageUrl(pin.image_url || null)}
+                                  className="mt-1.5 w-full rounded-md overflow-hidden border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+                                >
+                                  <div className="relative w-full h-20 bg-gray-100">
+                                    <Image
+                                      src={pin.image_url}
+                                      alt={pin.description || 'Mention image'}
+                                      fill
+                                      className="object-contain"
+                                      unoptimized={pin.image_url.startsWith('data:') || pin.image_url.includes('supabase.co')}
+                                    />
+                                  </div>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Edit Icon - Only for own profile */}
+                            {isOwnProfile && (
+                              <button
+                                onClick={() => handleEditMention(pin.id)}
+                                className="p-1 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
+                                aria-label="Edit mention"
+                              >
+                                <PencilIcon className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Edit Mention Modal */}
+      <EditMentionModal
+        isOpen={editingMentionId !== null}
+        onClose={() => setEditingMentionId(null)}
+        mentionId={editingMentionId}
+        onMentionUpdated={handleMentionUpdated}
+      />
+
+      {/* Image Preview Container */}
+      <ImagePreviewContainer
+        isOpen={previewImageUrl !== null}
+        onClose={() => setPreviewImageUrl(null)}
+        imageUrl={previewImageUrl || ''}
+        alt="Mention image"
+      />
     </>
   );
 }

@@ -48,6 +48,7 @@ export interface ProfileAccount {
   role?: string | null; // User role: 'user' | 'admin'
   subscription_status?: string | null; // Stripe subscription status
   billing_mode?: string | null; // Billing mode configuration
+  search_visibility?: boolean; // Whether profile is searchable in @ mention searches
   created_at: string;
 }
 

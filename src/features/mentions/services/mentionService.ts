@@ -16,12 +16,30 @@ export class MentionService {
     const { data: { user } } = await supabase.auth.getUser();
     const isAuthenticated = !!user;
     
-    // Build query - for anonymous users, include description and accounts.image_url (public) but exclude username
+    // Build query - optimized for map display
+    // Select only essential columns (exclude large JSONB fields like map_meta, atlas_meta for performance)
     // Note: collections join is excluded for anonymous users due to RLS restrictions
+    const essentialColumns = `id,
+      lat,
+      lng,
+      description,
+      image_url,
+      video_url,
+      media_type,
+      account_id,
+      city_id,
+      collection_id,
+      visibility,
+      archived,
+      post_date,
+      created_at,
+      updated_at,
+      view_count`;
+    
     let query = supabase
       .from('mentions')
       .select(isAuthenticated 
-        ? `*,
+        ? `${essentialColumns},
           accounts(
             id,
             username,
@@ -34,23 +52,7 @@ export class MentionService {
             emoji,
             title
           )`
-        : `id,
-          lat,
-          lng,
-          description,
-          image_url,
-          video_url,
-          media_type,
-          account_id,
-          city_id,
-          collection_id,
-          visibility,
-          archived,
-          post_date,
-          map_meta,
-          created_at,
-          updated_at,
-          view_count,
+        : `${essentialColumns},
           accounts(
             image_url
           )`
@@ -73,8 +75,8 @@ export class MentionService {
       query = query.eq('city_id', filters.city_id);
     }
 
-
     // Time filter - filter by created_at (last 24 hours or 7 days)
+    // This is the default filter for initial load (7d) to improve performance
     if (filters?.timeFilter) {
       const now = new Date();
       let cutoffDate: Date;
@@ -90,6 +92,11 @@ export class MentionService {
       const cutoffISO = cutoffDate.toISOString();
       query = query.gte('created_at', cutoffISO);
     }
+
+    // Add reasonable limit for performance (5000 mentions max)
+    // This prevents loading thousands of mentions on initial load
+    // Users can use filters (time, year, bbox) to narrow results further
+    query = query.limit(5000);
 
     // Year filter - filter by post_date year (or created_at if post_date is null)
     // Using 01-02 instead of 01-01 to avoid timezone issues

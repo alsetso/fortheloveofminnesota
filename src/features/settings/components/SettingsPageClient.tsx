@@ -33,7 +33,10 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   const { setActiveAccountId } = useAuthStateSafe();
   const { success, error: showError } = useToast();
   const { openUpgrade } = useAppModalContextSafe();
-  const [account, setAccount] = useState<ProfileAccount>(initialAccount);
+  const [account, setAccount] = useState<ProfileAccount>({
+    ...initialAccount,
+    search_visibility: initialAccount.search_visibility ?? false,
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -275,6 +278,7 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
         username: account.username || null,
         bio: account.bio || null,
         traits: account.traits && account.traits.length > 0 ? (account.traits as any) : null,
+        search_visibility: account.search_visibility ?? false,
       }, account.id);
 
       setAccount(updatedAccount);
@@ -293,7 +297,10 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   };
 
   const handleCancel = () => {
-    setAccount(initialAccount);
+    setAccount({
+      ...initialAccount,
+      search_visibility: initialAccount.search_visibility ?? false,
+    });
     setIsEditing(false);
     setUsernameAvailable(null);
   };
@@ -616,6 +623,34 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
                     Username not available
                   </p>
                 )}
+              </div>
+              
+              {/* Search Visibility Toggle */}
+              <div className="py-2">
+                <label className="text-xs font-medium text-gray-700 block mb-0.5">
+                  Profile is searchable
+                </label>
+                <p className="text-[10px] text-gray-500 mb-2">
+                  Allow others to find you in @ mention searches
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setAccount({ ...account, search_visibility: !account.search_visibility })}
+                  disabled={!isEditing}
+                  className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    account.search_visibility ? 'bg-gray-900' : 'bg-gray-200'
+                  }`}
+                  role="switch"
+                  aria-checked={account.search_visibility}
+                  aria-label="Toggle profile searchability"
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      account.search_visibility ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                    style={{ marginTop: '2px' }}
+                  />
+                </button>
               </div>
             </div>
 

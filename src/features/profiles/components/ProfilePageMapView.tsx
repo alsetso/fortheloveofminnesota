@@ -59,6 +59,7 @@ export default function ProfilePageMapView({
           account={account} 
           isOwnProfile={isOwnProfile}
           collections={collections}
+          pins={pins}
           onAccountUpdate={(updatedAccount) => {
             // Update account in parent if needed
           }}

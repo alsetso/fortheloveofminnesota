@@ -166,6 +166,7 @@ export interface Account {
   subscription_status: string | null;
   stripe_subscription_id: string | null;
   onboarded: boolean;
+  search_visibility: boolean;
   created_at: string;
   updated_at: string;
   last_visit: string | null;
@@ -184,6 +185,7 @@ export interface UpdateAccountData {
   city_id?: string | null;
   role?: AccountRole;
   traits?: AccountTrait[] | null;
+  search_visibility?: boolean;
 }
 
 export class AccountService {

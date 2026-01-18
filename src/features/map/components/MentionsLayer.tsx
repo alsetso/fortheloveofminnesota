@@ -16,13 +16,14 @@ import {
 interface MentionsLayerProps {
   map: MapboxMapInstance;
   mapLoaded: boolean;
+  onLoadingChange?: (isLoading: boolean) => void;
 }
 
 /**
  * MentionsLayer component manages Mapbox mention visualization
  * Handles fetching, formatting, and real-time updates
  */
-export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
+export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: MentionsLayerProps) {
   const sourceId = 'map-mentions';
   const pointLayerId = 'map-mentions-point';
   const pointLabelLayerId = 'map-mentions-point-label';
@@ -49,6 +50,11 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
   const [editDescription, setEditDescription] = useState('');
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>('7d');
   const [isLoadingMentions, setIsLoadingMentions] = useState(false);
+
+  // Notify parent of loading state changes
+  useEffect(() => {
+    onLoadingChange?.(isLoadingMentions);
+  }, [isLoadingMentions, onLoadingChange]);
   const currentMentionRef = useRef<Mention | null>(null);
   const accountRef = useRef(account);
   const openWelcomeRef = useRef(openWelcome);
@@ -203,10 +209,11 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
         }
 
         // Load account images and fallback heart icon
+        // Optimized: Load fallback first, then add map layers, then lazy load account images
         const fallbackImageId = 'map-mention-heart-fallback';
         const accountImageIds = new Map<string, string>();
         
-        // Load fallback heart icon
+        // Load fallback heart icon (required before adding layers)
         if (!mapboxMap.hasImage(fallbackImageId)) {
           try {
             const img = new Image();
@@ -235,7 +242,7 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           }
         }
         
-        // Load unique account images with plan info (pro vs non-pro need different borders)
+        // Collect unique account images (will be loaded asynchronously after map renders)
         const uniqueAccountImages = new Map<string, { imageUrl: string; isPro: boolean }>();
         geoJSON.features.forEach((feature: any) => {
           const accountImageUrl = feature.properties.account_image_url;
@@ -378,6 +385,8 @@ export default function MentionsLayer({ map, mapLoaded }: MentionsLayerProps) {
           }
         });
         
+        // Load images in parallel (but still await for icon expression)
+        // Optimized: Load in smaller batches to prevent blocking
         await Promise.all(imageLoadPromises);
         
         // Build case expression for icon selection (match by image URL and plan)

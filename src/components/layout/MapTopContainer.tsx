@@ -59,6 +59,7 @@ type SearchSuggestion = MapboxFeature | PeopleSuggestion | AccountSuggestion;
 interface MapTopContainerProps {
   map?: any;
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: MapboxMetadata) => void;
+  isLoadingMentions?: boolean;
   modalState?: {
     isAccountModalOpen: boolean;
     openAccount: () => void;
@@ -118,7 +119,7 @@ const MAP_META_LAYERS = [
   { id: 'services', name: 'Services', icon: '🔧', layerPatterns: ['poi'], sourceLayerPatterns: ['poi'], makiPatterns: ['bank', 'car', 'car-rental', 'car-repair', 'fuel', 'charging-station', 'laundry', 'pharmacy', 'dentist', 'doctor', 'veterinary', 'optician', 'mobile-phone', 'post', 'toilet', 'information'] },
 ];
 
-export default function MapTopContainer({ map, onLocationSelect, modalState, districtsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
+export default function MapTopContainer({ map, onLocationSelect, isLoadingMentions = false, modalState, districtsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
   const router = useRouter();
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
@@ -1174,6 +1175,14 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
             )}
           </div>
         </div>
+
+        {/* Mentions Loading Spinner - Below search container */}
+        {isLoadingMentions && (
+          <div className="flex items-center justify-center gap-1.5 py-1">
+            <div className="w-3 h-3 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
+            <span className="text-[10px] text-gray-600">Loading mentions...</span>
+          </div>
+        )}
 
         {/* Bottom Row: Reload Mentions or Map Settings on left */}
         <div className="flex items-start justify-between gap-1.5">

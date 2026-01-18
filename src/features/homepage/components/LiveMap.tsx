@@ -57,6 +57,7 @@ export default function LiveMap() {
   const [mapError, setMapError] = useState<string | null>(null);
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [mentionsRefreshKey, setMentionsRefreshKey] = useState(0);
+  const [isLoadingMentions, setIsLoadingMentions] = useState(false);
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
   const temporaryMarkerRef = useRef<any>(null);
@@ -1182,6 +1183,7 @@ export default function LiveMap() {
             onCloseDailyWelcome={() => setShowDailyWelcome(false)}
             useBlurStyle={useBlurStyle}
             map={mapInstanceRef.current}
+            isLoadingMentions={isLoadingMentions}
             onLocationSelect={(coordinates, placeName, mapboxMetadata) => {
               if (mapInstanceRef.current && mapLoaded) {
                 mapInstanceRef.current.flyTo({
@@ -1240,7 +1242,12 @@ export default function LiveMap() {
 
           {/* Mentions Layer */}
           {mapLoaded && mapInstanceRef.current && (
-            <MentionsLayer key={mentionsRefreshKey} map={mapInstanceRef.current} mapLoaded={mapLoaded} />
+            <MentionsLayer 
+              key={mentionsRefreshKey} 
+              map={mapInstanceRef.current} 
+              mapLoaded={mapLoaded}
+              onLoadingChange={setIsLoadingMentions}
+            />
           )}
 
 

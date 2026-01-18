@@ -211,6 +211,7 @@ export default function ContributeClient({ auth }: ContributeClientProps) {
                 subscription_status: null,
                 stripe_subscription_id: null,
                 onboarded: false,
+                search_visibility: false,
                 created_at: '',
                 updated_at: '',
                 last_visit: null,

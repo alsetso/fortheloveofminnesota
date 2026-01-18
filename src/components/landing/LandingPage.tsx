@@ -85,32 +85,12 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="relative">
-      {/* Homepage Screen Container - 100vh/100vw cropped viewport */}
-      <div className="homepageScreenContainer h-screen w-screen overflow-hidden relative">
+    <div className="relative min-h-screen">
+      {/* Homepage Screen Container - 100vh/100vw sticky hero section */}
+      <div className="homepageScreenContainer h-screen w-screen sticky top-0">
         <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex flex-col">
           {/* Hero Section - Fixed Height, Centered */}
           <div className="flex-shrink-0 flex flex-col items-center justify-center px-6 py-12 space-y-6 h-screen relative">
-            {/* Homepage Visit Counter - Top Left */}
-            {visitStats && (
-              <button
-                onClick={() => setShowTotal(!showTotal)}
-                className="absolute top-4 left-4 px-3 py-1.5 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:bg-white hover:border-gray-300 transition-all shadow-sm flex items-center gap-1.5"
-              >
-                {loading ? (
-                  'Loading...'
-                ) : (
-                  <>
-                    {isTrending && <span>🔥</span>}
-                    {showTotal ? (
-                      <span>{visitStats.total.toLocaleString()} total</span>
-                    ) : (
-                      <span>{visitStats.last24Hours.toLocaleString()} in 24h</span>
-                    )}
-                  </>
-                )}
-              </button>
-            )}
             {/* Logo */}
             <div className="relative w-20 h-20 mb-2 animate-fade-in">
               <Image
@@ -191,6 +171,27 @@ export default function LandingPage() {
               >
                 Explore Map
               </button>
+              
+              {/* Live Analytics - Below Explore Map Button */}
+              {visitStats && (
+                <button
+                  onClick={() => setShowTotal(!showTotal)}
+                  className="w-full text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center justify-center gap-1.5 pt-1"
+                >
+                  {loading ? (
+                    'Loading...'
+                  ) : (
+                    <>
+                      {isTrending && <span>🔥</span>}
+                      {showTotal ? (
+                        <span>{visitStats.total.toLocaleString()} total visits</span>
+                      ) : (
+                        <span>{visitStats.last24Hours.toLocaleString()} visits in 24h</span>
+                      )}
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Scroll Indicator */}
@@ -201,8 +202,8 @@ export default function LandingPage() {
         </div>
       </div>
 
-      {/* About Section - Fixed Height, No Scroll */}
-      <div className="flex-shrink-0 bg-white border-t border-gray-200 py-5">
+      {/* About Section - Covers hero on scroll */}
+      <div className="relative z-10 bg-white border-t border-gray-200 py-5">
         <div className="max-w-[600px] mx-auto px-6 space-y-4 text-left">
         {/* The Core Idea */}
         <section className="space-y-1">

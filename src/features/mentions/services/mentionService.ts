@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { LocationLookupService } from '@/features/map/services/locationLookupService';
 import { LikeService } from './likeService';
+import { AccountService } from '@/features/auth/services/memberService';
 import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
 
 /**
@@ -147,30 +148,23 @@ export class MentionService {
     // Add likes data if we have mentions
     if (mentions.length > 0 && isAuthenticated) {
       try {
-        // Get current user's account ID
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: accountData } = await supabase
-            .from('accounts')
-            .select('id')
-            .eq('user_id', user.id)
-            .single();
+        // Get current user's account using AccountService (handles RLS properly)
+        const account = await AccountService.getCurrentAccount();
+        
+        if (account?.id) {
+          const mentionIds = mentions.map(m => m.id);
+          
+          // Get like counts for all mentions (batch query)
+          const likeCounts = await LikeService.getLikeCounts(mentionIds);
+          
+          // Get which mentions the user has liked (batch query)
+          const likedMentionIds = await LikeService.getLikedMentionIds(mentionIds, account.id);
 
-          if (accountData?.id) {
-            const mentionIds = mentions.map(m => m.id);
-            
-            // Get like counts for all mentions (batch query)
-            const likeCounts = await LikeService.getLikeCounts(mentionIds);
-            
-            // Get which mentions the user has liked (batch query)
-            const likedMentionIds = await LikeService.getLikedMentionIds(mentionIds, accountData.id);
-
-            // Merge likes data into mentions
-            mentions.forEach(mention => {
-              mention.likes_count = likeCounts.get(mention.id) || 0;
-              mention.is_liked = likedMentionIds.has(mention.id);
-            });
-          }
+          // Merge likes data into mentions
+          mentions.forEach(mention => {
+            mention.likes_count = likeCounts.get(mention.id) || 0;
+            mention.is_liked = likedMentionIds.has(mention.id);
+          });
         }
       } catch (likesError) {
         // Non-blocking: if likes fetch fails, mentions still work

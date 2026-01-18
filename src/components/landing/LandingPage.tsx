@@ -8,6 +8,7 @@ import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useMemo, useState, useEffect } from 'react';
+import { useIOSStandalone } from '@/hooks/useIOSStandalone';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function LandingPage() {
   }, [account?.created_at]);
 
   const displayName = account ? AccountService.getDisplayName(account) : '';
+  const isIOSStandalone = useIOSStandalone();
 
   // Homepage visit stats
   const [visitStats, setVisitStats] = useState<{ last24Hours: number; previous24Hours: number; total: number } | null>(null);
@@ -89,7 +91,13 @@ export default function LandingPage() {
       {/* Homepage Screen Container - 100vh fixed height */}
       <div className="homepageScreenContainer h-screen w-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#000000' }}>
         {/* Header - Sticky, never moves */}
-        <div className="sticky top-0 z-10 px-6 h-[70px] flex items-center justify-between flex-shrink-0" style={{ backgroundColor: '#000000' }}>
+        <div 
+          className="sticky top-0 z-10 px-6 h-[70px] flex items-center justify-between flex-shrink-0" 
+          style={{ 
+            backgroundColor: '#000000',
+            paddingTop: isIOSStandalone ? '20px' : '0px'
+          }}
+        >
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10">
               <Image

@@ -13,6 +13,7 @@ import MapStylesPopup from './MapStylesPopup';
 import DynamicSearchModal from './DynamicSearchModal';
 import DailyWelcomeModal from './DailyWelcomeModal';
 import { useLocation } from '@/features/map/hooks/useLocation';
+import { useIOSStandalone } from '@/hooks/useIOSStandalone';
 
 interface MapboxFeature {
   id: string;
@@ -122,6 +123,7 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
   const { info, pro: proToast } = useToast();
+  const isIOSStandalone = useIOSStandalone();
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -764,7 +766,14 @@ export default function MapTopContainer({ map, onLocationSelect, modalState, dis
   }, [router]);
 
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[45] pointer-events-none" style={{ maxWidth: '600px', width: 'calc(100% - 2rem)' }}>
+    <div 
+      className="fixed left-1/2 -translate-x-1/2 z-[45] pointer-events-none" 
+      style={{ 
+        maxWidth: '600px', 
+        width: 'calc(100% - 2rem)',
+        top: isIOSStandalone ? '23px' : '12px' // 3px (top-3) + 20px padding = 23px
+      }}
+    >
       <div ref={containerRef} className="pointer-events-auto space-y-1.5 relative">
         {/* Search Bar */}
         <div 

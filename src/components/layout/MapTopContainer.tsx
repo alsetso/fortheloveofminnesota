@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MagnifyingGlassIcon, MapPinIcon, UserIcon, ChevronDownIcon, ArrowPathIcon, ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui/hooks/useToast';
@@ -121,6 +121,7 @@ const MAP_META_LAYERS = [
 
 export default function MapTopContainer({ map, onLocationSelect, isLoadingMentions = false, modalState, districtsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
   const { info, pro: proToast } = useToast();
@@ -745,26 +746,18 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
 
 
   const handleLogoClick = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const referrer = document.referrer;
-      // Check if referrer exists and is from the same origin
-      if (referrer && referrer.startsWith(window.location.origin)) {
-        // Extract the path from the referrer URL
-        const referrerPath = new URL(referrer).pathname;
-        // Only navigate back if it's not the same page
-        if (referrerPath !== window.location.pathname) {
-          router.push(referrerPath);
-          return;
-        }
-      }
-      // Fallback: use browser back or go to home
-      if (window.history.length > 1) {
-        router.back();
-      } else {
-        router.push('/');
-      }
+    // Route-aware navigation:
+    // - On /profile/* pages: go to /live
+    // - On /live page: go to / (homepage)
+    if (pathname?.startsWith('/profile/')) {
+      router.push('/live');
+    } else if (pathname === '/live') {
+      router.push('/');
+    } else {
+      // Fallback: go to homepage
+      router.push('/');
     }
-  }, [router]);
+  }, [router, pathname]);
 
   return (
     <div 

@@ -87,9 +87,9 @@ export default function LandingPage() {
   return (
     <div className="relative">
       {/* Homepage Screen Container - 100vh fixed height */}
-      <div className="homepageScreenContainer h-screen w-screen bg-black flex flex-col overflow-hidden">
+      <div className="homepageScreenContainer h-screen w-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#000000' }}>
         {/* Header - Sticky, never moves */}
-        <div className="sticky top-0 z-10 bg-black px-6 h-[70px] flex items-center justify-between flex-shrink-0">
+        <div className="sticky top-0 z-10 px-6 h-[70px] flex items-center justify-between flex-shrink-0" style={{ backgroundColor: '#000000' }}>
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10">
               <Image
@@ -119,7 +119,7 @@ export default function LandingPage() {
         </div>
 
         {/* Scrollable Content Area - calc(100vh - 70px) */}
-        <div className="flex-1 overflow-y-auto bg-black rounded-t-3xl scrollbar-hide">
+        <div className="flex-1 overflow-y-auto rounded-t-3xl scrollbar-hide" style={{ backgroundColor: '#000000' }}>
           {/* Hero Content Card - White background with rounded top corners */}
           <div className="min-h-full flex flex-col justify-end pb-0">
             <div className="bg-white rounded-t-3xl flex flex-col items-center justify-center px-6 py-12 space-y-6">
@@ -215,13 +215,18 @@ export default function LandingPage() {
         <section className="space-y-1">
           <h2 className="text-sm font-bold text-gray-900">The Core Idea</h2>
           <p className="text-xs text-gray-700 leading-snug font-medium">
-            If you love it, someone else probably will too.
+            What's loved deserves visibility.
           </p>
           <p className="text-xs text-gray-600 leading-snug">
-            For the Love of Minnesota lets you mark things worth knowing about — quietly great places, moments, and experiences — and share them with people who actually care.
+            For the Love of Minnesota is a space to mark places, moments, and experiences that matter — not because they're trending, but because they're real.
           </p>
           <p className="text-xs text-gray-600 leading-snug">
-            No algorithms chasing outrage. No paid placements. Just real love, placed on the map.
+            No outrage.<br />
+            No manipulation.<br />
+            No race for attention.
+          </p>
+          <p className="text-xs text-gray-700 leading-snug font-medium">
+            Just genuine appreciation, mapped.
           </p>
         </section>
 
@@ -231,11 +236,11 @@ export default function LandingPage() {
           <div className="space-y-1 text-xs text-gray-700">
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600 font-semibold">📍</span>
-              <span>Drop a pin where something matters to you</span>
+              <span>Drop a pin anywhere in Minnesota</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-red-600 font-semibold">❤️</span>
-              <span>Add why you love it</span>
+              <span>Say why it matters to you</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600 font-semibold">👀</span>
@@ -243,11 +248,15 @@ export default function LandingPage() {
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600 font-semibold">🗺</span>
-              <span>Watch the map fill with meaning</span>
+              <span>Watch the map take shape</span>
             </div>
           </div>
           <p className="text-xs text-gray-600 leading-snug mt-1.5">
-            Every pin makes Minnesota more visible — one genuine moment at a time.
+            Each pin adds context.<br />
+            Each contribution adds meaning.
+          </p>
+          <p className="text-xs text-gray-600 leading-snug mt-1">
+            Over time, Minnesota reveals itself — quietly, honestly.
           </p>
         </section>
 
@@ -255,13 +264,19 @@ export default function LandingPage() {
         <section className="space-y-1">
           <h2 className="text-sm font-bold text-gray-900">Why This Feels Different</h2>
           <p className="text-xs text-gray-600 leading-snug">
-            Most platforms push what's loud. This one reveals what's loved.
+            Most platforms reward noise.<br />
+            This one reveals care.
           </p>
           <p className="text-xs text-gray-600 leading-snug">
-            Over time, patterns form. Favorites rise. Hidden gems stop being hidden — but never feel corporate.
+            There's no feed to compete in.<br />
+            No performance to maintain.<br />
+            No incentive to exaggerate.
           </p>
           <p className="text-xs text-gray-700 leading-snug font-medium">
-            What people love becomes the signal.
+            What rises here does so because people return to it — again and again.
+          </p>
+          <p className="text-xs text-gray-700 leading-snug font-medium">
+            Love becomes the signal.
           </p>
         </section>
 
@@ -271,15 +286,15 @@ export default function LandingPage() {
           <div className="space-y-0.5 text-xs text-gray-600">
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600">•</span>
-              <span>Local-first by design</span>
+              <span>Designed with a local-first mindset</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600">•</span>
-              <span>Simple enough to use instantly</span>
+              <span>Easy to use the moment you arrive</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600">•</span>
-              <span>Deep enough to grow with the community</span>
+              <span>Capable of growing into something deeper</span>
             </div>
             <div className="flex items-start gap-1.5">
               <span className="text-indigo-600">•</span>
@@ -287,7 +302,8 @@ export default function LandingPage() {
             </div>
           </div>
           <p className="text-xs text-gray-600 leading-snug mt-1">
-            This is about pride, care, and presence — not performance.
+            This isn't about influence.<br />
+            It's about presence.
           </p>
         </section>
 
@@ -295,10 +311,12 @@ export default function LandingPage() {
         <section className="space-y-1">
           <h2 className="text-sm font-bold text-gray-900">What This Becomes</h2>
           <p className="text-xs text-gray-600 leading-snug">
-            A living guide powered by real affection. A shared sense of place across the entire state. A way to see Minnesota through each other's eyes.
+            A shared memory of the state.<br />
+            A guide built from trust, not ads.<br />
+            A way to understand Minnesota beyond lists and rankings.
           </p>
           <p className="text-xs text-gray-700 leading-snug font-medium">
-            When people mark what they love, the map starts to mean something.
+            When people mark what they care about, the map starts to tell the truth.
           </p>
         </section>
 
@@ -306,21 +324,31 @@ export default function LandingPage() {
         <section className="space-y-1">
           <h2 className="text-sm font-bold text-gray-900">Coming to iOS</h2>
           <p className="text-xs text-gray-600 leading-snug">
-            We're finalizing approval and preparing the next release. Early users aren't just downloading an app — they're setting the tone.
+            We're preparing the next release now.
           </p>
           <p className="text-xs text-gray-600 leading-snug">
-            We read every comment. We respond to DMs. We build based on what you say.
+            Early users aren't just joining — they're defining the culture.
+          </p>
+          <p className="text-xs text-gray-600 leading-snug">
+            We read every message.<br />
+            We respond to feedback.<br />
+            We build alongside the community.
           </p>
         </section>
 
-        {/* Start With Love */}
+        {/* Start With What You Love */}
         <section className="space-y-1 pt-1.5 border-t border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900">Start With Love</h2>
+          <h2 className="text-sm font-bold text-gray-900">Start With What You Love</h2>
           <p className="text-xs text-gray-600 leading-snug">
-            If there's a place you'd recommend without hesitation — If there's a moment you wish others could experience — If you love Minnesota and want to show it —
+            If there's a place you'd recommend without hesitation —<br />
+            If there's something here you want others to experience —<br />
+            If Minnesota means something to you —
           </p>
           <p className="text-xs text-gray-700 leading-snug font-medium">
-            This is for you.
+            You're in the right place.
+          </p>
+          <p className="text-xs text-gray-700 leading-snug font-medium">
+            Put it on the map.
           </p>
         </section>
 

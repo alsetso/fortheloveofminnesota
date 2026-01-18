@@ -155,7 +155,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
   // Use white text when transparent blur + satellite map
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
-  const [placeholderText, setPlaceholderText] = useState<'Search address' | 'Enter "@" for people'>('Search address');
+  const [placeholderText, setPlaceholderText] = useState<'Enter address' | 'Enter "@" for username'>('Enter address');
   const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
   const [dynamicSearchType, setDynamicSearchType] = useState<'people'>('people');
   const [isAccountSearch, setIsAccountSearch] = useState(false);
@@ -470,8 +470,8 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
           .not('username', 'is', null);
         
         if (usernameQuery.length > 0) {
-          // Fuzzy search: username contains the query (case-insensitive)
-          accountsQuery = accountsQuery.ilike('username', `%${usernameQuery}%`);
+          // Username must start with the query (case-insensitive)
+          accountsQuery = accountsQuery.ilike('username', `${usernameQuery}%`);
         } else {
           // If just "@", show some accounts (ordered by view_count or created_at)
           accountsQuery = accountsQuery.order('view_count', { ascending: false, nullsFirst: false });
@@ -489,8 +489,9 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
         
         if (!data || data.length === 0) {
           setSuggestions([]);
-          setShowSuggestions(usernameQuery.length > 0); // Show message only if user typed something
-          setShowNoAccountResults(usernameQuery.length > 0); // Show message only if user typed something
+          // Always show dropdown with message when searching (even with just @)
+          setShowSuggestions(true);
+          setShowNoAccountResults(true);
           setSelectedIndex(-1);
           return;
         }
@@ -614,10 +615,10 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
   useEffect(() => {
     placeholderIntervalRef.current = setInterval(() => {
       setPlaceholderText((prev) => {
-        if (prev === 'Search address') return 'Enter "@" for people';
-        return 'Search address';
+        if (prev === 'Enter address') return 'Enter "@" for username';
+        return 'Enter address';
       });
-    }, 3000); // Rotate every 3 seconds
+    }, 3000);
 
     return () => {
       if (placeholderIntervalRef.current) {
@@ -638,16 +639,26 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // If query starts with "@", search immediately (even if just "@")
-    // Otherwise, require at least 2 characters
     const trimmedQuery = searchQuery.trim();
-    if (trimmedQuery.startsWith('@') || trimmedQuery.length >= 2) {
+    const hasAtSymbol = trimmedQuery.startsWith('@');
+    
+    if (hasAtSymbol) {
+      // For @ searches, search immediately with no delay (seamless typing)
+      // Search starts with 1 letter after @
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      searchLocations(searchQuery);
+    } else if (trimmedQuery.length >= 2) {
+      // Normal search requires at least 2 characters with delay
       searchTimeoutRef.current = setTimeout(() => {
         searchLocations(searchQuery);
       }, 300);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
+      setIsAccountSearch(false);
+      setShowNoAccountResults(false);
     }
 
     return () => {
@@ -801,15 +812,15 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
               {/* Highlight overlay for @ mentions */}
               {searchQuery && searchQuery.startsWith('@') && (
                 <div 
-                  className={`absolute inset-0 pointer-events-none text-sm py-0.5 flex items-center ${
-                    useWhiteText ? 'text-white' : 'text-gray-900'
-                  }`}
+                  className="absolute inset-0 pointer-events-none flex items-center"
                   style={{ 
                     fontFamily: 'inherit',
-                    fontSize: 'inherit',
-                    lineHeight: 'inherit',
+                    fontSize: '0.875rem', // text-sm = 14px
+                    lineHeight: '1.25rem', // text-sm line-height
                     paddingLeft: '0',
                     paddingRight: '0',
+                    paddingTop: '0.125rem', // py-0.5 = 2px
+                    paddingBottom: '0.125rem',
                   }}
                 >
                   <span className={useWhiteText ? 'text-blue-300' : 'text-blue-600'}>@</span>
@@ -824,11 +835,15 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                 type="text"
                 value={searchQuery || ''}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSuggestions(true);
+                  const newValue = e.target.value;
+                  setSearchQuery(newValue);
+                  // Show suggestions immediately when @ is typed
+                  if (newValue.trim().startsWith('@')) {
+                    setShowSuggestions(true);
+                  }
                 }}
                 onFocus={() => {
-                  if (suggestions.length > 0) {
+                  if (suggestions.length > 0 || searchQuery.trim().startsWith('@')) {
                     setShowSuggestions(true);
                   }
                 }}
@@ -843,11 +858,15 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                   }
                 }}
                 placeholder={placeholderText}
-                className={`w-full bg-transparent border-0 outline-none text-sm py-0.5 ${
+                className={`w-full bg-transparent border-0 outline-none text-sm py-0.5 caret-gray-900 ${
                   useWhiteText 
-                    ? 'text-white placeholder:text-white/50' 
+                    ? 'text-white placeholder:text-white/50 caret-white' 
                     : 'text-gray-900 placeholder:text-gray-500'
-                } ${searchQuery && searchQuery.startsWith('@') ? 'text-transparent' : ''}`}
+                } ${searchQuery && searchQuery.startsWith('@') ? 'text-transparent caret-gray-900' : ''}`}
+                style={searchQuery && searchQuery.startsWith('@') ? { 
+                  color: 'transparent',
+                  caretColor: useWhiteText ? 'white' : '#111827'
+                } : undefined}
               />
             </div>
             {useBlurStyle && (
@@ -938,9 +957,9 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                   );
                   })
                 ) : showNoAccountResults && isAccountSearch ? (
-                  <div className="px-3 py-3 space-y-2">
+                  <div className="px-3 py-3">
                     <p className="text-xs text-gray-600">
-                      Can't find that user.
+                      Can't find user with that username.
                     </p>
                     {currentUserSearchVisibility === false && (
                       <button
@@ -949,11 +968,18 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                             modalState.openMapStyles();
                           }
                         }}
-                        className="text-xs text-blue-600 hover:text-blue-700 underline"
+                        className="text-xs text-blue-600 hover:text-blue-700 underline mt-1 block"
                       >
                         Turn on search visibility in map settings
                       </button>
                     )}
+                  </div>
+                ) : isAccountSearch && isSearching ? (
+                  <div className="px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
+                      <p className="text-xs text-gray-600">Searching...</p>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -1169,11 +1195,15 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
           </div>
         </div>
 
-        {/* Mentions Loading Spinner - Below search container */}
+        {/* Mentions Loading Toast - Below search container */}
         {isLoadingMentions && (
-          <div className="flex items-center justify-center gap-1.5 py-1">
-            <div className="w-3 h-3 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
-            <span className="text-[10px] text-gray-600">Loading mentions...</span>
+          <div className={`rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 transition-all ${
+            useBlurStyle 
+              ? 'bg-white/90 backdrop-blur-md border border-white/50' 
+              : 'bg-white border border-gray-200'
+          }`}>
+            <div className="w-4 h-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin flex-shrink-0" />
+            <span className="text-xs font-medium text-gray-900">Loading mentions...</span>
           </div>
         )}
 

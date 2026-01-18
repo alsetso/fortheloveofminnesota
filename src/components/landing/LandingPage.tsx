@@ -136,13 +136,6 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {/* Supporting Line */}
-            <div className="w-full max-w-sm text-center">
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Restaurants, trails, views, small businesses, hidden gems — if it matters to you, it belongs here.
-              </p>
-            </div>
-
             {/* CTA Buttons */}
             <div className="w-full max-w-sm space-y-2.5 pt-2">
               {user && account ? (

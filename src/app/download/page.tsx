@@ -8,7 +8,6 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import DownloadPWAButton from '@/components/pwa/DownloadPWAButton';
 
 export const metadata: Metadata = {
   title: 'Download App - For the Love of Minnesota',
@@ -26,68 +25,6 @@ export default function DownloadPage() {
             Access For the Love of Minnesota on your mobile device or desktop
           </p>
         </div>
-
-        {/* PWA Section */}
-        <section className="bg-white border border-gray-200 rounded-md p-[10px] space-y-3">
-          <div className="flex items-center gap-2">
-            <DevicePhoneMobileIcon className="w-4 h-4 text-gray-700" />
-            <h2 className="text-xs font-semibold text-gray-900">Progressive Web App (PWA)</h2>
-          </div>
-          
-          <div className="space-y-2">
-            <p className="text-xs text-gray-600">
-              Install our web app directly to your device. Works on all platforms - iOS, Android, and desktop browsers.
-            </p>
-            
-            <div className="space-y-1.5">
-              <h3 className="text-[10px] font-medium text-gray-700 uppercase tracking-wide">Features</h3>
-              <ul className="space-y-1 text-xs text-gray-600">
-                <li className="flex items-start gap-1.5">
-                  <CheckCircleIcon className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Works offline - access cached content without internet</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <CheckCircleIcon className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Fast loading - cached assets for quicker access</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <CheckCircleIcon className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>App-like experience - full screen, no browser UI</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <CheckCircleIcon className="w-3 h-3 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>Home screen icon - quick access from your device</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-[10px] font-medium text-gray-700 uppercase tracking-wide">Limitations</h3>
-              <ul className="space-y-1 text-xs text-gray-600">
-                <li className="flex items-start gap-1.5">
-                  <XCircleIcon className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span>Requires modern browser with PWA support</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <XCircleIcon className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span>Offline functionality limited to previously visited pages</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <XCircleIcon className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span>No push notifications (coming in native apps)</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <XCircleIcon className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <span>Some advanced features may require internet connection</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="pt-2">
-              <DownloadPWAButton />
-            </div>
-          </div>
-        </section>
 
         {/* iOS App Section */}
         <section className="bg-white border border-gray-200 rounded-md p-[10px] space-y-3">

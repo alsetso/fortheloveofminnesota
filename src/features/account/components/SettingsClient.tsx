@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
 import { useAuth, AccountService, Account } from '@/features/auth';
-import { PWAStatusIcon } from '@/components/pwa/PWAStatusIcon';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import type { SettingsClientProps } from '../types';
 
@@ -118,14 +117,8 @@ export default function SettingsClient({ initialAccount, userEmail }: SettingsCl
       {/* Download App Section */}
       <div className="bg-white border border-gray-200 rounded-md p-[10px]">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">Download App</h3>
-        <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
-          <div>
-            <h4 className="text-xs font-semibold text-gray-900 mb-0.5">Install App</h4>
-            <p className="text-xs text-gray-600">Download the app for iOS, Android, or use the Progressive Web App</p>
-          </div>
-          <div className="flex-shrink-0">
-            <PWAStatusIcon variant="light" size="sm" showLabel={true} labelPosition="inline" />
-          </div>
+        <div className="p-[10px] border border-gray-200 rounded-md">
+          <p className="text-xs text-gray-600">Native iOS app coming to the App Store. Get push notifications, enhanced offline support, and optimized performance.</p>
         </div>
       </div>
 

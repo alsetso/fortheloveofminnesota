@@ -6,7 +6,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* PWA and Mobile Optimizations */
+/* Mobile Optimizations */
 @layer base {
   /* Safe area insets for iOS notch and home indicator */
   :root {
@@ -41,7 +41,7 @@
   }
 }
 
-/* Prevent scrolling on live map page for PWA */
+/* Prevent scrolling on live map page */
 html.live-map-page,
 body.live-map-page {
   overflow: hidden;

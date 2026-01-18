@@ -40,7 +40,7 @@ export default function LiveMap() {
   // Track page view
   usePageView();
   
-  // Prevent body scrolling on mount/unmount for PWA
+  // Prevent body scrolling on mount/unmount
   useEffect(() => {
     document.documentElement.classList.add('live-map-page');
     document.body.classList.add('live-map-page');
@@ -1151,7 +1151,7 @@ export default function LiveMap() {
       <div 
         className="fixed inset-0 w-full h-full overflow-hidden"
         style={{ 
-          height: '100dvh', // Dynamic viewport height for mobile/PWA
+          height: '100dvh', // Dynamic viewport height for mobile
           width: '100vw',
           position: 'fixed',
           top: 0,

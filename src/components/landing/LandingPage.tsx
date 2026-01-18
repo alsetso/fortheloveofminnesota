@@ -126,14 +126,17 @@ export default function LandingPage() {
             {/* Main Heading */}
             <div className="text-center space-y-3 max-w-md">
               <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight">
-                Share what you love. Discover what others do.
+                Share what you love. Discover what Minnesotans do.
               </h1>
+              <p className="text-base sm:text-lg font-medium text-gray-700 leading-relaxed">
+                A social map of Minnesota built from real places, real moments, and real recommendations — not algorithms.
+              </p>
             </div>
 
-            {/* Core Message */}
+            {/* Supporting Line */}
             <div className="w-full max-w-sm text-center">
-              <p className="text-sm text-gray-700 leading-relaxed">
-                This is a map built on appreciation. The places you go back to. The views you don't forget. The spots you tell friends about. Drop them on the map — so other Minnesotans can find them too.
+              <p className="text-sm text-gray-600 leading-relaxed">
+                Restaurants, trails, views, small businesses, hidden gems — if it matters to you, it belongs here.
               </p>
             </div>
 

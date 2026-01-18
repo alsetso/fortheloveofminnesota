@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { LocationLookupService } from '@/features/map/services/locationLookupService';
+import { LikeService } from './likeService';
 import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
 
 /**
@@ -141,8 +142,64 @@ export class MentionService {
       throw new Error(`Failed to fetch mentions: ${error.message}`);
     }
 
-    // Type assertion needed because Supabase types don't handle conditional selects well
-    return (data || []) as unknown as Mention[];
+    const mentions = (data || []) as unknown as Mention[];
+
+    // Add likes data if we have mentions
+    if (mentions.length > 0 && isAuthenticated) {
+      try {
+        // Get current user's account ID
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: accountData } = await supabase
+            .from('accounts')
+            .select('id')
+            .eq('user_id', user.id)
+            .single();
+
+          if (accountData?.id) {
+            const mentionIds = mentions.map(m => m.id);
+            
+            // Get like counts for all mentions (batch query)
+            const likeCounts = await LikeService.getLikeCounts(mentionIds);
+            
+            // Get which mentions the user has liked (batch query)
+            const likedMentionIds = await LikeService.getLikedMentionIds(mentionIds, accountData.id);
+
+            // Merge likes data into mentions
+            mentions.forEach(mention => {
+              mention.likes_count = likeCounts.get(mention.id) || 0;
+              mention.is_liked = likedMentionIds.has(mention.id);
+            });
+          }
+        }
+      } catch (likesError) {
+        // Non-blocking: if likes fetch fails, mentions still work
+        console.warn('[MentionService] Error fetching likes data:', likesError);
+        mentions.forEach(mention => {
+          mention.likes_count = 0;
+          mention.is_liked = false;
+        });
+      }
+    } else if (mentions.length > 0) {
+      // For anonymous users, still get like counts (but not is_liked)
+      try {
+        const mentionIds = mentions.map(m => m.id);
+        const likeCounts = await LikeService.getLikeCounts(mentionIds);
+        
+        mentions.forEach(mention => {
+          mention.likes_count = likeCounts.get(mention.id) || 0;
+          mention.is_liked = false;
+        });
+      } catch (likesError) {
+        console.warn('[MentionService] Error fetching like counts:', likesError);
+        mentions.forEach(mention => {
+          mention.likes_count = 0;
+          mention.is_liked = false;
+        });
+      }
+    }
+
+    return mentions;
   }
 
   /**

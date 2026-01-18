@@ -22,6 +22,8 @@ export interface Mention {
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
   view_count?: number; // Total number of views for this mention
+  likes_count?: number; // Total number of likes for this mention
+  is_liked?: boolean; // Whether the current user has liked this mention
   created_at: string;
   updated_at: string;
   account?: {
@@ -35,6 +37,13 @@ export interface Mention {
     emoji: string;
     title: string;
   } | null;
+}
+
+export interface MentionLike {
+  id: string;
+  mention_id: string;
+  account_id: string;
+  created_at: string;
 }
 
 export interface CreateMentionData {

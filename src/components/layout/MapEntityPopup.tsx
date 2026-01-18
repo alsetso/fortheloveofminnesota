@@ -10,6 +10,7 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
 import YouTubePreview from '@/features/mentions/components/YouTubePreview';
+import LikeButton from '@/components/mentions/LikeButton';
 
 interface MapEntityPopupProps {
   isOpen: boolean;
@@ -37,6 +38,8 @@ interface MapEntityPopupProps {
     } | null;
     created_at?: string;
     view_count?: number;
+    likes_count?: number;
+    is_liked?: boolean;
     // Location data
     place_name?: string;
     address?: string;
@@ -57,6 +60,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const [editDescription, setEditDescription] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [likesCount, setLikesCount] = useState(data?.likes_count || 0);
+  const [isLiked, setIsLiked] = useState(data?.is_liked || false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -160,6 +165,14 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
       setEditDescription(data.description);
     }
   }, [isEditing, data]);
+
+  // Update likes state when data changes
+  useEffect(() => {
+    if (data) {
+      setLikesCount(data.likes_count || 0);
+      setIsLiked(data.is_liked || false);
+    }
+  }, [data]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -802,6 +815,19 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                         <EyeIcon className="w-3 h-3" />
                         <span>{data.view_count.toLocaleString()}</span>
                       </div>
+                    )}
+                    {type === 'pin' && data.id && account && (
+                      <LikeButton
+                        mentionId={data.id}
+                        initialLiked={isLiked}
+                        initialCount={likesCount}
+                        onLikeChange={(liked, count) => {
+                          setIsLiked(liked);
+                          setLikesCount(count);
+                        }}
+                        size="sm"
+                        showCount={true}
+                      />
                     )}
                     {data.collection && (
                       <div className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${

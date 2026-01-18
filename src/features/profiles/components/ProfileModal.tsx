@@ -11,8 +11,10 @@ import ProfileCard from '@/components/profile/ProfileCard';
 import CollectionsManagement from '@/components/layout/CollectionsManagement';
 import CollectionsList from '@/components/layout/CollectionsList';
 import { MentionService } from '@/features/mentions/services/mentionService';
+import { useAuthStateSafe } from '@/features/auth';
 import EditMentionModal from '@/components/modals/EditMentionModal';
 import ImagePreviewContainer from '@/components/modals/ImagePreviewContainer';
+import LikeButton from '@/components/mentions/LikeButton';
 
 interface ProfileModalProps {
   account: ProfileAccount;
@@ -33,6 +35,7 @@ export default function ProfileModal({ account: initialAccount, isOwnProfile, co
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLButtonElement>(null);
+  const { account: currentAccount } = useAuthStateSafe();
   const { success, error: showError } = useToast();
 
   // Update local state when prop changes
@@ -363,16 +366,29 @@ export default function ProfileModal({ account: initialAccount, isOwnProfile, co
                               )}
                             </div>
 
-                            {/* Edit Icon - Only for own profile */}
-                            {isOwnProfile && (
-                              <button
-                                onClick={() => handleEditMention(pin.id)}
-                                className="p-1 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
-                                aria-label="Edit mention"
-                              >
-                                <PencilIcon className="w-3 h-3" />
-                              </button>
-                            )}
+                            {/* Actions */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {/* Like Button - Show for all authenticated users */}
+                              {currentAccount && (
+                                <LikeButton
+                                  mentionId={pin.id}
+                                  initialLiked={pin.is_liked || false}
+                                  initialCount={pin.likes_count || 0}
+                                  size="sm"
+                                  showCount={true}
+                                />
+                              )}
+                              {/* Edit Icon - Only for own profile */}
+                              {isOwnProfile && (
+                                <button
+                                  onClick={() => handleEditMention(pin.id)}
+                                  className="p-1 text-gray-500 hover:text-gray-900 transition-colors flex-shrink-0"
+                                  aria-label="Edit mention"
+                                >
+                                  <PencilIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}

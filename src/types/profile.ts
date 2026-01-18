@@ -20,6 +20,8 @@ export interface ProfilePin {
   image_url?: string | null;
   video_url?: string | null;
   media_type?: 'image' | 'video' | 'none';
+  likes_count?: number;
+  is_liked?: boolean;
   created_at: string;
   updated_at: string;
 }

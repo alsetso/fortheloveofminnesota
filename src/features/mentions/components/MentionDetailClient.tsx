@@ -5,11 +5,14 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '../services/mentionService';
+import { LikeService } from '../services/likeService';
 import { useRouter } from 'next/navigation';
 import { usePageView } from '@/hooks/usePageView';
 import { MAP_CONFIG } from '@/features/map/config';
+import { useAuthStateSafe } from '@/features/auth';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import LikeButton from '@/components/mentions/LikeButton';
 
 interface MentionDetailClientProps {
   mention: {
@@ -23,6 +26,8 @@ interface MentionDetailClientProps {
     media_type: 'image' | 'video' | 'none' | null;
     full_address: string | null;
     view_count: number | null;
+    likes_count?: number;
+    is_liked?: boolean;
     created_at: string;
     updated_at: string;
     account_id: string | null;
@@ -37,12 +42,35 @@ interface MentionDetailClientProps {
 }
 
 export default function MentionDetailClient({ mention, isOwner }: MentionDetailClientProps) {
+  const { account } = useAuthStateSafe();
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewCount, setViewCount] = useState(mention.view_count || 0);
+  const [likesCount, setLikesCount] = useState(mention.likes_count || 0);
+  const [isLiked, setIsLiked] = useState(mention.is_liked || false);
   const router = useRouter();
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
+
+  // Fetch likes data if not provided
+  useEffect(() => {
+    const fetchLikesData = async () => {
+      if (!account?.id || mention.likes_count !== undefined) return;
+
+      try {
+        const [count, liked] = await Promise.all([
+          LikeService.getLikeCount(mention.id),
+          LikeService.hasLiked(mention.id, account.id),
+        ]);
+        setLikesCount(count);
+        setIsLiked(liked);
+      } catch (error) {
+        console.error('[MentionDetailClient] Error fetching likes:', error);
+      }
+    };
+
+    fetchLikesData();
+  }, [mention.id, account?.id, mention.likes_count]);
 
   // Track page view
   usePageView({ page_url: `/mention/${mention.id}` });
@@ -211,6 +239,19 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               <EyeIcon className="w-4 h-4" />
               <span>{viewCount} views</span>
             </div>
+            {account && (
+              <LikeButton
+                mentionId={mention.id}
+                initialLiked={isLiked}
+                initialCount={likesCount}
+                onLikeChange={(liked, count) => {
+                  setIsLiked(liked);
+                  setLikesCount(count);
+                }}
+                size="sm"
+                showCount={true}
+              />
+            )}
             <div>
               <span>{createdDate}</span>
             </div>

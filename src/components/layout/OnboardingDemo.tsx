@@ -50,16 +50,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   const [showSuccessStep, setShowSuccessStep] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Always show onboarding when map is loaded (for UI testing)
-  useEffect(() => {
-    if (mapLoaded) {
-      setIsVisible(true);
-    } else {
-      setIsVisible(false);
-    }
-  }, [mapLoaded]);
-
-  // Listen for custom event to show onboarding demo
+  // Listen for custom event to show onboarding demo (triggered by info button click)
   useEffect(() => {
     const handleShowOnboarding = () => {
       if (mapLoaded) {

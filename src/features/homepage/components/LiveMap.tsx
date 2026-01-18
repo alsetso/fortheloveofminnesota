@@ -1147,18 +1147,19 @@ export default function LiveMap() {
   }, []);
 
   return (
-    <div 
-      className="fixed inset-0 w-full h-full overflow-hidden"
-      style={{ 
-        height: '100dvh', // Dynamic viewport height for mobile/PWA
-        width: '100vw',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-      }}
-    >
+    <div className="liveMapScreenContainer h-screen w-screen overflow-hidden fixed inset-0">
+      <div 
+        className="fixed inset-0 w-full h-full overflow-hidden"
+        style={{ 
+          height: '100dvh', // Dynamic viewport height for mobile/PWA
+          width: '100vw',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
+      >
       <div 
         className="relative w-full h-full overflow-hidden flex"
         style={{ 
@@ -1628,6 +1629,7 @@ export default function LiveMap() {
       {/* Visitor Stats */}
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}
+      </div>
     </div>
   );
 }

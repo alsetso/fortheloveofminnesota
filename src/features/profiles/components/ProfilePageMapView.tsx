@@ -38,30 +38,32 @@ export default function ProfilePageMapView({
   }, [isOwnProfile, info]);
 
   return (
-    <div className="fixed inset-0" style={{ width: '100vw', height: '100vh', margin: 0, padding: 0 }}>
-      {/* Full Screen Map */}
-      <ProfileMap 
-        pins={filteredPins} 
-        accountId={account.id}
-        isOwnProfile={isOwnProfile}
-        accountUsername={account.username}
-        accountImageUrl={account.image_url}
-        selectedCollectionId={null}
-        collections={collections}
-      />
+    <div className="profileScreenContainer h-screen w-screen overflow-hidden fixed inset-0">
+      <div className="fixed inset-0" style={{ width: '100vw', height: '100vh', margin: 0, padding: 0 }}>
+        {/* Full Screen Map */}
+        <ProfileMap 
+          pins={filteredPins} 
+          accountId={account.id}
+          isOwnProfile={isOwnProfile}
+          accountUsername={account.username}
+          accountImageUrl={account.image_url}
+          selectedCollectionId={null}
+          collections={collections}
+        />
 
-      {/* Floating Map Profile Header - Top */}
-      <MapProfileHeader isOwnProfile={isOwnProfile} />
+        {/* Floating Map Profile Header - Top */}
+        <MapProfileHeader isOwnProfile={isOwnProfile} />
 
-      {/* Profile Modal - iOS Style Bottom Sheet (z-50, appears in front of header) */}
-      <ProfileModal 
-        account={account} 
-        isOwnProfile={isOwnProfile}
-        collections={collections}
-        onAccountUpdate={(updatedAccount) => {
-          // Update account in parent if needed
-        }}
-      />
+        {/* Profile Modal - iOS Style Bottom Sheet (z-50, appears in front of header) */}
+        <ProfileModal 
+          account={account} 
+          isOwnProfile={isOwnProfile}
+          collections={collections}
+          onAccountUpdate={(updatedAccount) => {
+            // Update account in parent if needed
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAuthStateSafe, AccountService } from '@/features/auth';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
-import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { PaperAirplaneIcon, HeartIcon } from '@heroicons/react/24/solid';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useMemo, useState, useEffect } from 'react';
@@ -87,9 +87,9 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="relative">
+    <div className="relative w-full overflow-x-hidden" style={{ maxWidth: '100vw' }}>
       {/* Homepage Screen Container - 100vh fixed height */}
-      <div className="homepageScreenContainer h-screen w-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#000000' }}>
+      <div className="homepageScreenContainer h-screen w-full flex flex-col overflow-hidden" style={{ backgroundColor: '#000000', maxWidth: '100vw' }}>
         {/* Header - Sticky, never moves */}
         <div 
           className="sticky top-0 z-10 px-6 h-[70px] flex items-center justify-between flex-shrink-0" 
@@ -127,7 +127,7 @@ export default function LandingPage() {
         </div>
 
         {/* Scrollable Content Area - calc(100vh - 70px) */}
-        <div className="flex-1 overflow-y-auto rounded-t-3xl scrollbar-hide" style={{ backgroundColor: '#000000' }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden rounded-t-3xl scrollbar-hide" style={{ backgroundColor: '#000000', maxWidth: '100vw' }}>
           {/* Hero Content Card - White background with rounded top corners */}
           <div className="min-h-full flex flex-col justify-end pb-0">
             <div className="bg-white rounded-t-3xl flex flex-col items-center justify-center px-6 py-12 space-y-6">
@@ -216,169 +216,357 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* About Section - Below hero, scrollable */}
-          <div className="relative z-10 bg-white py-5">
-            <div className="max-w-[600px] mx-auto px-6 space-y-4 text-left">
-        {/* The Core Idea */}
-        <section className="space-y-1">
-          <h2 className="text-sm font-bold text-gray-900">The Core Idea</h2>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            What's loved deserves visibility.
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">
-            For the Love of Minnesota is a space to mark places, moments, and experiences that matter — not because they're trending, but because they're real.
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">
-            No outrage.<br />
-            No manipulation.<br />
-            No race for attention.
-          </p>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            Just genuine appreciation, mapped.
-          </p>
-        </section>
+          {/* About Section - Horizontal scrolling iOS-style cards */}
+          <div className="relative z-10 bg-white py-6 w-full overflow-hidden">
+            <div className="overflow-x-auto scrollbar-hide px-6" style={{ width: '100%', maxWidth: '100vw' }}>
+              <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
+                {/* The Core Idea */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      What's loved deserves visibility.
+                    </p>
+                    <p className="text-gray-700">
+                      A map built from real places that matter to real people. Not what's trending. Not what's viral. Just what's true. Only genuine appreciation, made visible.
+                    </p>
+                  </div>
+                </div>
 
-        {/* How It Works */}
-        <section className="space-y-1">
-          <h2 className="text-sm font-bold text-gray-900">How It Works</h2>
-          <div className="space-y-1 text-xs text-gray-700">
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600 font-semibold">📍</span>
-              <span>Drop a pin anywhere in Minnesota</span>
-            </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-red-600 font-semibold">❤️</span>
-              <span>Say why it matters to you</span>
-            </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600 font-semibold">👀</span>
-              <span>Let others discover it naturally</span>
-            </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600 font-semibold">🗺</span>
-              <span>Watch the map take shape</span>
+                {/* How It Works */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      How It Works
+                    </p>
+                    <p className="text-gray-700">
+                      Find a place in Minnesota that means something to you. Mark it. Tell us why. That's it. No likes. No followers. No feed. Just a map that grows more honest with every pin. Minnesota reveals itself through the places people actually return to.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Why This Feels Different */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      Why This Feels Different
+                    </p>
+                    <p className="text-gray-700">
+                      Other platforms reward what gets attention. This one rewards what gets returned to. No feed to scroll. No metrics to chase. No persona to maintain. Just places and why they matter. What surfaces here does so because people keep coming back — not because it went viral.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Built for Minnesotans */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      Built for Minnesotans
+                    </p>
+                    <p className="text-gray-700">
+                      Made by people who live here. For people who live here. Simple enough to use today. Deep enough to grow with over time. Every feature, every decision, every change — shaped by the community that shows up. This isn't about building an audience. It's about building a map.
+                    </p>
+                  </div>
+                </div>
+
+                {/* What This Becomes */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      What This Becomes
+                    </p>
+                    <p className="text-gray-700">
+                      A collective memory of Minnesota. A guide written by people who've actually been there. A map that shows what matters, not what's marketed. When enough people mark what they love, the map becomes honest. And honesty is the best guide.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Coming to iOS */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      Coming to iOS
+                    </p>
+                    <p className="text-gray-700">
+                      The app is in development. Coming soon to your phone. Right now, you're not just early — you're helping shape what this becomes. Every message matters. Every suggestion is read. We're building this together.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Start With What You Love */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      Start With What You Love
+                    </p>
+                    <p className="text-gray-700">
+                      That spot you always take visitors. The place you think about when you're away. The corner of Minnesota that feels like home. If it matters to you, it belongs on the map. Put it there.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Contact */}
+                <div className="flex-shrink-0 w-[85vw] max-w-[400px] h-[70vh] min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 flex flex-col shadow-sm relative">
+                  <HeartIcon className="w-8 h-8 text-red-600 absolute top-8 right-8" />
+                  <div className="flex-1" />
+                  <div className="space-y-3 text-lg text-gray-900 leading-relaxed">
+                    <p className="font-bold text-gray-900">
+                      Contact
+                    </p>
+                    <p className="text-gray-700">
+                      <a 
+                        href="mailto:loveofminnesota@gmail.com" 
+                        className="text-red-600 hover:text-red-700 underline font-bold"
+                      >
+                        Contact us
+                      </a>
+                      {' '}at{' '}
+                      <a 
+                        href="mailto:loveofminnesota@gmail.com" 
+                        className="text-red-600 hover:text-red-700 underline"
+                      >
+                        loveofminnesota@gmail.com
+                      </a>
+                      {' '}for business inquiries and customer support.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <p className="text-xs text-gray-600 leading-snug mt-1.5">
-            Each pin adds context.<br />
-            Each contribution adds meaning.
-          </p>
-          <p className="text-xs text-gray-600 leading-snug mt-1">
-            Over time, Minnesota reveals itself — quietly, honestly.
-          </p>
-        </section>
 
-        {/* Why This Feels Different */}
-        <section className="space-y-1">
-          <h2 className="text-sm font-bold text-gray-900">Why This Feels Different</h2>
-          <p className="text-xs text-gray-600 leading-snug">
-            Most platforms reward noise.<br />
-            This one reveals care.
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">
-            There's no feed to compete in.<br />
-            No performance to maintain.<br />
-            No incentive to exaggerate.
-          </p>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            What rises here does so because people return to it — again and again.
-          </p>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            Love becomes the signal.
-          </p>
-        </section>
+          {/* Categories Section - Wrapped grid */}
+          <div className="relative z-10 bg-white py-8 w-full">
+            <div className="max-w-[1200px] mx-auto px-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">All of the things you can post</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {/* Community & Social */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🗣</span>
+                  <span className="text-xs text-gray-700 font-medium">Community & Social</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">💬</span>
+                  <span className="text-xs text-gray-700 font-medium">Stories & moments</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">📸</span>
+                  <span className="text-xs text-gray-700 font-medium">Photos & videos</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">❤️</span>
+                  <span className="text-xs text-gray-700 font-medium">Local shoutouts</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🤝</span>
+                  <span className="text-xs text-gray-700 font-medium">Meetups & gatherings</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🧭</span>
+                  <span className="text-xs text-gray-700 font-medium">Tips & recommendations</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🐕</span>
+                  <span className="text-xs text-gray-700 font-medium">Lost & found (pets/items)</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🚨</span>
+                  <span className="text-xs text-gray-700 font-medium">Neighborhood alerts</span>
+                </div>
 
-        {/* Built for Minnesotans */}
-        <section className="space-y-1">
-          <h2 className="text-sm font-bold text-gray-900">Built for Minnesotans</h2>
-          <div className="space-y-0.5 text-xs text-gray-600">
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600">•</span>
-              <span>Designed with a local-first mindset</span>
-            </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600">•</span>
-              <span>Easy to use the moment you arrive</span>
-            </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600">•</span>
-              <span>Capable of growing into something deeper</span>
-            </div>
-            <div className="flex items-start gap-1.5">
-              <span className="text-indigo-600">•</span>
-              <span>Shaped by the people who show up early</span>
-            </div>
-          </div>
-          <p className="text-xs text-gray-600 leading-snug mt-1">
-            This isn't about influence.<br />
-            It's about presence.
-          </p>
-        </section>
+                {/* Business & Commerce */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">⭐</span>
+                  <span className="text-xs text-gray-700 font-medium">Reviews</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏷</span>
+                  <span className="text-xs text-gray-700 font-medium">Things for sale</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏠</span>
+                  <span className="text-xs text-gray-700 font-medium">Listings & rentals</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">💼</span>
+                  <span className="text-xs text-gray-700 font-medium">Job postings</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🆕</span>
+                  <span className="text-xs text-gray-700 font-medium">New businesses</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">❌</span>
+                  <span className="text-xs text-gray-700 font-medium">Closures & changes</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🛍</span>
+                  <span className="text-xs text-gray-700 font-medium">Pop-ups & markets</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🧾</span>
+                  <span className="text-xs text-gray-700 font-medium">Services offered</span>
+                </div>
 
-        {/* What This Becomes */}
-        <section className="space-y-1">
-          <h2 className="text-sm font-bold text-gray-900">What This Becomes</h2>
-          <p className="text-xs text-gray-600 leading-snug">
-            A shared memory of the state.<br />
-            A guide built from trust, not ads.<br />
-            A way to understand Minnesota beyond lists and rankings.
-          </p>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            When people mark what they care about, the map starts to tell the truth.
-          </p>
-        </section>
+                {/* Events & Activities */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">📅</span>
+                  <span className="text-xs text-gray-700 font-medium">Events & festivals</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🎶</span>
+                  <span className="text-xs text-gray-700 font-medium">Live music</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏟</span>
+                  <span className="text-xs text-gray-700 font-medium">Sports & games</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🎭</span>
+                  <span className="text-xs text-gray-700 font-medium">Arts & performances</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🌽</span>
+                  <span className="text-xs text-gray-700 font-medium">Farmers markets</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🧺</span>
+                  <span className="text-xs text-gray-700 font-medium">Community sales</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🎟</span>
+                  <span className="text-xs text-gray-700 font-medium">Ticketed events</span>
+                </div>
 
-        {/* Coming to iOS */}
-        <section className="space-y-1">
-          <h2 className="text-sm font-bold text-gray-900">Coming to iOS</h2>
-          <p className="text-xs text-gray-600 leading-snug">
-            We're preparing the next release now.
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">
-            Early users aren't just joining — they're defining the culture.
-          </p>
-          <p className="text-xs text-gray-600 leading-snug">
-            We read every message.<br />
-            We respond to feedback.<br />
-            We build alongside the community.
-          </p>
-        </section>
+                {/* Outdoors & Nature */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🌲</span>
+                  <span className="text-xs text-gray-700 font-medium">Parks & trails</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏕</span>
+                  <span className="text-xs text-gray-700 font-medium">Campgrounds</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🚶</span>
+                  <span className="text-xs text-gray-700 font-medium">Hiking spots</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🚣</span>
+                  <span className="text-xs text-gray-700 font-medium">Lakes & rivers</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🎣</span>
+                  <span className="text-xs text-gray-700 font-medium">Fishing reports</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">❄️</span>
+                  <span className="text-xs text-gray-700 font-medium">Ice & snow conditions</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🌤</span>
+                  <span className="text-xs text-gray-700 font-medium">Weather impacts</span>
+                </div>
 
-        {/* Start With What You Love */}
-        <section className="space-y-1 pt-1.5 border-t border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900">Start With What You Love</h2>
-          <p className="text-xs text-gray-600 leading-snug">
-            If there's a place you'd recommend without hesitation —<br />
-            If there's something here you want others to experience —<br />
-            If Minnesota means something to you —
-          </p>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            You're in the right place.
-          </p>
-          <p className="text-xs text-gray-700 leading-snug font-medium">
-            Put it on the map.
-          </p>
-        </section>
+                {/* Infrastructure & Development */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🚧</span>
+                  <span className="text-xs text-gray-700 font-medium">Construction updates</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏗</span>
+                  <span className="text-xs text-gray-700 font-medium">Development progress</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🛣</span>
+                  <span className="text-xs text-gray-700 font-medium">Road conditions</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🚦</span>
+                  <span className="text-xs text-gray-700 font-medium">Traffic issues</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏘</span>
+                  <span className="text-xs text-gray-700 font-medium">Zoning changes</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏠</span>
+                  <span className="text-xs text-gray-700 font-medium">Open houses</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">📍</span>
+                  <span className="text-xs text-gray-700 font-medium">Before & after photos</span>
+                </div>
 
-        {/* Contact */}
-        <section className="space-y-1 pt-1.5 border-t border-gray-100">
-          <p className="text-xs text-gray-600 leading-snug">
-            <a 
-              href="mailto:loveofminnesota@gmail.com" 
-              className="text-red-600 hover:text-red-700 underline font-medium"
-            >
-              Contact us
-            </a>
-            {' '}at{' '}
-            <a 
-              href="mailto:loveofminnesota@gmail.com" 
-              className="text-red-600 hover:text-red-700 underline"
-            >
-              loveofminnesota@gmail.com
-            </a>
-            {' '}for business inquiries and customer support.
-          </p>
-        </section>
+                {/* Civic & Government */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏛</span>
+                  <span className="text-xs text-gray-700 font-medium">Town halls & meetings</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🗳</span>
+                  <span className="text-xs text-gray-700 font-medium">Voting locations</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">📢</span>
+                  <span className="text-xs text-gray-700 font-medium">Public notices</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">💰</span>
+                  <span className="text-xs text-gray-700 font-medium">Spending observations</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">📊</span>
+                  <span className="text-xs text-gray-700 font-medium">Transparency updates</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">⚖️</span>
+                  <span className="text-xs text-gray-700 font-medium">Policy impacts</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🏢</span>
+                  <span className="text-xs text-gray-700 font-medium">Government buildings</span>
+                </div>
+
+                {/* Help & Support */}
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🙋</span>
+                  <span className="text-xs text-gray-700 font-medium">Volunteer opportunities</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🎁</span>
+                  <span className="text-xs text-gray-700 font-medium">Donations & fundraisers</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🤲</span>
+                  <span className="text-xs text-gray-700 font-medium">Mutual aid</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🚗</span>
+                  <span className="text-xs text-gray-700 font-medium">Ride shares</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🩺</span>
+                  <span className="text-xs text-gray-700 font-medium">Community assistance</span>
+                </div>
+                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
+                  <span className="text-xl">🆘</span>
+                  <span className="text-xs text-gray-700 font-medium">Emergency info</span>
+                </div>
+              </div>
             </div>
           </div>
           </div>

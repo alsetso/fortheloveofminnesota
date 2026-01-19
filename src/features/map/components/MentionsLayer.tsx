@@ -102,9 +102,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
       // Prevent concurrent calls
       if (isAddingLayersRef.current) return;
       
-      if (showLoading) {
-        setIsLoadingMentions(true);
-      }
+      // Always show loading on initial load or when explicitly requested
+      setIsLoadingMentions(true);
       
       try {
         // Get year filter from URL
@@ -764,9 +763,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
         }
         isAddingLayersRef.current = false;
       } finally {
-        if (showLoading) {
-          setIsLoadingMentions(false);
-        }
+        // Always clear loading state when done
+        setIsLoadingMentions(false);
       }
     };
 
@@ -872,17 +870,6 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
     };
   }, [map, mapLoaded, searchParams, timeFilter]);
 
-  // Loading spinner overlay
-  if (isLoadingMentions) {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-30 pointer-events-none">
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
-          <span className="text-xs font-medium text-gray-900">Loading mentions...</span>
-        </div>
-      </div>
-    );
-  }
-
+  // Component doesn't render anything visible - loading state is shown in MapTopContainer toast
   return null;
 }

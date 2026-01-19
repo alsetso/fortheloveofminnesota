@@ -18,14 +18,65 @@ function getGuestId(): string | null {
   return localStorage.getItem(GUEST_ID_KEY);
 }
 
+/**
+ * Cookie helper functions for browser client
+ * These sync cookies between client and server for proper auth persistence
+ */
+function getCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return undefined;
+}
+
+function setCookie(name: string, value: string, options: { maxAge?: number; path?: string; sameSite?: string | boolean } = {}) {
+  if (typeof document === 'undefined') return;
+  const { maxAge = 31536000, path = '/' } = options;
+  const sameSite = typeof options.sameSite === 'string' ? options.sameSite : options.sameSite === true ? 'Strict' : 'Lax';
+  document.cookie = `${name}=${value}; path=${path}; max-age=${maxAge}; SameSite=${sameSite}`;
+}
+
+function deleteCookie(name: string, options: { path?: string } = {}) {
+  if (typeof document === 'undefined') return;
+  const { path = '/' } = options;
+  document.cookie = `${name}=; path=${path}; expires=Thu, 01 Jan 1970 00:00:00 UTC`;
+}
+
 // Use SSR-compatible browser client for proper auth handling in Next.js App Router
-// Configure with auto-refresh to prevent token expiration issues
+// Configure with auto-refresh and cookie handlers to sync auth state between client and server
 // Include x-guest-id header for RLS policies to verify guest ownership
 export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+  },
+  cookies: {
+    getAll() {
+      if (typeof document === 'undefined') return [];
+      const cookies = document.cookie.split(';').map(cookie => {
+        const [name, ...rest] = cookie.trim().split('=');
+        return { name, value: rest.join('=') };
+      });
+      return cookies;
+    },
+    setAll(cookiesToSet) {
+      cookiesToSet.forEach(({ name, value, options }) => {
+        if (value) {
+          const sameSite = options?.sameSite 
+            ? (typeof options.sameSite === 'string' ? options.sameSite : 'Strict')
+            : 'Lax';
+          setCookie(name, value, {
+            maxAge: options?.maxAge,
+            path: options?.path || '/',
+            sameSite,
+          });
+        } else {
+          deleteCookie(name, { path: options?.path || '/' });
+        }
+      });
+    },
   },
   global: {
     headers: {
@@ -41,15 +92,17 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
         headers.set('x-guest-id', guestId);
       }
       
-      // Supabase uses token-based auth (not cookies), so we don't need credentials
-      // Only use credentials for same-origin API routes (handled separately)
-      // The service worker already skips cross-origin Supabase requests
-      // Explicitly remove credentials to avoid CORS issues with Supabase
-      const { credentials, ...restOptions } = options;
+      // Use 'include' for same-origin requests to allow cookie transmission
+      // For cross-origin Supabase requests, cookies are handled via the Authorization header
+      // but we still need credentials for cookie-based session management
+      const isSameOrigin = typeof url === 'string' 
+        ? new URL(url, window.location.origin).origin === window.location.origin
+        : url instanceof URL && url.origin === window.location.origin;
+      
       return fetch(url, { 
-        ...restOptions, 
+        ...options, 
         headers,
-        credentials: 'omit', // Explicitly omit credentials for Supabase (uses tokens, not cookies)
+        credentials: isSameOrigin ? 'include' : 'same-origin',
       });
     },
   },

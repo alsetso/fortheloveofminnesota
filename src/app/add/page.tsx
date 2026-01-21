@@ -144,12 +144,13 @@ export default function AddMentionPage() {
   }, []);
 
   // Open mention type modal on page load (only if no type is selected from URL)
+  // Now works for both authenticated and non-authenticated users
   useEffect(() => {
     const urlMentionTypeId = searchParams.get('mention_type_id');
-    if (!isLoading && user && !loadingTypes && mentionTypes.length > 0 && !selectedTypeId && !urlMentionTypeId) {
+    if (!isLoading && !loadingTypes && mentionTypes.length > 0 && !selectedTypeId && !urlMentionTypeId) {
       setShowMentionTypesModal(true);
     }
-  }, [isLoading, user, loadingTypes, mentionTypes.length, selectedTypeId, searchParams]);
+  }, [isLoading, loadingTypes, mentionTypes.length, selectedTypeId, searchParams]);
 
   // Read lat, lng, mention_type_id, and username from URL parameters
   useEffect(() => {
@@ -253,14 +254,7 @@ export default function AddMentionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Only run when searchParams changes (username param)
 
-  // Check authentication - wait for auth to load before redirecting
-  useEffect(() => {
-    // Only redirect if auth has finished loading and user is not logged in
-    if (!isLoading && !user) {
-      openWelcome();
-      router.push('/');
-    }
-  }, [user, isLoading, openWelcome, router]);
+  // No longer redirecting non-authenticated users - page is now public
 
   // Check for #success hash in URL
   useEffect(() => {
@@ -825,10 +819,7 @@ export default function AddMentionPage() {
     setSuccess(false);
   };
 
-  // Don't render form if user is not logged in (will redirect)
-  if (!user) {
-    return null;
-  }
+  // Page is now public - no early return for non-authenticated users
 
   // Determine which screen to show
   const isSuccessScreen = showSuccessScreen && createdMention;
@@ -973,98 +964,119 @@ export default function AddMentionPage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4" style={{ paddingBottom: 'calc(80px + env(safe-area-inset-bottom))' }}>
-          {/* Profile Section - Show account user is posting from */}
-          {!showSuccessScreen && account && (
-            <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
-              {/* Account Card Header - Clickable */}
-              <button
-                type="button"
-                onClick={() => setShowCollectionAccordion(!showCollectionAccordion)}
-                className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
-              >
-                <ProfilePhoto account={account} size="sm" />
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="text-sm font-bold text-gray-900 truncate">
-                    {AccountService.getDisplayName(account)}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedCollectionId ? (
-                    <span className="text-xs font-medium text-gray-700 truncate max-w-[120px]">
-                      {(() => {
-                        const selectedCollection = collections.find(c => c.id === selectedCollectionId);
-                        if (!selectedCollection) return '';
-                        const displayText = `${selectedCollection.emoji} ${selectedCollection.title}`;
-                        return displayText.length > 30 ? `${displayText.substring(0, 30)}...` : displayText;
-                      })()}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-medium text-gray-700">+Collection</span>
-                  )}
-                  <ChevronDownIcon 
-                    className={`w-4 h-4 text-gray-500 transition-transform duration-200 flex-shrink-0 ${
-                      showCollectionAccordion ? 'rotate-180' : ''
-                    }`}
-                  />
-                </div>
-              </button>
-              
-              {/* Collection Accordion Content */}
-              {showCollectionAccordion && (
-                <div className="border-t border-gray-200 p-3 space-y-2 max-h-64 overflow-y-auto">
-                  {loadingCollections ? (
-                    <div className="text-xs text-gray-500 py-4 text-center">Loading collections...</div>
-                  ) : collections.length === 0 ? (
-                    <div className="text-xs text-gray-500 py-4 text-center">
-                      No collections yet. Create one from your profile.
+          {/* Profile Section - Show account user is posting from OR sign in prompt */}
+          {!showSuccessScreen && (
+            account ? (
+              <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+                {/* Account Card Header - Clickable */}
+                <button
+                  type="button"
+                  onClick={() => setShowCollectionAccordion(!showCollectionAccordion)}
+                  className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                >
+                  <ProfilePhoto account={account} size="sm" />
+                  <div className="flex-1 min-w-0 text-left">
+                    <div className="text-sm font-bold text-gray-900 truncate">
+                      {AccountService.getDisplayName(account)}
                     </div>
-                  ) : (
-                    <>
-                      {/* Option to remove collection */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCollectionId(null);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
-                          !selectedCollectionId
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'hover:bg-gray-50 text-gray-900'
-                        }`}
-                      >
-                        <span className="text-base">📁</span>
-                        <span className="font-medium">Unassigned</span>
-                        {!selectedCollectionId && (
-                          <CheckCircleIcon className="w-4 h-4 text-gray-600 ml-auto" />
-                        )}
-                      </button>
-
-                      {/* Collection list */}
-                      {collections.map((collection) => (
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedCollectionId ? (
+                      <span className="text-xs font-medium text-gray-700 truncate max-w-[120px]">
+                        {(() => {
+                          const selectedCollection = collections.find(c => c.id === selectedCollectionId);
+                          if (!selectedCollection) return '';
+                          const displayText = `${selectedCollection.emoji} ${selectedCollection.title}`;
+                          return displayText.length > 30 ? `${displayText.substring(0, 30)}...` : displayText;
+                        })()}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-medium text-gray-700">+Collection</span>
+                    )}
+                    <ChevronDownIcon 
+                      className={`w-4 h-4 text-gray-500 transition-transform duration-200 flex-shrink-0 ${
+                        showCollectionAccordion ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </div>
+                </button>
+                
+                {/* Collection Accordion Content */}
+                {showCollectionAccordion && (
+                  <div className="border-t border-gray-200 p-3 space-y-2 max-h-64 overflow-y-auto">
+                    {loadingCollections ? (
+                      <div className="text-xs text-gray-500 py-4 text-center">Loading collections...</div>
+                    ) : collections.length === 0 ? (
+                      <div className="text-xs text-gray-500 py-4 text-center">
+                        No collections yet. Create one from your profile.
+                      </div>
+                    ) : (
+                      <>
+                        {/* Option to remove collection */}
                         <button
-                          key={collection.id}
                           type="button"
                           onClick={() => {
-                            setSelectedCollectionId(collection.id);
+                            setSelectedCollectionId(null);
                           }}
                           className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
-                            selectedCollectionId === collection.id
+                            !selectedCollectionId
                               ? 'bg-gray-100 text-gray-900'
                               : 'hover:bg-gray-50 text-gray-900'
                           }`}
                         >
-                          <span className="text-base">{collection.emoji}</span>
-                          <span className="font-medium">{collection.title}</span>
-                          {selectedCollectionId === collection.id && (
+                          <span className="text-base">📁</span>
+                          <span className="font-medium">Unassigned</span>
+                          {!selectedCollectionId && (
                             <CheckCircleIcon className="w-4 h-4 text-gray-600 ml-auto" />
                           )}
                         </button>
-                      ))}
-                    </>
-                  )}
+
+                        {/* Collection list */}
+                        {collections.map((collection) => (
+                          <button
+                            key={collection.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCollectionId(collection.id);
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
+                              selectedCollectionId === collection.id
+                                ? 'bg-gray-100 text-gray-900'
+                                : 'hover:bg-gray-50 text-gray-900'
+                            }`}
+                          >
+                            <span className="text-base">{collection.emoji}</span>
+                            <span className="font-medium">{collection.title}</span>
+                            {selectedCollectionId === collection.id && (
+                              <CheckCircleIcon className="w-4 h-4 text-gray-600 ml-auto" />
+                            )}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-md border border-gray-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <UserIcon className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">Sign in to post</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Create an account to share your mention</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openWelcome()}
+                    className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex-shrink-0"
+                  >
+                    Sign In
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )
           )}
           
           {/* Required: Mention Type */}
@@ -1163,7 +1175,13 @@ export default function AddMentionPage() {
                       <button
                         ref={tagButtonRef}
                         type="button"
-                        onClick={() => setShowTagModal(true)}
+                        onClick={() => {
+                          if (!user) {
+                            openWelcome();
+                            return;
+                          }
+                          setShowTagModal(true);
+                        }}
                         className="relative flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
                         title={taggedAccounts.length > 0 ? `${taggedAccounts.length} user${taggedAccounts.length > 1 ? 's' : ''} tagged` : 'Tag users (optional)'}
                       >
@@ -1284,10 +1302,10 @@ export default function AddMentionPage() {
             <button
               type="submit"
               form="mention-form"
-              disabled={isSubmitting || isUploadingMedia || !selectedTypeId || !description.trim() || !lat || !lng}
+              disabled={!user || !activeAccountId || isSubmitting || isUploadingMedia || !selectedTypeId || !description.trim() || !lat || !lng}
               className="px-4 py-2 text-xs font-medium bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? (isUploadingMedia ? 'Uploading media...' : 'Creating...') : 'Create Mention'}
+              {!user || !activeAccountId ? 'Sign In to Post' : (isSubmitting ? (isUploadingMedia ? 'Uploading media...' : 'Creating...') : 'Create Mention')}
             </button>
           </div>
         </div>

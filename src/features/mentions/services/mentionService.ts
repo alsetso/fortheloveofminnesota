@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { LocationLookupService } from '@/features/map/services/locationLookupService';
 import { LikeService } from './likeService';
 import { AccountService } from '@/features/auth/services/memberService';
 import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
@@ -31,6 +30,7 @@ export class MentionService {
       account_id,
       city_id,
       collection_id,
+      mention_type_id,
       visibility,
       archived,
       post_date,
@@ -53,10 +53,20 @@ export class MentionService {
             id,
             emoji,
             title
+          ),
+          mention_type:mention_types(
+            id,
+            emoji,
+            name
           )`
         : `${essentialColumns},
           accounts(
             image_url
+          ),
+          mention_type:mention_types(
+            id,
+            emoji,
+            name
           )`
       )
       .eq('archived', false); // Exclude archived mentions
@@ -75,6 +85,14 @@ export class MentionService {
 
     if (filters?.city_id) {
       query = query.eq('city_id', filters.city_id);
+    }
+
+    if (filters?.mention_type_ids && filters.mention_type_ids.length > 0) {
+      // Multiple mention types - use 'in' filter
+      query = query.in('mention_type_id', filters.mention_type_ids);
+    } else if (filters?.mention_type_id) {
+      // Single mention type
+      query = query.eq('mention_type_id', filters.mention_type_id);
     }
 
     // Time filter - filter by created_at (last 24 hours or 7 days)
@@ -143,7 +161,34 @@ export class MentionService {
       throw new Error(`Failed to fetch mentions: ${error.message}`);
     }
 
-    const mentions = (data || []) as unknown as Mention[];
+    const mentions = (data || []) as any[];
+
+    // Transform mention_type relationship (Supabase returns it as an object when using alias)
+    // Since we're using mention_type:mention_types(...), it should already be an object, not an array
+    mentions.forEach((mention: any) => {
+      // If mention_type is already an object (from the alias), keep it
+      // If it's an array (legacy format), transform it
+      if (mention.mention_type && Array.isArray(mention.mention_type)) {
+        mention.mention_type = mention.mention_type.length > 0 ? mention.mention_type[0] : null;
+      } else if (!mention.mention_type) {
+        // If mention_type is missing, set it to null
+        mention.mention_type = null;
+      }
+      
+      // Clean up any legacy mention_types array if it exists
+      if (mention.mention_types) {
+        delete mention.mention_types;
+      }
+      
+      // Debug: Log if mention has mention_type_id but no mention_type object
+      if (process.env.NODE_ENV === 'development' && mention.mention_type_id && !mention.mention_type) {
+        console.warn('[MentionService] Mention has mention_type_id but no mention_type object:', {
+          id: mention.id,
+          mention_type_id: mention.mention_type_id,
+          mention_type: mention.mention_type,
+        });
+      }
+    });
 
     // Add likes data if we have mentions
     if (mentions.length > 0 && isAuthenticated) {
@@ -193,7 +238,7 @@ export class MentionService {
       }
     }
 
-    return mentions;
+    return mentions as Mention[];
   }
 
   /**
@@ -255,17 +300,8 @@ export class MentionService {
       normalizedPostDate = postDate.toISOString();
     }
 
-    // Auto-detect city_id if not provided
-    let cityId = data.city_id || null;
-    if (!cityId) {
-      try {
-        const locationIds = await LocationLookupService.getLocationIds(data.lat, data.lng);
-        cityId = locationIds.cityId || null;
-      } catch (error) {
-        // Non-blocking: if city detection fails, continue without city_id
-        console.warn('[MentionService] Failed to auto-detect city_id:', error);
-      }
-    }
+    // Use city_id if provided, otherwise leave as null
+    const cityId = data.city_id || null;
 
     const { data: mention, error } = await supabase
       .from('mentions')
@@ -286,6 +322,8 @@ export class MentionService {
         map_meta: data.map_meta || null,
         atlas_meta: null,
         collection_id: data.collection_id || null,
+        mention_type_id: data.mention_type_id || null,
+        tagged_account_ids: data.tagged_account_ids && data.tagged_account_ids.length > 0 ? data.tagged_account_ids : [],
       })
       .select(`
         *,

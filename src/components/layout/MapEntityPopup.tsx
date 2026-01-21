@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { XMarkIcon, MapPinIcon, EllipsisVerticalIcon, PencilIcon, TrashIcon, EyeIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MapPinIcon, EllipsisVerticalIcon, EyeIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -36,10 +38,16 @@ interface MapEntityPopupProps {
       emoji: string;
       title: string;
     } | null;
+    mention_type?: {
+      id: string;
+      emoji: string;
+      name: string;
+    } | null;
     created_at?: string;
     view_count?: number;
     likes_count?: number;
     is_liked?: boolean;
+    map_meta?: Record<string, any> | null;
     // Location data
     place_name?: string;
     address?: string;
@@ -52,14 +60,11 @@ interface MapEntityPopupProps {
  * Shows pin or location details
  */
 export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntityPopupProps) {
+  const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editDescription, setEditDescription] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [likesCount, setLikesCount] = useState(data?.likes_count || 0);
   const [isLiked, setIsLiked] = useState(data?.is_liked || false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -71,6 +76,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>(() => {
     return typeof window !== 'undefined' ? ((window as any).__currentMapStyle || 'streets') : 'streets';
   });
+  const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
+  const mapMetaInfoRef = useRef<HTMLDivElement>(null);
 
   // Listen for blur style and map style changes
   useEffect(() => {
@@ -92,6 +99,22 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   // Use transparent backgrounds and white text when satellite + blur
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
+
+  // Close map meta info popup when clicking outside
+  useEffect(() => {
+    if (!showMapMetaInfo) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mapMetaInfoRef.current && !mapMetaInfoRef.current.contains(event.target as Node)) {
+        setShowMapMetaInfo(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMapMetaInfo]);
 
   useEffect(() => {
     if (isOpen) {
@@ -159,12 +182,6 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   // Check if current user owns this mention
   const isOwner = type === 'pin' && user && account && data && data.account_id === account.id;
 
-  // Initialize edit description when editing starts
-  useEffect(() => {
-    if (isEditing && data && data.description) {
-      setEditDescription(data.description);
-    }
-  }, [isEditing, data]);
 
   // Update likes state when data changes
   useEffect(() => {
@@ -190,102 +207,6 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
     };
   }, [showMenu]);
 
-  const handleEdit = () => {
-    setIsEditing(true);
-    setShowMenu(false);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!data || !data.id) return;
-    
-    setIsSaving(true);
-    try {
-      await MentionService.updateMention(data.id, {
-        description: editDescription.trim() || null,
-      });
-      
-      // Update local data
-      if (data) {
-        data.description = editDescription.trim() || undefined;
-      }
-      
-      // Dispatch event to refresh mentions
-      window.dispatchEvent(new CustomEvent('mention-archived'));
-      
-      setIsEditing(false);
-      setEditDescription('');
-    } catch (err) {
-      console.error('[MapEntityPopup] Error updating mention:', err);
-      alert('Failed to update mention. Please try again.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditDescription('');
-  };
-
-  const handleDelete = async () => {
-    if (!data || !data.id) return;
-    
-    if (!confirm('Are you sure you want to delete this mention?')) {
-      setShowMenu(false);
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      await MentionService.updateMention(data.id, {
-        archived: true,
-      });
-      
-      // Dispatch event to refresh mentions
-      window.dispatchEvent(new CustomEvent('mention-archived'));
-      
-      // Close popup
-      handleClose();
-    } catch (err) {
-      console.error('[MapEntityPopup] Error deleting mention:', err);
-      alert('Failed to delete mention. Please try again.');
-    } finally {
-      setIsDeleting(false);
-      setShowMenu(false);
-    }
-  };
-
-  const handleRemoveImage = async () => {
-    if (!data || !data.id) return;
-    
-    if (!confirm('Are you sure you want to remove the image from this mention?')) {
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await MentionService.updateMention(data.id, {
-        image_url: null,
-        video_url: null,
-        media_type: 'none',
-      });
-      
-      // Update local data
-      if (data) {
-        data.image_url = null;
-        data.video_url = null;
-        data.media_type = 'none';
-      }
-      
-      // Dispatch event to refresh mentions
-      window.dispatchEvent(new CustomEvent('mention-archived'));
-    } catch (err) {
-      console.error('[MapEntityPopup] Error removing image:', err);
-      alert('Failed to remove image. Please try again.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   if (!isOpen || !data) return null;
 
@@ -481,8 +402,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             </h2>
           )}
           <div className="flex items-center gap-0.5">
-            {/* Three dots menu - only show for owner's mentions */}
-            {isOwner && (
+            {/* Three dots menu - show for all mentions */}
+            {type === 'pin' && data && (
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setShowMenu(!showMenu)}
@@ -492,40 +413,42 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                       : 'text-gray-500 hover:text-gray-900'
                   }`}
                   aria-label="More options"
-                  disabled={isDeleting}
                 >
                   <EllipsisVerticalIcon className="w-4 h-4" />
                 </button>
                 {showMenu && (
-                  <div className={`absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[120px] ${
+                  <div className={`absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[140px] ${
                     useTransparentUI
                       ? 'bg-white/90 backdrop-blur-md border border-white/20'
                       : 'bg-white border border-gray-200'
                   }`}>
-                    <button
-                      onClick={handleEdit}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
-                        useTransparentUI
-                          ? 'text-white hover:bg-white/20'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                      disabled={isEditing || isSaving}
-                    >
-                      <PencilIcon className="w-4 h-4" />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      onClick={handleDelete}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
-                        useTransparentUI
-                          ? 'text-red-300 hover:bg-red-500/20'
-                          : 'text-red-600 hover:bg-red-50'
-                      }`}
-                      disabled={isDeleting}
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
-                    </button>
+                    {data?.id && (
+                      <Link
+                        href={`/mention/${data.id}`}
+                        onClick={() => setShowMenu(false)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                          useTransparentUI
+                            ? 'text-white hover:bg-white/20'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <EyeIcon className="w-4 h-4" />
+                        <span>More</span>
+                      </Link>
+                    )}
+                    {data?.account?.username && (
+                      <Link
+                        href={`/profile/${encodeURIComponent(data.account.username)}`}
+                        onClick={() => setShowMenu(false)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                          useTransparentUI
+                            ? 'text-white hover:bg-white/20'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span>View Profile</span>
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>
@@ -550,100 +473,143 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
             {/* Pin/Mention Content */}
             {type === 'pin' && (
               <>
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      className={`w-full px-3 py-2 text-xs rounded-md focus:outline-none focus:ring-1 resize-none ${
-                        useTransparentUI
-                          ? 'bg-white/10 border border-white/20 text-white placeholder:text-white/50 focus:ring-white'
-                          : 'text-gray-900 border border-gray-200 focus:ring-indigo-500'
-                      }`}
-                      rows={3}
-                      maxLength={240}
-                      disabled={isSaving}
-                      autoFocus
-                    />
-                    
-                    {/* Image Management within Edit */}
-                    {(data.image_url || data.video_url) ? (
-                      <div className="relative w-full rounded-md overflow-hidden border border-gray-200 bg-black">
-                        {data.video_url ? (
-                          <video
-                            src={data.video_url}
-                            controls
-                            playsInline
-                            preload="metadata"
-                            className="w-full h-auto max-h-64 object-contain"
-                          />
-                        ) : data.image_url ? (
-                          <Image
-                            src={data.image_url}
-                            alt="Mention media"
-                            width={400}
-                            height={300}
-                            className="w-full h-auto object-cover"
-                            unoptimized={data.image_url.includes('supabase.co')}
-                          />
-                        ) : null}
-                        {/* Remove image button - X in top right */}
-                        <button
-                          onClick={handleRemoveImage}
-                          disabled={isSaving}
-                          className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 hover:bg-black/90 flex items-center justify-center transition-colors"
-                          aria-label="Remove image"
-                        >
-                          <XMarkIcon className="w-4 h-4 text-white" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          // Trigger file input or camera - placeholder for now
-                          alert('Image upload functionality coming soon. Use the create flow to add images.');
-                        }}
-                        disabled={isSaving}
-                        className={`w-full py-8 rounded-md border-2 border-dashed transition-colors flex flex-col items-center justify-center gap-2 ${
-                          useTransparentUI
-                            ? 'border-white/30 hover:border-white/50 hover:bg-white/10'
-                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                        }`}
-                      >
-                        <CameraIcon className={`w-8 h-8 ${useWhiteText ? 'text-white/70' : 'text-gray-400'}`} />
-                        <span className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                          Add image or video
-                        </span>
-                      </button>
-                    )}
-                    
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={handleCancelEdit}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          useTransparentUI
-                            ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'
-                            : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
-                        }`}
-                        disabled={isSaving}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSaveEdit}
-                        className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={isSaving}
-                      >
-                        {isSaving ? 'Saving...' : 'Save'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
                     <div className="space-y-2">
+                      {/* Map Metadata Label - Public, visible to all users */}
+                      {data.map_meta && data.map_meta.feature && (() => {
+                        const feature = data.map_meta.feature;
+                        const props = feature.properties || {};
+                        
+                        // Determine display label - prefer name, fallback to type/class/layerId
+                        let displayName = feature.name || 'Map Feature';
+                        if (!feature.name) {
+                          if (props.type) {
+                            displayName = String(props.type);
+                          } else if (props.class) {
+                            displayName = String(props.class).replace(/_/g, ' ');
+                          } else if (feature.layerId) {
+                            // Parse layerId for common patterns
+                            const layerId = feature.layerId.toLowerCase();
+                            if (layerId.includes('poi')) displayName = 'Point of Interest';
+                            else if (layerId.includes('building')) displayName = 'Building';
+                            else if (layerId.includes('road') || layerId.includes('highway')) displayName = 'Road';
+                            else if (layerId.includes('water')) displayName = 'Water';
+                            else if (layerId.includes('landuse')) displayName = 'Land Use';
+                            else if (layerId.includes('place')) displayName = 'Place';
+                            else displayName = feature.layerId.replace(/-/g, ' ').replace(/_/g, ' ');
+                          }
+                        }
+                        
+                        // Determine category label - prefer category, fallback to type/class
+                        let categoryLabel = feature.category && feature.category !== 'unknown' 
+                          ? feature.category.replace(/_/g, ' ')
+                          : null;
+                        
+                        if (!categoryLabel || categoryLabel === 'unknown') {
+                          if (props.type) {
+                            categoryLabel = String(props.type).replace(/_/g, ' ');
+                          } else if (props.class) {
+                            categoryLabel = String(props.class).replace(/_/g, ' ');
+                          } else if (feature.sourceLayer) {
+                            categoryLabel = feature.sourceLayer.replace(/_/g, ' ');
+                          } else if (feature.layerId) {
+                            const layerId = feature.layerId.toLowerCase();
+                            if (layerId.includes('poi')) categoryLabel = 'Point of Interest';
+                            else if (layerId.includes('building')) categoryLabel = 'Building';
+                            else if (layerId.includes('road') || layerId.includes('highway')) categoryLabel = 'Road';
+                            else if (layerId.includes('water')) categoryLabel = 'Water';
+                            else categoryLabel = feature.layerId.replace(/-/g, ' ').replace(/_/g, ' ');
+                          }
+                        }
+                        
+                        // Combine displayName and categoryLabel into single line
+                        const singleLineLabel = categoryLabel && categoryLabel !== displayName
+                          ? `${displayName} • ${categoryLabel}`
+                          : displayName;
+
+                        return (
+                          <div className="relative">
+                            <div className={`flex items-center gap-2 p-2 border rounded-md ${
+                              useTransparentUI
+                                ? 'bg-white/10 border-white/20'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}>
+                              {feature.icon && feature.icon !== '📍' && (
+                                <span className="text-xs flex-shrink-0">{feature.icon}</span>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className={`text-xs font-semibold truncate ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                                  {singleLineLabel}
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowMapMetaInfo(!showMapMetaInfo);
+                                }}
+                                className={`flex-shrink-0 p-0.5 transition-colors ${
+                                  useTransparentUI
+                                    ? 'text-white/60 hover:text-white'
+                                    : 'text-gray-400 hover:text-gray-600'
+                                }`}
+                                aria-label="Map metadata information"
+                              >
+                                <InformationCircleIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            
+                            {/* Info Popup */}
+                            {showMapMetaInfo && (
+                              <div
+                                ref={mapMetaInfoRef}
+                                className={`absolute top-full left-0 right-0 mt-1 z-50 border rounded-md shadow-lg p-2 ${
+                                  useTransparentUI
+                                    ? 'bg-white/90 backdrop-blur-md border-white/20'
+                                    : 'bg-white border-gray-200'
+                                }`}
+                              >
+                                <p className={`text-xs ${useTransparentUI ? 'text-white/90' : 'text-gray-600'}`}>
+                                  This is map data from where this mention was created. It helps provide context about the location.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* Mention Type Label - Above Description - Clickable */}
+                      {(() => {
+                        // Debug: Log mention_type data
+                        if (process.env.NODE_ENV === 'development') {
+                          console.log('[MapEntityPopup] Rendering mention type:', {
+                            mention_type: data.mention_type,
+                            has_mention_type: !!data.mention_type,
+                            type: typeof data.mention_type,
+                          });
+                        }
+                        return data.mention_type ? (
+                          <button
+                            onClick={() => {
+                              const typeSlug = mentionTypeNameToSlug(data.mention_type!.name);
+                              // Close popup first
+                              handleClose();
+                              // Navigate to /live with type filter
+                              router.push(`/live?type=${typeSlug}`);
+                            }}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
+                              useWhiteText 
+                                ? 'bg-white/10 text-white/70 hover:bg-white/20' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            <span className="text-sm">{data.mention_type.emoji}</span>
+                            <span className="text-xs font-medium">{data.mention_type.name}</span>
+                          </button>
+                        ) : null;
+                      })()}
                     {data.description ? (
                       <>
-                      {/* Description text with clickable YouTube links */}
-                      <div className={`text-xs ${useWhiteText ? 'text-white/90' : 'text-gray-700'}`}>
+                      {/* Description text with clickable YouTube links - Large, Dark, Bold */}
+                      <div className={`text-base font-bold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
                         {(() => {
                             // For non-authenticated users: truncate to 90 characters
                             const description = data.description || '';
@@ -748,16 +714,17 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                       </div>
                       
                       {/* Mention Media (Image or Video) */}
-                      {(data.image_url || data.video_url) && (
-                        <div className="relative w-full rounded-md overflow-hidden border border-gray-200 mt-2 bg-black">
-                          {data.video_url ? (
+                      {(data.media_type === 'video' && data.video_url) || (data.media_type === 'image' && data.image_url) ? (
+                        <div className="relative w-full aspect-video rounded-md overflow-hidden border border-gray-200 mt-2 bg-black">
+                          {data.media_type === 'video' && data.video_url ? (
                             <video
                               key={data.video_url}
                               src={data.video_url}
                               controls
                               playsInline
+                              muted
                               preload="metadata"
-                              className="w-full h-auto max-h-64 object-contain"
+                              className="w-full h-full object-contain"
                               onError={(e) => {
                                 console.error('[MapEntityPopup] Video load error:', e);
                                 const target = e.target as HTMLVideoElement;
@@ -766,19 +733,22 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                                   console.error('[MapEntityPopup] Video URL:', data.video_url);
                                 }
                               }}
+                              onLoadedMetadata={() => {
+                                // Video metadata loaded successfully
+                                console.debug('[MapEntityPopup] Video metadata loaded:', data.video_url);
+                              }}
                             />
-                          ) : data.image_url ? (
+                          ) : data.media_type === 'image' && data.image_url ? (
                             <Image
                               src={data.image_url}
                               alt="Mention image"
-                              width={400}
-                              height={300}
-                              className="w-full h-auto object-cover"
+                              fill
+                              className="object-cover"
                               unoptimized={data.image_url.includes('supabase.co')}
                             />
                           ) : null}
                         </div>
-                      )}
+                      ) : null}
                       
                       {/* YouTube Previews - only show for authenticated users */}
                       {user && (() => {
@@ -806,7 +776,6 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                       </div>
                     )}
                     </div>
-                )}
                 {/* View count and timestamp row */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -829,20 +798,23 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                         showCount={true}
                       />
                     )}
+                    {/* Collection Label */}
                     {data.collection && (
                       <div className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded ${
-                        useWhiteText ? 'bg-white/10 text-white/70' : 'bg-gray-100 text-gray-600'
+                        useWhiteText ? 'bg-white/10 text-white/70' : 'bg-blue-100 text-blue-700'
                       }`}>
                         <span>{data.collection.emoji}</span>
                         <span>{data.collection.title}</span>
                       </div>
                     )}
                   </div>
-                  {data.created_at && (
-                    <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                      {formatTimeAgo(data.created_at)}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {data.created_at && (
+                      <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        {formatTimeAgo(data.created_at)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}

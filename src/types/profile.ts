@@ -51,6 +51,7 @@ export interface ProfileAccount {
   subscription_status?: string | null; // Stripe subscription status
   billing_mode?: string | null; // Billing mode configuration
   search_visibility?: boolean; // Whether profile is searchable in @ mention searches
+  account_taggable?: boolean; // Whether this account can be tagged by other users in mentions
   created_at: string;
 }
 

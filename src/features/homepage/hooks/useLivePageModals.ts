@@ -31,6 +31,7 @@ export type LivePageModalType =
   | 'bottomButton-analytics'   // BottomButtonsPopup with analytics
   | 'bottomButton-collections' // BottomButtonsPopup with collections
   | 'bottomButton-create'      // BottomButtonsPopup create placeholder
+  | 'bottomButton-search'      // BottomButtonsPopup with search/filter
   | MobileNavTab        // 'contribute' | 'tools'
   | null;
 
@@ -191,7 +192,7 @@ export function useLivePageModals() {
   }, []);
 
   // Open bottom button popup (closes other bottom buttons and lower priority modals)
-  const openBottomButton = useCallback((type: 'settings' | 'analytics' | 'collections' | 'create') => {
+  const openBottomButton = useCallback((type: 'settings' | 'analytics' | 'collections' | 'create' | 'search') => {
     setModal(prev => {
       // Don't close top-level modals, camera, or entity popups
       if (

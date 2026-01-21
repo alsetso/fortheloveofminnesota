@@ -24,6 +24,7 @@ export interface Mention {
   view_count?: number; // Total number of views for this mention
   likes_count?: number; // Total number of likes for this mention
   is_liked?: boolean; // Whether the current user has liked this mention
+  tagged_account_ids?: string[] | null; // Array of account IDs for users tagged in this mention
   created_at: string;
   updated_at: string;
   account?: {
@@ -36,6 +37,11 @@ export interface Mention {
     id: string;
     emoji: string;
     title: string;
+  } | null;
+  mention_type?: {
+    id: string;
+    emoji: string;
+    name: string;
   } | null;
 }
 
@@ -52,6 +58,7 @@ export interface CreateMentionData {
   description?: string | null;
   city_id?: string | null; // Optional city ID - can be set during creation or auto-detected
   collection_id?: string | null; // Optional collection ID for categorizing mentions
+  mention_type_id?: string | null; // Optional mention type ID for categorizing mentions
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
   icon_url?: string | null; // URL to the icon image for this mention pin
@@ -60,12 +67,15 @@ export interface CreateMentionData {
   media_type?: 'image' | 'video' | 'none'; // Type of media attached to this mention
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
+  tagged_account_ids?: string[] | null; // Array of account IDs for users tagged in this mention (only accounts with account_taggable=true can be tagged)
 }
 
 export interface MentionFilters {
   account_id?: string;
   city_id?: string; // Filter by city ID
   collection_id?: string; // Filter by collection ID
+  mention_type_id?: string; // Filter by mention type ID (single)
+  mention_type_ids?: string[]; // Filter by mention type IDs (multiple)
   year?: number; // Filter by year of post_date
   timeFilter?: '24h' | '7d'; // Filter by time: last 24 hours or 7 days
   bbox?: {

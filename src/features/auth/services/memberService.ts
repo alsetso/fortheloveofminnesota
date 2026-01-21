@@ -167,6 +167,7 @@ export interface Account {
   stripe_subscription_id: string | null;
   onboarded: boolean;
   search_visibility: boolean;
+  account_taggable?: boolean; // Whether this account can be tagged by other users in mentions
   created_at: string;
   updated_at: string;
   last_visit: string | null;
@@ -186,6 +187,7 @@ export interface UpdateAccountData {
   role?: AccountRole;
   traits?: AccountTrait[] | null;
   search_visibility?: boolean;
+  account_taggable?: boolean; // Whether this account can be tagged by other users in mentions
 }
 
 export class AccountService {

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import CreateMentionContent from './CreateMentionContent';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { supabase } from '@/lib/supabase';
 
 interface CreateMentionPopupProps {
   isOpen: boolean;
@@ -16,6 +17,16 @@ interface CreateMentionPopupProps {
   initialFullAddress?: string | null;
   initialImageBlob?: Blob | null;
   onMentionCreated?: () => void;
+  isEditMode?: boolean;
+  editData?: {
+    mention_id?: string;
+    description?: string;
+    image_url?: string | null;
+    video_url?: string | null;
+    media_type?: 'image' | 'video' | 'none';
+    mention_type_id?: string | null;
+    collection_id?: string | null;
+  } | null;
 }
 
 /**
@@ -32,9 +43,15 @@ export default function CreateMentionPopup({
   initialFullAddress,
   initialImageBlob,
   onMentionCreated,
+  isEditMode = false,
+  editData = null,
 }: CreateMentionPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [step, setStep] = useState<'select-type' | 'create'>('select-type');
+  const [selectedMentionTypeId, setSelectedMentionTypeId] = useState<string | null>(null);
+  const [mentionTypes, setMentionTypes] = useState<Array<{ id: string; emoji: string; name: string }>>([]);
+  const [loadingTypes, setLoadingTypes] = useState(true);
   const [useBlurStyle, setUseBlurStyle] = useState(() => {
     return typeof window !== 'undefined' && (window as any).__useBlurStyle === true;
   });
@@ -66,6 +83,39 @@ export default function CreateMentionPopup({
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  // Fetch mention types
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const fetchMentionTypes = async () => {
+      setLoadingTypes(true);
+      try {
+        const { data, error } = await (supabase as any)
+          .from('mention_types')
+          .select('id, emoji, name')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) throw error;
+        setMentionTypes((data || []) as Array<{ id: string; emoji: string; name: string }>);
+      } catch (error) {
+        console.error('Failed to fetch mention types:', error);
+      } finally {
+        setLoadingTypes(false);
+      }
+    };
+
+    fetchMentionTypes();
+  }, [isOpen]);
+
+  // Reset step when popup closes
+  useEffect(() => {
+    if (!isOpen) {
+      setStep('select-type');
+      setSelectedMentionTypeId(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -99,6 +149,16 @@ export default function CreateMentionPopup({
     }, 300);
   };
 
+  const handleTypeSelect = (typeId: string) => {
+    setSelectedMentionTypeId(typeId);
+    setStep('create');
+  };
+
+  const handleBack = () => {
+    setStep('select-type');
+    setSelectedMentionTypeId(null);
+  };
+
   if (!isOpen || !mounted) return null;
 
   const popupContent = (
@@ -125,10 +185,14 @@ export default function CreateMentionPopup({
           }`}
         style={{
           transform: 'translate(-50%, 100%)',
-          minHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
-          maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '80vh',
-          maxWidth: '600px',
-          width: 'calc(100% - 2rem)',
+          minHeight: isEditMode 
+            ? '100vh' 
+            : typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
+          maxHeight: isEditMode 
+            ? '100vh' 
+            : typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '80vh',
+          maxWidth: isEditMode ? '100%' : '600px',
+          width: isEditMode ? '100%' : 'calc(100% - 2rem)',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
@@ -145,7 +209,24 @@ export default function CreateMentionPopup({
             ? 'border-transparent'
             : 'border-gray-200'
         }`}>
-          <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>Create</h2>
+          <div className="flex items-center gap-2">
+            {step === 'create' && (
+              <button
+                onClick={handleBack}
+                className={`p-1 -ml-1 transition-colors ${
+                  useWhiteText
+                    ? 'text-white/80 hover:text-white'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+                aria-label="Back"
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+              </button>
+            )}
+            <h2 className={`text-sm font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+              {step === 'select-type' ? 'Select Type' : 'Create'}
+            </h2>
+          </div>
           <button
             onClick={handleClose}
             className={`p-1 -mr-1 transition-colors ${
@@ -161,7 +242,43 @@ export default function CreateMentionPopup({
 
         {/* Content - Always scrollable on desktop */}
         <div className="flex-1 overflow-y-auto xl:overflow-y-auto">
-          {initialCoordinates ? (
+          {!initialCoordinates ? (
+            <div className="space-y-3 p-4">
+              <p className={`text-xs ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>
+                Click on the map to select a location, then create a mention.
+              </p>
+            </div>
+          ) : step === 'select-type' ? (
+            <div className="p-4 space-y-3">
+              <p className={`text-xs ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>
+                What's going on here?
+              </p>
+              {loadingTypes ? (
+                <div className={`text-center py-8 text-xs ${useWhiteText ? 'text-white/60' : 'text-gray-500'}`}>
+                  Loading types...
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {mentionTypes.map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => handleTypeSelect(type.id)}
+                      className={`p-3 rounded-md border text-left transition-colors ${
+                        useWhiteText
+                          ? 'bg-white/10 border-white/30 text-white hover:bg-white/20'
+                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{type.emoji}</span>
+                        <span className="text-xs font-medium">{type.name}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
             <CreateMentionContent
               map={map ?? null}
               mapLoaded={mapLoaded}
@@ -172,13 +289,8 @@ export default function CreateMentionPopup({
               onMentionCreated={onMentionCreated}
               useTransparentUI={useTransparentUI}
               useWhiteText={useWhiteText}
+              selectedMentionTypeId={selectedMentionTypeId}
             />
-          ) : (
-            <div className="space-y-3 p-4">
-              <p className={`text-xs ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`}>
-                Click on the map to select a location, then create a mention.
-              </p>
-            </div>
           )}
         </div>
       </div>

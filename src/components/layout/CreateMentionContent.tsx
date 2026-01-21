@@ -27,6 +27,7 @@ interface CreateMentionContentProps {
   onMentionCreated?: () => void;
   useTransparentUI?: boolean;
   useWhiteText?: boolean;
+  selectedMentionTypeId?: string | null;
 }
 
 export default function CreateMentionContent({ 
@@ -39,6 +40,7 @@ export default function CreateMentionContent({
   onMentionCreated,
   useTransparentUI = false,
   useWhiteText = false,
+  selectedMentionTypeId = null,
 }: CreateMentionContentProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -400,6 +402,7 @@ export default function CreateMentionContent({
         description: description.trim() || null,
         visibility,
         collection_id: selectedCollectionId || null,
+        mention_type_id: selectedMentionTypeId || null,
         image_url: imageUrl,
         video_url: null,
         media_type: (imageUrl ? 'image' : 'none') as 'image' | 'none',

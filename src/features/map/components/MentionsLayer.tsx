@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { supabase } from '@/lib/supabase';
 import {
   buildMentionsLabelLayout,
   buildMentionsLabelPaint,
@@ -37,6 +39,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
   const popupRef = useRef<any>(null); // Mapbox Popup instance
   const clickHandlersAddedRef = useRef<boolean>(false);
   const locationSelectedHandlerRef = useRef<(() => void) | null>(null);
+  const mentionClickHandlerRef = useRef<((e: any) => void) | null>(null);
+  const mentionHoverStartHandlerRef = useRef<((e: any) => void) | null>(null);
+  const mentionHoverEndHandlerRef = useRef<(() => void) | null>(null);
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isHandlingStyleChangeRef = useRef<boolean>(false);
   const mentionCreatedHandlerRef = useRef<EventListener | null>(null);
@@ -110,6 +115,53 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
         const yearParam = searchParams.get('year');
         const year = yearParam ? parseInt(yearParam, 10) : undefined;
         
+        // Get mention type filter from URL (support both single 'type' and multiple 'types')
+        const typeParam = searchParams.get('type');
+        const typesParam = searchParams.get('types');
+        let mentionTypeIds: string[] | undefined;
+        
+        if (typesParam) {
+          // Multiple types - comma-separated slugs
+          const slugs = typesParam.split(',').map(s => s.trim());
+          const { data: allTypes } = await supabase
+            .from('mention_types')
+            .select('id, name')
+            .eq('is_active', true);
+          
+          if (allTypes) {
+            const matchingIds = slugs
+              .map(slug => {
+                const matchingType = allTypes.find(type => {
+                  const typeSlug = mentionTypeNameToSlug(type.name);
+                  return typeSlug === slug;
+                });
+                return matchingType?.id;
+              })
+              .filter(Boolean) as string[];
+            
+            if (matchingIds.length > 0) {
+              mentionTypeIds = matchingIds;
+            }
+          }
+        } else if (typeParam) {
+          // Single type
+          const { data: allTypes } = await supabase
+            .from('mention_types')
+            .select('id, name')
+            .eq('is_active', true);
+          
+          if (allTypes) {
+            const matchingType = allTypes.find(type => {
+              const typeSlug = mentionTypeNameToSlug(type.name);
+              return typeSlug === typeParam;
+            });
+            
+            if (matchingType) {
+              mentionTypeIds = [matchingType.id];
+            }
+          }
+        }
+        
         // Build filters object
         const filters: any = {};
         if (year && !timeFilter) {
@@ -117,6 +169,15 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
         }
         if (timeFilter) {
           filters.timeFilter = timeFilter;
+        }
+        if (mentionTypeIds && mentionTypeIds.length > 0) {
+          // For multiple types, we need to use 'in' filter
+          if (mentionTypeIds.length === 1) {
+            filters.mention_type_id = mentionTypeIds[0];
+          } else {
+            // Multiple types - will need to handle in MentionService
+            filters.mention_type_ids = mentionTypeIds;
+          }
         }
         
         const mentions = await MentionService.getMentions(Object.keys(filters).length > 0 ? filters : undefined);
@@ -389,28 +450,35 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
         await Promise.all(imageLoadPromises);
         
         // Build case expression for icon selection (match by image URL and plan)
-        const iconExpression: any[] = ['case'];
-        accountImageIds.forEach((imageId, key) => {
-          const [imageUrl, planType] = key.split('|');
-          if (planType === 'pro') {
-            // Match pro or plus accounts with this image URL
-            iconExpression.push([
-              'all',
-              ['==', ['get', 'account_image_url'], imageUrl],
-              ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]
-            ]);
-            iconExpression.push(imageId);
-          } else {
-            // Match regular accounts (plan is null or not pro/plus) with this image URL
-            iconExpression.push([
-              'all',
-              ['==', ['get', 'account_image_url'], imageUrl],
-              ['!', ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]]
-            ]);
-            iconExpression.push(imageId);
-          }
-        });
-        iconExpression.push(fallbackImageId); // Fallback to heart icon
+        let iconExpression: any;
+        if (accountImageIds.size === 0) {
+          // No account images, just use fallback
+          iconExpression = fallbackImageId;
+        } else {
+          // Build case expression with conditions
+          iconExpression = ['case'];
+          accountImageIds.forEach((imageId, key) => {
+            const [imageUrl, planType] = key.split('|');
+            if (planType === 'pro') {
+              // Match pro or plus accounts with this image URL
+              iconExpression.push([
+                'all',
+                ['==', ['get', 'account_image_url'], imageUrl],
+                ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]
+              ]);
+              iconExpression.push(imageId);
+            } else {
+              // Match regular accounts (plan is null or not pro/plus) with this image URL
+              iconExpression.push([
+                'all',
+                ['==', ['get', 'account_image_url'], imageUrl],
+                ['!', ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]]
+              ]);
+              iconExpression.push(imageId);
+            }
+          });
+          iconExpression.push(fallbackImageId); // Fallback to heart icon
+        }
 
         // Store layer data for re-adding after style changes (before adding layers)
         layersDataRef.current = {
@@ -528,7 +596,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
           console.warn('[MentionsLayer] Error showing layers:', error);
         }
 
-        // Add click handlers for mention interactions (only once)
+        // Add click handlers for mention interactions (only once, but reset on filter changes)
         if (!clickHandlersAddedRef.current) {
           const handleMentionClick = async (e: any) => {
             if (!mounted) return;
@@ -553,6 +621,16 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
             // Find the mention data
             let mention = mentionsRef.current.find(m => m.id === mentionId);
             if (!mention) return;
+            
+            // Debug: Log mention_type to check if it's properly set
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[MentionsLayer] Mention clicked:', {
+                id: mention.id,
+                mention_type: mention.mention_type,
+                mention_type_id: (mention as any).mention_type_id,
+                has_mention_type: !!mention.mention_type,
+              });
+            }
 
             // Fetch full account profile data if account_id exists
             if (mention.account_id && (!mention.account || !mention.account.username)) {
@@ -585,6 +663,33 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
                 console.error('[MentionsLayer] Error fetching account profile:', error);
                 // Continue with existing mention data
               }
+            }
+
+            // Fetch map_meta for the mention (not included in initial fetch for performance)
+            let mapMeta: Record<string, any> | null = null;
+            if (!mention.map_meta) {
+              try {
+                const { supabase } = await import('@/lib/supabase');
+                const { data: mentionData } = await supabase
+                  .from('mentions')
+                  .select('map_meta')
+                  .eq('id', mentionId)
+                  .single();
+                
+                if (mentionData && mentionData.map_meta) {
+                  mapMeta = mentionData.map_meta;
+                  // Update mention with map_meta
+                  mention = {
+                    ...mention,
+                    map_meta: mapMeta,
+                  };
+                }
+              } catch (error) {
+                console.error('[MentionsLayer] Error fetching map_meta:', error);
+                // Continue without map_meta
+              }
+            } else {
+              mapMeta = mention.map_meta;
             }
 
             // Fly to mention location
@@ -663,6 +768,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
             return;
           };
 
+          // Store handler references for cleanup
+          mentionClickHandlerRef.current = handleMentionClick;
+          
           // Add click handler to point layer
           // Cast to any for layer-specific event handlers (not in interface)
           (mapboxMap as any).on('click', pointLayerId, handleMentionClick);
@@ -704,6 +812,10 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
               canvas.style.cursor = '';
             }
           };
+          
+          // Store hover handler references for cleanup
+          mentionHoverStartHandlerRef.current = handleMentionHoverStart;
+          mentionHoverEndHandlerRef.current = handleMentionHoverEnd;
           
           // Add hover handlers for both point and label layers
           (mapboxMap as any).on('mouseenter', pointLayerId, handleMentionHoverStart);
@@ -826,6 +938,53 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
           // Map may be removed
         }
         styleLoadHandlerRef.current = null;
+      }
+      
+      // Remove click and hover handlers before removing layers
+      if (map && !(map as any).removed && clickHandlersAddedRef.current) {
+        try {
+          const mapboxMap = map as any;
+          
+          // Remove click handlers
+          if (mentionClickHandlerRef.current) {
+            try {
+              if (mapboxMap.getLayer(pointLayerId)) {
+                (mapboxMap as any).off('click', pointLayerId, mentionClickHandlerRef.current);
+              }
+              if (mapboxMap.getLayer(pointLabelLayerId)) {
+                (mapboxMap as any).off('click', pointLabelLayerId, mentionClickHandlerRef.current);
+              }
+            } catch (e) {
+              // Handlers may already be removed
+            }
+          }
+          
+          // Remove hover handlers
+          if (mentionHoverStartHandlerRef.current && mentionHoverEndHandlerRef.current) {
+            try {
+              if (mapboxMap.getLayer(pointLayerId)) {
+                (mapboxMap as any).off('mouseenter', pointLayerId, mentionHoverStartHandlerRef.current);
+                (mapboxMap as any).off('mouseleave', pointLayerId, mentionHoverEndHandlerRef.current);
+              }
+              if (mapboxMap.getLayer(pointLabelLayerId)) {
+                (mapboxMap as any).off('mouseenter', pointLabelLayerId, mentionHoverStartHandlerRef.current);
+                (mapboxMap as any).off('mouseleave', pointLabelLayerId, mentionHoverEndHandlerRef.current);
+              }
+            } catch (e) {
+              // Handlers may already be removed
+            }
+          }
+          
+          // Reset handler refs
+          mentionClickHandlerRef.current = null;
+          mentionHoverStartHandlerRef.current = null;
+          mentionHoverEndHandlerRef.current = null;
+          clickHandlersAddedRef.current = false;
+        } catch (e) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('[MentionsLayer] Error removing click handlers:', e);
+          }
+        }
       }
       
       // Remove layers and source if map still exists

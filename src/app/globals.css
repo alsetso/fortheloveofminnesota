@@ -537,3 +537,46 @@ button[class*="flex"][class*="items-center"][class*="justify-center"] > svg {
   z-index: 2;
 }
 
+/* Mention Type Label - Compact design */
+.mention-type-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background-color: white;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1;
+  height: auto;
+  min-height: auto;
+}
+
+.mention-type-label:not(.mention-type-label--selected) {
+  opacity: 0.5;
+}
+
+.mention-type-label--selected {
+  opacity: 1;
+  border-color: #111827;
+}
+
+.mention-type-label:hover:not(.mention-type-label--selected) {
+  opacity: 0.75;
+}
+
+.mention-type-label__emoji {
+  font-size: 12px;
+  line-height: 1;
+  display: inline-block;
+}
+
+.mention-type-label__text {
+  font-size: 8px;
+  font-weight: 500;
+  line-height: 1;
+}

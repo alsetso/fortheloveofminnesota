@@ -3,15 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon, ShareIcon, CheckIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '../services/mentionService';
 import { LikeService } from '../services/likeService';
 import { useRouter } from 'next/navigation';
 import { usePageView } from '@/hooks/usePageView';
-import { MAP_CONFIG } from '@/features/map/config';
 import { useAuthStateSafe } from '@/features/auth';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import LikeButton from '@/components/mentions/LikeButton';
 
 interface MentionDetailClientProps {
@@ -36,6 +33,17 @@ interface MentionDetailClientProps {
       username: string | null;
       first_name: string | null;
       image_url: string | null;
+      account_taggable?: boolean | null;
+    } | null;
+    mention_type?: {
+      id: string;
+      emoji: string;
+      name: string;
+    } | null;
+    collection?: {
+      id: string;
+      emoji: string;
+      title: string;
     } | null;
   };
   isOwner: boolean;
@@ -47,10 +55,10 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
   const [viewCount, setViewCount] = useState(mention.view_count || 0);
   const [likesCount, setLikesCount] = useState(mention.likes_count || 0);
   const [isLiked, setIsLiked] = useState(mention.is_liked || false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
 
   // Fetch likes data if not provided
   useEffect(() => {
@@ -65,7 +73,9 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
         setLikesCount(count);
         setIsLiked(liked);
       } catch (error) {
-        console.error('[MentionDetailClient] Error fetching likes:', error);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[MentionDetailClient] Error fetching likes:', error);
+        }
       }
     };
 
@@ -80,44 +90,6 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
     setViewCount(prev => prev + 1);
   }, []);
 
-  // Initialize map
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
-
-    if (!MAP_CONFIG.MAPBOX_TOKEN) {
-      console.error('Mapbox token not found');
-      return;
-    }
-
-    mapboxgl.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
-
-    const map = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [mention.lng, mention.lat],
-      zoom: 14,
-    });
-
-    mapRef.current = map;
-
-    // Add marker
-    const marker = new mapboxgl.Marker({ color: '#ef4444' })
-      .setLngLat([mention.lng, mention.lat])
-      .addTo(map);
-
-    markerRef.current = marker;
-
-    // Add navigation controls
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-    return () => {
-      marker.remove();
-      map.remove();
-      mapRef.current = null;
-      markerRef.current = null;
-    };
-  }, [mention.lat, mention.lng]);
-
   const accountName = mention.accounts?.first_name || mention.accounts?.username || 'Anonymous';
   const createdDate = new Date(mention.created_at).toLocaleDateString('en-US', {
     month: 'long',
@@ -126,17 +98,76 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
   });
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this mention?')) return;
+    if (!confirm('Are you sure you want to delete this mention?')) {
+      setShowMenu(false);
+      return;
+    }
 
     setIsDeleting(true);
     try {
       await MentionService.deleteMention(mention.id);
       router.push('/');
     } catch (error) {
-      console.error('Error deleting mention:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[MentionDetailClient] Error deleting mention:', error);
+      }
       alert('Failed to delete mention');
       setIsDeleting(false);
+      setShowMenu(false);
     }
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!showMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
+
+  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/mention/${mention.id}` : '';
+
+  const handleCopyLink = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+      setShowMenu(false);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[MentionDetailClient] Error copying to clipboard:', error);
+      }
+    }
+  };
+
+  const handleShare = async () => {
+    if (!shareUrl) return;
+    const shareData = {
+      title: 'Check out this mention on Love of Minnesota',
+      text: mention.description || 'Check out this mention on the map!',
+      url: shareUrl,
+    };
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        handleCopyLink();
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[MentionDetailClient] Share cancelled or failed:', error);
+      }
+    }
+    setShowMenu(false);
   };
 
   return (
@@ -155,12 +186,93 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               />
               <span className="text-sm font-semibold text-gray-900">Love of Minnesota</span>
             </Link>
-            <Link
-              href={`/?mention=${mention.id}`}
-              className="text-xs text-gray-600 hover:text-gray-900 transition-colors"
-            >
-              View on Map
-            </Link>
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="p-1 text-gray-500 hover:text-gray-900 transition-colors"
+                aria-label="More options"
+              >
+                <EllipsisVerticalIcon className="w-5 h-5" />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[160px] bg-white border border-gray-200">
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    {isCopied ? (
+                      <>
+                        <CheckIcon className="w-4 h-4 text-green-600" />
+                        <span className="text-green-600">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span>Copy URL</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <ShareIcon className="w-4 h-4" />
+                    <span>Share</span>
+                  </button>
+                  {mention.accounts?.username && (
+                    <Link
+                      href={`/profile/${mention.accounts.username}?mentionId=${mention.id}`}
+                      onClick={() => setShowMenu(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <MapPinIcon className="w-4 h-4" />
+                      <span>View on Profile</span>
+                    </Link>
+                  )}
+                  <Link
+                    href={`/live?lat=${mention.lat}&lng=${mention.lng}`}
+                    onClick={() => setShowMenu(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <MapPinIcon className="w-4 h-4" />
+                    <span>Live Map</span>
+                  </Link>
+                  {mention.accounts?.username && mention.accounts?.account_taggable && (
+                    <Link
+                      href={`/add?username=${encodeURIComponent(mention.accounts.username)}`}
+                      onClick={() => setShowMenu(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <UserPlusIcon className="w-4 h-4" />
+                      <span>Tag User</span>
+                    </Link>
+                  )}
+                  {isOwner && (
+                    <>
+                      <div className="border-t border-gray-200 my-1" />
+                      <Link
+                        href={`/mention/${mention.id}/edit`}
+                        onClick={() => setShowMenu(false)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <PencilIcon className="w-4 h-4" />
+                        <span>Edit</span>
+                      </Link>
+                      <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -185,7 +297,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                   </span>
                 </div>
               )}
-              <div>
+              <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{accountName}</div>
                 {mention.accounts.username && (
                   <Link
@@ -196,10 +308,47 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                   </Link>
                 )}
               </div>
+              {/* Labels: Mention Type and Collection */}
+              <div className="flex items-center gap-2">
+                {mention.mention_type && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200">
+                    <span className="text-sm">{mention.mention_type.emoji}</span>
+                    <span className="text-xs font-medium text-gray-700">{mention.mention_type.name}</span>
+                  </div>
+                )}
+                {mention.collection && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200">
+                    <span className="text-sm">{mention.collection.emoji}</span>
+                    <span className="text-xs font-medium text-blue-700">{mention.collection.title}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Media */}
+          {mention.media_type === 'video' && mention.video_url && (
+            <div className="mb-4 rounded-lg overflow-hidden border border-gray-200 bg-black">
+              <video
+                src={mention.video_url}
+                controls
+                playsInline
+                muted
+                preload="metadata"
+                className="w-full h-auto max-h-[600px] object-contain"
+                onError={(e) => {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.error('[MentionDetailClient] Video load error:', e);
+                    const target = e.target as HTMLVideoElement;
+                    if (target.error) {
+                      console.error('[MentionDetailClient] Video error code:', target.error.code, 'Message:', target.error.message);
+                      console.error('[MentionDetailClient] Video URL:', mention.video_url);
+                    }
+                  }
+                }}
+              />
+            </div>
+          )}
           {mention.media_type === 'image' && mention.image_url && (
             <div className="mb-4 rounded-lg overflow-hidden border border-gray-200">
               <Image
@@ -220,10 +369,6 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
             </div>
           )}
 
-          {/* Map */}
-          <div className="mb-4 rounded-lg overflow-hidden border border-gray-200" style={{ height: '300px' }}>
-            <div ref={mapContainerRef} className="w-full h-full" />
-          </div>
 
           {/* Location */}
           {mention.full_address && (
@@ -232,6 +377,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               <span>{mention.full_address}</span>
             </div>
           )}
+
 
           {/* Meta Info */}
           <div className="flex items-center gap-4 text-xs text-gray-500 mb-6 pb-6 border-b border-gray-200">
@@ -257,26 +403,6 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
             </div>
           </div>
 
-          {/* Owner Actions */}
-          {isOwner && (
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/mention/${mention.id}/edit`}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-              >
-                <PencilIcon className="w-4 h-4" />
-                Edit
-              </Link>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors disabled:opacity-50"
-              >
-                <TrashIcon className="w-4 h-4" />
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          )}
         </main>
       </div>
     </>

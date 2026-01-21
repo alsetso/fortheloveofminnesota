@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MagnifyingGlassIcon, MapPinIcon, UserIcon, ChevronDownIcon, ArrowPathIcon, ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, MapPinIcon, UserIcon, ChevronDownIcon, ArrowPathIcon, ExclamationTriangleIcon, XMarkIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui/hooks/useToast';
@@ -14,6 +15,7 @@ import DynamicSearchModal from './DynamicSearchModal';
 import DailyWelcomeModal from './DailyWelcomeModal';
 import { useLocation } from '@/features/map/hooks/useLocation';
 import { useIOSStandalone } from '@/hooks/useIOSStandalone';
+import { supabase } from '@/lib/supabase';
 
 interface MapboxFeature {
   id: string;
@@ -122,6 +124,7 @@ const MAP_META_LAYERS = [
 export default function MapTopContainer({ map, onLocationSelect, isLoadingMentions = false, modalState, districtsState, ctuState, stateBoundaryState, countyBoundariesState, hideMicrophone = false, showWelcomeText = false, showDailyWelcome = false, onCloseDailyWelcome, useBlurStyle: propUseBlurStyle }: MapTopContainerProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
   const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
   const { info, pro: proToast } = useToast();
@@ -155,6 +158,91 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
   // Use white text when transparent blur + satellite map
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
+  const [selectedMentionTypes, setSelectedMentionTypes] = useState<Array<{ id: string; name: string; emoji: string; slug: string }>>([]);
+
+  // Fetch selected mention types from URL parameters
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    const typesParam = searchParams.get('types');
+    
+    const fetchSelectedTypes = async () => {
+      if (typesParam) {
+        // Multiple types - comma-separated slugs
+        const slugs = typesParam.split(',').map(s => s.trim());
+        const { data: allTypes } = await supabase
+          .from('mention_types')
+          .select('id, name, emoji')
+          .eq('is_active', true);
+        
+        if (allTypes) {
+          const selected = slugs
+            .map(slug => {
+              const matchingType = allTypes.find(type => {
+                const typeSlug = mentionTypeNameToSlug(type.name);
+                return typeSlug === slug;
+              });
+              return matchingType ? { ...matchingType, slug } : null;
+            })
+            .filter(Boolean) as Array<{ id: string; name: string; emoji: string; slug: string }>;
+          
+          setSelectedMentionTypes(selected);
+        } else {
+          setSelectedMentionTypes([]);
+        }
+      } else if (typeParam) {
+        // Single type
+        const { data: allTypes } = await supabase
+          .from('mention_types')
+          .select('id, name, emoji')
+          .eq('is_active', true);
+        
+        if (allTypes) {
+          const matchingType = allTypes.find(type => {
+            const typeSlug = mentionTypeNameToSlug(type.name);
+            return typeSlug === typeParam;
+          });
+          
+          if (matchingType) {
+            setSelectedMentionTypes([{ ...matchingType, slug: typeParam }]);
+          } else {
+            setSelectedMentionTypes([]);
+          }
+        } else {
+          setSelectedMentionTypes([]);
+        }
+      } else {
+        setSelectedMentionTypes([]);
+      }
+    };
+
+    fetchSelectedTypes();
+  }, [searchParams, supabase]);
+
+  // Remove a mention type filter
+  const handleRemoveType = (slugToRemove: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const typeParam = params.get('type');
+    const typesParam = params.get('types');
+    
+    if (typesParam) {
+      // Remove from multiple types
+      const slugs = typesParam.split(',').map(s => s.trim()).filter(s => s !== slugToRemove);
+      if (slugs.length === 0) {
+        params.delete('types');
+      } else if (slugs.length === 1) {
+        // Convert to single type parameter
+        params.delete('types');
+        params.set('type', slugs[0]);
+      } else {
+        params.set('types', slugs.join(','));
+      }
+    } else if (typeParam && typeParam === slugToRemove) {
+      // Remove single type
+      params.delete('type');
+    }
+    
+    router.push(`/live?${params.toString()}`);
+  };
   const [placeholderText, setPlaceholderText] = useState<'Enter address' | 'Enter "@" for username'>('Enter address');
   const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
   const [dynamicSearchType, setDynamicSearchType] = useState<'people'>('people');
@@ -1197,13 +1285,45 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
 
         {/* Mentions Loading Toast - Below search container */}
         {isLoadingMentions && (
-          <div className={`rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 transition-all ${
+          <div className={`rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 transition-all h-5 ${
             useBlurStyle 
               ? 'bg-white/90 backdrop-blur-md border border-white/50' 
               : 'bg-white border border-gray-200'
           }`}>
             <div className="w-4 h-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin flex-shrink-0" />
             <span className="text-xs font-medium text-gray-900">Loading mentions...</span>
+          </div>
+        )}
+
+        {/* Selected Mention Type Filters - Wrapped card labels */}
+        {!isLoadingMentions && selectedMentionTypes.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            {selectedMentionTypes.map((type) => (
+              <div
+                key={type.id}
+                className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap ${
+                  useWhiteText
+                    ? 'bg-white/10 border-white/30 text-white'
+                    : 'bg-white border-gray-200 text-gray-700'
+                }`}
+              >
+                <span className="text-base flex-shrink-0">{type.emoji}</span>
+                <span className="font-medium leading-none">{type.name}</span>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRemoveType(type.slug);
+                  }}
+                  className={`hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 ${
+                    useWhiteText ? 'text-white' : 'text-gray-500'
+                  }`}
+                  aria-label={`Remove ${type.name} filter`}
+                >
+                  <XCircleIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

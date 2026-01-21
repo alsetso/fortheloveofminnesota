@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -13,10 +14,11 @@ import { useUrlMapState } from '../hooks/useUrlMapState';
 import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
 import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
+import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
 import CameraModal from '@/components/camera/CameraModal';
 import BottomButtons from '@/components/layout/BottomButtons';
 import BottomButtonsPopup from '@/components/layout/BottomButtonsPopup';
-import CollectionsManagement from '@/components/layout/CollectionsManagement';
+import MentionTypeFilterPopup from '@/components/layout/MentionTypeFilterPopup';
 import LocationPermissionModal from '@/components/layout/LocationPermissionModal';
 import LivePageStats from '@/components/layout/LivePageStats';
 import MapSettingsContent from '@/components/layout/MapSettingsContent';
@@ -65,6 +67,21 @@ export default function LiveMap() {
   const [createTabSelectedLocation, setCreateTabSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [createTabMapMeta, setCreateTabMapMeta] = useState<Record<string, any> | null>(null);
   const [createTabFullAddress, setCreateTabFullAddress] = useState<string | null>(null);
+  
+  // Location select popup state (for map clicks)
+  const [locationSelectPopup, setLocationSelectPopup] = useState<{
+    isOpen: boolean;
+    lat: number;
+    lng: number;
+    address: string | null;
+    mapMeta: Record<string, any> | null;
+  }>({
+    isOpen: false,
+    lat: 0,
+    lng: 0,
+    address: null,
+    mapMeta: null,
+  });
   
   
   // Congressional districts visibility state
@@ -130,6 +147,16 @@ export default function LiveMap() {
   
   // URL-based state (only year filter)
   useUrlMapState();
+  
+  // Close modals/popups when mention type filters change
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    // Close all modals and popups when mention type filters change
+    // This ensures clean state when filters are removed
+    closeAll();
+    // Also close location select popup
+    setLocationSelectPopup({ isOpen: false, lat: 0, lng: 0, address: null, mapMeta: null });
+  }, [searchParams.get('type'), searchParams.get('types'), closeAll]);
   
   // Auth state from unified context - use isLoading to ensure auth is initialized
   const {
@@ -468,6 +495,15 @@ export default function LiveMap() {
           }));
         }
         
+        // Debug: Log mention data being passed to popup
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[LiveMap] Opening popup with mention:', {
+            id: mention.id,
+            mention_type: mention.mention_type,
+            has_mention_type: !!mention.mention_type,
+          });
+        }
+        
         openPopup('pin', {
           id: mention.id,
           description: mention.description,
@@ -479,6 +515,8 @@ export default function LiveMap() {
           created_at: mention.created_at,
           view_count: mention.view_count,
           collection: mention.collection,
+          mention_type: mention.mention_type,
+          map_meta: mention.map_meta || null,
         });
       }
     };
@@ -490,8 +528,8 @@ export default function LiveMap() {
   }, [openPopup]);
 
 
-  // Unified handler for opening create form with location
-  // Handles: single-click, "Add Mention" button, any show-location-for-mention event
+  // Handler for "Add Mention" button from layer popups (still opens create form)
+  // Note: Map clicks now show LocationSelectPopup instead
   useEffect(() => {
     const handleShowLocationForMention = async (event: Event) => {
       const customEvent = event as CustomEvent<{
@@ -542,8 +580,82 @@ export default function LiveMap() {
     };
 
     window.addEventListener('show-location-for-mention', handleShowLocationForMention);
+    
+    // Handle edit mention event - opens create container at 100%
+    const handleShowLocationForMentionEdit = async (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        lat: number;
+        lng: number;
+        map_meta?: Record<string, any>;
+        full_address?: string | null;
+        mention_id?: string;
+        description?: string;
+        image_url?: string | null;
+        video_url?: string | null;
+        media_type?: 'image' | 'video' | 'none';
+        mention_type_id?: string | null;
+        collection_id?: string | null;
+      }>;
+      const { lat, lng, map_meta, full_address } = customEvent.detail || {};
+      if (!lat || !lng) return;
+
+      // Set flag to prevent popup from removing marker during transition
+      isTransitioningToCreateRef.current = true;
+
+      // Set location state FIRST (before any async operations or closing popups)
+      setCreateTabSelectedLocation({ lat, lng });
+      setCreateTabMapMeta(map_meta || null);
+      setCreateTabFullAddress(full_address || null);
+
+      // Close any open popups/tabs
+      closeAll();
+
+      // Open create form with edit mode (100% width/height)
+      openCreate({ 
+        lat, 
+        lng, 
+        map_meta, 
+        isEditMode: true, 
+        editData: {
+          mention_id: customEvent.detail.mention_id,
+          description: customEvent.detail.description,
+          image_url: customEvent.detail.image_url,
+          video_url: customEvent.detail.video_url,
+          media_type: customEvent.detail.media_type,
+          mention_type_id: customEvent.detail.mention_type_id,
+          collection_id: customEvent.detail.collection_id,
+        }
+      });
+
+      // Transform existing white pin to red pin when create form opens
+      setTimeout(() => {
+        if (temporaryMarkerRef.current && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
+          const markerElement = temporaryMarkerRef.current.getElement();
+          if (markerElement) {
+            // The pin element itself is the circle, find the dot inside
+            const pinDot = markerElement.querySelector('.map-click-pin-dot') as HTMLElement;
+            
+            if (markerElement && pinDot) {
+              // Change white pin to red pin
+              markerElement.style.backgroundColor = '#ef4444'; // red-500
+              markerElement.style.borderColor = '#ef4444';
+              
+              // Change black dot to white dot
+              pinDot.style.backgroundColor = '#ffffff'; // white
+            }
+          }
+        }
+        
+        // Clear flag
+        isTransitioningToCreateRef.current = false;
+      }, 50);
+    };
+
+    window.addEventListener('show-location-for-mention-edit', handleShowLocationForMentionEdit);
+    
     return () => {
       window.removeEventListener('show-location-for-mention', handleShowLocationForMention);
+      window.removeEventListener('show-location-for-mention-edit', handleShowLocationForMentionEdit);
     };
   }, [account, closeAll, openCreate, setCreateTabSelectedLocation, setCreateTabMapMeta]);
 
@@ -1082,10 +1194,14 @@ export default function LiveMap() {
             console.debug('[LiveMap] Error reverse geocoding:', err);
           }
           
-          // Dispatch event to open create form (single-click to mention)
-          window.dispatchEvent(new CustomEvent('show-location-for-mention', {
-            detail: { lat, lng, map_meta: mapMeta, full_address: fullAddress }
-          }));
+          // Show location select popup instead of opening create form
+          setLocationSelectPopup({
+            isOpen: true,
+            lat,
+            lng,
+            address: fullAddress,
+            mapMeta: mapMeta,
+          });
           
           // Dispatch event to update search input with address and coordinates
           if (fullAddress) {
@@ -1417,12 +1533,6 @@ export default function LiveMap() {
             handleLocationButtonClick();
           } else if (button === 'home') {
             // Navigation handled by button onClick
-          } else if (button === 'collections') {
-            if (isBottomButtonOpen('collections')) {
-              closeBottomButton();
-            } else {
-              openBottomButton('collections');
-            }
           } else if (button === 'account') {
             // Directly open account modal, don't use popup
             if (account) {
@@ -1431,6 +1541,12 @@ export default function LiveMap() {
               openWelcome();
             }
             // Don't set activeBottomButton for account - it opens modal directly
+          } else if (button === 'search') {
+            if (isBottomButtonOpen('search')) {
+              closeBottomButton();
+            } else {
+              openBottomButton('search');
+            }
           }
         }}
         isPopupOpen={getBottomButtonType() !== null || isModalOpen('create')}
@@ -1514,6 +1630,12 @@ export default function LiveMap() {
         />
       </BottomButtonsPopup>
 
+      {/* Mention Type Filter Popup */}
+      <MentionTypeFilterPopup
+        isOpen={isBottomButtonOpen('search')}
+        onClose={closeBottomButton}
+      />
+
       <BottomButtonsPopup
         isOpen={isBottomButtonOpen('analytics')}
         onClose={closeBottomButton}
@@ -1536,15 +1658,24 @@ export default function LiveMap() {
         onAllow={handleLocationPermissionAllow}
       />
 
-      <BottomButtonsPopup
-        isOpen={isBottomButtonOpen('collections')}
-        onClose={closeBottomButton}
-        type="collections"
-        height="full"
-      >
-        <CollectionsManagement />
-      </BottomButtonsPopup>
 
+
+      {/* Location Select Popup - Shows when user clicks on map */}
+      <LocationSelectPopup
+        isOpen={locationSelectPopup.isOpen}
+        onClose={() => {
+          setLocationSelectPopup({ isOpen: false, lat: 0, lng: 0, address: null, mapMeta: null });
+          // Remove temporary marker when popup closes
+          if (temporaryMarkerRef.current) {
+            temporaryMarkerRef.current.remove();
+            temporaryMarkerRef.current = null;
+          }
+        }}
+        lat={locationSelectPopup.lat}
+        lng={locationSelectPopup.lng}
+        address={locationSelectPopup.address}
+        mapMeta={locationSelectPopup.mapMeta}
+      />
 
       {/* Create Popup - Only opened via "Add Label" button */}
       <CreateMentionPopup
@@ -1563,6 +1694,8 @@ export default function LiveMap() {
             temporaryMarkerRef.current = null;
           }
         }}
+        isEditMode={modal?.data?.isEditMode || false}
+        editData={modal?.data?.editData || null}
             map={mapInstanceRef.current}
             mapLoaded={mapLoaded}
             initialCoordinates={createTabSelectedLocation}

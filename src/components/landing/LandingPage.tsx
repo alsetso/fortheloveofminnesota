@@ -1,14 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAuthStateSafe, AccountService } from '@/features/auth';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { PaperAirplaneIcon, HeartIcon } from '@heroicons/react/24/solid';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useIOSStandalone } from '@/hooks/useIOSStandalone';
+import { useSupabaseClient } from '@/hooks/useSupabaseClient';
+import { PencilIcon, XMarkIcon, PlusIcon, EyeIcon, EyeSlashIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -41,11 +45,26 @@ export default function LandingPage() {
 
   const displayName = account ? AccountService.getDisplayName(account) : '';
   const isIOSStandalone = useIOSStandalone();
+  const supabase = useSupabaseClient();
+  const isAdmin = account?.role === 'admin';
 
   // Homepage visit stats
   const [visitStats, setVisitStats] = useState<{ last24Hours: number; previous24Hours: number; total: number } | null>(null);
   const [showTotal, setShowTotal] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // Mention types
+  type MentionType = { id: string; emoji: string; name: string; is_active: boolean };
+  const [mentionTypes, setMentionTypes] = useState<MentionType[]>([]);
+  const [editingType, setEditingType] = useState<MentionType | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+
+  // Scroll tracking for white container overlay effect
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const whiteContentRef = useRef<HTMLDivElement>(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [footerRevealed, setFooterRevealed] = useState(false);
 
   // Calculate if trending (volume + growth)
   const isTrending = useMemo(() => {
@@ -86,16 +105,193 @@ export default function LandingPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch mention types
+  useEffect(() => {
+    const fetchMentionTypes = async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from('mention_types')
+          .select('id, emoji, name, is_active')
+          .order('name');
+        
+        if (error) throw error;
+        setMentionTypes((data || []) as MentionType[]);
+      } catch (error) {
+        console.error('Failed to fetch mention types:', error);
+      } finally {
+        setLoadingTypes(false);
+      }
+    };
+
+    fetchMentionTypes();
+  }, [supabase]);
+
+  // Handle opening edit modal
+  const handleOpenEditModal = (type: MentionType) => {
+    setEditingType(type);
+    setIsEditModalOpen(true);
+  };
+
+  // Handle opening create modal
+  const handleOpenCreateModal = () => {
+    setEditingType({ id: '', emoji: '', name: '', is_active: true });
+    setIsEditModalOpen(true);
+  };
+
+  // Handle closing edit modal
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingType(null);
+  };
+
+  // Handle saving mention type (create or update)
+  const handleSaveMentionType = async (emoji: string, name: string) => {
+    if (!editingType) return;
+    
+    try {
+      if (editingType.id) {
+        // Update existing
+        const { error } = await (supabase as any)
+          .from('mention_types')
+          .update({ emoji, name })
+          .eq('id', editingType.id);
+        
+        if (error) throw error;
+        
+        setMentionTypes(prev => prev.map(t => t.id === editingType.id ? { ...t, emoji, name } : t));
+      } else {
+        // Create new
+        const { data, error } = await (supabase as any)
+          .from('mention_types')
+          .insert({ emoji, name })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        setMentionTypes(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      
+      handleCloseEditModal();
+    } catch (error) {
+      console.error('Failed to save mention type:', error);
+      alert('Failed to save mention type');
+    }
+  };
+
+  // Handle toggling mention type visibility
+  const handleToggleVisibility = async (type: MentionType, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!isAdmin) return;
+    
+    try {
+      const newIsActive = !type.is_active;
+      const { error } = await (supabase as any)
+        .from('mention_types')
+        .update({ is_active: newIsActive })
+        .eq('id', type.id);
+      
+      if (error) throw error;
+      
+      setMentionTypes(prev => prev.map(t => 
+        t.id === type.id ? { ...t, is_active: newIsActive } : t
+      ));
+    } catch (error) {
+      console.error('Failed to toggle visibility:', error);
+      alert('Failed to toggle visibility');
+    }
+  };
+
+  // Handle deleting mention type
+  const handleDeleteMentionType = async () => {
+    if (!editingType || !editingType.id) return;
+    
+    if (!confirm('Are you sure you want to delete this mention type? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const { error } = await (supabase as any)
+        .from('mention_types')
+        .delete()
+        .eq('id', editingType.id);
+      
+      if (error) throw error;
+      
+      setMentionTypes(prev => prev.filter(t => t.id !== editingType.id));
+      handleCloseEditModal();
+    } catch (error) {
+      console.error('Failed to delete mention type:', error);
+      alert('Failed to delete mention type');
+    }
+  };
+
+  // Track scroll position for white container overlay effect
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const scrollTop = scrollContainer.scrollTop;
+      const scrollHeight = scrollContainer.scrollHeight;
+      const clientHeight = scrollContainer.clientHeight;
+      const maxScroll = scrollHeight - clientHeight;
+      
+      // Calculate progress (0 to 1) - when we reach bottom, progress = 1
+      const progress = maxScroll > 0 ? Math.min(scrollTop / maxScroll, 1) : 0;
+      
+      // Use hysteresis to prevent flickering: reveal at 0.85, hide at 0.80
+      setFooterRevealed(prev => {
+        if (progress >= 0.85) return true;
+        if (progress < 0.80) return false;
+        return prev; // Keep current state when between thresholds
+      });
+      
+      setScrollProgress(progress);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Viewport height constants
+  const HEADER_HEIGHT_VH = 10; // 10vh
+  const FOOTER_HEIGHT_VH = 10; // 10vh
+  const MAIN_CONTENT_HEIGHT_VH = 90; // 90vh initially
+  const MAIN_CONTENT_HEIGHT_WITH_FOOTER_VH = 80; // 80vh when footer is revealed
+
+  // Calculate header height in pixels for transform
+  const headerHeightPx = typeof window !== 'undefined' ? window.innerHeight * (HEADER_HEIGHT_VH / 100) : 130;
+
+  // Main content height based on footer visibility (using state with hysteresis to prevent flickering)
+  const mainContentHeight = footerRevealed 
+    ? MAIN_CONTENT_HEIGHT_WITH_FOOTER_VH 
+    : MAIN_CONTENT_HEIGHT_VH;
+
   return (
     <div className="relative w-full overflow-x-hidden" style={{ maxWidth: '100vw' }}>
       {/* Homepage Screen Container - 100vh fixed height */}
-      <div className="homepageScreenContainer h-screen w-full flex flex-col overflow-hidden" style={{ backgroundColor: '#000000', maxWidth: '100vw' }}>
-        {/* Header - Sticky, never moves */}
-        <div 
-          className="sticky top-0 z-10 px-6 h-[70px] flex items-center justify-between flex-shrink-0" 
+      <div 
+        className="h-screen w-full flex flex-col overflow-hidden" 
+        style={{ 
+          backgroundColor: '#000000', 
+          maxWidth: '100vw',
+          height: '100vh',
+          minHeight: '100vh',
+          maxHeight: '100vh'
+        }}
+      >
+        {/* Header - Sticky to top, 10vh */}
+        <header 
+          className="sticky top-0 z-10 px-6 flex items-end justify-between flex-shrink-0" 
           style={{ 
             backgroundColor: '#000000',
-            paddingTop: isIOSStandalone ? '20px' : '0px'
+            paddingTop: '20px',
+            paddingBottom: '20px',
+            height: `${HEADER_HEIGHT_VH}vh`,
+            minHeight: `${HEADER_HEIGHT_VH}vh`,
+            maxHeight: `${HEADER_HEIGHT_VH}vh`
           }}
         >
           <div className="flex items-center gap-3">
@@ -110,11 +306,19 @@ export default function LandingPage() {
             </div>
             <span className="text-white font-semibold text-sm">For the Love of Minnesota</span>
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             {user && account ? (
-              <button onClick={handleProfileClick} className="flex items-center gap-2">
-                <ProfilePhoto account={account} size="sm" />
-              </button>
+              <>
+                <Link
+                  href="/plans"
+                  className="text-white text-sm font-medium hover:text-gray-300 transition-colors flex items-center"
+                >
+                  Plans
+                </Link>
+                <button onClick={handleProfileClick} className="flex items-center justify-center">
+                  <ProfilePhoto account={account} size="sm" />
+                </button>
+              </>
             ) : (
               <button
                 onClick={handleGetStarted}
@@ -124,13 +328,48 @@ export default function LandingPage() {
               </button>
             )}
           </div>
-        </div>
+        </header>
 
-        {/* Scrollable Content Area - calc(100vh - 70px) */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden rounded-t-3xl scrollbar-hide" style={{ backgroundColor: '#000000', maxWidth: '100vw' }}>
-          {/* Hero Content Card - White background with rounded top corners */}
-          <div className="min-h-full flex flex-col justify-end pb-0">
-            <div className="bg-white rounded-t-3xl flex flex-col items-center justify-center px-6 py-12 space-y-6">
+        {/* Main Content Area - Sticky, 90vh initially, 80vh when footer revealed */}
+        <div 
+          className="relative overflow-visible flex-shrink-0" 
+          style={{ 
+            height: `${mainContentHeight}vh`,
+            minHeight: `${mainContentHeight}vh`,
+            maxHeight: `${mainContentHeight}vh`,
+            transition: 'height 0.2s ease-out',
+            backgroundColor: '#000000'
+          }}
+        >
+          {/* Wrapper Container - Rounded top corners, moves behind header on scroll */}
+          <div 
+            ref={whiteContentRef}
+            className="bg-white rounded-t-3xl rounded-b-3xl h-full overflow-hidden"
+            style={{
+              transform: `translateY(-${scrollProgress * headerHeightPx}px)`,
+              willChange: 'transform',
+              zIndex: 20,
+              position: 'relative',
+              backgroundColor: '#ffffff'
+            }}
+          >
+            {/* Scroll Container - Handles scrolling inside the wrapper */}
+            <div 
+              ref={scrollContainerRef}
+              className="h-full overflow-y-auto overflow-x-hidden scrollbar-hide rounded-t-3xl" 
+              style={{ 
+                backgroundColor: 'transparent'
+              }}
+            >
+              <div 
+                className="bg-white rounded-b-3xl"
+                style={{
+                  minHeight: '100%'
+                }}
+              >
+            {/* Hero Content Card - White background with rounded top corners */}
+            <div className="min-h-[calc(100vh-130px)] flex flex-col justify-end pb-0">
+              <div className="rounded-t-3xl flex flex-col items-center justify-center px-6 py-12 space-y-6">
             {/* Main Heading */}
             <div className="text-center space-y-3 max-w-md">
               <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">
@@ -145,7 +384,7 @@ export default function LandingPage() {
             </div>
 
             {/* CTA Buttons */}
-            <div className="w-full max-w-sm space-y-2.5 pt-2">
+            <div className="w-full max-w-sm space-y-2.5 pt-2" style={{ pointerEvents: 'auto' }}>
               {user && account ? (
                 <button
                   onClick={handleProfileClick}
@@ -187,6 +426,22 @@ export default function LandingPage() {
               >
                 Explore Map
               </button>
+              {user && account && (
+                <Link
+                  href="/settings"
+                  className="w-full bg-white hover:bg-gray-50 text-gray-900 font-medium py-3.5 px-6 rounded-xl border border-gray-200 transition-all active:scale-[0.98] hover:shadow-sm flex items-center justify-center"
+                >
+                  Manage Account
+                </Link>
+              )}
+              {user && account && (
+                <Link
+                  href="/add"
+                  className="w-full bg-white hover:bg-gray-50 text-gray-900 font-medium py-3.5 px-6 rounded-xl border border-gray-200 transition-all active:scale-[0.98] hover:shadow-sm flex items-center justify-center"
+                >
+                  Add To Map
+                </Link>
+              )}
               
               {/* Live Analytics - Below Explore Map Button */}
               {visitStats && (
@@ -216,7 +471,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* About Section - Horizontal scrolling iOS-style cards */}
+          {/* About Section - Horizontal scrolling iOS-style cards - Hidden if user is logged in */}
+          {!user && (
           <div className="relative z-10 bg-white py-6 w-full overflow-hidden">
             <div className="overflow-x-auto scrollbar-hide px-6" style={{ width: '100%', maxWidth: '100vw' }}>
               <div className="flex gap-3 pb-2" style={{ width: 'max-content' }}>
@@ -347,231 +603,304 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Categories Section - Wrapped grid */}
+          <div className="relative z-10 bg-white py-8 w-full rounded-b-3xl">
+            <div className="max-w-[1200px] mx-auto px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">All of the things you can post</h2>
+                {isAdmin && (
+                  <div 
+                    onClick={handleOpenCreateModal}
+                    className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                    title="Add new mention type"
+                  >
+                    <PlusIcon className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs text-blue-600 font-medium">Add Type</span>
+                  </div>
+                )}
+              </div>
+              {loadingTypes ? (
+                <div className="text-center text-gray-500 py-8">Loading categories...</div>
+              ) : (
+              <>
+                {/* Active Cards Group */}
+                {(() => {
+                  const activeTypes = mentionTypes.filter(type => type.is_active);
+                  const inactiveTypes = mentionTypes.filter(type => !type.is_active);
+                  
+                  // Helper function to render a card
+                  const renderCard = (type: MentionType) => {
+                    // Convert name to URL-friendly format
+                    const typeSlug = mentionTypeNameToSlug(type.name);
+                    return (
+                      <div 
+                        key={type.id} 
+                        className={`rounded-md border border-gray-200 p-3 flex items-center gap-2 transition-colors relative group cursor-pointer ${
+                          type.is_active 
+                            ? 'bg-white hover:bg-gray-50' 
+                            : 'bg-gray-100 opacity-60'
+                        }`}
+                        onClick={(e) => {
+                          // Don't navigate if clicking the edit or eye icon
+                          if ((e.target as HTMLElement).closest('svg')) return;
+                          router.push(`/live?type=${typeSlug}`);
+                        }}
+                      >
+                        <span className="text-xl">{type.emoji}</span>
+                        <span className={`text-xs font-medium flex-1 ${
+                          type.is_active ? 'text-gray-700' : 'text-gray-500'
+                        }`}>{type.name}</span>
+                        {isAdmin && (
+                          <>
+                            {type.is_active ? (
+                              <EyeIcon 
+                                onClick={(e) => handleToggleVisibility(type, e)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity w-3 h-3 text-gray-500 cursor-pointer hover:text-gray-700"
+                                title="Hide from public"
+                              />
+                            ) : (
+                              <EyeSlashIcon 
+                                onClick={(e) => handleToggleVisibility(type, e)}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity w-3 h-3 text-gray-500 cursor-pointer hover:text-gray-700"
+                                title="Show to public"
+                              />
+                            )}
+                            <PencilIcon 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditModal(type);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity w-3 h-3 text-gray-500 cursor-pointer hover:text-gray-700"
+                              title="Edit"
+                            />
+                          </>
+                        )}
+                      </div>
+                    );
+                  };
+                  
+                  return (
+                    <>
+                      {activeTypes.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                          {activeTypes.map(renderCard)}
+                        </div>
+                      )}
+                      {isAdmin && inactiveTypes.length > 0 && (
+                        <div className="mt-6">
+                          <h3 className="text-sm font-medium text-gray-500 mb-3">Inactive</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {inactiveTypes.map(renderCard)}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
+              )}
+            </div>
+          </div>
+
+          {/* After You Post Section */}
           <div className="relative z-10 bg-white py-8 w-full">
             <div className="max-w-[1200px] mx-auto px-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">All of the things you can post</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                {/* Community & Social */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🗣</span>
-                  <span className="text-xs text-gray-700 font-medium">Community & Social</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">💬</span>
-                  <span className="text-xs text-gray-700 font-medium">Stories & moments</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">📸</span>
-                  <span className="text-xs text-gray-700 font-medium">Photos & videos</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">❤️</span>
-                  <span className="text-xs text-gray-700 font-medium">Local shoutouts</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🤝</span>
-                  <span className="text-xs text-gray-700 font-medium">Meetups & gatherings</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🧭</span>
-                  <span className="text-xs text-gray-700 font-medium">Tips & recommendations</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🐕</span>
-                  <span className="text-xs text-gray-700 font-medium">Lost & found (pets/items)</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🚨</span>
-                  <span className="text-xs text-gray-700 font-medium">Neighborhood alerts</span>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">After you post</h2>
+              <p className="text-xs text-gray-600 mb-6">
+                Your posts are available in all time filters. View them by 24 hours, 7 days (default), or all time.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* 24 Hours Card */}
+                <div className="bg-white rounded-md border border-gray-200 p-6 flex flex-col gap-3 hover:bg-gray-50 transition-colors">
+                  <h3 className="text-sm font-semibold text-gray-900">24 Hours</h3>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Your posts appear in the 24-hour feed. See the freshest content from your community.
+                  </p>
                 </div>
 
-                {/* Business & Commerce */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">⭐</span>
-                  <span className="text-xs text-gray-700 font-medium">Reviews</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏷</span>
-                  <span className="text-xs text-gray-700 font-medium">Things for sale</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏠</span>
-                  <span className="text-xs text-gray-700 font-medium">Listings & rentals</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">💼</span>
-                  <span className="text-xs text-gray-700 font-medium">Job postings</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🆕</span>
-                  <span className="text-xs text-gray-700 font-medium">New businesses</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">❌</span>
-                  <span className="text-xs text-gray-700 font-medium">Closures & changes</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🛍</span>
-                  <span className="text-xs text-gray-700 font-medium">Pop-ups & markets</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🧾</span>
-                  <span className="text-xs text-gray-700 font-medium">Services offered</span>
+                {/* 7 Days Card - Default */}
+                <div className="bg-white rounded-md border-2 border-gray-900 p-6 flex flex-col gap-3 hover:bg-gray-50 transition-colors relative">
+                  <div className="absolute top-2 right-2">
+                    <span className="text-xs font-medium text-gray-900 bg-gray-100 px-2 py-0.5 rounded">Default</span>
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900">7 Days</h3>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Your posts appear in the 7-day feed. This is the default view for browsing mentions.
+                  </p>
                 </div>
 
-                {/* Events & Activities */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">📅</span>
-                  <span className="text-xs text-gray-700 font-medium">Events & festivals</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🎶</span>
-                  <span className="text-xs text-gray-700 font-medium">Live music</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏟</span>
-                  <span className="text-xs text-gray-700 font-medium">Sports & games</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🎭</span>
-                  <span className="text-xs text-gray-700 font-medium">Arts & performances</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🌽</span>
-                  <span className="text-xs text-gray-700 font-medium">Farmers markets</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🧺</span>
-                  <span className="text-xs text-gray-700 font-medium">Community sales</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🎟</span>
-                  <span className="text-xs text-gray-700 font-medium">Ticketed events</span>
-                </div>
-
-                {/* Outdoors & Nature */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🌲</span>
-                  <span className="text-xs text-gray-700 font-medium">Parks & trails</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏕</span>
-                  <span className="text-xs text-gray-700 font-medium">Campgrounds</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🚶</span>
-                  <span className="text-xs text-gray-700 font-medium">Hiking spots</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🚣</span>
-                  <span className="text-xs text-gray-700 font-medium">Lakes & rivers</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🎣</span>
-                  <span className="text-xs text-gray-700 font-medium">Fishing reports</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">❄️</span>
-                  <span className="text-xs text-gray-700 font-medium">Ice & snow conditions</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🌤</span>
-                  <span className="text-xs text-gray-700 font-medium">Weather impacts</span>
-                </div>
-
-                {/* Infrastructure & Development */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🚧</span>
-                  <span className="text-xs text-gray-700 font-medium">Construction updates</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏗</span>
-                  <span className="text-xs text-gray-700 font-medium">Development progress</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🛣</span>
-                  <span className="text-xs text-gray-700 font-medium">Road conditions</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🚦</span>
-                  <span className="text-xs text-gray-700 font-medium">Traffic issues</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏘</span>
-                  <span className="text-xs text-gray-700 font-medium">Zoning changes</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏠</span>
-                  <span className="text-xs text-gray-700 font-medium">Open houses</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">📍</span>
-                  <span className="text-xs text-gray-700 font-medium">Before & after photos</span>
-                </div>
-
-                {/* Civic & Government */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏛</span>
-                  <span className="text-xs text-gray-700 font-medium">Town halls & meetings</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🗳</span>
-                  <span className="text-xs text-gray-700 font-medium">Voting locations</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">📢</span>
-                  <span className="text-xs text-gray-700 font-medium">Public notices</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">💰</span>
-                  <span className="text-xs text-gray-700 font-medium">Spending observations</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">📊</span>
-                  <span className="text-xs text-gray-700 font-medium">Transparency updates</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">⚖️</span>
-                  <span className="text-xs text-gray-700 font-medium">Policy impacts</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🏢</span>
-                  <span className="text-xs text-gray-700 font-medium">Government buildings</span>
-                </div>
-
-                {/* Help & Support */}
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🙋</span>
-                  <span className="text-xs text-gray-700 font-medium">Volunteer opportunities</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🎁</span>
-                  <span className="text-xs text-gray-700 font-medium">Donations & fundraisers</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🤲</span>
-                  <span className="text-xs text-gray-700 font-medium">Mutual aid</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🚗</span>
-                  <span className="text-xs text-gray-700 font-medium">Ride shares</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🩺</span>
-                  <span className="text-xs text-gray-700 font-medium">Community assistance</span>
-                </div>
-                <div className="bg-white rounded-md border border-gray-200 p-3 flex items-center gap-2 hover:bg-gray-50 transition-colors">
-                  <span className="text-xl">🆘</span>
-                  <span className="text-xs text-gray-700 font-medium">Emergency info</span>
+                {/* All Time Card - Pro Only */}
+                <div className={`rounded-md border border-gray-200 p-6 flex flex-col gap-3 transition-colors ${
+                  (account?.plan === 'pro' || account?.plan === 'plus') 
+                    ? 'bg-white hover:bg-gray-50' 
+                    : 'bg-gray-50 opacity-75'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-gray-900">All Time</h3>
+                    {(account?.plan !== 'pro' && account?.plan !== 'plus') && (
+                      <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded">Pro</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    {(account?.plan === 'pro' || account?.plan === 'plus') ? (
+                      <>Your posts appear in the all-time feed. Access complete history of all mentions.</>
+                    ) : (
+                      <>All-time view is available for Pro members. You can still view any user's all-time posts by visiting their profile.</>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Footer - Sticky to bottom, 10vh, revealed after scrolling */}
+          <footer 
+            className="sticky bottom-0 z-10 bg-black text-white flex-shrink-0"
+            style={{
+              backgroundColor: '#000000',
+              height: `${FOOTER_HEIGHT_VH}vh`,
+              minHeight: `${FOOTER_HEIGHT_VH}vh`,
+              maxHeight: `${FOOTER_HEIGHT_VH}vh`,
+              width: '100vw',
+              left: 0,
+              right: 0,
+              margin: 0,
+              padding: 0,
+              opacity: footerRevealed ? Math.min((scrollProgress - 0.80) / 0.20, 1) : 0,
+              transition: 'opacity 0.2s ease-out',
+              pointerEvents: footerRevealed && scrollProgress > 0.9 ? 'auto' : 'none',
+              visibility: footerRevealed ? 'visible' : 'hidden'
+            }}
+          >
+          <div 
+            className="h-full flex items-center justify-center"
+            style={{
+              width: '100%',
+              margin: 0,
+              padding: 0
+            }}
+          >
+            <div 
+              className="flex items-center justify-center gap-4"
+              style={{
+                width: '100%',
+                fontSize: 'clamp(0.625rem, 1.5vw, 0.875rem)',
+                margin: 0,
+                padding: 0,
+                lineHeight: '1'
+              }}
+            >
+              <Link
+                href="/contact"
+                className="text-gray-400 hover:text-white transition-colors flex items-center"
+                style={{ lineHeight: '1' }}
+              >
+                Contact
+              </Link>
+              <span className="text-gray-600 flex items-center" style={{ lineHeight: '1' }}>•</span>
+              <a
+                href="mailto:loveofminnesota@gmail.com"
+                className="text-gray-400 hover:text-white transition-colors flex items-center"
+                style={{ lineHeight: '1' }}
+              >
+                loveofminnesota@gmail.com
+              </a>
+            </div>
+          </div>
+        </footer>
+        </div>
       </div>
+
+      {/* Edit Mention Type Modal */}
+      {isEditModalOpen && editingType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-md border border-gray-200 w-full max-w-md mx-4 p-[10px] space-y-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-gray-900">
+                {editingType?.id ? 'Edit Mention Type' : 'Create Mention Type'}
+              </h2>
+              <button
+                onClick={handleCloseEditModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const emoji = formData.get('emoji') as string;
+                const name = formData.get('name') as string;
+                handleSaveMentionType(emoji, name);
+              }} 
+              className="space-y-2"
+            >
+              <div>
+                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">
+                  Emoji
+                </label>
+                <input
+                  type="text"
+                  name="emoji"
+                  defaultValue={editingType.emoji}
+                  className="w-full px-2 py-1.5 text-xl border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors"
+                  maxLength={2}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-medium text-gray-700 mb-0.5">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  defaultValue={editingType.name}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-2 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseEditModal}
+                    className="flex-1 px-2 py-1.5 text-xs font-medium bg-gray-200 text-gray-900 rounded-md hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {editingType?.id && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteMentionType}
+                    className="w-full px-2 py-1.5 text-xs font-medium bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <TrashIcon className="w-3 h-3" />
+                    Delete
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

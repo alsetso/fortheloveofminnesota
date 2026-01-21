@@ -78,6 +78,7 @@ export default async function MentionPage({ params }: Props) {
       lng,
       description,
       visibility,
+      archived,
       image_url,
       video_url,
       media_type,
@@ -86,38 +87,81 @@ export default async function MentionPage({ params }: Props) {
       created_at,
       updated_at,
       account_id,
-      user_id,
       accounts (
         id,
         username,
         first_name,
-        image_url
+        image_url,
+        account_taggable
+      ),
+      mention_type:mention_types (
+        id,
+        emoji,
+        name
+      ),
+      collection:collections (
+        id,
+        emoji,
+        title
       )
     `)
     .eq('id', id)
+    .eq('archived', false)
     .single();
 
-  if (error || !mention) {
+  if (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[MentionPage] Error fetching mention:', error);
+    }
     notFound();
   }
 
-  const mentionData = mention as unknown as {
-    id: string;
-    lat: number;
-    lng: number;
-    description: string | null;
-    visibility: string;
-    image_url: string | null;
-    video_url: string | null;
-    media_type: string | null;
-    full_address: string | null;
-    view_count: number | null;
-    created_at: string;
-    updated_at: string;
-    account_id: string | null;
-    user_id: string | null;
-    accounts: { id: string; username: string | null; first_name: string | null; image_url: string | null } | null;
-  };
+  if (!mention) {
+    notFound();
+  }
+
+  const mentionData = mention as any;
+  
+  // Transform mention_type relationship (Supabase returns it as an object when using alias)
+  // Since we're using mention_type:mention_types(...), it should already be an object, not an array
+  if (mentionData.mention_type && Array.isArray(mentionData.mention_type)) {
+    // If it's an array (legacy format), take the first item
+    mentionData.mention_type = mentionData.mention_type.length > 0 ? mentionData.mention_type[0] : null;
+  } else if (!mentionData.mention_type) {
+    // If mention_type is missing, set it to null
+    mentionData.mention_type = null;
+  }
+  
+  // Clean up any legacy mention_types array if it exists
+  if (mentionData.mention_types) {
+    delete mentionData.mention_types;
+  }
+  
+  // Transform collection relationship (Supabase returns it as an object when using alias)
+  // Since we're using collection:collections(...), it should already be an object, not an array
+  if (mentionData.collection && Array.isArray(mentionData.collection)) {
+    // If it's an array (legacy format), take the first item
+    mentionData.collection = mentionData.collection.length > 0 ? mentionData.collection[0] : null;
+  } else if (!mentionData.collection) {
+    // If collection is missing, set it to null
+    mentionData.collection = null;
+  }
+  
+  // Clean up any legacy collections array if it exists
+  if (mentionData.collections) {
+    delete mentionData.collections;
+  }
+  
+  // Debug: Log the transformed data
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[MentionPage] Transformed mention data:', {
+      id: mentionData.id,
+      mention_type: mentionData.mention_type,
+      collection: mentionData.collection,
+      has_mention_type: !!mentionData.mention_type,
+      has_collection: !!mentionData.collection,
+    });
+  }
 
   // Check if user is authenticated and owns this mention
   const { data: { user } } = await supabase.auth.getUser();

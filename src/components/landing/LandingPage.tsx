@@ -308,17 +308,9 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             {user && account ? (
-              <>
-                <Link
-                  href="/plans"
-                  className="text-white text-sm font-medium hover:text-gray-300 transition-colors flex items-center"
-                >
-                  Plans
-                </Link>
-                <button onClick={handleProfileClick} className="flex items-center justify-center">
-                  <ProfilePhoto account={account} size="sm" />
-                </button>
-              </>
+              <button onClick={handleProfileClick} className="flex items-center justify-center">
+                <ProfilePhoto account={account} size="sm" />
+              </button>
             ) : (
               <button
                 onClick={handleGetStarted}

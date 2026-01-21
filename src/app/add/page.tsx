@@ -35,6 +35,7 @@ export default function AddMentionPage() {
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
   const [fullAddress, setFullAddress] = useState<string | null>(null);
+  const [mapMeta, setMapMeta] = useState<Record<string, any> | null>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -304,10 +305,11 @@ export default function AddMentionPage() {
     setLng(selectedLng.toFixed(6));
   }, []);
 
-  // Reverse geocode coordinates to get address
+  // Reverse geocode coordinates to get address and map metadata
   useEffect(() => {
     if (!lat || !lng) {
       setFullAddress(null);
+      setMapMeta(null);
       return;
     }
 
@@ -317,13 +319,15 @@ export default function AddMentionPage() {
         const token = MAP_CONFIG.MAPBOX_TOKEN;
         if (!token) {
           setFullAddress(null);
+          setMapMeta(null);
           return;
         }
 
+        // Fetch full geocoding data with all location types
         const url = `${MAP_CONFIG.GEOCODING_BASE_URL}/${lng},${lat}.json`;
         const params = new URLSearchParams({
           access_token: token,
-          types: 'address',
+          types: 'address,poi,neighborhood,locality,place,postcode,district,region',
           limit: '1',
         });
 
@@ -331,18 +335,33 @@ export default function AddMentionPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.features && data.features.length > 0) {
-            setFullAddress(data.features[0].place_name || null);
+            const feature = data.features[0];
+            setFullAddress(feature.place_name || null);
+            
+            // Store full map metadata
+            setMapMeta({
+              feature: feature,
+              place_name: feature.place_name,
+              text: feature.text,
+              place_type: feature.place_type,
+              properties: feature.properties,
+              context: feature.context,
+              geometry: feature.geometry,
+            });
           } else {
             setFullAddress(null);
+            setMapMeta(null);
           }
         } else {
           setFullAddress(null);
+          setMapMeta(null);
         }
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[AddMentionPage] Failed to reverse geocode:', error);
         }
         setFullAddress(null);
+        setMapMeta(null);
       } finally {
         setIsReverseGeocoding(false);
       }
@@ -742,6 +761,8 @@ export default function AddMentionPage() {
         media_type: finalMediaType !== 'none' ? finalMediaType : undefined,
         tagged_account_ids: taggedAccounts.length > 0 ? taggedAccounts.map(acc => acc.id) : undefined,
         collection_id: selectedCollectionId || undefined,
+        full_address: fullAddress || undefined,
+        map_meta: mapMeta || undefined,
       }, activeAccountId);
 
       setCreatedMention(mention);
@@ -1134,7 +1155,7 @@ export default function AddMentionPage() {
               />
             </div>
             {(lat && lng) && (
-              <div className="mt-1 space-y-0.5">
+              <div className="mt-1 space-y-1">
                 {isReverseGeocoding ? (
                   <p className="text-[10px] text-gray-400">Loading address...</p>
                 ) : fullAddress ? (
@@ -1143,6 +1164,86 @@ export default function AddMentionPage() {
                 <p className="text-[10px] text-gray-500">
                   Coordinates: {lat}, {lng}
                 </p>
+                
+                {/* Map Metadata Display */}
+                {mapMeta && !isReverseGeocoding && (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <div className="space-y-1.5">
+                      {mapMeta.context && Array.isArray(mapMeta.context) && (
+                        <>
+                          {mapMeta.context.find((c: any) => c.id?.startsWith('neighborhood')) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">Neighborhood:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.context.find((c: any) => c.id?.startsWith('neighborhood'))?.text}
+                              </span>
+                            </div>
+                          )}
+                          {mapMeta.context.find((c: any) => c.id?.startsWith('locality')) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">City:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.context.find((c: any) => c.id?.startsWith('locality'))?.text}
+                              </span>
+                            </div>
+                          )}
+                          {mapMeta.context.find((c: any) => c.id?.startsWith('district')) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">District:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.context.find((c: any) => c.id?.startsWith('district'))?.text}
+                              </span>
+                            </div>
+                          )}
+                          {mapMeta.context.find((c: any) => c.id?.startsWith('postcode')) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">ZIP:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.context.find((c: any) => c.id?.startsWith('postcode'))?.text}
+                              </span>
+                            </div>
+                          )}
+                          {mapMeta.context.find((c: any) => c.id?.startsWith('region')) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">State:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.context.find((c: any) => c.id?.startsWith('region'))?.text}
+                              </span>
+                            </div>
+                          )}
+                          {mapMeta.context.find((c: any) => c.id?.startsWith('country')) && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">Country:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.context.find((c: any) => c.id?.startsWith('country'))?.text}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {mapMeta.properties && (
+                        <>
+                          {mapMeta.properties.category && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">Category:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.properties.category}
+                              </span>
+                            </div>
+                          )}
+                          {mapMeta.properties.landmark && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400">Landmark:</span>
+                              <span className="text-[10px] text-gray-700 font-medium">
+                                {mapMeta.properties.landmark}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

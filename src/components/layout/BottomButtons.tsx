@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { CameraIcon, Cog6ToothIcon, ChartBarIcon, MapPinIcon, UserIcon, FolderIcon, XMarkIcon, HomeIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
-import { CameraIcon as CameraIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, ChartBarIcon as ChartBarIconSolid, MapPinIcon as MapPinIconSolid, UserIcon as UserIconSolid, FolderIcon as FolderIconSolid, HomeIcon as HomeIconSolid } from '@heroicons/react/24/solid';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { CameraIcon, Cog6ToothIcon, ChartBarIcon, MapPinIcon, UserIcon, XMarkIcon, HomeIcon, InformationCircleIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CameraIcon as CameraIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, ChartBarIcon as ChartBarIconSolid, MapPinIcon as MapPinIconSolid, UserIcon as UserIconSolid, HomeIcon as HomeIconSolid, MagnifyingGlassIcon as MagnifyingGlassIconSolid } from '@heroicons/react/24/solid';
 import Image from 'next/image';
 import { useAuthStateSafe } from '@/features/auth';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
+import { supabase } from '@/lib/supabase';
 
-export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'info' | null;
+export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'info' | 'search' | null;
 
 interface BottomButtonsProps {
   activeButton: BottomButtonType | null;
@@ -34,11 +36,15 @@ interface BottomButtonsProps {
  */
 export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen = false, modalState, openAccount, imagePreview, onRemoveImage }: BottomButtonsProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
+  const isLivePage = pathname === '/live';
   // Initialize with consistent defaults to avoid hydration mismatch
   const [useBlurStyle, setUseBlurStyle] = useState(false);
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>('streets');
   const [mounted, setMounted] = useState(false);
+  const [selectedMentionType, setSelectedMentionType] = useState<{ name: string; emoji: string } | null>(null);
 
   // Initialize client-side values after mount to avoid hydration mismatch
   useEffect(() => {
@@ -67,6 +73,53 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
     };
   }, []);
 
+  // Fetch selected mention type from URL parameters (only for single type selection)
+  useEffect(() => {
+    if (!isLivePage) {
+      setSelectedMentionType(null);
+      return;
+    }
+
+    const typeParam = searchParams.get('type');
+    const typesParam = searchParams.get('types');
+    
+    const fetchSelectedType = async () => {
+      // Only show "Add [Type]" for single type selection, not multiple
+      if (typesParam) {
+        // Multiple types selected - use default red plus
+        setSelectedMentionType(null);
+        return;
+      }
+      
+      if (typeParam) {
+        // Single type selected
+        const { data: allTypes } = await supabase
+          .from('mention_types')
+          .select('id, name, emoji')
+          .eq('is_active', true);
+        
+        if (allTypes) {
+          const matchingType = allTypes.find(type => {
+            const typeSlug = mentionTypeNameToSlug(type.name);
+            return typeSlug === typeParam;
+          });
+          
+          if (matchingType) {
+            setSelectedMentionType({ name: matchingType.name, emoji: matchingType.emoji });
+          } else {
+            setSelectedMentionType(null);
+          }
+        } else {
+          setSelectedMentionType(null);
+        }
+      } else {
+        setSelectedMentionType(null);
+      }
+    };
+
+    fetchSelectedType();
+  }, [searchParams, isLivePage]);
+
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
 
@@ -85,28 +138,59 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
     >
       <div className="flex items-center justify-between gap-2">
         {/* Container 1: Create Button (Left) */}
-        <button
-          onClick={() => onButtonClick('create')}
-          className={`w-14 h-14 rounded-full transition-all ${
-            activeButton === 'create'
-              ? useTransparentUI
-                ? 'bg-white/30 border-2 border-white/50 shadow-lg'
-                : 'bg-white border-2 border-gray-300 shadow-lg'
-              : useTransparentUI
-                ? 'bg-white/10 border-2 border-white/30 hover:bg-white/20 hover:border-white/40'
-                : 'bg-white border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-          }`}
-          aria-label="Create"
-        >
-          {activeButton === 'create' ? (
-            <CameraIconSolid className={`w-6 h-6 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
-          ) : (
-            <CameraIcon className={`w-6 h-6 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
-          )}
-        </button>
+        {isLivePage && selectedMentionType ? (
+          // Single mention type selected - show "Add [Type]" button
+          <button
+            onClick={() => {
+              router.push('/add');
+            }}
+            className={`px-4 h-14 rounded-full transition-all flex items-center gap-2 ${
+              useTransparentUI
+                ? 'bg-white/20 border-2 border-white/50 shadow-lg hover:bg-white/30'
+                : 'bg-white border-2 border-gray-300 shadow-lg hover:bg-gray-50'
+            }`}
+            aria-label={`Add ${selectedMentionType.name}`}
+          >
+            <span className="text-lg">{selectedMentionType.emoji}</span>
+            <span className={`text-sm font-semibold whitespace-nowrap ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+              Add {selectedMentionType.name}
+            </span>
+          </button>
+        ) : (
+          // Default red plus button (no type selected or multiple types)
+          <button
+            onClick={() => {
+              if (isLivePage) {
+                router.push('/add');
+              } else {
+                onButtonClick('create');
+              }
+            }}
+            className={`w-14 h-14 rounded-full transition-all ${
+              isLivePage
+                ? 'bg-red-600 border-0 hover:bg-red-700'
+                : activeButton === 'create'
+                ? useTransparentUI
+                  ? 'bg-white/30 border-2 border-white/50 shadow-lg'
+                  : 'bg-white border-2 border-gray-300 shadow-lg'
+                : useTransparentUI
+                  ? 'bg-white/10 border-2 border-white/30 hover:bg-white/20 hover:border-white/40'
+                  : 'bg-white border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+            }`}
+            aria-label={isLivePage ? "Add" : "Create"}
+          >
+            {isLivePage ? (
+              <PlusIcon className="w-6 h-6 text-white" />
+            ) : activeButton === 'create' ? (
+              <CameraIconSolid className={`w-6 h-6 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
+            ) : (
+              <CameraIcon className={`w-6 h-6 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
+            )}
+          </button>
+        )}
 
         {/* Container 2: Middle Buttons OR Image Preview */}
-        {account && (
+        {account && !(isLivePage && selectedMentionType) && (
           <>
             {imagePreview ? (
               <div className={`h-14 px-3 rounded-full flex items-center gap-3 transition-all ${
@@ -142,25 +226,27 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
                 )}
               </div>
             ) : (
-              <div className={`h-14 px-2 rounded-full flex items-center gap-1.5 transition-all ${
-                useTransparentUI
-                  ? 'bg-white/10 border-2 border-white/30'
-                  : 'bg-white border-2 border-gray-200'
-              }`}>
-                {/* Collections Button */}
+              <div 
+                data-middle-buttons-container
+                className={`h-14 px-2 rounded-full flex items-center gap-1.5 transition-all ${
+                  useTransparentUI
+                    ? 'bg-white/10 border-2 border-white/30'
+                    : 'bg-white border-2 border-gray-200'
+                }`}>
+                {/* Search/Filter Button */}
                 <button
-                  onClick={() => onButtonClick('collections')}
+                  onClick={() => onButtonClick('search')}
                   className={`w-8 h-8 rounded-full transition-colors ${
-                    activeButton === 'collections'
+                    activeButton === 'search'
                       ? useWhiteText ? 'bg-white/20' : 'bg-gray-100'
                       : 'hover:bg-gray-50/50'
                   }`}
-                  aria-label="Collections"
+                  aria-label="Filter by mention type"
                 >
-                  {activeButton === 'collections' ? (
-                    <FolderIconSolid className={`w-4 h-4 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
+                  {activeButton === 'search' ? (
+                    <MagnifyingGlassIconSolid className={`w-4 h-4 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
                   ) : (
-                    <FolderIcon className={`w-4 h-4 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
+                    <MagnifyingGlassIcon className={`w-4 h-4 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
                   )}
                 </button>
 

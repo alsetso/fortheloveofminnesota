@@ -6,6 +6,7 @@ import { useAuthStateSafe, AccountService, useAuth } from '@/features/auth';
 import { supabase } from '@/lib/supabase';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import confetti from 'canvas-confetti';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface OnboardingDemoProps {
   map: MapboxMapInstance | null;
@@ -34,6 +35,7 @@ function isOnboardingProfileComplete(account: any): boolean {
 export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) {
   const { account, refreshAccount } = useAuthStateSafe();
   const { user } = useAuth();
+  const { openWelcome } = useAppModalContextSafe();
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [username, setUsername] = useState('');
@@ -51,6 +53,11 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
   useEffect(() => {
     const handleShowOnboarding = () => {
       if (mapLoaded) {
+        // If user is not logged in, prompt them to sign in
+        if (!user) {
+          openWelcome();
+          return;
+        }
         setIsVisible(true);
         setCurrentStep(0); // Reset to first step
       }
@@ -60,7 +67,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
     return () => {
       window.removeEventListener('show-onboarding-demo', handleShowOnboarding);
     };
-  }, [mapLoaded]);
+  }, [mapLoaded, user, openWelcome]);
 
   // Initialize form fields when account changes
   useEffect(() => {

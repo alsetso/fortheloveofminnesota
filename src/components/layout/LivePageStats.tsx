@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MapPinIcon, EyeIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useAuth } from '@/features/auth';
 
 type TimeFilter = '24h' | '7d' | 'all';
 
@@ -20,6 +21,7 @@ interface Mention {
  * Also shows user's mentions with view counts filtered by time period
  */
 export default function LivePageStats() {
+  const { user } = useAuth();
   const [visitStats, setVisitStats] = useState<{ last24Hours: number; previous24Hours: number; total: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [mentions, setMentions] = useState<Mention[]>([]);
@@ -65,8 +67,14 @@ export default function LivePageStats() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch user's mentions when time filter changes
+  // Fetch user's mentions when time filter changes (only if authenticated)
   useEffect(() => {
+    if (!user) {
+      setMentions([]);
+      setMentionsLoading(false);
+      return;
+    }
+
     const fetchMentions = async () => {
       setMentionsLoading(true);
       try {
@@ -87,7 +95,7 @@ export default function LivePageStats() {
     };
 
     fetchMentions();
-  }, [timeFilter]);
+  }, [timeFilter, user]);
 
   if (loading && !visitStats) {
     return (
@@ -138,41 +146,49 @@ export default function LivePageStats() {
             <MapPinIcon className="w-4 h-4 text-gray-500" />
             <p className="text-xs font-semibold text-gray-900">Your Mentions</p>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setTimeFilter('24h')}
-              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                timeFilter === '24h'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              24h
-            </button>
-            <button
-              onClick={() => setTimeFilter('7d')}
-              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                timeFilter === '7d'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              7d
-            </button>
-            <button
-              onClick={() => setTimeFilter('all')}
-              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                timeFilter === 'all'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              All
-            </button>
-          </div>
+          {user && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setTimeFilter('24h')}
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                  timeFilter === '24h'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                24h
+              </button>
+              <button
+                onClick={() => setTimeFilter('7d')}
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                  timeFilter === '7d'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                7d
+              </button>
+              <button
+                onClick={() => setTimeFilter('all')}
+                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                  timeFilter === 'all'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+            </div>
+          )}
         </div>
 
-        {mentionsLoading ? (
+        {!user ? (
+          <div className="p-4 bg-gray-50 rounded-md border border-gray-200">
+            <p className="text-xs text-gray-600 text-center">
+              You need to sign in to see your mention analytics
+            </p>
+          </div>
+        ) : mentionsLoading ? (
           <div className="p-3 bg-gray-50 rounded-md">
             <p className="text-xs text-gray-500">Loading mentions...</p>
           </div>

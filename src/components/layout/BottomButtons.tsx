@@ -5,7 +5,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { CameraIcon, Cog6ToothIcon, ChartBarIcon, MapPinIcon, UserIcon, XMarkIcon, HomeIcon, InformationCircleIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { CameraIcon as CameraIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, ChartBarIcon as ChartBarIconSolid, MapPinIcon as MapPinIconSolid, UserIcon as UserIconSolid, HomeIcon as HomeIconSolid, MagnifyingGlassIcon as MagnifyingGlassIconSolid } from '@heroicons/react/24/solid';
 import Image from 'next/image';
-import { useAuthStateSafe } from '@/features/auth';
+import { useAuthStateSafe, useAuth } from '@/features/auth';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { supabase } from '@/lib/supabase';
 
@@ -39,6 +39,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
+  const { user } = useAuth();
   const isLivePage = pathname === '/live';
   // Initialize with consistent defaults to avoid hydration mismatch
   const [useBlurStyle, setUseBlurStyle] = useState(false);
@@ -190,7 +191,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
         )}
 
         {/* Container 2: Middle Buttons OR Image Preview */}
-        {account && !(isLivePage && selectedMentionType) && (
+        {!(isLivePage && selectedMentionType) && (
           <>
             {imagePreview ? (
               <div className={`h-14 px-3 rounded-full flex items-center gap-3 transition-all ${

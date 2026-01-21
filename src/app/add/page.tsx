@@ -80,9 +80,11 @@ export default function AddMentionPage() {
   const [showCollectionAccordion, setShowCollectionAccordion] = useState(false);
   const [showTagMenuDropdown, setShowTagMenuDropdown] = useState(false);
   const [isUpdatingTaggable, setIsUpdatingTaggable] = useState(false);
+  const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
   const tagInfoRef = useRef<HTMLDivElement>(null);
   const collectionInfoRef = useRef<HTMLDivElement>(null);
   const mediaInfoRef = useRef<HTMLDivElement>(null);
+  const mapMetaInfoRef = useRef<HTMLDivElement>(null);
   const tagButtonRef = useRef<HTMLButtonElement>(null);
   const mediaButtonRef = useRef<HTMLButtonElement>(null);
   const tagMenuDropdownRef = useRef<HTMLDivElement>(null);
@@ -607,14 +609,17 @@ export default function AddMentionPage() {
       if (tagMenuDropdownRef.current && !tagMenuDropdownRef.current.contains(event.target as Node)) {
         setShowTagMenuDropdown(false);
       }
+      if (mapMetaInfoRef.current && !mapMetaInfoRef.current.contains(event.target as Node)) {
+        setShowMapMetaInfo(false);
+      }
     };
 
-    if (showAccountDropdown || showTagInfo || showCollectionInfo || showMediaInfo || showTagMenuDropdown) {
+    if (showAccountDropdown || showTagInfo || showCollectionInfo || showMediaInfo || showTagMenuDropdown || showMapMetaInfo) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => document.removeEventListener('mousedown', handleClickOutside);
     }
     return undefined;
-  }, [showAccountDropdown, showTagInfo, showCollectionInfo, showMediaInfo]);
+  }, [showAccountDropdown, showTagInfo, showCollectionInfo, showMediaInfo, showTagMenuDropdown, showMapMetaInfo]);
 
   // Handle logout
   const handleLogout = async () => {
@@ -1165,85 +1170,165 @@ export default function AddMentionPage() {
                   Coordinates: {lat}, {lng}
                 </p>
                 
-                {/* Map Metadata Display */}
-                {mapMeta && !isReverseGeocoding && (
-                  <div className="mt-2 pt-2 border-t border-gray-100">
-                    <div className="space-y-1.5">
-                      {mapMeta.context && Array.isArray(mapMeta.context) && (
-                        <>
-                          {mapMeta.context.find((c: any) => c.id?.startsWith('neighborhood')) && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">Neighborhood:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.context.find((c: any) => c.id?.startsWith('neighborhood'))?.text}
-                              </span>
-                            </div>
-                          )}
-                          {mapMeta.context.find((c: any) => c.id?.startsWith('locality')) && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">City:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.context.find((c: any) => c.id?.startsWith('locality'))?.text}
-                              </span>
-                            </div>
-                          )}
-                          {mapMeta.context.find((c: any) => c.id?.startsWith('district')) && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">District:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.context.find((c: any) => c.id?.startsWith('district'))?.text}
-                              </span>
-                            </div>
-                          )}
-                          {mapMeta.context.find((c: any) => c.id?.startsWith('postcode')) && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">ZIP:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.context.find((c: any) => c.id?.startsWith('postcode'))?.text}
-                              </span>
-                            </div>
-                          )}
-                          {mapMeta.context.find((c: any) => c.id?.startsWith('region')) && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">State:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.context.find((c: any) => c.id?.startsWith('region'))?.text}
-                              </span>
-                            </div>
-                          )}
-                          {mapMeta.context.find((c: any) => c.id?.startsWith('country')) && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">Country:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.context.find((c: any) => c.id?.startsWith('country'))?.text}
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                      {mapMeta.properties && (
-                        <>
-                          {mapMeta.properties.category && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">Category:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.properties.category}
-                              </span>
-                            </div>
-                          )}
-                          {mapMeta.properties.landmark && (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400">Landmark:</span>
-                              <span className="text-[10px] text-gray-700 font-medium">
-                                {mapMeta.properties.landmark}
-                              </span>
-                            </div>
-                          )}
-                        </>
+                {/* Map Metadata Display - Similar to mention modal */}
+                {mapMeta && !isReverseGeocoding && (() => {
+                  const feature = mapMeta.feature;
+                  const placeType = feature?.place_type?.[0] || '';
+                  const text = feature?.text || mapMeta.text || '';
+                  const context = mapMeta.context || [];
+                  
+                  // Determine emoji based on place type
+                  let emoji = '📍';
+                  if (placeType === 'poi') {
+                    emoji = '🏢';
+                  } else if (placeType === 'address') {
+                    emoji = '🏠';
+                  } else if (placeType === 'neighborhood') {
+                    emoji = '🏘️';
+                  } else if (placeType === 'locality') {
+                    emoji = '🏙️';
+                  } else if (placeType === 'district') {
+                    emoji = '🏛️';
+                  } else if (placeType === 'postcode') {
+                    emoji = '📮';
+                  } else if (placeType === 'region') {
+                    emoji = '🗺️';
+                  } else if (placeType === 'country') {
+                    emoji = '🌍';
+                  }
+                  
+                  // Determine display name - prefer text, fallback to place_name
+                  let displayName = text || mapMeta.place_name?.split(',')[0] || 'Location';
+                  
+                  // Get category label if available
+                  let categoryLabel = null;
+                  if (context.length > 0) {
+                    const neighborhood = context.find((c: any) => c.id?.startsWith('neighborhood'));
+                    const locality = context.find((c: any) => c.id?.startsWith('locality'));
+                    const district = context.find((c: any) => c.id?.startsWith('district'));
+                    
+                    if (neighborhood) {
+                      categoryLabel = neighborhood.text;
+                    } else if (locality) {
+                      categoryLabel = locality.text;
+                    } else if (district) {
+                      categoryLabel = district.text;
+                    }
+                  }
+                  
+                  // Combine display name and category
+                  const singleLineLabel = categoryLabel && categoryLabel !== displayName
+                    ? `${displayName} • ${categoryLabel}`
+                    : displayName;
+                  
+                  return (
+                    <div className="relative mt-2">
+                      <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50 border-gray-200">
+                        {emoji && emoji !== '📍' && (
+                          <span className="text-xs flex-shrink-0">{emoji}</span>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold truncate text-gray-900">
+                            {singleLineLabel}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowMapMetaInfo(!showMapMetaInfo);
+                          }}
+                          className="flex-shrink-0 p-0.5 transition-colors text-gray-400 hover:text-gray-600"
+                          aria-label="Map metadata information"
+                        >
+                          <InformationCircleIcon className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      
+                      {/* Info Popup */}
+                      {showMapMetaInfo && (
+                        <div
+                          ref={mapMetaInfoRef}
+                          className="absolute top-full left-0 right-0 mt-1 z-50 border rounded-md shadow-lg p-2 bg-white border-gray-200"
+                        >
+                          <div className="space-y-1.5">
+                            {context && Array.isArray(context) && (
+                              <>
+                                {context.find((c: any) => c.id?.startsWith('neighborhood')) && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">Neighborhood:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {context.find((c: any) => c.id?.startsWith('neighborhood'))?.text}
+                                    </span>
+                                  </div>
+                                )}
+                                {context.find((c: any) => c.id?.startsWith('locality')) && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">City:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {context.find((c: any) => c.id?.startsWith('locality'))?.text}
+                                    </span>
+                                  </div>
+                                )}
+                                {context.find((c: any) => c.id?.startsWith('district')) && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">District:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {context.find((c: any) => c.id?.startsWith('district'))?.text}
+                                    </span>
+                                  </div>
+                                )}
+                                {context.find((c: any) => c.id?.startsWith('postcode')) && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">ZIP:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {context.find((c: any) => c.id?.startsWith('postcode'))?.text}
+                                    </span>
+                                  </div>
+                                )}
+                                {context.find((c: any) => c.id?.startsWith('region')) && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">State:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {context.find((c: any) => c.id?.startsWith('region'))?.text}
+                                    </span>
+                                  </div>
+                                )}
+                                {context.find((c: any) => c.id?.startsWith('country')) && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">Country:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {context.find((c: any) => c.id?.startsWith('country'))?.text}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {mapMeta.properties && (
+                              <>
+                                {mapMeta.properties.category && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">Category:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {mapMeta.properties.category}
+                                    </span>
+                                  </div>
+                                )}
+                                {mapMeta.properties.landmark && (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400">Landmark:</span>
+                                    <span className="text-[10px] text-gray-700 font-medium">
+                                      {mapMeta.properties.landmark}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>

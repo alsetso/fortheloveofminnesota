@@ -25,6 +25,7 @@ function isValidEmail(email: string): boolean {
 
 const HAS_VISITED_KEY = 'welcome_modal_has_visited';
 const HAS_ATTEMPTED_SIGNIN_KEY = 'welcome_modal_has_attempted_signin';
+const STORED_EMAIL_KEY = 'user_email';
 
 export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const router = useRouter();
@@ -80,18 +81,28 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Reset state when modal opens/closes
+  // Reset state when modal opens/closes and load stored email
   useEffect(() => {
     if (isOpen) {
       // Always show getting started screen when modal opens
       setShowGettingStarted(true);
       setAuthState('email');
-      setEmail('');
       setOtp('');
       setMessage('');
       setMessageType(null);
       setEmailError('');
-      setIsEmailValid(false);
+      
+      // Load stored email from localStorage
+      if (typeof window !== 'undefined') {
+        const storedEmail = localStorage.getItem(STORED_EMAIL_KEY);
+        if (storedEmail) {
+          setEmail(storedEmail);
+          setIsEmailValid(isValidEmail(storedEmail));
+        } else {
+          setEmail('');
+          setIsEmailValid(false);
+        }
+      }
     }
   }, [isOpen]);
   
@@ -271,7 +282,14 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     setAuthState('verifying');
 
     try {
-      await verifyOtp(email.trim().toLowerCase(), code, 'email');
+      const emailToVerify = email.trim().toLowerCase();
+      await verifyOtp(emailToVerify, code, 'email');
+      
+      // Store email in localStorage after successful verification
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORED_EMAIL_KEY, emailToVerify);
+      }
+      
       setAuthState('success');
       setMessage('Verification successful');
       setMessageType('success');

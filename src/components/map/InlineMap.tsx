@@ -356,10 +356,8 @@ export default function InlineMap({
 
   return (
     <div 
-      className={`relative w-full rounded-md border border-gray-200 overflow-hidden ${
-        fullscreen ? 'h-screen' : 'aspect-square'
-      }`} 
-      style={fullscreen ? { width: '100vw', height: '100vh' } : { minHeight: '300px' }}
+      className="relative w-full h-full rounded-md border border-gray-200 overflow-hidden"
+      style={fullscreen ? { width: '100vw', height: '100vh' } : undefined}
     >
       {/* Map Container */}
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" />

@@ -308,9 +308,42 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
     setAccount({
       ...initialAccount,
       search_visibility: initialAccount.search_visibility ?? false,
+      account_taggable: initialAccount.account_taggable ?? false,
     });
     setIsEditing(false);
     setUsernameAvailable(null);
+  };
+
+  const handleToggleSearchable = async () => {
+    if (isUpdatingSearchable) return;
+    setIsUpdatingSearchable(true);
+    try {
+      const newSearchable = !account.search_visibility;
+      await AccountService.updateCurrentAccount({ search_visibility: newSearchable }, account.id);
+      setAccount({ ...account, search_visibility: newSearchable });
+      success('Updated', newSearchable ? 'Profile is now searchable' : 'Profile is no longer searchable');
+    } catch (err) {
+      console.error('Error updating search visibility:', err);
+      showError('Error', 'Failed to update search visibility');
+    } finally {
+      setIsUpdatingSearchable(false);
+    }
+  };
+
+  const handleToggleTaggable = async () => {
+    if (isUpdatingTaggable) return;
+    setIsUpdatingTaggable(true);
+    try {
+      const newTaggable = !account.account_taggable;
+      await AccountService.updateCurrentAccount({ account_taggable: newTaggable }, account.id);
+      setAccount({ ...account, account_taggable: newTaggable });
+      success('Updated', newTaggable ? 'Tagging enabled' : 'Tagging disabled');
+    } catch (err) {
+      console.error('Error updating taggable setting:', err);
+      showError('Error', 'Failed to update tagging setting');
+    } finally {
+      setIsUpdatingTaggable(false);
+    }
   };
 
   const toggleTrait = (traitId: TraitId) => {

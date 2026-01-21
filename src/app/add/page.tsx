@@ -1169,7 +1169,103 @@ export default function AddMentionPage() {
                 <p className="text-[10px] text-gray-500">
                   Coordinates: {lat}, {lng}
                 </p>
-                
+              </div>
+            )}
+          </div>
+          {!showSuccessScreen && (
+            <form id="mention-form" onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <p className="text-xs text-red-600">{error}</p>
+                </div>
+              )}
+
+              {/* Description */}
+              <div className="pt-5">
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  maxLength={240}
+                  className="w-full px-0 py-2 text-[20px] font-bold bg-transparent border-0 focus:outline-none resize-none placeholder:text-gray-400"
+                  placeholder="Write a mention..."
+                  required
+                />
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-3 pt-3 border-t border-gray-100">
+                  {/* Icon Toolbar - Optional Icons */}
+                  <div className="flex items-center gap-2 sm:gap-1.5 flex-1">
+                    {/* Tag Users - Optional */}
+                    <div className="relative">
+                      <button
+                        ref={tagButtonRef}
+                        type="button"
+                        onClick={() => {
+                          if (!user) {
+                            openWelcome();
+                            return;
+                          }
+                          setShowTagModal(true);
+                        }}
+                        className="relative flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
+                        title={taggedAccounts.length > 0 ? `${taggedAccounts.length} user${taggedAccounts.length > 1 ? 's' : ''} tagged` : 'Tag users (optional)'}
+                      >
+                      <UserPlusIcon className={`w-4 h-4 sm:w-4 sm:h-4 transition-colors ${
+                        taggedAccounts.length > 0 ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
+                      }`} />
+                      {taggedAccounts.length > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-2 sm:h-2 bg-green-500 rounded-full border-2 border-white" />
+                      )}
+                      </button>
+                    </div>
+
+                    {/* Camera - Optional */}
+                    <div className="relative">
+                      <button
+                        ref={mediaButtonRef}
+                        type="button"
+                        onClick={() => {
+                          if (!user) {
+                            openWelcome();
+                            return;
+                          }
+                          if (mediaPreview) {
+                            // If media is already uploaded, show preview modal
+                            setShowMediaPreviewModal(true);
+                          } else {
+                            // If no media, show upload modal
+                            setError(null); // Clear any previous image errors
+                            setShowMediaModal(true);
+                          }
+                        }}
+                        className="relative flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
+                        title={mediaPreview ? (mediaType === 'video' ? 'View video' : 'View photo') : 'Add media (optional)'}
+                      >
+                      <CameraIcon className={`w-4 h-4 sm:w-4 sm:h-4 transition-colors ${
+                        mediaPreview ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
+                      }`} />
+                      {mediaPreview && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-2 sm:h-2 bg-green-500 rounded-full border-2 border-white" />
+                      )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Character Count */}
+                  <div className="flex items-center justify-end">
+                    <span className={`text-[10px] font-medium px-2.5 py-1.5 rounded-md ${
+                      description.length >= 240 
+                        ? 'text-red-600 bg-red-50 border border-red-200' 
+                        : description.length >= 200
+                        ? 'text-orange-600 bg-orange-50 border border-orange-200'
+                        : 'text-gray-500 bg-gray-50 border border-gray-200'
+                    }`}>
+                      {description.length}/240
+                    </span>
+                  </div>
+                </div>
+
                 {/* Map Metadata Display - Similar to mention modal */}
                 {mapMeta && !isReverseGeocoding && (() => {
                   const feature = mapMeta.feature;
@@ -1329,102 +1425,6 @@ export default function AddMentionPage() {
                     </div>
                   );
                 })()}
-              </div>
-            )}
-          </div>
-          {!showSuccessScreen && (
-            <form id="mention-form" onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                  <p className="text-xs text-red-600">{error}</p>
-                </div>
-              )}
-
-              {/* Description */}
-              <div className="pt-5">
-                <textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  maxLength={240}
-                  className="w-full px-0 py-2 text-[20px] font-bold bg-transparent border-0 focus:outline-none resize-none placeholder:text-gray-400"
-                  placeholder="Write a mention..."
-                  required
-                />
-
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-3 pt-3 border-t border-gray-100">
-                  {/* Icon Toolbar - Optional Icons */}
-                  <div className="flex items-center gap-2 sm:gap-1.5 flex-1">
-                    {/* Tag Users - Optional */}
-                    <div className="relative">
-                      <button
-                        ref={tagButtonRef}
-                        type="button"
-                        onClick={() => {
-                          if (!user) {
-                            openWelcome();
-                            return;
-                          }
-                          setShowTagModal(true);
-                        }}
-                        className="relative flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
-                        title={taggedAccounts.length > 0 ? `${taggedAccounts.length} user${taggedAccounts.length > 1 ? 's' : ''} tagged` : 'Tag users (optional)'}
-                      >
-                      <UserPlusIcon className={`w-4 h-4 sm:w-4 sm:h-4 transition-colors ${
-                        taggedAccounts.length > 0 ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
-                      }`} />
-                      {taggedAccounts.length > 0 && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-2 sm:h-2 bg-green-500 rounded-full border-2 border-white" />
-                      )}
-                      </button>
-                    </div>
-
-                    {/* Camera - Optional */}
-                    <div className="relative">
-                      <button
-                        ref={mediaButtonRef}
-                        type="button"
-                        onClick={() => {
-                          if (!user) {
-                            openWelcome();
-                            return;
-                          }
-                          if (mediaPreview) {
-                            // If media is already uploaded, show preview modal
-                            setShowMediaPreviewModal(true);
-                          } else {
-                            // If no media, show upload modal
-                            setError(null); // Clear any previous image errors
-                            setShowMediaModal(true);
-                          }
-                        }}
-                        className="relative flex items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
-                        title={mediaPreview ? (mediaType === 'video' ? 'View video' : 'View photo') : 'Add media (optional)'}
-                      >
-                      <CameraIcon className={`w-4 h-4 sm:w-4 sm:h-4 transition-colors ${
-                        mediaPreview ? 'text-gray-900' : 'text-gray-400 group-hover:text-gray-600'
-                      }`} />
-                      {mediaPreview && (
-                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-2 sm:h-2 bg-green-500 rounded-full border-2 border-white" />
-                      )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Character Count */}
-                  <div className="flex items-center justify-end">
-                    <span className={`text-[10px] font-medium px-2.5 py-1.5 rounded-md ${
-                      description.length >= 240 
-                        ? 'text-red-600 bg-red-50 border border-red-200' 
-                        : description.length >= 200
-                        ? 'text-orange-600 bg-orange-50 border border-orange-200'
-                        : 'text-gray-500 bg-gray-50 border border-gray-200'
-                    }`}>
-                      {description.length}/240
-                    </span>
-                  </div>
-                </div>
 
                 {/* Status Indicators */}
                 {(selectedTypeId || selectedCollectionId || taggedAccounts.length > 0 || mediaPreview) && (

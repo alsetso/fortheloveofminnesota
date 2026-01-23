@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
  * - Request size limit: 1MB
  * - Input validation with Zod
  * - Requires authentication
- * - Requires Pro plan
+ * - Requires Contributor plan
  */
 const createMapSchema = z.object({
   title: z.string().min(1).max(200),
@@ -206,7 +206,7 @@ export async function POST(request: NextRequest) {
 
         const accountData = account as { plan: string } | null;
         if (accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
-          return createErrorResponse('Map creation is only available for Pro subscribers. Upgrade to Pro to create maps.', 403);
+          return createErrorResponse('Map creation is only available for Contributor subscribers. Upgrade to Contributor to create maps.', 403);
         }
 
         // Validate custom_slug if provided (already validated in schema, but check uniqueness)

@@ -307,19 +307,19 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
         geoJSON.features.forEach((feature: any) => {
           const accountImageUrl = feature.properties.account_image_url;
           const accountPlan = feature.properties.account_plan;
-          const isPro = accountPlan === 'pro' || accountPlan === 'plus';
+          const isPro = accountPlan === 'contributor' || accountPlan === 'plus';
           
           if (accountImageUrl) {
-            const key = `${accountImageUrl}|${isPro ? 'pro' : 'regular'}`;
+            const key = `${accountImageUrl}|${isPro ? 'contributor' : 'regular'}`;
             if (!uniqueAccountImages.has(key)) {
               uniqueAccountImages.set(key, { imageUrl: accountImageUrl, isPro });
             }
           }
         });
         
-        // Load each unique account image (separate for pro vs non-pro)
+        // Load each unique account image (separate for contributor vs non-contributor)
         const imageLoadPromises = Array.from(uniqueAccountImages.entries()).map(async ([key, { imageUrl, isPro }]) => {
-          const imageId = `map-mention-account-${imageUrl.replace(/[^a-zA-Z0-9]/g, '_')}-${isPro ? 'pro' : 'regular'}`;
+          const imageId = `map-mention-account-${imageUrl.replace(/[^a-zA-Z0-9]/g, '_')}-${isPro ? 'contributor' : 'regular'}`;
           
           if (mapboxMap.hasImage(imageId)) {
             accountImageIds.set(key, imageId);
@@ -364,9 +364,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
                 ctx.shadowOffsetX = 0;
                 ctx.shadowOffsetY = 2;
                 
-                // Draw border circle - gold gradient for pro, white for regular
+                // Draw border circle - gold gradient for contributor, white for regular
                 if (isPro) {
-                  // Gold gradient border for pro accounts
+                  // Gold gradient border for contributor accounts
                   const gradient = ctx.createLinearGradient(0, 0, size, size);
                   gradient.addColorStop(0, '#fbbf24'); // yellow-400
                   gradient.addColorStop(0.5, '#f59e0b'); // yellow-500
@@ -426,7 +426,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
                 ctx.shadowOffsetY = 1;
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
-                ctx.strokeStyle = isPro ? '#f59e0b' : '#ffffff'; // Gold for pro, white for regular
+                ctx.strokeStyle = isPro ? '#f59e0b' : '#ffffff'; // Gold for contributor, white for regular
                 ctx.lineWidth = borderWidth;
                 ctx.stroke();
                 ctx.shadowColor = 'transparent';
@@ -459,20 +459,20 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
           iconExpression = ['case'];
           accountImageIds.forEach((imageId, key) => {
             const [imageUrl, planType] = key.split('|');
-            if (planType === 'pro') {
-              // Match pro or plus accounts with this image URL
+            if (planType === 'contributor') {
+              // Match contributor or plus accounts with this image URL
               iconExpression.push([
                 'all',
                 ['==', ['get', 'account_image_url'], imageUrl],
-                ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]
+                ['in', ['get', 'account_plan'], ['literal', ['contributor', 'plus']]]
               ]);
               iconExpression.push(imageId);
             } else {
-              // Match regular accounts (plan is null or not pro/plus) with this image URL
+              // Match regular accounts (plan is null or not contributor/plus) with this image URL
               iconExpression.push([
                 'all',
                 ['==', ['get', 'account_image_url'], imageUrl],
-                ['!', ['in', ['get', 'account_plan'], ['literal', ['pro', 'plus']]]]
+                ['!', ['in', ['get', 'account_plan'], ['literal', ['contributor', 'plus']]]]
               ]);
               iconExpression.push(imageId);
             }

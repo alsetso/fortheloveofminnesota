@@ -134,7 +134,7 @@ export function ToastContainer() {
           ))}
         </div>
       )}
-      {/* Pro toasts - bottom corner */}
+      {/* Contributor toasts - bottom corner */}
       {proToasts.length > 0 && (
         <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-xs">
           {proToasts.map((toast) => (

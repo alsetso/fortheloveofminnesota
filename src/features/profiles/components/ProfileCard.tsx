@@ -120,7 +120,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
         {!hideTopSection && (
           <div className="flex items-center gap-2">
             <div className={`relative w-14 h-14 rounded-full bg-gray-100 overflow-hidden group flex-shrink-0 ${
-              (account.plan === 'pro' || account.plan === 'plus')
+              (account.plan === 'contributor' || account.plan === 'plus')
                 ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                 : 'border border-gray-200'
             } ${!isOwnProfile && account.image_url ? 'cursor-pointer' : ''}`}>

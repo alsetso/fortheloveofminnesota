@@ -111,7 +111,7 @@ export default function ProfileCard({
           <div
             onClick={onProfileImageClick}
             className={`relative w-16 h-16 -mt-10 rounded-full overflow-hidden ${onProfileImageClick ? 'cursor-pointer group' : ''} border-4 ${
-              (account.plan === 'pro' || account.plan === 'plus')
+              (account.plan === 'contributor' || account.plan === 'plus')
                 ? 'border-yellow-500'
                 : darkMode
                   ? 'border-black'

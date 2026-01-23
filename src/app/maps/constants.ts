@@ -18,7 +18,7 @@ export const COMMUNITY_MAPS: Omit<MapItem, 'view_count'>[] = [
 
 /**
  * Hardcoded professional maps
- * These require Pro plan access
+ * These require Contributor plan access
  */
 export const PROFESSIONAL_MAPS: Omit<MapItem, 'view_count'>[] = [
   {

@@ -147,38 +147,38 @@ export default function LivePageStats() {
             <p className="text-xs font-semibold text-gray-900">Your Mentions</p>
           </div>
           {user && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setTimeFilter('24h')}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                  timeFilter === '24h'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                24h
-              </button>
-              <button
-                onClick={() => setTimeFilter('7d')}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                  timeFilter === '7d'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                7d
-              </button>
-              <button
-                onClick={() => setTimeFilter('all')}
-                className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
-                  timeFilter === 'all'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                All
-              </button>
-            </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setTimeFilter('24h')}
+              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                timeFilter === '24h'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              24h
+            </button>
+            <button
+              onClick={() => setTimeFilter('7d')}
+              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                timeFilter === '7d'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              7d
+            </button>
+            <button
+              onClick={() => setTimeFilter('all')}
+              className={`px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                timeFilter === 'all'
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All
+            </button>
+          </div>
           )}
         </div>
 

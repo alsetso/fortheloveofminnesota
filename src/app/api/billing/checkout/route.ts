@@ -128,10 +128,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get price ID from environment
-    const priceId = process.env.STRIPE_PRO_PRICE_ID;
+    const priceId = process.env.STRIPE_CONTRIBUTOR_PRICE_ID;
     if (!priceId) {
       return NextResponse.json(
-        { error: 'STRIPE_PRO_PRICE_ID environment variable is not configured' },
+        { error: 'STRIPE_CONTRIBUTOR_PRICE_ID environment variable is not configured' },
         { status: 500 }
       );
     }

@@ -723,23 +723,23 @@ export default function LandingPage() {
                   </p>
                 </div>
 
-                {/* All Time Card - Pro Only */}
+                {/* All Time Card - Contributor Only */}
                 <div className={`rounded-md border border-gray-200 p-6 flex flex-col gap-3 transition-colors ${
-                  (account?.plan === 'pro' || account?.plan === 'plus') 
+                  (account?.plan === 'contributor' || account?.plan === 'plus') 
                     ? 'bg-white hover:bg-gray-50' 
                     : 'bg-gray-50 opacity-75'
                 }`}>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-gray-900">All Time</h3>
-                    {(account?.plan !== 'pro' && account?.plan !== 'plus') && (
-                      <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded">Pro</span>
+                    {(account?.plan !== 'contributor' && account?.plan !== 'plus') && (
+                      <span className="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded">Contributor</span>
                     )}
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed">
-                    {(account?.plan === 'pro' || account?.plan === 'plus') ? (
+                    {(account?.plan === 'contributor' || account?.plan === 'plus') ? (
                       <>Your posts appear in the all-time feed. Access complete history of all mentions.</>
                     ) : (
-                      <>All-time view is available for Pro members. You can still view any user's all-time posts by visiting their profile.</>
+                      <>All-time view is available for Contributor members. You can still view any user's all-time posts by visiting their profile.</>
                     )}
                   </p>
                 </div>

@@ -75,7 +75,7 @@ const mainNavItems: NavItem[] = [
 
 export default function Sidebar({ account, map, onLocationSelect }: SidebarProps) {
   const pathname = usePathname();
-  const { openAccount, openWelcome, openUpgrade } = useAppModalContextSafe();
+  const { openAccount, openWelcome } = useAppModalContextSafe();
   const [clickedNavItem, setClickedNavItem] = useState<string | null>(null);
   const isHomepage = pathname === '/';
   

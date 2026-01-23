@@ -16,13 +16,12 @@ interface ProfileMapsContainerProps {
 
 // Helper to check if plan is pro
 const isProPlan = (plan: string | null | undefined): boolean => {
-  return plan === 'pro' || plan === 'plus';
+  return plan === 'contributor' || plan === 'plus';
 };
 
 export default function ProfileMapsContainer({ accountId, isOwnProfile, accountPlan }: ProfileMapsContainerProps) {
   const router = useRouter();
   const { account } = useAuthStateSafe();
-  const { openUpgrade } = useAppModalContextSafe();
   const [maps, setMaps] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,8 +85,8 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
     const currentUserIsPro = isProPlan(account?.plan);
     
     if (!currentUserIsPro) {
-      // Open upgrade modal if not pro
-      openUpgrade('Maps Creation');
+      // Redirect to billing if not pro
+      router.push('/billing');
       return;
     }
     
@@ -118,7 +117,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
             {isOwnProfile 
               ? (currentUserIsPro 
                   ? 'Create your first map to get started'
-                  : 'Create custom maps to organize your highlights, collections, memories, and favorite locations. Set privacy controls and build your own communities. Upgrade to Pro to get started.')
+                  : 'Create custom maps to organize your highlights, collections, memories, and favorite locations. Set privacy controls and build your own communities. Upgrade to Contributor to get started.')
               : 'This user hasn\'t created any maps yet'}
           </p>
           {isOwnProfile && (
@@ -136,7 +135,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
                 className="flex items-center gap-1.5 px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
               >
                 <PlusIcon className="w-3 h-3" />
-                Upgrade to Pro to Create Maps
+                Upgrade to Contributor to Create Maps
               </button>
             )
           )}

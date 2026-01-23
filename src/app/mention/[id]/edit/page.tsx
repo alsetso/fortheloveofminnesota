@@ -371,7 +371,7 @@ export default function EditMentionPage() {
           <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-900">Edit Mention</h1>
           {account && (
             <div className={`w-8 h-8 rounded-full overflow-hidden ${
-              (account.plan === 'pro' || account.plan === 'plus')
+              (account.plan === 'contributor' || account.plan === 'plus')
                 ? 'p-[1px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                 : 'border border-gray-200'
             }`}>
@@ -507,10 +507,10 @@ export default function EditMentionPage() {
               rows={6}
               className="w-full px-3 py-2 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 resize-none"
               placeholder="What makes this place special?"
-              maxLength={account?.plan === 'pro' || account?.plan === 'plus' ? 10000 : 240}
+              maxLength={account?.plan === 'contributor' || account?.plan === 'plus' ? 10000 : 240}
             />
             <div className="mt-1 text-[10px] text-gray-500 text-right">
-              {description.length} / {account?.plan === 'pro' || account?.plan === 'plus' ? 10000 : 240}
+              {description.length} / {account?.plan === 'contributor' || account?.plan === 'plus' ? 10000 : 240}
             </div>
           </div>
 

@@ -88,9 +88,9 @@ export async function createCheckoutSession(accountId: string): Promise<string> 
   const customerId = await ensureStripeCustomer(accountId);
 
   // Get price ID from environment
-  const priceId = process.env.STRIPE_PRO_PRICE_ID;
+  const priceId = process.env.STRIPE_CONTRIBUTOR_PRICE_ID;
   if (!priceId) {
-    throw new Error('STRIPE_PRO_PRICE_ID environment variable is not configured');
+    throw new Error('STRIPE_CONTRIBUTOR_PRICE_ID environment variable is not configured');
   }
 
   // Get base URL for success/cancel redirects
@@ -281,7 +281,7 @@ export async function syncStripeData(customerId: string): Promise<void> {
     paused: 'paused',
   };
 
-  const plan = 'pro'; // If they have a subscription, they're on pro plan
+  const plan = 'contributor'; // If they have a subscription, they're on contributor plan
   const billingMode = subscription.status === 'trialing' ? 'trial' : 'standard';
   const subscriptionStatus = statusMap[subscription.status] || subscription.status;
 

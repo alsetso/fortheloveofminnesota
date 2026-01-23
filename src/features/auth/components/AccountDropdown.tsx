@@ -266,7 +266,7 @@ export default function AccountDropdown({
                   )}
                   
                   {/* Create New Account Button - Only for admins or pro plan users */}
-                  {(account.role === 'admin' || account.plan === 'pro') && (
+                  {(account.role === 'admin' || account.plan === 'contributor') && (
                     <div className="border-t border-gray-200">
                       <button
                         onClick={() => {

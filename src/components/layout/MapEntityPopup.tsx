@@ -310,7 +310,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                 >
                   {/* Profile image */}
                   <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
-                    (data.account.plan === 'pro' || data.account.plan === 'plus')
+                    (data.account.plan === 'contributor' || data.account.plan === 'plus')
                       ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                       : 'border border-gray-200'
                   }`}>
@@ -345,7 +345,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                 <div className="flex items-center gap-2">
                   {/* Profile image */}
                   <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
-                    (data.account.plan === 'pro' || data.account.plan === 'plus')
+                    (data.account.plan === 'contributor' || data.account.plan === 'plus')
                       ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                       : 'border border-gray-200'
                   }`}>

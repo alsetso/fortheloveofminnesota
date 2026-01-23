@@ -290,7 +290,7 @@ export default function MapSettingsContent({
             </button>
             <button
               onClick={() => {
-                const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+                const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
                 if (!isPro && onUpgrade) {
                   onUpgrade('All Time Filter');
                   return;

@@ -24,7 +24,7 @@ export default function AddMentionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, account, activeAccountId, isLoading, signOut } = useAuthStateSafe();
-  const { openWelcome, openUpgrade } = useAppModalContextSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const { success, error: showError } = useToast();
   
   const [mentionTypes, setMentionTypes] = useState<MentionType[]>([]);
@@ -413,6 +413,18 @@ export default function AddMentionPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      return;
+    }
+
+    // Restrict videos to Contributor users only
+    const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
+    if (isVideo && !isPro) {
+      setError('Videos are a Contributor feature. Upgrade to Contributor to add videos to your mentions.');
+      setIsProcessingMedia(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      router.push('/billing');
       return;
     }
 
@@ -907,7 +919,7 @@ export default function AddMentionPage() {
                 type="button"
                 onClick={() => setShowAccountDropdown(!showAccountDropdown)}
                 className={`w-8 h-8 rounded-full overflow-hidden transition-all ${
-                  (account.plan === 'pro' || account.plan === 'plus')
+                  (account.plan === 'contributor' || account.plan === 'plus')
                     ? 'p-[1px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                     : 'border border-gray-200'
                 } ${showAccountDropdown ? 'ring-2 ring-gray-300' : ''}`}
@@ -963,7 +975,7 @@ export default function AddMentionPage() {
                     type="button"
                     onClick={() => {
                       setShowAccountDropdown(false);
-                      openUpgrade();
+                      router.push('/billing');
                     }}
                     className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                   >
@@ -1475,7 +1487,12 @@ export default function AddMentionPage() {
         </div>
 
         {/* Sticky Footer */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div 
+          className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[9999] shadow-lg" 
+          style={{ 
+            paddingBottom: 'env(safe-area-inset-bottom)'
+          }}
+        >
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
             <button
               type="button"
@@ -1881,7 +1898,7 @@ export default function AddMentionPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*"
+                accept={(account?.plan === 'contributor' || account?.plan === 'plus') ? "image/*,video/*" : "image/*"}
                 onChange={handleMediaSelect}
                 className="hidden"
                 disabled={isProcessingMedia || isUploadingMedia}

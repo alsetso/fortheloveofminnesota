@@ -290,7 +290,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
           <button
             onClick={() => onButtonClick('settings')}
             className={`w-14 h-14 rounded-full overflow-hidden transition-colors ${
-              (account.plan === 'pro' || account.plan === 'plus')
+              (account.plan === 'contributor' || account.plan === 'plus')
                 ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                 : useTransparentUI
                   ? 'bg-white/10 border-2 border-white/30 hover:bg-white/20 hover:border-white/40'

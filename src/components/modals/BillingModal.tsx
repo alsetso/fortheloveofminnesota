@@ -82,7 +82,7 @@ export default function BillingModal({
           {/* Title */}
           <div className="text-center">
             <h2 className="text-sm font-semibold text-gray-900 mb-1">
-              Upgrade to Pro
+              Upgrade to Contributor
             </h2>
           </div>
         </div>
@@ -92,7 +92,7 @@ export default function BillingModal({
           <div className="text-center space-y-3">
             {feature && (
               <div className="text-xs text-gray-600 bg-gray-50 rounded-md px-3 py-2 border border-gray-100">
-                <span className="font-medium text-gray-900">{feature}</span> requires a Pro subscription
+                <span className="font-medium text-gray-900">{feature}</span> requires a Contributor subscription
               </div>
             )}
             
@@ -178,7 +178,7 @@ export default function BillingModal({
           {/* Title */}
           <div className="text-center mb-3">
             <h2 className="text-sm font-semibold text-gray-900 mb-1">
-              Upgrade to Pro
+              Upgrade to Contributor
             </h2>
           </div>
 
@@ -186,13 +186,13 @@ export default function BillingModal({
           <div className="space-y-3">
             {feature && (
               <div className="text-xs text-gray-600 bg-gray-50 rounded-md px-3 py-2 border border-gray-100">
-                <span className="font-medium text-gray-900">{feature}</span> requires a Pro subscription
+                <span className="font-medium text-gray-900">{feature}</span> requires a Contributor subscription
               </div>
             )}
             
             <div className="text-center space-y-3">
               <p className="text-xs text-gray-600">
-                Email us to learn more about Pro features and pricing.
+                Email us to learn more about Contributor features and pricing.
               </p>
 
               <button

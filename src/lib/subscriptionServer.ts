@@ -36,7 +36,7 @@ export interface SubscriptionState {
  *   return <LimitedAccessView />;
  * }
  * 
- * if (subscriptionState.plan === 'pro') {
+ * if (subscriptionState.plan === 'contributor') {
  *   return <FullAccessView />;
  * }
  * ```
@@ -107,8 +107,8 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
     };
   }
 
-  // Normalize plan (ensure it's 'hobby', 'pro', or 'plus')
-  const plan: Plan = account.plan === 'plus' ? 'plus' : account.plan === 'pro' ? 'pro' : 'hobby';
+  // Normalize plan (ensure it's 'hobby', 'contributor', or 'plus')
+  const plan: Plan = account.plan === 'plus' ? 'plus' : account.plan === 'contributor' ? 'contributor' : 'hobby';
   
   // Normalize billing mode (ensure it's 'standard' or 'trial')
   const billingMode: BillingMode = account.billing_mode === 'trial' ? 'trial' : 'standard';
@@ -143,8 +143,8 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
 /**
  * Check if user has access to a feature based on plan
  * 
- * @param _requiredPlan - Minimum plan required ('hobby' or 'pro') - reserved for future use
- * @returns 'limited_access' for hobby plan, 'full_access' for pro plan, or null if not authenticated
+ * @param _requiredPlan - Minimum plan required ('hobby' or 'contributor') - reserved for future use
+ * @returns 'limited_access' for hobby plan, 'full_access' for contributor plan, or null if not authenticated
  */
 export async function getFeatureAccess(_requiredPlan: Plan = 'hobby'): Promise<'limited_access' | 'full_access' | null> {
   const state = await getAccountSubscriptionState();
@@ -157,7 +157,7 @@ export async function getFeatureAccess(_requiredPlan: Plan = 'hobby'): Promise<'
     return 'limited_access';
   }
   
-  if (state.plan === 'pro' || state.plan === 'plus') {
+  if (state.plan === 'contributor' || state.plan === 'plus') {
     return 'full_access';
   }
   
@@ -165,13 +165,13 @@ export async function getFeatureAccess(_requiredPlan: Plan = 'hobby'): Promise<'
 }
 
 /**
- * Check if user has pro plan access
+ * Check if user has contributor plan access
  * 
- * @returns true if user has pro plan and active subscription
+ * @returns true if user has contributor plan and active subscription
  */
 export async function hasProAccess(): Promise<boolean> {
   const state = await getAccountSubscriptionState();
-  return (state.plan === 'pro' || state.plan === 'plus') && (state.isActive || state.isComped);
+  return (state.plan === 'contributor' || state.plan === 'plus') && (state.isActive || state.isComped);
 }
 
 /**

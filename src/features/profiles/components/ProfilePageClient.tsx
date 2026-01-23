@@ -19,7 +19,7 @@ interface ProfilePageClientProps {
 
 // Helper to check if plan is pro
 const isProPlan = (plan: string | null | undefined): boolean => {
-  return plan === 'pro' || plan === 'plus';
+  return plan === 'contributor' || plan === 'plus';
 };
 
 export default function ProfilePageClient({

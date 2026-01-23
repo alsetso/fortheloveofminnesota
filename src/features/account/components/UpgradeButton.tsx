@@ -1,6 +1,6 @@
 'use client';
 
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 
 interface UpgradeButtonProps {
@@ -10,11 +10,11 @@ interface UpgradeButtonProps {
 }
 
 export default function UpgradeButton({ feature, className, children }: UpgradeButtonProps) {
-  const { openUpgrade } = useAppModalContextSafe();
+  const router = useRouter();
 
   return (
     <button
-      onClick={() => openUpgrade(feature)}
+      onClick={() => router.push('/billing')}
       className={className}
     >
       {children}

@@ -126,7 +126,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
-  const { openAccount, openUpgrade, openWelcome } = useAppModalContextSafe();
+  const { openAccount, openWelcome } = useAppModalContextSafe();
   const { info, pro: proToast } = useToast();
   const isIOSStandalone = useIOSStandalone();
   const [searchQuery, setSearchQuery] = useState('');
@@ -1002,9 +1002,9 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                                 <span className="text-xs font-medium text-gray-900 truncate">
                                   @{account!.username}
                                 </span>
-                                {(account!.plan === 'pro' || account!.plan === 'plus') && (
+                                {(account!.plan === 'contributor' || account!.plan === 'plus') && (
                                   <span className="text-[10px] font-semibold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-200 flex-shrink-0">
-                                    Pro
+                                    Contributor
                                   </span>
                                 )}
                               </div>
@@ -1370,7 +1370,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
             setTimeFilter(filter);
           }}
           account={account}
-          onUpgrade={(feature?: string) => openUpgrade(feature)}
+          onUpgrade={() => router.push('/billing')}
           onProToast={(feature?: string) => proToast(feature || '')}
           districtsState={districtsState}
           ctuState={ctuState}

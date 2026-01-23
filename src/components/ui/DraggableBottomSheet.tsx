@@ -22,6 +22,8 @@ interface DraggableBottomSheetProps {
   leftOffset?: string;
   contentClassName?: string;
   showCloseButton?: boolean;
+  showDragHandle?: boolean;
+  hideScrollbar?: boolean;
 }
 
 export default function DraggableBottomSheet({
@@ -43,6 +45,8 @@ export default function DraggableBottomSheet({
   leftOffset,
   contentClassName = 'p-4',
   showCloseButton = true,
+  showDragHandle = true,
+  hideScrollbar = false,
 }: DraggableBottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -381,9 +385,11 @@ export default function DraggableBottomSheet({
   }
 
   const sheetClasses = [
-    'fixed bottom-0 bg-white rounded-t-2xl shadow-2xl flex flex-col',
+    'fixed bottom-0 bg-white shadow-2xl flex flex-col',
     centered ? 'left-1/2' : leftOffset ? '' : 'left-0',
     centered ? '' : leftOffset ? '' : 'right-0',
+    // Apply rounded corners - use sheetClassName if provided, otherwise default to rounded-t-2xl
+    sheetClassName && sheetClassName.includes('rounded') ? '' : 'rounded-t-2xl',
     className,
     sheetClassName,
   ].filter(Boolean).join(' ');
@@ -407,19 +413,21 @@ export default function DraggableBottomSheet({
         style={sheetStyle}
       >
         {/* Drag Handle */}
-        <div
-          className="flex items-center justify-center pt-3 pb-2 flex-shrink-0"
-          onTouchStart={handleDragStart}
-          onMouseDown={handleDragStart}
-          style={{ 
-            cursor: isDraggingRef.current ? 'grabbing' : 'grab',
-            touchAction: 'none',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-          }}
-        >
-          <div className="w-12 h-1 bg-gray-300 rounded-full" />
-        </div>
+        {showDragHandle && (
+          <div
+            className="flex items-center justify-center pt-3 pb-2 flex-shrink-0"
+            onTouchStart={handleDragStart}
+            onMouseDown={handleDragStart}
+            style={{ 
+              cursor: isDraggingRef.current ? 'grabbing' : 'grab',
+              touchAction: 'none',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
+          >
+            <div className="w-12 h-1 bg-gray-300 rounded-full" />
+          </div>
+        )}
 
         {/* Header */}
         {(title || header) && (
@@ -439,13 +447,15 @@ export default function DraggableBottomSheet({
 
         {/* Content */}
         <div 
-          className="flex-1 overflow-y-auto overscroll-contain"
+          className={`flex-1 overflow-y-auto overscroll-contain ${
+            hideScrollbar ? '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]' : ''
+          }`}
           style={{
             touchAction: isDraggingRef.current ? 'none' : 'pan-y',
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          <div className={contentClassName}>
+          <div className={`${contentClassName} h-full`}>
             {children}
           </div>
         </div>

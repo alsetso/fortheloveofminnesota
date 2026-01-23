@@ -13,6 +13,9 @@ import {
   XMarkIcon,
   PencilIcon
 } from '@heroicons/react/24/outline';
+import DraggableBottomSheet from '@/components/ui/DraggableBottomSheet';
+import BusinessSetupForm from '@/features/upgrade/components/BusinessSetupForm';
+import GovernmentSetupForm from '@/features/upgrade/components/GovernmentSetupForm';
 import { AccountService } from '@/features/auth';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
@@ -32,7 +35,6 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   const { user, signOut } = useAuth();
   const { setActiveAccountId } = useAuthStateSafe();
   const { success, error: showError } = useToast();
-  const { openUpgrade } = useAppModalContextSafe();
   const [account, setAccount] = useState<ProfileAccount>({
     ...initialAccount,
     search_visibility: initialAccount.search_visibility ?? false,
@@ -55,6 +57,8 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [switchingAccount, setSwitchingAccount] = useState<string | null>(null);
   const [hasAdminAccount, setHasAdminAccount] = useState(false);
+  const [showBusinessModal, setShowBusinessModal] = useState(false);
+  const [showGovernmentModal, setShowGovernmentModal] = useState(false);
   const [checkingAdminStatus, setCheckingAdminStatus] = useState(true);
 
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -382,15 +386,15 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   };
 
   const handleManageBilling = () => {
-    openUpgrade();
+    router.push('/billing');
   };
 
   // Determine billing status
-  const isProUser = account.plan === 'pro' || account.plan === 'plus';
+  const isProUser = account.plan === 'contributor' || account.plan === 'plus';
   const isActive = account.subscription_status === 'active' || account.subscription_status === 'trialing';
   const isTrial = account.billing_mode === 'trial' || account.subscription_status === 'trialing';
-  const planDisplayName = account.plan === 'plus' ? 'Pro+' : account.plan === 'pro' ? 'Pro' : 'Hobby';
-  const planPrice = account.plan === 'plus' ? '$80/month' : account.plan === 'pro' ? '$20/month' : 'Free';
+  const planDisplayName = account.plan === 'plus' ? 'Pro+' : account.plan === 'contributor' ? 'Contributor' : 'Hobby';
+  const planPrice = account.plan === 'plus' ? '$80/month' : account.plan === 'contributor' ? '$20/month' : 'Free';
 
   // Get subscription status display
   const getStatusDisplay = () => {
@@ -629,7 +633,7 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
             {/* Profile Image */}
             <div className="flex items-start gap-3">
               <div className={`relative w-20 h-20 -mt-14 rounded-full bg-white overflow-hidden group flex-shrink-0 ${
-                (account.plan === 'pro' || account.plan === 'plus')
+                (account.plan === 'contributor' || account.plan === 'plus')
                   ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                   : 'border-4 border-white'
               }`}>
@@ -826,16 +830,60 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
                     : account.subscription_status === 'past_due'
                     ? 'Payment required'
                     : 'Subscription inactive'
-                  : 'Upgrade to unlock Pro features'
+                  : 'Upgrade to unlock Contributor features'
                 }
               </p>
             </div>
             <button
               onClick={handleManageBilling}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors flex-shrink-0"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex-shrink-0"
             >
               <CreditCardIcon className="w-3 h-3" />
               <span>{isProUser ? 'Manage' : 'Upgrade'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Business & Government Plans */}
+        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">Business & Government Plans</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Business Card */}
+            <button
+              onClick={() => setShowBusinessModal(true)}
+              className="p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-left"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <h4 className="text-xs font-semibold text-gray-900">Business</h4>
+                {account.plan === 'business' && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded-full">
+                    Current
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-gray-600 mb-2">
+                Connect your business with Minnesota. Verified profiles and statewide visibility.
+              </p>
+              <span className="text-[10px] font-medium text-gray-900">Set up →</span>
+            </button>
+
+            {/* Government Card */}
+            <button
+              onClick={() => setShowGovernmentModal(true)}
+              className="p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors text-left"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <h4 className="text-xs font-semibold text-gray-900">Government</h4>
+                {account.plan === 'gov' && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded-full">
+                    Current
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-gray-600 mb-2">
+                Help your residents love Minnesota more. Strategic initiatives and civic engagement tools.
+              </p>
+              <span className="text-[10px] font-medium text-gray-900">Set up →</span>
             </button>
           </div>
         </div>
@@ -917,6 +965,42 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
           </div>
         </div>
       )}
+
+      {/* Business Setup Modal */}
+      <DraggableBottomSheet
+        isOpen={showBusinessModal}
+        onClose={() => setShowBusinessModal(false)}
+        initialHeight={90}
+        snapPoints={[50, 90]}
+        showCloseButton={false}
+        showDragHandle={false}
+        hideScrollbar={true}
+        contentClassName="p-0"
+        sheetClassName="w-full max-w-[700px] rounded-t-2xl"
+        centered={true}
+      >
+        <BusinessSetupForm
+          onBack={() => setShowBusinessModal(false)}
+        />
+      </DraggableBottomSheet>
+
+      {/* Government Setup Modal */}
+      <DraggableBottomSheet
+        isOpen={showGovernmentModal}
+        onClose={() => setShowGovernmentModal(false)}
+        initialHeight={90}
+        snapPoints={[50, 90]}
+        showCloseButton={false}
+        showDragHandle={false}
+        hideScrollbar={true}
+        contentClassName="p-0"
+        sheetClassName="w-full max-w-[700px] rounded-t-2xl"
+        centered={true}
+      >
+        <GovernmentSetupForm
+          onBack={() => setShowGovernmentModal(false)}
+        />
+      </DraggableBottomSheet>
     </div>
   );
 }

@@ -142,7 +142,7 @@ export type AccountTrait =
   | 'trend-aware'
   | 'place-value-oriented';
 
-export type Plan = 'hobby' | 'pro' | 'plus';
+export type Plan = 'hobby' | 'contributor' | 'plus' | 'business' | 'gov';
 export type BillingMode = 'standard' | 'trial';
 
 export interface Account {

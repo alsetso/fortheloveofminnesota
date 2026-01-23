@@ -20,13 +20,13 @@ interface MapCardProps {
 
 export default function MapCard({ map, account: userAccount, isFeatured = false, isSmall = false, showVisibility = false, fullWidth = false }: MapCardProps) {
   const router = useRouter();
-  const { openUpgrade, openComingSoon } = useAppModalContextSafe();
+  const { openComingSoon } = useAppModalContextSafe();
   
   if (!map) return null;
   
   // Memoize canAccess to prevent recalculation
   const canAccess = useMemo(
-    () => !map.requiresPro || userAccount?.plan === 'pro' || userAccount?.plan === 'plus',
+    () => !map.requiresPro || userAccount?.plan === 'contributor' || userAccount?.plan === 'plus',
     [map.requiresPro, userAccount?.plan]
   );
 
@@ -81,10 +81,10 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
       return;
     }
 
-    // For professional maps without access, show upgrade modal
+    // For professional maps without access, redirect to billing
     if (map.requiresPro && !canAccess) {
       e.preventDefault();
-      openUpgrade('Professional Maps');
+      router.push('/billing');
       return;
     }
 
@@ -106,7 +106,7 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
     if (map.href && canAccess) {
       return; // Let Link handle navigation
     }
-  }, [isComingSoon, map.title, map.requiresPro, map.map_type, map.href, map.id, canAccess, openUpgrade, openComingSoon, router]);
+  }, [isComingSoon, map.title, map.requiresPro, map.map_type, map.href, map.id, canAccess, openComingSoon, router]);
 
   const content = (
     <div 
@@ -140,12 +140,12 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
                 unoptimized
               />
             )}
-            {/* Pro Locked Overlay - Only for professional maps without access */}
+            {/* Contributor Locked Overlay - Only for professional maps without access */}
             {map.requiresPro && !canAccess && (
               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-md">
                 <div className="flex flex-col items-center gap-1">
                   <LockClosedIcon className="w-5 h-5 text-white" />
-                  <span className="text-[9px] font-medium text-white">Pro</span>
+                  <span className="text-[9px] font-medium text-white">Contributor</span>
                 </div>
               </div>
             )}

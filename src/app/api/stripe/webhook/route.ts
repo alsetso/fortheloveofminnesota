@@ -46,7 +46,7 @@ async function updateAccountFromSubscription(
   }
 
   // Determine plan and billing mode
-  const plan = 'pro'; // If they have a subscription, they're on pro plan
+  const plan = 'contributor'; // If they have a subscription, they're on contributor plan
   const billingMode = subscription.status === 'trialing' ? 'trial' : 'standard';
   const subscriptionStatus = statusMap[subscription.status] || subscription.status;
 
@@ -186,12 +186,15 @@ export async function POST(request: NextRequest) {
             const session = event.data.object as Stripe.Checkout.Session;
             customerId = session.customer as string | null;
             
+            // Handle subscription checkout
             if (session.subscription) {
               const subId = typeof session.subscription === 'string' 
                 ? session.subscription 
                 : session.subscription.id;
               subscription = await stripe.subscriptions.retrieve(subId);
             }
+            // For one-time payments (mode: 'payment'), subscription will be null
+            // The event is still logged to stripe_events for tracking
             break;
           }
 

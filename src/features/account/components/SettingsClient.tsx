@@ -10,7 +10,6 @@ import type { SettingsClientProps } from '../types';
 export default function SettingsClient({ initialAccount, userEmail }: SettingsClientProps) {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { openUpgrade } = useAppModalContextSafe();
   const [account, setAccount] = useState<Account>(initialAccount);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
@@ -49,15 +48,15 @@ export default function SettingsClient({ initialAccount, userEmail }: SettingsCl
   };
 
   const handleManageBilling = () => {
-    openUpgrade();
+    router.push('/billing');
   };
 
   // Determine billing status
-  const isProUser = account.plan === 'pro' || account.plan === 'plus';
+  const isProUser = account.plan === 'contributor' || account.plan === 'plus';
   const isActive = account.subscription_status === 'active' || account.subscription_status === 'trialing';
   const isTrial = account.billing_mode === 'trial' || account.subscription_status === 'trialing';
-  const planDisplayName = account.plan === 'plus' ? 'Pro+' : account.plan === 'pro' ? 'Pro' : 'Hobby';
-  const planPrice = account.plan === 'plus' ? '$80/month' : account.plan === 'pro' ? '$20/month' : 'Free';
+  const planDisplayName = account.plan === 'plus' ? 'Pro+' : account.plan === 'contributor' ? 'Contributor' : 'Hobby';
+  const planPrice = account.plan === 'plus' ? '$80/month' : account.plan === 'contributor' ? '$20/month' : 'Free';
 
   // Get subscription status display
   const getStatusDisplay = () => {
@@ -100,7 +99,7 @@ export default function SettingsClient({ initialAccount, userEmail }: SettingsCl
                   : account.subscription_status === 'past_due'
                   ? 'Payment required'
                   : 'Subscription inactive'
-                : 'Upgrade to unlock Pro features'
+                : 'Upgrade to unlock Contributor features'
               }
             </p>
           </div>

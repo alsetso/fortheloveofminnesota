@@ -72,7 +72,7 @@
  * @throws {Error} If account is not found
  * @throws {Error} If Stripe customer creation fails
  * @throws {Error} If checkout session creation fails
- * @throws {Error} If STRIPE_PRO_PRICE_ID environment variable is not configured
+ * @throws {Error} If STRIPE_CONTRIBUTOR_PRICE_ID environment variable is not configured
  * 
  * @see {@link https://stripe.com/docs/api/checkout/sessions/create|Stripe Checkout Sessions API}
  * @see {@link https://stripe.com/docs/payments/checkout|Stripe Checkout Documentation}
@@ -94,7 +94,7 @@
  *    - Stores the customer ID in the accounts table
  * 
  * 3. **Checkout Session Creation**
- *    - Retrieves the price ID from STRIPE_PRO_PRICE_ID environment variable
+ *    - Retrieves the price ID from STRIPE_CONTRIBUTOR_PRICE_ID environment variable
  *    - Creates a Stripe Checkout Session in subscription mode
  *    - Configures success and cancel URLs
  *    - Sets up metadata for tracking
@@ -110,7 +110,7 @@
  * Environment Variables Required
  * 
  * - `STRIPE_SECRET_KEY` - Stripe secret key for API authentication
- * - `STRIPE_PRO_PRICE_ID` - Stripe price ID for the subscription product
+ * - `STRIPE_CONTRIBUTOR_PRICE_ID` - Stripe price ID for the subscription product
  * - `NEXT_PUBLIC_SITE_URL` or `NEXT_PUBLIC_APP_URL` - Base URL for redirect URLs (defaults to http://localhost:3000)
  * - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
  * - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key

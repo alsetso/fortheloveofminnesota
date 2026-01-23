@@ -55,7 +55,7 @@ function ProfileAvatar({
   isActive: boolean;
   useWhiteText?: boolean;
 }) {
-  const isPro = account?.plan === 'pro' || account?.plan === 'plus';
+  const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
   
   return (
     <div className={`w-5 h-5 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center ${

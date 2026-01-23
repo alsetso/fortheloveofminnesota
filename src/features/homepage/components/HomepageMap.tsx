@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -37,6 +37,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   // Track page view
   usePageView();
   const pathname = usePathname();
+  const router = useRouter();
   
   // Map state
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -50,7 +51,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
   
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { isModalOpen, openWelcome, openAccount, openUpgrade } = useAppModalContextSafe();
+  const { isModalOpen, openWelcome, openAccount } = useAppModalContextSafe();
   
   // URL-based state (only year filter)
   useUrlMapState();
@@ -249,7 +250,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           {/* Upgrade Button */}
           {account?.plan === 'hobby' && (
             <button
-              onClick={() => openUpgrade()}
+              onClick={() => router.push('/billing')}
               className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
             >
               Upgrade

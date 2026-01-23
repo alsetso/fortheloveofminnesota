@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -41,6 +41,7 @@ import ImageUploadDropzone from '@/components/layout/ImageUploadDropzone';
 export default function LiveMap() {
   // Track page view
   usePageView();
+  const router = useRouter();
   
   // Prevent body scrolling on mount/unmount
   useEffect(() => {
@@ -142,7 +143,7 @@ export default function LiveMap() {
   } = useLivePageModals();
   
   // Modal controls (modals rendered globally, but we need access to open functions)
-  const { openWelcome, closeModal, modal: appModal, openUpgrade } = useAppModalContextSafe();
+  const { openWelcome, closeModal, modal: appModal } = useAppModalContextSafe();
   const { pro: proToast } = useToast();
   
   // URL-based state (only year filter)
@@ -1608,7 +1609,7 @@ export default function LiveMap() {
               detail: { timeFilter: filter }
             }));
           }}
-          onUpgrade={(feature?: string) => openUpgrade(feature)}
+          onUpgrade={() => router.push('/billing')}
           onProToast={(feature?: string) => proToast(feature || '')}
           darkMode={true}
           districtsState={{

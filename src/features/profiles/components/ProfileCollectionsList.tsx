@@ -83,7 +83,7 @@ export default function ProfileCollectionsList({
 
       if (account) {
         const plan = (account as { plan: string | null }).plan || 'hobby';
-        setMaxCollections(plan === 'pro' ? 10 : 3);
+        setMaxCollections((plan === 'contributor' || plan === 'plus') ? null : 3); // null means unlimited for Contributor
       }
     } catch (err) {
       console.error('Error loading account plan:', err);
@@ -266,15 +266,15 @@ export default function ProfileCollectionsList({
             <div className="text-xs font-medium text-gray-900">Collection limit reached</div>
             <div className="text-[10px] text-gray-600">
               {maxCollections === 3 
-                ? 'Hobby plan allows 3 collections. Upgrade to Pro for 10 collections.'
-                : 'Pro plan allows 10 collections.'}
+                ? 'Hobby plan allows 3 collections. Upgrade to Contributor for unlimited collections.'
+                : 'Contributor plan allows unlimited collections.'}
             </div>
             {maxCollections === 3 && (
               <button
                 onClick={handleUpgrade}
                 className="w-full px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors"
               >
-                Upgrade to Pro
+                Upgrade to Contributor
               </button>
             )}
           </div>

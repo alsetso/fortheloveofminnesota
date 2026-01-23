@@ -51,12 +51,12 @@ export class CollectionService {
 
     // Determine limit based on plan
     const plan = (account as { plan: string | null }).plan || 'hobby';
-    const maxCollections = plan === 'pro' ? 10 : 3;
+    const isPro = plan === 'contributor' || plan === 'plus';
+    const maxCollections = isPro ? null : 3; // null means unlimited for Contributor
     const currentCount = count || 0;
 
-    if (currentCount >= maxCollections) {
-      const planName = plan === 'pro' ? 'Pro' : 'Hobby';
-      throw new Error(`${planName} plan allows up to ${maxCollections} collections. Upgrade to Pro for more.`);
+    if (maxCollections !== null && currentCount >= maxCollections) {
+      throw new Error(`Hobby plan allows up to ${maxCollections} collections. Upgrade to Contributor for unlimited collections.`);
     }
 
     const { data: collection, error } = await supabase

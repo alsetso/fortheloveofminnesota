@@ -34,7 +34,7 @@ export function useToast() {
   }, [toast]);
 
   const pro = useCallback((featureName: string) => {
-    return toast('pro', `Pro feature: ${featureName}`, undefined);
+    return toast('pro', `Contributor feature: ${featureName}`, undefined);
   }, [toast]);
 
   // API-specific toast methods

@@ -55,7 +55,7 @@ export default function TermsPage() {
             <h3 className="text-lg font-medium text-gray-900 mb-2">3.1 Available Plans</h3>
             <ul className="list-disc pl-6 space-y-2 mb-4">
               <li><strong>Hobby:</strong> Free basic access with limited features</li>
-              <li><strong>Pro:</strong> Paid subscription with access to all-time historical data and advanced features</li>
+              <li><strong>Contributor:</strong> Paid subscription with access to all-time historical data and advanced features</li>
               <li><strong>Plus:</strong> Premium subscription with additional capabilities</li>
             </ul>
 

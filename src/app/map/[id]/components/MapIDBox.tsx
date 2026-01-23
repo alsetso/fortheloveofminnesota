@@ -80,7 +80,7 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
   const { account: currentAccount } = useAuthStateSafe();
-  const { openUpgrade, openAccount, openWelcome } = useAppModalContextSafe();
+  const { openAccount, openWelcome } = useAppModalContextSafe();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [pinMode, setPinMode] = useState(false);
   const [showAreaDrawModal, setShowAreaDrawModal] = useState(false);
@@ -767,7 +767,7 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
         {/* Upgrade Button */}
         {currentAccount?.plan === 'hobby' && (
           <button
-            onClick={() => openUpgrade()}
+            onClick={() => router.push('/billing')}
             className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
           >
             Upgrade

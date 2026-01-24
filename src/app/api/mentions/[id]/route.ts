@@ -86,15 +86,16 @@ export async function GET(
     }
 
     // Transform to match frontend expectations
+    const mentionData = data as any;
     const mention = {
-      ...data,
-      account: data.accounts,
-      collection: data.collections,
+      ...mentionData,
+      account: mentionData.accounts,
+      collection: mentionData.collections,
     };
 
     // Cache headers (5 minutes for public mentions)
     const headers = new Headers();
-    if (data.visibility === 'public') {
+    if (mentionData.visibility === 'public') {
       headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     }
 

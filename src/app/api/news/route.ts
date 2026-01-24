@@ -62,7 +62,7 @@ const getCachedNews = cache(async (
   }
 
   // Transform authors from JSONB to array
-  const transformedArticles = (articles || []).map((article) => ({
+  const transformedArticles = (articles || []).map((article: any) => ({
     ...article,
     authors: Array.isArray(article.authors) ? article.authors : [],
     related_topics: Array.isArray(article.related_topics) ? article.related_topics : [],

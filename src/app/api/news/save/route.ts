@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Trigger article extraction using public wrapper function
-        const { data: extractResult, error: extractError } = await supabase.rpc(
+        const { data: extractResult, error: extractError } = await (supabase.rpc as any)(
           'extract_articles_from_prompt',
           { p_prompt_id: promptId }
         );

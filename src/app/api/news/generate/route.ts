@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
             .maybeSingle();
           
           if (adminAccount && !adminError) {
-            finalAccountId = adminAccount.id;
+            finalAccountId = (adminAccount as any).id;
           } else {
             return NextResponse.json(
               { error: 'Account not found. Please ensure you have an admin account.' },

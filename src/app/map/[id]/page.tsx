@@ -300,7 +300,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
         }}
         searchResultsComponent={<SearchResults />}
       >
-        <div className="relative h-full w-full">
+        <div className="relative h-full w-full" style={{ minHeight: 0, height: '100%', width: '100%' }}>
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50">
               <div className="text-center">

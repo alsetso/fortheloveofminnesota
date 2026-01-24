@@ -51,8 +51,13 @@ export default function MapPageLayout({
 }: MapPageLayoutProps) {
   return (
     <div className="relative w-full h-full flex">
-      {/* Mobile: Slide-up modals */}
-      <div className="lg:hidden">
+      {/* Mobile: Map container + Slide-up modals */}
+      <div className="lg:hidden w-full h-full relative">
+        {/* Mobile Map Container */}
+        <div className="absolute inset-0 w-full h-full">
+          {children}
+        </div>
+        
         <BottomButtonsPopup
           isOpen={isFilterOpen}
           onClose={onFilterToggle}
@@ -111,7 +116,7 @@ export default function MapPageLayout({
         </aside>
 
         {/* Center: Map */}
-        <main className="flex-1 min-w-0 relative">
+        <main className="flex-1 min-w-0 relative h-full">
           {children}
         </main>
 

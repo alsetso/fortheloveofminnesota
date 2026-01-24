@@ -1129,7 +1129,7 @@ export default function MapIDBox({
   }, [pinMode, showAreaDrawModal, mapInstance, mapLoaded]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" style={{ minHeight: 0, height: '100%', width: '100%' }}>
       {/* Map Info Card - Replaces all floating elements */}
       {mapLoaded && (
         <>
@@ -1181,8 +1181,20 @@ export default function MapIDBox({
 
       <div 
         ref={mapContainer} 
-        className="w-full h-full rounded-t-3xl overflow-hidden"
-        style={{ margin: 0, padding: 0 }}
+        className="absolute inset-0 w-full h-full rounded-t-3xl overflow-hidden"
+        style={{ 
+          margin: 0, 
+          padding: 0, 
+          minWidth: 0,
+          minHeight: 0,
+          width: '100%',
+          height: '100%',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        }}
       />
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">

@@ -297,7 +297,7 @@ export async function DELETE(
         const { error } = await supabase
           .from('group_members')
           .delete()
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', targetAccountId);
 
         if (error) {

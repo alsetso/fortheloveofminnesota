@@ -11,8 +11,10 @@ import { usePageView } from '@/hooks/usePageView';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui/hooks/useToast';
 import { useUrlMapState } from '../hooks/useUrlMapState';
-import MapTopContainer from '@/components/layout/MapTopContainer';
 import MapEntityPopup from '@/components/layout/MapEntityPopup';
+import { supabase } from '@/lib/supabase';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
+import { ArrowPathIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
 import CameraModal from '@/components/camera/CameraModal';
@@ -38,7 +40,11 @@ import LayerRecordPopup from '@/components/layout/LayerRecordPopup';
 import OnboardingDemo from '@/components/layout/OnboardingDemo';
 import ImageUploadDropzone from '@/components/layout/ImageUploadDropzone';
 
-export default function LiveMap() {
+interface LiveMapProps {
+  mapInstanceRef?: React.MutableRefObject<any>;
+}
+
+export default function LiveMap({ mapInstanceRef: externalMapInstanceRef }: LiveMapProps = {} as LiveMapProps) {
   // Track page view
   usePageView();
   const router = useRouter();
@@ -58,7 +64,8 @@ export default function LiveMap() {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
+  const internalMapInstanceRef = useRef<MapboxMapInstance | null>(null);
+  const mapInstanceRef = externalMapInstanceRef || internalMapInstanceRef;
   const [mentionsRefreshKey, setMentionsRefreshKey] = useState(0);
   const [isLoadingMentions, setIsLoadingMentions] = useState(false);
   const hoveredMentionIdRef = useRef<string | null>(null);
@@ -190,6 +197,113 @@ export default function LiveMap() {
   const [showDailyWelcome, setShowDailyWelcome] = useState(false);
   const [hideMicrophone, setHideMicrophone] = useState(true);
   const [showWelcomeTextOnly, setShowWelcomeTextOnly] = useState(true);
+  
+  // Mention type filters state
+  const [selectedMentionTypes, setSelectedMentionTypes] = useState<Array<{ id: string; name: string; emoji: string; slug: string }>>([]);
+  const [mentionsLayerHidden, setMentionsLayerHidden] = useState(false);
+  
+  // Fetch selected mention types from URL parameters
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    const typesParam = searchParams.get('types');
+    
+    const fetchSelectedTypes = async () => {
+      if (typesParam) {
+        const slugs = typesParam.split(',').map(s => s.trim());
+        const { data: allTypes } = await supabase
+          .from('mention_types')
+          .select('id, name, emoji')
+          .eq('is_active', true);
+        
+        if (allTypes) {
+          const selected = slugs
+            .map(slug => {
+              const matchingType = allTypes.find(type => {
+                const typeSlug = mentionTypeNameToSlug(type.name);
+                return typeSlug === slug;
+              });
+              return matchingType ? { ...matchingType, slug } : null;
+            })
+            .filter(Boolean) as Array<{ id: string; name: string; emoji: string; slug: string }>;
+          
+          setSelectedMentionTypes(selected);
+        } else {
+          setSelectedMentionTypes([]);
+        }
+      } else if (typeParam) {
+        const { data: allTypes } = await supabase
+          .from('mention_types')
+          .select('id, name, emoji')
+          .eq('is_active', true);
+        
+        if (allTypes) {
+          const matchingType = allTypes.find(type => {
+            const typeSlug = mentionTypeNameToSlug(type.name);
+            return typeSlug === typeParam;
+          });
+          
+          if (matchingType) {
+            setSelectedMentionTypes([{ ...matchingType, slug: typeParam }]);
+          } else {
+            setSelectedMentionTypes([]);
+          }
+        } else {
+          setSelectedMentionTypes([]);
+        }
+      } else {
+        setSelectedMentionTypes([]);
+      }
+    };
+
+    fetchSelectedTypes();
+  }, [searchParams]);
+  
+  // Remove a mention type filter
+  const handleRemoveType = (slugToRemove: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const typeParam = params.get('type');
+    const typesParam = params.get('types');
+    
+    if (typesParam) {
+      const slugs = typesParam.split(',').map(s => s.trim()).filter(s => s !== slugToRemove);
+      if (slugs.length === 0) {
+        params.delete('types');
+      } else if (slugs.length === 1) {
+        params.delete('types');
+        params.set('type', slugs[0]);
+      } else {
+        params.set('types', slugs.join(','));
+      }
+    } else if (typeParam && typeParam === slugToRemove) {
+      params.delete('type');
+    }
+    
+    router.push(`/live?${params.toString()}`);
+  };
+  
+  // Handle reload mentions button click
+  const handleReloadMentions = () => {
+    window.dispatchEvent(new CustomEvent('reload-mentions'));
+  };
+  
+  // Listen for mentions layer hidden event
+  useEffect(() => {
+    const handleMentionsHidden = () => {
+      setMentionsLayerHidden(true);
+    };
+
+    const handleMentionsReloaded = () => {
+      setMentionsLayerHidden(false);
+    };
+
+    window.addEventListener('mentions-layer-hidden', handleMentionsHidden);
+    window.addEventListener('mentions-reloaded', handleMentionsReloaded);
+
+    return () => {
+      window.removeEventListener('mentions-layer-hidden', handleMentionsHidden);
+      window.removeEventListener('mentions-reloaded', handleMentionsReloaded);
+    };
+  }, []);
 
   // Show welcome toast when page loads (for authenticated users)
   // Sequence: hide mic -> show welcome text only -> reshow mic
@@ -1265,95 +1379,70 @@ export default function LiveMap() {
   }, []);
 
   return (
-    <div className="liveMapScreenContainer h-screen w-screen overflow-hidden fixed inset-0">
-      <div 
-        className="fixed inset-0 w-full h-full overflow-hidden"
-        style={{ 
-          height: '100dvh', // Dynamic viewport height for mobile
-          width: '100vw',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-        }}
-      >
-      <div 
-        className="relative w-full h-full overflow-hidden flex"
-        style={{ 
-          height: '100%',
-          width: '100%',
-        }}
-      >
-        {/* Title Card */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-          <div className="bg-white rounded-md border border-gray-200 px-3 py-2 shadow-sm">
-            <h1 className="text-sm font-semibold text-gray-900">Live</h1>
-          </div>
-        </div>
-
+    <div 
+      className="relative w-full h-full overflow-hidden flex"
+    >
         {/* Map and other components - no sidebar */}
         <div className="flex-1 flex relative overflow-hidden">
-          {/* Map Top Container - Search and Categories */}
-          <MapTopContainer
-            showDailyWelcome={showDailyWelcome}
-            onCloseDailyWelcome={() => setShowDailyWelcome(false)}
-            useBlurStyle={useBlurStyle}
-            map={mapInstanceRef.current}
-            isLoadingMentions={isLoadingMentions}
-            onLocationSelect={(coordinates, placeName, mapboxMetadata) => {
-              if (mapInstanceRef.current && mapLoaded) {
-                mapInstanceRef.current.flyTo({
-                  center: [coordinates.lng, coordinates.lat],
-                  zoom: 15,
-                  duration: 1500,
-                });
-              }
-            }}
-            modalState={{
-              isAccountModalOpen,
-              openAccount,
-              openMapStyles,
-              openDynamicSearch,
-              closeAccount,
-              closeMapStyles,
-              closeDynamicSearch,
-              isModalOpen,
-            }}
-            districtsState={{
-              showDistricts,
-              setShowDistricts,
-            }}
-            ctuState={{
-              showCTU,
-              setShowCTU,
-            }}
-            stateBoundaryState={{
-              showStateBoundary,
-              setShowStateBoundary,
-            }}
-            countyBoundariesState={{
-              showCountyBoundaries,
-              setShowCountyBoundaries,
-            }}
-            hideMicrophone={hideMicrophone}
-          />
+          {/* Top Controls - Loading, Filters, Reload */}
+          <div className="absolute top-4 left-4 right-4 z-40 pointer-events-none">
+            <div className="pointer-events-auto space-y-2">
+              {/* Loading Mentions Indicator */}
+              {isLoadingMentions && (
+                <div className="rounded-lg shadow-lg px-3 py-2 flex items-center gap-2 bg-white border border-gray-200">
+                  <div className="w-4 h-4 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin flex-shrink-0" />
+                  <span className="text-xs font-medium text-gray-900">Loading mentions...</span>
+                </div>
+              )}
 
+              {/* Selected Mention Type Filters */}
+              {!isLoadingMentions && selectedMentionTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  {selectedMentionTypes.map((type) => (
+                    <div
+                      key={type.id}
+                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white border-gray-200 text-gray-700"
+                    >
+                      <span className="text-base flex-shrink-0">{type.emoji}</span>
+                      <span className="font-medium leading-none">{type.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRemoveType(type.slug);
+                        }}
+                        className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-gray-500"
+                        aria-label={`Remove ${type.name} filter`}
+                      >
+                        <XCircleIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Reload Mentions Button */}
+              {mentionsLayerHidden && currentMapStyle !== 'satellite' && (
+                <button
+                  onClick={handleReloadMentions}
+                  className="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 border-2 border-red-500 bg-white hover:bg-red-50 text-gray-900"
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  Reload mentions
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Mapbox Container */}
           <div 
             ref={mapContainer} 
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0"
             style={{ 
               margin: 0, 
               padding: 0, 
               overflow: 'hidden', 
               zIndex: 1,
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
             }}
           />
 
@@ -1438,7 +1527,6 @@ export default function LiveMap() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Camera Modal */}
       <CameraModal
@@ -1770,7 +1858,6 @@ export default function LiveMap() {
       {/* Visitor Stats */}
 
       {/* Modals handled globally via AppModalContext/GlobalModals */}
-      </div>
     </div>
   );
 }

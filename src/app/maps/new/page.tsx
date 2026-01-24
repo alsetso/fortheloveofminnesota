@@ -10,12 +10,16 @@ import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
+import PageWrapper from '@/components/layout/PageWrapper';
+import MapSearchInput from '@/components/layout/MapSearchInput';
+import SearchResults from '@/components/layout/SearchResults';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export default function NewMapPage() {
   const router = useRouter();
   const { account, user } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'private' | 'shared'>('private');
@@ -474,8 +478,24 @@ export default function NewMapPage() {
   return (
     <>
       <PageViewTracker />
-      <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3">
-        <div className="max-w-7xl mx-auto">
+      <PageWrapper
+        headerContent={null}
+        searchComponent={
+          <MapSearchInput
+            onLocationSelect={() => {
+              // Handle location selection if needed
+            }}
+          />
+        }
+        accountDropdownProps={{
+          onAccountClick: () => {
+            // Handle account click
+          },
+          onSignInClick: openWelcome,
+        }}
+        searchResultsComponent={<SearchResults />}
+      >
+        <div className="max-w-7xl mx-auto px-4 py-6 overflow-y-auto">
           <div className="flex flex-col lg:flex-row gap-3">
             {/* Left Side - Form Steps */}
             <div className="flex-1 lg:max-w-md w-full">
@@ -617,7 +637,7 @@ export default function NewMapPage() {
             </div>
           </div>
         </div>
-      </SimplePageLayout>
+      </PageWrapper>
     </>
   );
 }

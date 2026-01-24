@@ -16,10 +16,21 @@ export interface ProfilePin {
   lng: number;
   description: string | null;
   collection_id: string | null;
+  collection?: {
+    id: string;
+    emoji: string;
+    title: string;
+  } | null;
+  mention_type?: {
+    id: string;
+    emoji: string;
+    name: string;
+  } | null;
   visibility: PinVisibility;
   image_url?: string | null;
   video_url?: string | null;
   media_type?: 'image' | 'video' | 'none';
+  view_count?: number;
   likes_count?: number;
   is_liked?: boolean;
   created_at: string;

@@ -77,6 +77,12 @@ export class MentionService {
       query = query.eq('visibility', 'public');
     }
     
+    // Visibility filter - if explicitly requested, apply it
+    // This allows search results to show only public mentions even for authenticated users
+    if (filters?.visibility) {
+      query = query.eq('visibility', filters.visibility);
+    }
+    
     query = query.order('created_at', { ascending: false });
 
     if (filters?.account_id) {
@@ -96,8 +102,8 @@ export class MentionService {
     }
 
     // Time filter - filter by created_at (last 24 hours or 7 days)
-    // This is the default filter for initial load (7d) to improve performance
-    if (filters?.timeFilter) {
+    // 'all' means no time filter is applied
+    if (filters?.timeFilter && filters.timeFilter !== 'all') {
       const now = new Date();
       let cutoffDate: Date;
       

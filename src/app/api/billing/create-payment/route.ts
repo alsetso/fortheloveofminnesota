@@ -161,17 +161,23 @@ export async function POST(request: NextRequest) {
               });
 
             if (eventError) {
-              console.error('[create-payment] Failed to log to stripe_events:', eventError);
+              if (process.env.NODE_ENV === 'development') {
+                console.error('[create-payment] Failed to log to stripe_events:', eventError);
+              }
             } else {
-              console.log('[create-payment] Payment logged to stripe_events:', {
-                eventId,
-                accountId: account.id,
-                paymentIntentId: paymentIntent.id,
-                customerId,
-              });
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[create-payment] Payment logged to stripe_events:', {
+                  eventId,
+                  accountId: account.id,
+                  paymentIntentId: paymentIntent.id,
+                  customerId,
+                });
+              }
             }
           } catch (eventErr) {
-            console.error('[create-payment] Error logging to stripe_events:', eventErr);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('[create-payment] Error logging to stripe_events:', eventErr);
+            }
           }
         }
 
@@ -181,7 +187,12 @@ export async function POST(request: NextRequest) {
           requiresAction: false,
         });
       } catch (error: any) {
-        console.error('Error creating payment:', error);
+        // Always log errors, but don't expose sensitive details in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error creating payment:', error);
+        } else {
+          console.error('Error creating payment:', error.message || 'Unknown error');
+        }
         return NextResponse.json(
           { error: error.message || 'Failed to create payment' },
           { status: 500 }

@@ -10,7 +10,7 @@ export default function CommunityBanner() {
   const isAuthenticated = !!account;
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px] mb-3">
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
       <div className="flex items-start gap-2">
         <UsersIcon className="w-4 h-4 text-gray-600 flex-shrink-0 mt-0.5" />
         <div className="flex-1 space-y-1">

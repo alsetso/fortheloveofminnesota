@@ -101,7 +101,9 @@ export async function POST(request: NextRequest) {
             }
           } catch (error) {
             // Customer doesn't exist in Stripe, create new one
-            console.log('Customer not found in Stripe, creating new one');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Customer not found in Stripe, creating new one');
+            }
           }
         }
 
@@ -131,7 +133,12 @@ export async function POST(request: NextRequest) {
           customerId: customer.id,
         });
       } catch (error) {
-        console.error('Error ensuring customer:', error);
+        // Always log errors, but don't expose sensitive details in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error ensuring customer:', error);
+        } else {
+          console.error('Error ensuring customer:', error instanceof Error ? error.message : 'Unknown error');
+        }
         return NextResponse.json(
           { error: 'Failed to ensure customer' },
           { status: 500 }

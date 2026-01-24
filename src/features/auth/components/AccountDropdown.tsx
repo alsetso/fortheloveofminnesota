@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserIcon } from '@heroicons/react/24/outline';
+import { UserIcon, Cog6ToothIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -286,17 +286,39 @@ export default function AccountDropdown({
               )}
 
               {/* Sign In / Sign Out */}
-              <div>
+              <div className="border-t border-gray-200">
                 {account ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        openAccount('settings');
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                    >
+                      <Cog6ToothIcon className="w-4 h-4 text-gray-500" />
+                      Settings
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push('/billing');
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                    >
+                      <CreditCardIcon className="w-4 h-4 text-gray-500" />
+                      Billing
+                    </button>
                   <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-600"
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-red-600 border-t border-gray-100"
                   >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     Sign Out
                   </button>
+                  </>
                 ) : (
                   <button
                     onClick={handleSignIn}

@@ -52,7 +52,7 @@ export default function RecentEditsFeed({ limit = 50 }: RecentEditsFeedProps) {
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <p className="text-xs text-gray-600">Loading recent edits...</p>
       </div>
     );
@@ -60,7 +60,7 @@ export default function RecentEditsFeed({ limit = 50 }: RecentEditsFeedProps) {
 
   if (events.length === 0) {
     return (
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <p className="text-xs text-gray-500">No recent edits</p>
       </div>
     );
@@ -88,8 +88,8 @@ export default function RecentEditsFeed({ limit = 50 }: RecentEditsFeedProps) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
-      <h3 className="text-xs font-semibold text-gray-900">Recent Community Edits</h3>
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
+      <h3 className="text-sm font-semibold text-gray-900 mb-3">Recent Community Edits</h3>
       <div className="space-y-1.5">
         {events.map((event) => (
           <div

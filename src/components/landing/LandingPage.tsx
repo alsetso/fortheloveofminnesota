@@ -7,7 +7,6 @@ import { useAuthStateSafe, AccountService } from '@/features/auth';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { PaperAirplaneIcon, HeartIcon } from '@heroicons/react/24/solid';
-import { ChevronDownIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { useIOSStandalone } from '@/hooks/useIOSStandalone';
@@ -60,11 +59,8 @@ export default function LandingPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [loadingTypes, setLoadingTypes] = useState(true);
 
-  // Scroll tracking for white container overlay effect
+  // Scroll container ref for content area
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const whiteContentRef = useRef<HTMLDivElement>(null);
-  const [scrollProgress, setScrollProgress] = useState(0);
-  const [footerRevealed, setFooterRevealed] = useState(false);
 
   // Calculate if trending (volume + growth)
   const isTrending = useMemo(() => {
@@ -227,141 +223,66 @@ export default function LandingPage() {
     }
   };
 
-  // Track scroll position for white container overlay effect
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) return;
-
-    const handleScroll = () => {
-      const scrollTop = scrollContainer.scrollTop;
-      const scrollHeight = scrollContainer.scrollHeight;
-      const clientHeight = scrollContainer.clientHeight;
-      const maxScroll = scrollHeight - clientHeight;
-      
-      // Calculate progress (0 to 1) - when we reach bottom, progress = 1
-      const progress = maxScroll > 0 ? Math.min(scrollTop / maxScroll, 1) : 0;
-      
-      // Use hysteresis to prevent flickering: reveal at 0.85, hide at 0.80
-      setFooterRevealed(prev => {
-        if (progress >= 0.85) return true;
-        if (progress < 0.80) return false;
-        return prev; // Keep current state when between thresholds
-      });
-      
-      setScrollProgress(progress);
-    };
-
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-    return () => scrollContainer.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Viewport height constants
+  // Viewport height constants - 10vh header, 90vh content
   const HEADER_HEIGHT_VH = 10; // 10vh
-  const FOOTER_HEIGHT_VH = 10; // 10vh
-  const MAIN_CONTENT_HEIGHT_VH = 90; // 90vh initially
-  const MAIN_CONTENT_HEIGHT_WITH_FOOTER_VH = 80; // 80vh when footer is revealed
-
-  // Calculate header height in pixels for transform
-  const headerHeightPx = typeof window !== 'undefined' ? window.innerHeight * (HEADER_HEIGHT_VH / 100) : 130;
-
-  // Main content height based on footer visibility (using state with hysteresis to prevent flickering)
-  const mainContentHeight = footerRevealed 
-    ? MAIN_CONTENT_HEIGHT_WITH_FOOTER_VH 
-    : MAIN_CONTENT_HEIGHT_VH;
+  const CONTENT_HEIGHT_VH = 90; // 90vh
 
   return (
-    <div className="relative w-full overflow-x-hidden" style={{ maxWidth: '100vw' }}>
-      {/* Homepage Screen Container - 100vh fixed height */}
-      <div 
-        className="h-screen w-full flex flex-col overflow-hidden" 
+    <div className="relative w-full h-screen overflow-hidden bg-black" style={{ maxWidth: '100vw', height: '100vh' }}>
+      {/* Header - 50vh, black background */}
+      <header 
+        className="px-6 flex items-center justify-between flex-shrink-0 bg-black" 
         style={{ 
-          backgroundColor: '#000000', 
-          maxWidth: '100vw',
-          height: '100vh',
-          minHeight: '100vh',
-          maxHeight: '100vh'
+          height: `${HEADER_HEIGHT_VH}vh`,
+          minHeight: `${HEADER_HEIGHT_VH}vh`,
+          maxHeight: `${HEADER_HEIGHT_VH}vh`
         }}
       >
-        {/* Header - Sticky to top, 10vh */}
-        <header 
-          className="sticky top-0 z-10 px-6 flex items-end justify-between flex-shrink-0" 
-          style={{ 
-            backgroundColor: '#000000',
-            paddingTop: '20px',
-            paddingBottom: '20px',
-            height: `${HEADER_HEIGHT_VH}vh`,
-            minHeight: `${HEADER_HEIGHT_VH}vh`,
-            maxHeight: `${HEADER_HEIGHT_VH}vh`
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10">
-              <Image
-                src="/white-logo.png"
-                alt="For the Love of Minnesota"
-                fill
-                className="object-contain"
-                unoptimized
-              />
-            </div>
-            <span className="text-white font-semibold text-sm">For the Love of Minnesota</span>
+        <div className="flex items-center gap-3">
+          <div className="relative w-10 h-10">
+            <Image
+              src="/white-logo.png"
+              alt="For the Love of Minnesota"
+              fill
+              className="object-contain"
+              unoptimized
+            />
           </div>
-          <div className="flex items-center gap-3">
-            {user && account ? (
-              <button onClick={handleProfileClick} className="flex items-center justify-center">
-                <ProfilePhoto account={account} size="sm" />
-              </button>
-            ) : (
-              <button
-                onClick={handleGetStarted}
-                className="text-white text-sm font-medium hover:text-gray-300 transition-colors"
-              >
-                Sign In
-              </button>
-            )}
-          </div>
-        </header>
-
-        {/* Main Content Area - Sticky, 90vh initially, 80vh when footer revealed */}
-        <div 
-          className="relative overflow-visible flex-shrink-0" 
-          style={{ 
-            height: `${mainContentHeight}vh`,
-            minHeight: `${mainContentHeight}vh`,
-            maxHeight: `${mainContentHeight}vh`,
-            transition: 'height 0.2s ease-out',
-            backgroundColor: '#000000'
-          }}
-        >
-          {/* Wrapper Container - Rounded top corners, moves behind header on scroll */}
-          <div 
-            ref={whiteContentRef}
-            className="bg-white rounded-t-3xl rounded-b-3xl h-full overflow-hidden"
-            style={{
-              transform: `translateY(-${scrollProgress * headerHeightPx}px)`,
-              willChange: 'transform',
-              zIndex: 20,
-              position: 'relative',
-              backgroundColor: '#ffffff'
-            }}
-          >
-            {/* Scroll Container - Handles scrolling inside the wrapper */}
-            <div 
-              ref={scrollContainerRef}
-              className="h-full overflow-y-auto overflow-x-hidden scrollbar-hide rounded-t-3xl" 
-              style={{ 
-                backgroundColor: 'transparent'
-              }}
+          <span className="text-white font-semibold text-sm">For the Love of Minnesota</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {user && account ? (
+            <button onClick={handleProfileClick} className="flex items-center justify-center">
+              <ProfilePhoto account={account} size="sm" />
+            </button>
+          ) : (
+            <button
+              onClick={handleGetStarted}
+              className="text-white text-sm font-medium hover:text-gray-300 transition-colors"
             >
-              <div 
-                className="bg-white rounded-b-3xl"
-                style={{
-                  minHeight: '100%'
-                }}
-              >
-            {/* Hero Content Card - White background with rounded top corners */}
-            <div className="min-h-[calc(100vh-130px)] flex flex-col justify-end pb-0">
-              <div className="rounded-t-3xl flex flex-col items-center justify-center px-6 py-12 space-y-6">
+              Sign In
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Main Content Area - 50vh, white background, rounded top corners, scrollable */}
+      <div 
+        className="bg-white rounded-t-3xl flex-shrink-0 overflow-hidden"
+        style={{ 
+          height: `${CONTENT_HEIGHT_VH}vh`,
+          minHeight: `${CONTENT_HEIGHT_VH}vh`,
+          maxHeight: `${CONTENT_HEIGHT_VH}vh`
+        }}
+      >
+        {/* Scroll Container - Handles scrolling inside the content area */}
+        <div 
+          ref={scrollContainerRef}
+          className="h-full overflow-y-auto overflow-x-hidden scrollbar-hide"
+        >
+          <div className="bg-white">
+            {/* Hero Content */}
+            <div className="flex flex-col items-center justify-center px-6 py-12 space-y-6">
             {/* Main Heading */}
             <div className="text-center space-y-3 max-w-md">
               <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">
@@ -457,10 +378,6 @@ export default function LandingPage() {
               )}
             </div>
 
-            {/* Scroll Indicator */}
-            <div className="flex flex-col items-center justify-center mt-8 animate-bounce">
-              <ChevronDownIcon className="w-6 h-6 text-gray-400" />
-            </div>
           </div>
 
           {/* About Section - Horizontal scrolling iOS-style cards - Hidden if user is logged in */}
@@ -746,66 +663,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-              </div>
-            </div>
           </div>
-        </div>
-
-        {/* Footer - Sticky to bottom, 10vh, revealed after scrolling */}
-          <footer 
-            className="sticky bottom-0 z-10 bg-black text-white flex-shrink-0"
-            style={{
-              backgroundColor: '#000000',
-              height: `${FOOTER_HEIGHT_VH}vh`,
-              minHeight: `${FOOTER_HEIGHT_VH}vh`,
-              maxHeight: `${FOOTER_HEIGHT_VH}vh`,
-              width: '100vw',
-              left: 0,
-              right: 0,
-              margin: 0,
-              padding: 0,
-              opacity: footerRevealed ? Math.min((scrollProgress - 0.80) / 0.20, 1) : 0,
-              transition: 'opacity 0.2s ease-out',
-              pointerEvents: footerRevealed && scrollProgress > 0.9 ? 'auto' : 'none',
-              visibility: footerRevealed ? 'visible' : 'hidden'
-            }}
-          >
-          <div 
-            className="h-full flex items-center justify-center"
-            style={{
-              width: '100%',
-              margin: 0,
-              padding: 0
-            }}
-          >
-            <div 
-              className="flex items-center justify-center gap-4"
-              style={{
-                width: '100%',
-                fontSize: 'clamp(0.625rem, 1.5vw, 0.875rem)',
-                margin: 0,
-                padding: 0,
-                lineHeight: '1'
-              }}
-            >
-              <Link
-                href="/contact"
-                className="text-gray-400 hover:text-white transition-colors flex items-center"
-                style={{ lineHeight: '1' }}
-              >
-                Contact
-              </Link>
-              <span className="text-gray-600 flex items-center" style={{ lineHeight: '1' }}>•</span>
-              <a
-                href="mailto:loveofminnesota@gmail.com"
-                className="text-gray-400 hover:text-white transition-colors flex items-center"
-                style={{ lineHeight: '1' }}
-              >
-                loveofminnesota@gmail.com
-              </a>
-            </div>
-          </div>
-        </footer>
         </div>
       </div>
 

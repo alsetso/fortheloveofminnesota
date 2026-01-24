@@ -1,10 +1,13 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
-import ProfilePageMapView from '@/features/profiles/components/ProfilePageMapView';
+import ProfileLayout from '@/features/profiles/components/ProfileLayout';
 import { Metadata } from 'next';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
+import ProfileMentionsList from '@/features/profiles/components/ProfileMentionsList';
+import Link from 'next/link';
+import { MapIcon } from '@heroicons/react/24/outline';
 
 export const dynamic = 'force-dynamic';
 
@@ -117,7 +120,32 @@ export default async function ProfilePage({ params }: Props) {
   // For visitors, only show public mentions; for owners, show all non-archived mentions
   let mentionsQuery = supabase
     .from('mentions')
-    .select('id, lat, lng, description, visibility, city_id, collection_id, image_url, video_url, media_type, created_at, updated_at')
+    .select(`
+      id, 
+      lat, 
+      lng, 
+      description, 
+      visibility, 
+      city_id, 
+      collection_id, 
+      mention_type_id,
+      image_url, 
+      video_url, 
+      media_type, 
+      view_count,
+      created_at, 
+      updated_at,
+      collections (
+        id,
+        emoji,
+        title
+      ),
+      mention_type:mention_types (
+        id,
+        emoji,
+        name
+      )
+    `)
     .eq('account_id', accountData.id)
     .eq('archived', false)
     .order('created_at', { ascending: false });
@@ -129,29 +157,46 @@ export default async function ProfilePage({ params }: Props) {
 
   const { data: mentionsData } = await mentionsQuery;
 
-  const mentions: ProfilePin[] = (mentionsData || []).map((mention: {
-    id: string;
-    lat: number;
-    lng: number;
-    description: string | null;
-    visibility: 'public' | 'only_me';
-    city_id: string | null;
-    collection_id: string | null;
-    image_url: string | null;
-    video_url: string | null;
-    media_type: 'image' | 'video' | 'none' | null;
-    created_at: string;
-    updated_at: string;
-  }) => ({
+  // Fetch likes counts for all mentions
+  const mentionIds = (mentionsData || []).map((m: any) => m.id);
+  let likesCounts = new Map<string, number>();
+  
+  if (mentionIds.length > 0) {
+    const { data: likesData } = await supabase
+      .from('mentions_likes')
+      .select('mention_id')
+      .in('mention_id', mentionIds);
+    
+    if (likesData) {
+      likesData.forEach((like: { mention_id: string }) => {
+        const current = likesCounts.get(like.mention_id) || 0;
+        likesCounts.set(like.mention_id, current + 1);
+      });
+    }
+  }
+
+  const mentions: ProfilePin[] = (mentionsData || []).map((mention: any) => ({
     id: mention.id,
     lat: mention.lat,
     lng: mention.lng,
     description: mention.description,
     collection_id: mention.collection_id,
+    collection: mention.collections ? {
+      id: mention.collections.id,
+      emoji: mention.collections.emoji,
+      title: mention.collections.title,
+    } : null,
+    mention_type: mention.mention_type ? {
+      id: mention.mention_type.id,
+      emoji: mention.mention_type.emoji,
+      name: mention.mention_type.name,
+    } : null,
     visibility: mention.visibility || 'public',
     image_url: mention.image_url || null,
     video_url: mention.video_url || null,
     media_type: mention.media_type || 'none',
+    view_count: mention.view_count || 0,
+    likes_count: likesCounts.get(mention.id) || 0,
     created_at: mention.created_at,
     updated_at: mention.updated_at,
   }));
@@ -177,12 +222,33 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <>
       <PageViewTracker page_url={`/profile/${slug}`} />
-      <ProfilePageMapView
-        account={profileAccountData}
-        pins={mentions}
-        collections={collections}
-        isOwnProfile={isOwnProfile}
-      />
+      <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile}>
+        {/* Main Content Area */}
+        <div className="space-y-6">
+          {/* Profile Header - Inline */}
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+            <Link
+              href={`/profile/${slug}/map`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              <MapIcon className="w-5 h-5" />
+              View Map
+            </Link>
+          </div>
+
+          {/* Mentions List Section */}
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Mentions</h2>
+            </div>
+            <ProfileMentionsList
+              pins={mentions}
+              isOwnProfile={isOwnProfile}
+            />
+          </div>
+        </div>
+      </ProfileLayout>
     </>
   );
 }

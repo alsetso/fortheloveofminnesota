@@ -1,45 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClientWithAuth } from '@/lib/supabaseServer';
+import { cookies } from 'next/headers';
 
 /**
  * Check if a plan has a price ID configured
  * 
- * GET /api/billing/check-price-id?plan={plan}
+ * GET /api/billing/check-price-id?plan={plan}&period={monthly|yearly}
  * 
- * Returns whether the plan has a Stripe price ID configured
+ * Returns whether the plan has a Stripe price ID configured in the database
  */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const plan = searchParams.get('plan');
+    const planSlug = searchParams.get('plan');
+    const period = searchParams.get('period') || 'monthly'; // Default to monthly
 
-    if (!plan) {
+    if (!planSlug) {
       return NextResponse.json(
         { error: 'Plan parameter is required' },
         { status: 400 }
       );
     }
 
-    // Check for price ID based on plan type
-    let hasPriceId = false;
-    switch (plan) {
-      case 'contributor':
-        hasPriceId = !!process.env.STRIPE_CONTRIBUTOR_PRICE_ID;
-        break;
-      case 'business':
-        hasPriceId = !!process.env.STRIPE_BUSINESS_PRICE_ID;
-        break;
-      case 'government':
-        hasPriceId = !!process.env.STRIPE_GOVERNMENT_PRICE_ID;
-        break;
-      case 'credits':
-        hasPriceId = !!(process.env.STRIPE_CREDITS_PRICE_ID || 'price_1Ss5F5RxPcmTLDu9ygiUQpKw');
-        break;
-      default:
-        hasPriceId = false;
+    // Special case for credits (still uses env var as fallback)
+    if (planSlug === 'credits') {
+      const hasPriceId = !!(process.env.STRIPE_CREDITS_PRICE_ID || 'price_1Ss5F5RxPcmTLDu9ygiUQpKw');
+      return NextResponse.json({
+        plan: planSlug,
+        hasPriceId,
+      });
     }
 
+    // Fetch plan from database
+    const supabase = await createServerClientWithAuth(cookies());
+    const { data: plan, error: planError } = await supabase
+      .from('billing_plans')
+      .select('stripe_price_id_monthly, stripe_price_id_yearly')
+      .eq('slug', planSlug)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (planError || !plan) {
+      return NextResponse.json({
+        plan: planSlug,
+        hasPriceId: false,
+      });
+    }
+
+    // Check if the requested period has a price ID
+    const hasPriceId = period === 'yearly'
+      ? !!plan.stripe_price_id_yearly
+      : !!plan.stripe_price_id_monthly;
+
     return NextResponse.json({
-      plan,
+      plan: planSlug,
+      period,
       hasPriceId,
     });
   } catch (error) {

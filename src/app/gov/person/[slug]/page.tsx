@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import Link from 'next/link';
 import { getCivicPersonBySlug } from '@/features/civic/services/civicService';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
@@ -9,6 +8,7 @@ import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
+import PersonPageWrapper from './PersonPageWrapper';
 
 export const revalidate = 3600;
 
@@ -98,7 +98,7 @@ export default async function PersonPage({ params }: Props) {
   });
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3">
+    <PersonPageWrapper>
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
@@ -237,7 +237,7 @@ export default async function PersonPage({ params }: Props) {
           />
         </div>
       </div>
-    </SimplePageLayout>
+    </PersonPageWrapper>
   );
 }
 

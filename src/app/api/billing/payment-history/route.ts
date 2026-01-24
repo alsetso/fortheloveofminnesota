@@ -156,14 +156,24 @@ export async function GET(request: NextRequest) {
             raw: rawData,
           });
         } catch (stripeError: any) {
-          console.error('Error fetching payment history from Stripe:', stripeError);
+          // Always log errors, but don't expose sensitive details in production
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Error fetching payment history from Stripe:', stripeError);
+          } else {
+            console.error('Error fetching payment history from Stripe:', stripeError.message || 'Unknown error');
+          }
           return NextResponse.json(
             { error: stripeError.message || 'Failed to fetch payment history from Stripe' },
             { status: 500 }
           );
         }
       } catch (error) {
-        console.error('Error fetching payment history:', error);
+        // Always log errors, but don't expose sensitive details in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error fetching payment history:', error);
+        } else {
+          console.error('Error fetching payment history:', error instanceof Error ? error.message : 'Unknown error');
+        }
         return NextResponse.json(
           { error: error instanceof Error ? error.message : 'Failed to fetch payment history' },
           { status: 500 }

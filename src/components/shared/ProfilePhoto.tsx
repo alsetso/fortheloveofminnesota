@@ -126,7 +126,10 @@ export default function ProfilePhoto({
     }
   };
 
-  const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
+  const isPro = account?.plan === 'contributor' || 
+                account?.plan === 'plus' || 
+                account?.plan === 'professional' || 
+                account?.plan === 'business';
 
   return (
     <div className={`relative ${className}`}>

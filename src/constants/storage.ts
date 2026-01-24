@@ -4,6 +4,9 @@
 
 export const STORAGE_BUCKETS = {
   GOV_PEOPLE: 'gov-people-storage',
+  GROUP_IMAGES: 'group-images',
+  PROFILE_IMAGES: 'profile-images',
+  COVER_PHOTOS: 'cover-photos',
 } as const;
 
 export const STORAGE_CONFIG = {

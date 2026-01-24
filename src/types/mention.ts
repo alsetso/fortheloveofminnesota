@@ -77,7 +77,8 @@ export interface MentionFilters {
   mention_type_id?: string; // Filter by mention type ID (single)
   mention_type_ids?: string[]; // Filter by mention type IDs (multiple)
   year?: number; // Filter by year of post_date
-  timeFilter?: '24h' | '7d'; // Filter by time: last 24 hours or 7 days
+  timeFilter?: '24h' | '7d' | 'all'; // Filter by time: last 24 hours, 7 days, or all
+  visibility?: MentionVisibility; // Filter by visibility: 'public' or 'only_me'
   bbox?: {
     minLat: number;
     maxLat: number;

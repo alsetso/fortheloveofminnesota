@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
-import { createServiceClient } from '@/lib/supabaseServer';
+import { createServiceClient, createServerClientWithAuth } from '@/lib/supabaseServer';
 import { stripe } from '@/lib/stripe';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 
@@ -126,12 +126,13 @@ export async function POST(request: NextRequest) {
               }
               customerId = null;
             } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[checkout-promo] Customer verified in Stripe:', {
-                  customerId: customer.id,
-                  email: customer.email,
-                });
-              }
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[checkout-promo] Customer verified in Stripe:', {
+                customerId: customer.id,
+                // Email only logged in development for debugging
+                email: customer.email,
+              });
+            }
             }
           } catch (error) {
             // Customer doesn't exist in Stripe, need to create new one
@@ -164,6 +165,7 @@ export async function POST(request: NextRequest) {
             if (process.env.NODE_ENV === 'development') {
               console.log('[checkout-promo] Stripe customer created:', {
                 customerId: customer.id,
+                // Email only logged in development for debugging
                 email: customer.email,
               });
             }
@@ -236,12 +238,40 @@ export async function POST(request: NextRequest) {
 
         // At this point, customerId is guaranteed to exist and be saved in Supabase
 
-        // Get price ID from environment
-        const priceId = process.env.STRIPE_CONTRIBUTOR_PRICE_ID;
+        // Get plan and billing period from request body
+        const body = await req.json().catch(() => ({}));
+        const planSlug = body.plan || 'contributor';
+        const billingPeriod = body.period || 'monthly';
+        
+        // Fetch plan from database to get price ID
+        const supabaseWithAuth = await createServerClientWithAuth(cookies());
+        const { data: plan, error: planError } = await supabaseWithAuth
+          .from('billing_plans')
+          .select('stripe_price_id_monthly, stripe_price_id_yearly, slug, name')
+          .eq('slug', planSlug)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (planError || !plan) {
+          return NextResponse.json(
+            { error: `Plan '${planSlug}' not found or inactive` },
+            { status: 404 }
+          );
+        }
+        
+        // Get the appropriate price ID based on billing period
+        const priceId = billingPeriod === 'yearly' 
+          ? plan.stripe_price_id_yearly 
+          : plan.stripe_price_id_monthly;
+        
         if (!priceId) {
           return NextResponse.json(
-            { error: 'STRIPE_CONTRIBUTOR_PRICE_ID environment variable is not configured' },
-            { status: 500 }
+            { 
+              error: `Price ID not configured for ${plan.name} (${billingPeriod})`,
+              plan: planSlug,
+              period: billingPeriod,
+            },
+            { status: 400 }
           );
         }
 
@@ -267,6 +297,8 @@ export async function POST(request: NextRequest) {
           metadata: {
             accountId: account.id,
             userId: user.id,
+            planSlug: planSlug,
+            billingPeriod: billingPeriod,
           },
         });
 

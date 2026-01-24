@@ -7,12 +7,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
-import { useAuthStateSafe } from '@/features/auth';
+import { useAuthStateSafe, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
 import YouTubePreview from '@/features/mentions/components/YouTubePreview';
 import LikeButton from '@/components/mentions/LikeButton';
+import ProfilePhoto from '@/components/shared/ProfilePhoto';
 
 interface MapEntityPopupProps {
   isOpen: boolean;
@@ -309,30 +310,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                   className="flex items-center gap-2"
                 >
                   {/* Profile image */}
-                  <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
-                    (data.account.plan === 'contributor' || data.account.plan === 'plus')
-                      ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-                      : 'border border-gray-200'
-                  }`}>
-                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                      {data.account.image_url ? (
-                        <Image
-                          src={data.account.image_url}
-                          alt={data.account.username || 'User'}
-                          width={28}
-                          height={28}
-                          className="w-full h-full rounded-full object-cover"
-                          unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
-                          <span className="text-[10px] font-medium text-gray-600">
-                            {data.account.username?.[0]?.toUpperCase() || data.account.first_name?.[0]?.toUpperCase() || 'U'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <ProfilePhoto 
+                    account={data.account as unknown as Account} 
+                    size="xs" 
+                    editable={false} 
+                  />
                   {/* Username */}
                   <span className={`text-xs font-medium truncate ${
                     useWhiteText ? 'text-white' : 'text-gray-900'
@@ -344,30 +326,11 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                 // Authenticated without username: non-clickable
                 <div className="flex items-center gap-2">
                   {/* Profile image */}
-                  <div className={`w-7 h-7 rounded-full overflow-hidden flex-shrink-0 ${
-                    (data.account.plan === 'contributor' || data.account.plan === 'plus')
-                      ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-                      : 'border border-gray-200'
-                  }`}>
-                    <div className="w-full h-full rounded-full overflow-hidden bg-white">
-                      {data.account.image_url ? (
-                        <Image
-                          src={data.account.image_url}
-                          alt="User"
-                          width={28}
-                          height={28}
-                          className="w-full h-full rounded-full object-cover"
-                          unoptimized={data.account.image_url.startsWith('data:') || data.account.image_url.includes('supabase.co')}
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-full flex items-center justify-center bg-gray-100">
-                          <span className="text-[10px] font-medium text-gray-600">
-                            {data.account.first_name?.[0]?.toUpperCase() || 'U'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <ProfilePhoto 
+                    account={data.account as unknown as Account} 
+                    size="xs" 
+                    editable={false} 
+                  />
                   {/* Name */}
                   <span className={`text-xs font-medium truncate ${
                     useWhiteText ? 'text-white' : 'text-gray-900'

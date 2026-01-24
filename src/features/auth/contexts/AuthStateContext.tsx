@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { AccountService, Account } from '../services/memberService';
@@ -331,8 +332,16 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
           setAccount(accountData);
           // Dispatch event when account loads/changes
           if (typeof window !== 'undefined' && accountId !== previousAccountIdRef.current) {
+            const isFirstLoad = previousAccountIdRef.current === null;
             previousAccountIdRef.current = accountId;
             window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId, account: accountData } }));
+            
+            // Redirect to profile after login if account has username
+            // Only redirect if we're on the homepage (/) to avoid interrupting other flows
+            // Only redirect on first account load (when previousAccountIdRef was null)
+            if (accountData.username && window.location.pathname === '/' && isFirstLoad) {
+              router.push(`/profile/${accountData.username}`);
+            }
           }
         } else {
           setAccount(null);

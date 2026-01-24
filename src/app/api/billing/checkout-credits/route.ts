@@ -115,7 +115,9 @@ export async function POST(request: NextRequest) {
               );
             }
           } catch (error) {
-            console.error('Error creating Stripe customer:', error);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Error creating Stripe customer:', error);
+            }
             return NextResponse.json(
               { error: 'Failed to create customer' },
               { status: 500 }
@@ -184,18 +186,24 @@ export async function POST(request: NextRequest) {
             });
 
           if (eventError) {
-            console.error('[checkout-credits] Failed to log to stripe_events:', eventError);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('[checkout-credits] Failed to log to stripe_events:', eventError);
+            }
             // Don't fail the request - checkout URL is more important
           } else {
-            console.log('[checkout-credits] Checkout event logged to stripe_events:', {
-              eventId,
-              sessionId: session.id,
-              accountId: account.id,
-              customerId,
-            });
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[checkout-credits] Checkout event logged to stripe_events:', {
+                eventId,
+                sessionId: session.id,
+                accountId: account.id,
+                customerId,
+              });
+            }
           }
         } catch (error) {
-          console.error('[checkout-credits] Error logging to stripe_events:', error);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[checkout-credits] Error logging to stripe_events:', error);
+          }
           // Don't fail the request
         }
 
@@ -203,7 +211,12 @@ export async function POST(request: NextRequest) {
           url: session.url,
         });
       } catch (error: any) {
-        console.error('Error creating credits checkout session:', error);
+        // Always log errors, but don't expose sensitive details in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error creating credits checkout session:', error);
+        } else {
+          console.error('Error creating credits checkout session:', error.message || 'Unknown error');
+        }
         return NextResponse.json(
           { error: error.message || 'Failed to create checkout session' },
           { status: 500 }

@@ -16,6 +16,8 @@ import DailyWelcomeModal from './DailyWelcomeModal';
 import { useLocation } from '@/features/map/hooks/useLocation';
 import { useIOSStandalone } from '@/hooks/useIOSStandalone';
 import { supabase } from '@/lib/supabase';
+import ProfilePhoto from '../shared/ProfilePhoto';
+import { Account } from '@/features/auth';
 
 interface MapboxFeature {
   id: string;
@@ -986,17 +988,11 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                       <div className="flex items-start gap-2">
                         {isAccount ? (
                           <>
-                            {account!.image_url ? (
-                              <img 
-                                src={account!.image_url} 
-                                alt={account!.username}
-                                className="w-5 h-5 rounded-full mt-0.5 flex-shrink-0 object-cover"
-                              />
-                            ) : (
-                              <div className="w-5 h-5 rounded-full bg-gray-200 mt-0.5 flex-shrink-0 flex items-center justify-center">
-                                <UserIcon className="w-3 h-3 text-gray-400" />
-                              </div>
-                            )}
+                            <ProfilePhoto 
+                              account={account! as unknown as Account} 
+                              size="xs" 
+                              editable={false} 
+                            />
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-medium text-gray-900 truncate">

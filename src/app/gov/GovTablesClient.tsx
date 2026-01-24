@@ -284,7 +284,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
   // Render tabs only
   if (showTabsOnly) {
     return (
-      <div className="space-y-3">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <div className="flex flex-col gap-2">
           <button
             onClick={() => setActiveTab('orgs')}
@@ -327,9 +327,9 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
   // Render tables only (no tabs, no banner)
   if (showTablesOnly) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-4">
         {/* Search Input */}
-        <div className="bg-white rounded-md border border-gray-200 p-[10px]">
+        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
               <MagnifyingGlassIcon className="w-3 h-3 text-gray-400" />
@@ -349,7 +349,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           )}
         </div>
 
-        <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         {activeTab === 'orgs' && (
           <div className="overflow-x-auto">
             {filteredOrgs.length === 0 ? (
@@ -954,7 +954,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
         )}
       </div>
 
-      <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">
+      <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
         {activeTab === 'orgs' && (
           <div className="overflow-x-auto">
             {filteredOrgs.length === 0 ? (

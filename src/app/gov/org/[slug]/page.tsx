@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import OrgChart from '@/features/civic/components/OrgChart';
 import { getCivicOrgBySlug } from '@/features/civic/services/civicService';
 import { buildOrgBreadcrumbs } from '@/features/civic/utils/breadcrumbs';
@@ -10,6 +9,7 @@ import OrgPageClient from './OrgPageClient';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
+import OrgPageWrapper from './OrgPageWrapper';
 
 export const revalidate = 3600;
 
@@ -88,7 +88,7 @@ export default async function OrgPage({ params }: Props) {
   const icon = getIconForOrgType(org.org_type);
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3">
+    <OrgPageWrapper>
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={breadcrumbs} />
@@ -136,7 +136,7 @@ export default async function OrgPage({ params }: Props) {
           />
         </div>
       </div>
-    </SimplePageLayout>
+    </OrgPageWrapper>
   );
 }
 

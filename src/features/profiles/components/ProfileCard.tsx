@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserIcon, Cog6ToothIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { UserIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
 import { getDisplayName, formatJoinDate, TRAIT_OPTIONS } from '@/types/profile';
 import { AccountService } from '@/features/auth';
@@ -120,7 +120,7 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
         {!hideTopSection && (
           <div className="flex items-center gap-2">
             <div className={`relative w-14 h-14 rounded-full bg-gray-100 overflow-hidden group flex-shrink-0 ${
-              (account.plan === 'contributor' || account.plan === 'plus')
+              (account.plan === 'contributor' || account.plan === 'plus' || account.plan === 'professional' || account.plan === 'business')
                 ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                 : 'border border-gray-200'
             } ${!isOwnProfile && account.image_url ? 'cursor-pointer' : ''}`}>
@@ -224,6 +224,15 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
           )}
         </div>
 
+        {/* Account Plan */}
+        {account.plan && (
+          <div className="pt-2">
+            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
+              {account.plan === 'contributor' ? '⭐ Contributor' : account.plan === 'plus' ? '⭐ Plus' : account.plan}
+            </span>
+          </div>
+        )}
+
         {/* Bio */}
         {account.bio && (
           <p className="text-xs text-gray-600 leading-relaxed">{account.bio}</p>
@@ -259,9 +268,21 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
           </div>
         </div>
 
-        {/* Join Date */}
-        <div className="text-[10px] text-gray-500">
-          Joined {joinDate}
+        {/* Edit Link and Join Date */}
+        <div className="space-y-1">
+          {isOwnProfile && (
+            <div>
+              <Link
+                href="/settings"
+                className="text-[10px] font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Edit
+              </Link>
+            </div>
+          )}
+          <div className="text-[10px] text-gray-500">
+            Joined {joinDate}
+          </div>
         </div>
 
         {/* View Profile Button */}
@@ -275,17 +296,6 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
               <ArrowUpTrayIcon className="w-4 h-4" />
             </Link>
           </div>
-        )}
-
-        {/* Settings Button - Bottom Right */}
-        {isOwnProfile && (
-          <Link
-            href="/settings"
-            className="absolute bottom-2 right-2 p-1.5 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors z-10"
-            title="Settings"
-          >
-            <Cog6ToothIcon className="w-3 h-3 text-gray-600" />
-          </Link>
         )}
       </div>
 

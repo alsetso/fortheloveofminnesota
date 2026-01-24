@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
-import { createServiceClient } from '@/lib/supabaseServer';
+import { createServiceClient, createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 
 /**
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     async (req, { userId, accountId }) => {
       try {
         const body = await req.json();
-        const { paymentMethodId, customerId } = body;
+        const { paymentMethodId, customerId, plan: planSlug = 'contributor', period: billingPeriod = 'monthly' } = body;
 
         if (!paymentMethodId || !customerId) {
           return NextResponse.json(
@@ -95,12 +95,35 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Get price ID from environment
-        const priceId = process.env.STRIPE_CONTRIBUTOR_PRICE_ID;
+        // Fetch plan from database to get price ID
+        const supabaseWithAuth = await createServerClientWithAuth(cookies());
+        const { data: plan, error: planError } = await supabaseWithAuth
+          .from('billing_plans')
+          .select('stripe_price_id_monthly, stripe_price_id_yearly, slug, name')
+          .eq('slug', planSlug)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (planError || !plan) {
+          return NextResponse.json(
+            { error: `Plan '${planSlug}' not found or inactive` },
+            { status: 404 }
+          );
+        }
+        
+        // Get the appropriate price ID based on billing period
+        const priceId = billingPeriod === 'yearly' 
+          ? plan.stripe_price_id_yearly 
+          : plan.stripe_price_id_monthly;
+        
         if (!priceId) {
           return NextResponse.json(
-            { error: 'Price ID not configured' },
-            { status: 500 }
+            { 
+              error: `Price ID not configured for ${plan.name} (${billingPeriod})`,
+              plan: planSlug,
+              period: billingPeriod,
+            },
+            { status: 400 }
           );
         }
 
@@ -128,12 +151,14 @@ export async function POST(request: NextRequest) {
           expand: ['latest_invoice.payment_intent'],
         });
 
-        // Log subscription creation for debugging
-        console.log('[create-subscription] Subscription created:', {
-          subscriptionId: subscription.id,
-          status: subscription.status,
-          customerId: customerId,
-        });
+        // Log subscription creation for debugging (dev only)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[create-subscription] Subscription created:', {
+            subscriptionId: subscription.id,
+            status: subscription.status,
+            customerId: customerId,
+          });
+        }
 
         // Check invoice and payment status
         const invoice = subscription.latest_invoice;
@@ -147,11 +172,13 @@ export async function POST(request: NextRequest) {
             ? await stripe.invoices.retrieve(invoice)
             : invoice;
 
-          console.log('[create-subscription] Invoice status:', {
-            invoiceId: fullInvoice.id,
-            status: fullInvoice.status,
-            paymentIntent: (fullInvoice as any).payment_intent,
-          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[create-subscription] Invoice status:', {
+              invoiceId: fullInvoice.id,
+              status: fullInvoice.status,
+              paymentIntent: (fullInvoice as any).payment_intent,
+            });
+          }
 
           const paymentIntentValue = (fullInvoice as any).payment_intent;
           if (paymentIntentValue) {
@@ -164,17 +191,21 @@ export async function POST(request: NextRequest) {
                 const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
                 paymentStatus = paymentIntent.status;
                 
-                console.log('[create-subscription] Payment intent status:', {
-                  paymentIntentId,
-                  status: paymentIntent.status,
-                  amount: paymentIntent.amount,
-                });
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[create-subscription] Payment intent status:', {
+                    paymentIntentId,
+                    status: paymentIntent.status,
+                    amount: paymentIntent.amount,
+                  });
+                }
                 
                 // If payment requires confirmation, confirm it
                 if (paymentIntent.status === 'requires_confirmation') {
                   const confirmed = await stripe.paymentIntents.confirm(paymentIntentId);
                   paymentStatus = confirmed.status;
-                  console.log('[create-subscription] Payment confirmed, new status:', confirmed.status);
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[create-subscription] Payment confirmed, new status:', confirmed.status);
+                  }
                 }
                 
                 // If payment requires action (3D Secure), return client secret
@@ -215,7 +246,7 @@ export async function POST(request: NextRequest) {
               .update({
                 subscription_status: subscription.status === 'trialing' ? 'trialing' : 'active',
                 stripe_subscription_id: subscription.id,
-                plan: 'contributor',
+                plan: planSlug,
                 billing_mode: subscription.status === 'trialing' ? 'trial' : 'standard',
                 updated_at: new Date().toISOString(),
               })
@@ -225,12 +256,14 @@ export async function POST(request: NextRequest) {
               console.error('[create-subscription] Failed to update account status:', updateError);
               // Don't fail the request - webhook will update it
             } else {
-              console.log('[create-subscription] Account status updated immediately:', {
-                customerId,
-                subscriptionId: subscription.id,
-                status: subscription.status,
-                accountId: account.id,
-              });
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[create-subscription] Account status updated immediately:', {
+                  customerId,
+                  subscriptionId: subscription.id,
+                  status: subscription.status,
+                  accountId: account.id,
+                });
+              }
 
               // Log successful payment to stripe_events table
               // This ensures we have a record even if webhook doesn't fire
@@ -270,12 +303,14 @@ export async function POST(request: NextRequest) {
                   console.error('[create-subscription] Failed to log to stripe_events:', eventError);
                   // Don't fail the request - account is already updated
                 } else {
-                  console.log('[create-subscription] Payment logged to stripe_events:', {
-                    eventId,
-                    accountId: account.id,
-                    subscriptionId: subscription.id,
-                    customerId,
-                  });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[create-subscription] Payment logged to stripe_events:', {
+                      eventId,
+                      accountId: account.id,
+                      subscriptionId: subscription.id,
+                      customerId,
+                    });
+                  }
                 }
               } catch (eventErr) {
                 console.error('[create-subscription] Error logging to stripe_events:', eventErr);
@@ -296,7 +331,12 @@ export async function POST(request: NextRequest) {
           paymentStatus,
         });
       } catch (error: any) {
-        console.error('Error creating subscription:', error);
+        // Always log errors, but don't expose sensitive details in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error creating subscription:', error);
+        } else {
+          console.error('Error creating subscription:', error.message || 'Unknown error');
+        }
         return NextResponse.json(
           { error: error.message || 'Failed to create subscription' },
           { status: 500 }

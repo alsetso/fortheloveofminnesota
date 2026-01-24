@@ -4,7 +4,10 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MagnifyingGlassIcon, PlusIcon, MapIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
+import PageWrapper from '@/components/layout/PageWrapper';
+import MapSearchInput from '@/components/layout/MapSearchInput';
+import SearchResults from '@/components/layout/SearchResults';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import MapCard from './components/MapCard';
 import { COMMUNITY_MAPS, PROFESSIONAL_MAPS } from './constants';
@@ -16,11 +19,7 @@ export default function MapsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
-
-  // Redirect to /live immediately
-  useEffect(() => {
-    router.replace('/live');
-  }, [router]);
+  const { openWelcome } = useAppModalContextSafe();
   const [userMaps, setUserMaps] = useState<MapItem[]>([]);
   const [accountMaps, setAccountMaps] = useState<MapItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -340,106 +339,93 @@ export default function MapsPage() {
   return (
     <>
       <PageViewTracker />
-      {/* Full overlay to ensure redirect happens */}
-      <div className="fixed inset-0 z-[9999] bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-gray-900 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <div className="text-sm font-medium text-gray-900">Redirecting to Live Map...</div>
-        </div>
-      </div>
-      <SimplePageLayout containerMaxWidth="7xl" backgroundColor="bg-[#f4f2ef]" contentPadding="px-[10px] py-3">
-        <div className="max-w-7xl mx-auto">
+      <PageWrapper
+        headerContent={null}
+        searchComponent={
+          <MapSearchInput
+            onLocationSelect={() => {
+              // Handle location selection if needed
+            }}
+          />
+        }
+        accountDropdownProps={{
+          onAccountClick: () => {
+            // Handle account click
+          },
+          onSignInClick: openWelcome,
+        }}
+        searchResultsComponent={<SearchResults />}
+      >
+        <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="w-full space-y-3">
-            {/* Hero Area */}
-            <div className="space-y-2">
+            {/* Header */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <MapIcon className="w-5 h-5 text-gray-600 flex-shrink-0" />
-                <h1 className="text-lg font-semibold text-gray-900">Maps of Minnesota</h1>
+                <MapIcon className="w-4 h-4 text-gray-700" />
+                <h1 className="text-sm font-semibold text-gray-900">Maps</h1>
               </div>
-              <p className="text-xs text-gray-600 pl-7">
-                Create, explore, and share interactive maps across Minnesota. Browse community maps, professional tools, and user-generated content.
-              </p>
+              {activeTab === 'my-maps' && (
+                <button
+                  onClick={() => router.push('/maps/new')}
+                  className="flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+                >
+                  <PlusIcon className="w-3 h-3" />
+                  <span>Create</span>
+                </button>
+              )}
             </div>
 
-            {/* Two Column Layout */}
-            <div className="flex flex-col md:flex-row gap-3">
-              {/* Left Sidebar - Tabs */}
-              <div className="w-full md:w-48 flex-shrink-0">
-                <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1">
-                  {account && (
-                    <button
-                      onClick={() => setActiveTab('my-maps')}
-                      className={`w-full text-left px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                        activeTab === 'my-maps'
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      My Maps <span className="text-gray-500">({getTabCount('my-maps')})</span>
-                    </button>
-                  )}
+            {/* Tabs and Content */}
+            <div className="space-y-3">
+              {/* Tabs */}
+              <div className="flex items-center gap-1 border-b border-gray-200">
+                <button
+                  onClick={() => setActiveTab('community')}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                    activeTab === 'community'
+                      ? 'border-gray-900 text-gray-900'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Community <span className="text-gray-500">({getTabCount('community')})</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('professional')}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                    activeTab === 'professional'
+                      ? 'border-gray-900 text-gray-900'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Professional <span className="text-gray-500">({getTabCount('professional')})</span>
+                </button>
+                {account && (
                   <button
-                    onClick={() => setActiveTab('community')}
-                    className={`w-full text-left px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === 'community'
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50'
+                    onClick={() => setActiveTab('my-maps')}
+                    className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                      activeTab === 'my-maps'
+                        ? 'border-gray-900 text-gray-900'
+                        : 'border-transparent text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    Community <span className="text-gray-500">({getTabCount('community')})</span>
+                    My Maps <span className="text-gray-500">({getTabCount('my-maps')})</span>
                   </button>
-                  <button
-                    onClick={() => setActiveTab('professional')}
-                    className={`w-full text-left px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === 'professional'
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    Professional <span className="text-gray-500">({getTabCount('professional')})</span>
-                  </button>
-                </div>
+                )}
               </div>
 
-              {/* Right Content - Maps Grid */}
-              <div className="flex-1 space-y-2">
-                {/* Heading and Search */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <h2 className="text-sm font-semibold text-gray-900">
-                    {activeTab === 'my-maps' && 'My Maps'}
-                    {activeTab === 'community' && 'Community Maps'}
-                    {activeTab === 'professional' && 'Professional Maps'}
-                  </h2>
-                  <span className="text-xs text-gray-500">
-                    {activeTab === 'community' 
-                      ? `${filteredCommunityMaps.length + filteredUserMaps.length} ${filteredCommunityMaps.length + filteredUserMaps.length === 1 ? 'map' : 'maps'}`
-                      : `${currentTabData.maps.length} ${currentTabData.maps.length === 1 ? 'map' : 'maps'}`
-                    }
-                  </span>
-                </div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="relative flex-1">
-                    <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search maps..."
-                      className="w-full pl-7 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
-                    />
-                  </div>
-                  {activeTab === 'my-maps' && (
-                    <button
-                      onClick={() => router.push('/maps/new')}
-                      className="flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors sm:w-auto w-full"
-                    >
-                      <PlusIcon className="w-3 h-3" />
-                      <span>Create</span>
-                    </button>
-                  )}
-                </div>
+              {/* Search */}
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search maps..."
+                  className="w-full pl-7 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                />
+              </div>
 
-                {/* Maps Grid */}
+              {/* Maps Grid */}
                 {activeTab === 'community' ? (
                   <div className="space-y-3">
                     {/* Featured Community Maps (Mentions) */}
@@ -517,11 +503,10 @@ export default function MapsPage() {
                     ))}
                   </div>
                 )}
-              </div>
             </div>
           </div>
         </div>
-      </SimplePageLayout>
+      </PageWrapper>
     </>
   );
 }

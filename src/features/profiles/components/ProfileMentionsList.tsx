@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { formatPinDate } from '@/types/profile';
 import type { ProfilePin } from '@/types/profile';
+import { EyeIcon, HeartIcon } from '@heroicons/react/24/outline';
 
 interface ProfileMentionsListProps {
   pins: ProfilePin[];
@@ -16,8 +17,8 @@ export default function ProfileMentionsList({ pins, isOwnProfile = false, onView
   
   if (filteredPins.length === 0) {
     return (
-      <div className="p-[10px]">
-        <p className="text-xs text-gray-500 text-center py-6">No mentions found</p>
+      <div className="p-6">
+        <p className="text-sm text-gray-500 text-center py-8">No mentions found</p>
       </div>
     );
   }
@@ -25,7 +26,7 @@ export default function ProfileMentionsList({ pins, isOwnProfile = false, onView
   return (
     <div>
       {/* List Content */}
-      <div className="p-[10px]">
+      <div className="p-6">
       <div className="relative">
         {/* Vertical Timeline */}
         {filteredPins.map((pin, index) => (
@@ -73,6 +74,40 @@ export default function ProfileMentionsList({ pins, isOwnProfile = false, onView
                   </video>
                 </div>
               )}
+
+              {/* Metadata Row - Mention Type, Collection, Views, Likes */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Mention Type */}
+                {pin.mention_type && (
+                  <span className="text-[10px] text-gray-600">
+                    {pin.mention_type.emoji} {pin.mention_type.name}
+                  </span>
+                )}
+                
+                {/* Collection Badge */}
+                {pin.collection && (
+                  <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded">
+                    <span>{pin.collection.emoji}</span>
+                    <span>{pin.collection.title}</span>
+                  </span>
+                )}
+                
+                {/* View Count */}
+                {(pin.view_count !== undefined && pin.view_count > 0) && (
+                  <div className="flex items-center gap-0.5 text-[10px] text-gray-500">
+                    <EyeIcon className="w-3 h-3" />
+                    <span>{pin.view_count}</span>
+                  </div>
+                )}
+                
+                {/* Like Count */}
+                {(pin.likes_count !== undefined && pin.likes_count > 0) && (
+                  <div className="flex items-center gap-0.5 text-[10px] text-gray-500">
+                    <HeartIcon className="w-3 h-3" />
+                    <span>{pin.likes_count}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Timestamp */}
               <p className="text-[10px] text-gray-500">

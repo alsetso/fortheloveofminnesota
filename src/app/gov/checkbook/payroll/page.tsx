@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import CheckbookPageWrapper from '../CheckbookPageWrapper';
 
 export const revalidate = 3600;
 
@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PayrollPage() {
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3">
+    <CheckbookPageWrapper>
       <div className="max-w-7xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
@@ -61,7 +61,7 @@ export default async function PayrollPage() {
           </p>
         </div>
       </div>
-    </SimplePageLayout>
+    </CheckbookPageWrapper>
   );
 }
 

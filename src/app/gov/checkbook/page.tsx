@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import Link from 'next/link';
 import { DocumentTextIcon, CurrencyDollarIcon, BanknotesIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import CheckbookPageWrapper from './CheckbookPageWrapper';
 
 export const revalidate = 3600;
 
@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CheckbookPage() {
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3">
+    <CheckbookPageWrapper>
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
@@ -147,7 +147,7 @@ export default async function CheckbookPage() {
           </Link>
         </div>
       </div>
-    </SimplePageLayout>
+    </CheckbookPageWrapper>
   );
 }
 

@@ -33,7 +33,9 @@ async function ensureStripeCustomer(accountId: string): Promise<string> {
       }
     } catch (error) {
       // Customer doesn't exist in Stripe, create a new one
-      console.log('Customer not found in Stripe, creating new one');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Customer not found in Stripe, creating new one');
+      }
     }
   }
 
@@ -164,7 +166,9 @@ export async function syncStripeData(customerId: string): Promise<void> {
       .eq('stripe_customer_id', customerId);
 
     if (deleteError) {
-      console.error('Error deleting subscription record:', deleteError);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error deleting subscription record:', deleteError);
+      }
       // Don't throw - this is a cleanup operation
     }
 
@@ -181,7 +185,9 @@ export async function syncStripeData(customerId: string): Promise<void> {
       .eq('stripe_customer_id', customerId);
 
     if (accountUpdateError) {
-      console.error('Error updating account:', accountUpdateError);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error updating account:', accountUpdateError);
+      }
       // Don't throw - this is a cleanup operation
     }
     return;
@@ -236,7 +242,9 @@ export async function syncStripeData(customerId: string): Promise<void> {
       }
     } catch (error) {
       // Payment method retrieval failed - continue without card info
-      console.warn('Failed to retrieve payment method details:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Failed to retrieve payment method details:', error);
+      }
     }
   }
 

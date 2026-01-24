@@ -560,11 +560,11 @@ export default function MentionLocationSheet({
                   {fullMention?.id && (
                     <LikeButton
                       mentionId={fullMention.id}
-                      initialLikesCount={likesCount}
-                      initialIsLiked={isLiked}
-                      onLikeChange={(count, liked) => {
-                        setLikesCount(count);
+                      initialLiked={isLiked}
+                      initialCount={likesCount}
+                      onLikeChange={(liked: boolean, count: number) => {
                         setIsLiked(liked);
+                        setLikesCount(count);
                       }}
                       size="sm"
                     />

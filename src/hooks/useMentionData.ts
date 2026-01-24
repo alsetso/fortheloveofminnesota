@@ -64,7 +64,7 @@ export function useMentionData(mentionId: string | null): UseMentionDataResult {
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    const fetchMention = async () => {
+    const fetchMention = async (): Promise<Mention | null> => {
       try {
         const { data, error: fetchError } = await supabase
           .from('mentions')
@@ -121,7 +121,7 @@ export function useMentionData(mentionId: string | null): UseMentionDataResult {
           ...data,
           account: data.accounts,
           collection: data.collections,
-        } as Mention;
+        } as unknown as Mention;
 
         // Cache result
         cache.set(mentionId, { mention: transformedMention, timestamp: Date.now() });
@@ -132,15 +132,17 @@ export function useMentionData(mentionId: string | null): UseMentionDataResult {
           setIsLoading(false);
           setError(null);
         }
+        return transformedMention;
       } catch (err: any) {
         inFlightRequests.delete(mentionId);
         if (err.name === 'AbortError') {
-          return;
+          return null;
         }
         if (!abortController.signal.aborted) {
           setError(err.message || 'Failed to fetch mention');
           setIsLoading(false);
         }
+        return null;
       }
     };
 

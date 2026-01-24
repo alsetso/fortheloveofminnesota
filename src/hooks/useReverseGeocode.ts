@@ -70,7 +70,7 @@ export function useReverseGeocode(lat: number | null, lng: number | null): Rever
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    const fetchAddress = async () => {
+    const fetchAddress = async (): Promise<string | null> => {
       try {
         const token = MAP_CONFIG.MAPBOX_TOKEN;
         if (!token) {
@@ -106,15 +106,17 @@ export function useReverseGeocode(lat: number | null, lng: number | null): Rever
           setIsLoading(false);
           setError(null);
         }
+        return result;
       } catch (err: any) {
         inFlightRequests.delete(cacheKey);
         if (err.name === 'AbortError') {
-          return; // Request was cancelled
+          return null; // Request was cancelled
         }
         if (!abortController.signal.aborted) {
           setError(err.message || 'Failed to reverse geocode');
           setIsLoading(false);
         }
+        return null;
       }
     };
 

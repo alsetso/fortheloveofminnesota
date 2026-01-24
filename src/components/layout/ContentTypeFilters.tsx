@@ -61,10 +61,10 @@ export default function ContentTypeFilters() {
           <button
             key={type.id}
             onClick={() => handleTypeSelect(type.id)}
-            className={`text-sm font-medium transition-opacity whitespace-nowrap ${
+            className={`text-sm font-medium transition-all whitespace-nowrap px-2 py-1 rounded-md ${
               isSelected
-                ? 'text-white opacity-100'
-                : 'text-white opacity-50 hover:opacity-75'
+                ? 'text-white bg-white/20 font-semibold'
+                : 'text-white opacity-50 hover:opacity-75 hover:bg-white/10'
             }`}
           >
             {type.label}

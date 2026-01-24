@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode, useState, useEffect, useMemo } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
 import { Toaster } from 'react-hot-toast';
@@ -68,10 +68,22 @@ export default function PageWrapper({
   trackPageView = true
 }: PageWrapperProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   // Initialize as false to avoid hydration mismatch - will be set correctly on client mount
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Get selected content type for label
+  const selectedContentType = searchParams.get('content_type');
+  const contentTypeLabels: Record<string, string> = {
+    posts: 'Posts',
+    mentions: 'Mentions',
+    groups: 'Groups',
+    users: 'Users',
+    news: 'News',
+  };
+  const selectedLabel = selectedContentType ? contentTypeLabels[selectedContentType] : null;
 
   // Automatically track page views for all pages using PageWrapper
   // Uses current pathname, tracks once per page load
@@ -270,6 +282,12 @@ export default function PageWrapper({
         {isSearchMode && (
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 py-1 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-center gap-2">
+              {/* Label area - shows selected content type */}
+              {selectedLabel && (
+                <div className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-white bg-white/10 rounded-md">
+                  {selectedLabel}
+                </div>
+              )}
               <div className="flex-1">
                 {searchComponent}
               </div>

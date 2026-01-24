@@ -188,8 +188,9 @@ export default function PageWrapper({
         <div className="h-5 w-full" style={{ height: '20px' }} />
         
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
-          {/* Top Row: Logo, Search, Nav, Account */}
-          <div className={`grid grid-cols-12 gap-6 items-center transition-all duration-300 h-14 ${isSearchMode ? 'opacity-0 h-0 overflow-hidden pointer-events-none' : 'opacity-100'}`}>
+          {/* Top Row: Logo, Search, Nav, Account - Hidden completely in search mode */}
+          {!isSearchMode && (
+            <div className="grid grid-cols-12 gap-6 items-center transition-all duration-300 h-14">
             {/* 1st Column: Logo & Search (Aligns with left sidebar) */}
             <div className="hidden lg:flex lg:col-span-3 items-center gap-3 min-w-0">
           <div className="flex-shrink-0">
@@ -275,12 +276,12 @@ export default function PageWrapper({
               />
             )}
           </div>
-          </div>
+          )}
         </div>
 
         {/* Search Mode Header (Transitions in when isSearchMode is true) */}
         {isSearchMode && (
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300 pt-1">
             <div className="flex items-center gap-2">
               {/* Label area - shows selected content type */}
               {selectedLabel && (

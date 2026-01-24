@@ -54,27 +54,50 @@ export default function SearchResults() {
 
   useEffect(() => {
     const fetchResults = async () => {
+      // Get content type filters from URL
+      const contentTypeParam = searchParams.get('content_type');
+      const contentTypesParam = searchParams.get('content_types');
+      let selectedTypes: ContentType[] = [];
+
+      if (contentTypesParam) {
+        const types = contentTypesParam.split(',').map(s => s.trim()) as ContentType[];
+        selectedTypes = types.filter(t => ['posts', 'mentions', 'groups', 'users', 'news'].includes(t));
+      } else if (contentTypeParam) {
+        if (['posts', 'mentions', 'groups', 'users', 'news'].includes(contentTypeParam)) {
+          selectedTypes = [contentTypeParam as ContentType];
+        }
+      } else {
+        // Default to all types if none selected
+        selectedTypes = ['posts', 'mentions', 'groups', 'users', 'news'];
+      }
+
+      // Create cache key from selected types
+      const cacheKey = `search_results_${selectedTypes.sort().join('_')}`;
+      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+      // Check cache first
+      try {
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          const age = Date.now() - timestamp;
+          if (age < CACHE_DURATION) {
+            setResults(data);
+            setLoading(false);
+            return; // Use cached data
+          } else {
+            // Cache expired, remove it
+            sessionStorage.removeItem(cacheKey);
+          }
+        }
+      } catch (err) {
+        // Cache read failed, continue with fetch
+      }
+
       setLoading(true);
       setError(null);
 
       try {
-        // Get content type filters from URL
-        const contentTypeParam = searchParams.get('content_type');
-        const contentTypesParam = searchParams.get('content_types');
-        let selectedTypes: ContentType[] = [];
-
-        if (contentTypesParam) {
-          const types = contentTypesParam.split(',').map(s => s.trim()) as ContentType[];
-          selectedTypes = types.filter(t => ['posts', 'mentions', 'groups', 'users', 'news'].includes(t));
-        } else if (contentTypeParam) {
-          if (['posts', 'mentions', 'groups', 'users', 'news'].includes(contentTypeParam)) {
-            selectedTypes = [contentTypeParam as ContentType];
-          }
-        } else {
-          // Default to all types if none selected
-          selectedTypes = ['posts', 'mentions', 'groups', 'users', 'news'];
-        }
-
         const newResults: SearchResultsData = {
           posts: [],
           mentions: [],
@@ -213,6 +236,16 @@ export default function SearchResults() {
         }
 
         setResults(newResults);
+        
+        // Cache results
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({
+            data: newResults,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          // Cache write failed, continue without caching
+        }
       } catch (err) {
         console.error('Error fetching search results:', err);
         setError('Failed to load search results');

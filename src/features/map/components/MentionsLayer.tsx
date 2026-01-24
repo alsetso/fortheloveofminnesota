@@ -22,13 +22,15 @@ interface MentionsLayerProps {
   onLoadingChange?: (isLoading: boolean) => void;
   /** Optional mention ID to highlight on the map */
   selectedMentionId?: string | null;
+  /** Optional map ID to filter mentions by map */
+  mapId?: string | null;
 }
 
 /**
  * MentionsLayer component manages Mapbox mention visualization
  * Handles fetching, formatting, and real-time updates
  */
-export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId }: MentionsLayerProps) {
+export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId, mapId }: MentionsLayerProps) {
   const sourceId = 'map-mentions';
   const pointLayerId = 'map-mentions-point';
   const pointLabelLayerId = 'map-mentions-point-label';
@@ -285,6 +287,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         
         // Build filters object
         const filters: any = {};
+        if (mapId) {
+          filters.map_id = mapId;
+        }
         if (year && !timeFilter) {
           filters.year = year;
         }
@@ -1246,7 +1251,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         }
       }
     };
-  }, [map, mapLoaded, searchParams, timeFilter]);
+  }, [map, mapLoaded, searchParams, timeFilter, mapId]);
 
   // Component doesn't render anything visible - loading state is shown in MapTopContainer toast
   return null;

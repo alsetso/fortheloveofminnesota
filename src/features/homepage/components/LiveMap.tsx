@@ -71,6 +71,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   const loadingToastIdRef = useRef<string | null>(null);
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
+  const [liveMapId, setLiveMapId] = useState<string | null>(null);
   
   // Location select popup state (for map clicks)
   const [locationSelectPopup, setLocationSelectPopup] = useState<{
@@ -470,6 +471,33 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
     closeLocationPermission();
     requestLocation();
   }, [requestLocation, closeLocationPermission]);
+
+  // Fetch live map ID on mount
+  useEffect(() => {
+    const fetchLiveMapId = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('map')
+          .select('id')
+          .eq('custom_slug', 'live')
+          .eq('is_primary', true)
+          .single();
+        
+        if (error) {
+          console.error('[LiveMap] Error fetching live map:', error);
+          return;
+        }
+        
+        if (data) {
+          setLiveMapId(data.id);
+        }
+      } catch (err) {
+        console.error('[LiveMap] Error fetching live map:', err);
+      }
+    };
+
+    fetchLiveMapId();
+  }, []);
 
   // Listen for mention-created event to refresh mentions layer
   useEffect(() => {
@@ -1078,6 +1106,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
               mapLoaded={mapLoaded}
               onLoadingChange={setIsLoadingMentions}
               selectedMentionId={selectedMentionId}
+              mapId={liveMapId}
             />
           )}
 

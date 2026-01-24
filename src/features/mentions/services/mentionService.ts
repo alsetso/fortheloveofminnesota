@@ -93,6 +93,10 @@ export class MentionService {
       query = query.eq('city_id', filters.city_id);
     }
 
+    if (filters?.map_id) {
+      query = query.eq('map_id', filters.map_id);
+    }
+
     if (filters?.mention_type_ids && filters.mention_type_ids.length > 0) {
       // Multiple mention types - use 'in' filter
       query = query.in('mention_type_id', filters.mention_type_ids);

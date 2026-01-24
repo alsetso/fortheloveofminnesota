@@ -596,7 +596,7 @@ export default function EditPostPage() {
               </div>
               {selectedMentions.map((mention) => (
                 <div key={mention.id} className="relative">
-                  <MentionCard mention={mention} />
+                  <MentionCard mention={mention as any} />
                   <button
                     type="button"
                     onClick={() => handleMentionToggle(mention.id)}

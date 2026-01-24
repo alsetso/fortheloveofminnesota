@@ -59,7 +59,6 @@ export default function PeopleSearchabilityToggle() {
           Searchable
         </span>
         <button
-          type="button"
           onClick={toggle}
           disabled={disabled}
           className={`relative inline-flex h-5 w-9 cursor-pointer rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-60 disabled:cursor-not-allowed ${

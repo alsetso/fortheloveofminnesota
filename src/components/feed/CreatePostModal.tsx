@@ -87,9 +87,8 @@ export default function CreatePostModal({
 
   // Check if user can upload videos
   const canUploadVideo = account?.plan === 'contributor' || 
-                         account?.plan === 'plus' || account?.plan === 'business' || 
-                         account?.plan === 'plus' || 
-                         account?.plan === 'business' || 
+                         (account?.plan as string) === 'plus' || 
+                         (account?.plan as string) === 'business' || 
                          account?.plan === 'gov';
 
   // Fetch mention types (only active ones for public selection)
@@ -636,7 +635,8 @@ export default function CreatePostModal({
                       // Remove any existing map screenshot
                       const filtered = prev.filter((img) => img.url !== data.screenshot);
                       // Add the new screenshot as the first image (thumbnail)
-                      const newImages = [{ url: data.screenshot, alt: 'Map screenshot', type: 'image' as const }, ...filtered];
+                      const newImages: Array<{ url: string; alt?: string; type?: 'image' | 'video' }> = [{ url: data.screenshot || '', alt: 'Map screenshot', type: 'image' as const }, ...filtered];
+                      return newImages;
                       console.log('Updated images array:', newImages.length);
                       return newImages;
                     });

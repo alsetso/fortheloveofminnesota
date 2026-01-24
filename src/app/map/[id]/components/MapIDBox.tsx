@@ -1140,7 +1140,6 @@ export default function MapIDBox({
             viewCount={viewCount}
             isOwner={isOwner}
             hideCreator={hideCreator}
-            mapId={mapId}
             onInfoClick={() => setShowInfoModal(true)}
             onPinClick={() => {
               if (pinMode) {

@@ -15,7 +15,7 @@ export default function PostImageDrawer({
   initialImages = [],
   canUploadVideo = false 
 }: PostImageDrawerProps) {
-  const [images, setImages] = useState<Array<{ url: string; alt?: string; type: 'image' | 'video' }>>(initialImages);
+  const [images, setImages] = useState<Array<{ url: string; alt?: string; type?: 'image' | 'video' }>>(initialImages.map(img => ({ ...img, type: img.type || 'image' as const })));
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

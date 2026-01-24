@@ -11,7 +11,7 @@ export default function GroupsSidebar() {
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isPayingUser = account?.plan === 'contributor' || account?.plan === 'plus' || account?.plan === 'business' || account?.plan === 'business';
+  const isPayingUser = account?.plan === 'contributor' || (account?.plan as string) === 'plus' || (account?.plan as string) === 'business';
   const yourGroups = allGroups.filter(g => g.is_member === true);
   const otherGroups = allGroups.filter(g => !g.is_member);
 

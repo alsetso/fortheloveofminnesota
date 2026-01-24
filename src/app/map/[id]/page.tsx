@@ -327,7 +327,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
 
           {mapData && !loading && (
             <MapPageLayout
-              initialMap={mapData}
+              initialMap={mapData as any}
               onMapUpdated={(updated) => {
                 setMapData(prev => prev ? { ...prev, ...updated } : updated);
               }}

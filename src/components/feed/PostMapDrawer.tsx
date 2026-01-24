@@ -42,13 +42,13 @@ export default function PostMapDrawer({ onClose, onMapDataSave, initialMapData }
       try {
         if (!MAP_CONFIG.MAPBOX_TOKEN) {
           console.error('Mapbox token missing');
-          return;
+          return undefined;
         }
 
         const mapboxgl = await loadMapboxGL();
         mapboxgl.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
         
-        if (!mounted || !mapContainer.current) return;
+        if (!mounted || !mapContainer.current) return undefined;
 
         const map = new mapboxgl.Map({
           container: mapContainer.current,
@@ -72,6 +72,7 @@ export default function PostMapDrawer({ onClose, onMapDataSave, initialMapData }
         };
       } catch (error) {
         console.error('Error loading map:', error);
+        return undefined;
       }
     };
 

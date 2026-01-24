@@ -173,8 +173,15 @@ export default function PageWrapper({
       />
       
       <div 
-        className={`relative w-full h-screen overflow-hidden flex flex-col ${className}`} 
-        style={{ maxWidth: '100vw', backgroundColor: '#000000' }}
+        className={`relative flex flex-col ${className}`} 
+        style={{ 
+          width: '100vw', 
+          height: '100vh', 
+          maxWidth: '100vw', 
+          maxHeight: '100vh',
+          overflow: 'hidden',
+          backgroundColor: '#000000' 
+        }}
       >
       {/* Header - Flexible height based on content, black background */}
       <header 
@@ -329,8 +336,11 @@ export default function PageWrapper({
         className="bg-white rounded-t-3xl flex-1 overflow-hidden relative flex flex-col"
         style={{ minHeight: 0 }}
       >
-        {/* Content - Direct children, fills 100% of content area */}
-        <div className="flex-1 bg-white overflow-hidden" style={{ minHeight: 0, height: '100%', width: '100%' }}>
+        {/* Scrollable Content Container - Hidden scrollbar */}
+        <div 
+          className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide"
+          style={{ minHeight: 0 }}
+        >
           {isSearchMode && searchResultsComponent ? searchResultsComponent : children}
         </div>
       </div>

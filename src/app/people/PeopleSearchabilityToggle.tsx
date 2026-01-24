@@ -65,7 +65,7 @@ export default function PeopleSearchabilityToggle() {
             enabled ? 'bg-gray-900' : 'bg-gray-200'
           }`}
           role="switch"
-          aria-checked={enabled ?? false}
+          aria-checked={enabled === null ? undefined : enabled}
           aria-label="Toggle profile searchability"
         >
           <span

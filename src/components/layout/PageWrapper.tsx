@@ -266,16 +266,17 @@ export default function PageWrapper({
             </div>
             
             {/* 3rd Column: Header Content, Account Dropdown (Aligns with right sidebar) */}
-          <div className="hidden lg:flex lg:col-span-3 justify-end items-center gap-2">
-            {headerContent}
-            {showAccountDropdown && (
-              <AccountDropdown 
-                variant="dark"
-                onAccountClick={accountDropdownProps?.onAccountClick}
-                onSignInClick={accountDropdownProps?.onSignInClick}
-              />
-            )}
-          </div>
+            <div className="hidden lg:flex lg:col-span-3 justify-end items-center gap-2">
+              {headerContent}
+              {showAccountDropdown && (
+                <AccountDropdown 
+                  variant="dark"
+                  onAccountClick={accountDropdownProps?.onAccountClick}
+                  onSignInClick={accountDropdownProps?.onSignInClick}
+                />
+              )}
+            </div>
+            </div>
           )}
         </div>
 

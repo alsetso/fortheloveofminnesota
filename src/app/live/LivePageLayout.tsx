@@ -53,8 +53,13 @@ export default function LivePageLayout({
 }: LivePageLayoutProps) {
   return (
     <div className="relative w-full h-full flex">
-      {/* Mobile: Slide-up modals */}
-      <div className="lg:hidden">
+      {/* Mobile: Map container + Slide-up modals */}
+      <div className="lg:hidden w-full h-full relative">
+        {/* Mobile Map Container */}
+        <div className="absolute inset-0 w-full h-full">
+          {children}
+        </div>
+        
         <MentionTypeFilterPopup
           isOpen={isFilterOpen}
           onClose={onFilterToggle}

@@ -295,9 +295,10 @@ export default function PageWrapper({
       {/* Main Content Area - Flex to fill remaining space, white background, rounded top corners */}
       <div 
         className="bg-white rounded-t-3xl flex-1 overflow-hidden relative flex flex-col"
+        style={{ minHeight: 0 }}
       >
         {/* Content - Direct children, fills 100% of content area */}
-        <div className="flex-1 bg-white overflow-hidden">
+        <div className="flex-1 bg-white overflow-hidden" style={{ minHeight: 0, height: '100%', width: '100%' }}>
           {isSearchMode && searchResultsComponent ? searchResultsComponent : children}
         </div>
       </div>

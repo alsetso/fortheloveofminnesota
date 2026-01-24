@@ -1240,8 +1240,10 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
         record={modal.type === 'layerRecord' ? modal.data : null}
         onAddMention={(coordinates) => {
           closeLayerRecord();
-          setCreateTabSelectedLocation(coordinates);
-          openCreate();
+          const params = new URLSearchParams();
+          params.set('lat', coordinates.lat.toString());
+          params.set('lng', coordinates.lng.toString());
+          router.push(`/add?${params.toString()}`);
         }}
       />
 

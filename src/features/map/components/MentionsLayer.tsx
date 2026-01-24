@@ -848,17 +848,6 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             let mention = mentionsRef.current.find(m => m.id === mentionId);
             if (!mention) return;
             
-            // Debug: Log mention_type to check if it's properly set
-            if (process.env.NODE_ENV === 'development') {
-              // Mention clicked
-              {
-                id: mention.id,
-                mention_type: mention.mention_type,
-                mention_type_id: (mention as any).mention_type_id,
-                has_mention_type: !!mention.mention_type,
-              });
-            }
-
             // Fetch full account profile data if account_id exists
             if (mention.account_id && (!mention.account || !mention.account.username)) {
               try {

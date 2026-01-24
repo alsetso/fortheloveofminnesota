@@ -103,7 +103,7 @@ export async function PATCH(
           .update({
             status,
             processed_by_account_id: accountId,
-          } as any)
+          } as Record<string, any>)
           .eq('id', id)
           .select(`
             id,

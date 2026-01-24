@@ -19,6 +19,7 @@ import CongressionalDistrictsLayer from '@/features/map/components/Congressional
 import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
 import StateBoundaryLayer from '@/features/map/components/StateBoundaryLayer';
 import CountyBoundariesLayer from '@/features/map/components/CountyBoundariesLayer';
+import MentionsLayer from '@/features/map/components/MentionsLayer';
 
 interface MapIDBoxProps {
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
@@ -1176,6 +1177,18 @@ export default function MapIDBox({
             visible={showCountyBoundaries}
           />
           <StateBoundaryLayer map={mapInstance} mapLoaded={mapLoaded} visible={showStateBoundary} />
+          
+          {/* Mentions Layer - Render mentions as pins on map */}
+          {mapLoaded && mapInstance && (
+            <>
+              {console.log('[MapIDBox] Rendering MentionsLayer for map:', mapId)}
+              <MentionsLayer 
+                map={mapInstance} 
+                mapLoaded={mapLoaded}
+                mapId={mapId}
+              />
+            </>
+          )}
         </>
       )}
 

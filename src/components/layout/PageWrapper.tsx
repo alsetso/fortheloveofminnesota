@@ -280,7 +280,7 @@ export default function PageWrapper({
 
         {/* Search Mode Header (Transitions in when isSearchMode is true) */}
         {isSearchMode && (
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 py-1 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-center gap-2">
               {/* Label area - shows selected content type */}
               {selectedLabel && (

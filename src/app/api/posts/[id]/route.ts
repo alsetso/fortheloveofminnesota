@@ -59,8 +59,7 @@ export async function GET(
               name
             )
           `)
-          .eq('id', id)
-          .single();
+          .eq('id', id);
 
         // For anonymous users, only show public posts
         if (!accountId) {
@@ -70,7 +69,7 @@ export async function GET(
           query = query.or(`visibility.eq.public,account_id.eq.${accountId}`);
         }
 
-        const { data: post, error } = await query;
+        const { data: post, error } = await query.single();
 
         if (error || !post) {
           return NextResponse.json(
@@ -80,7 +79,8 @@ export async function GET(
         }
 
         // Fetch mentions if referenced
-        if (post.mention_ids && Array.isArray(post.mention_ids) && post.mention_ids.length > 0) {
+        const postData = post as any;
+        if (postData.mention_ids && Array.isArray(postData.mention_ids) && postData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
             .from('mentions')
             .select(`
@@ -99,12 +99,12 @@ export async function GET(
                 title
               )
             `)
-            .in('id', post.mention_ids);
+            .in('id', postData.mention_ids);
 
-          post.mentions = mentions || [];
+          postData.mentions = mentions || [];
         }
 
-        return NextResponse.json({ post });
+        return NextResponse.json({ post: postData });
       } catch (error) {
         console.error('[Posts API] Error:', error);
         return NextResponse.json(

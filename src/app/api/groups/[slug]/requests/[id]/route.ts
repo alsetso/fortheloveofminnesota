@@ -98,12 +98,13 @@ export async function PATCH(
         }
 
         // Update request
+        const updateData: Record<string, any> = {
+          status,
+          processed_by_account_id: accountId,
+        };
         const { data: updatedRequest, error } = await supabase
           .from('group_requests')
-          .update({
-            status,
-            processed_by_account_id: accountId,
-          } as Record<string, any>)
+          .update(updateData as never)
           .eq('id', id)
           .select(`
             id,

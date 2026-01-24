@@ -1364,9 +1364,10 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   return (
     <div 
       className="relative w-full h-full overflow-hidden flex"
+      style={{ minHeight: 0 }}
     >
         {/* Map and other components - no sidebar */}
-        <div className="flex-1 flex relative overflow-hidden">
+        <div className="flex-1 flex relative overflow-hidden" style={{ minHeight: 0, minWidth: 0 }}>
           {/* Top Controls - Loading, Filters, Reload */}
           <div className="absolute top-4 left-4 right-4 z-40 pointer-events-none">
             <div className="pointer-events-auto space-y-2">
@@ -1412,12 +1413,14 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           {/* Mapbox Container */}
           <div 
             ref={mapContainer} 
-            className="absolute inset-0"
+            className="absolute inset-0 w-full h-full"
             style={{ 
               margin: 0, 
               padding: 0, 
               overflow: 'hidden', 
               zIndex: 1,
+              minWidth: 0,
+              minHeight: 0,
             }}
           />
 

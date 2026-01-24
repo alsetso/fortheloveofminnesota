@@ -1179,7 +1179,8 @@ export default function MapIDBox({
           <StateBoundaryLayer map={mapInstance} mapLoaded={mapLoaded} visible={showStateBoundary} />
           
           {/* Mentions Layer - Render mentions as pins on map */}
-          {mapLoaded && mapInstance && (
+          {/* Always render for public maps, conditionally for private/shared maps */}
+          {mapLoaded && mapInstance && (visibility === 'public' || visibility === 'shared' || isOwner) && (
             <MentionsLayer 
               map={mapInstance} 
               mapLoaded={mapLoaded}

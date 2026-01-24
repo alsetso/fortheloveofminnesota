@@ -649,8 +649,10 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
         {/* Close Icon (only in search mode) */}
         {isSearchMode && (
           <div className="flex-shrink-0">
-            <button
-              onClick={() => {
+            <a
+              href={`${pathname}${window.location.search}`}
+              onClick={(e) => {
+                e.preventDefault();
                 // Exit search mode
                 const newUrl = pathname + window.location.search;
                 window.history.pushState({}, '', newUrl);
@@ -658,11 +660,11 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
                 setShowSuggestions(false);
                 inputRef.current?.blur();
               }}
-              className="w-8 h-8 rounded-full transition-colors flex items-center justify-center bg-transparent hover:bg-white/20 text-white"
+              className="flex items-center justify-center text-white hover:text-white/80 transition-colors"
               aria-label="Close search"
             >
               <XMarkIcon className="w-4 h-4" />
-            </button>
+            </a>
           </div>
         )}
       </div>

@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return {
-    title: group.name,
-    description: group.description || `Join ${group.name} on Love of Minnesota`,
+    title: (group as any).name,
+    description: (group as any).description || `Join ${(group as any).name} on Love of Minnesota`,
   };
 }
 
@@ -87,12 +87,12 @@ export default async function GroupPage({ params }: Props) {
     const { data: membership } = await supabase
       .from('group_members')
       .select('is_admin')
-      .eq('group_id', group.id)
+      .eq('group_id', (group as any).id)
       .eq('account_id', accountId)
       .maybeSingle();
 
     (group as any).is_member = !!membership;
-    (group as any).is_admin = membership?.is_admin || false;
+    (group as any).is_admin = (membership as any)?.is_admin || false;
   } else {
     (group as any).is_member = false;
     (group as any).is_admin = false;

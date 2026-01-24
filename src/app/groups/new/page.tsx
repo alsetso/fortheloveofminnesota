@@ -28,7 +28,7 @@ export default function NewGroupPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const slugCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isPayingUser = account?.plan === 'contributor' || account?.plan === 'professional' || account?.plan === 'business';
+  const isPayingUser = account?.plan === 'contributor' || account?.plan === 'business';
 
   // Auto-generate slug from name
   const generateSlug = (text: string) => {

@@ -12,7 +12,7 @@ export default function GroupsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isPayingUser = account?.plan === 'contributor' || account?.plan === 'professional' || account?.plan === 'business';
+  const isPayingUser = account?.plan === 'contributor' || account?.plan === 'business';
   const yourGroups = groups.filter(g => g.is_member === true);
   const otherGroups = groups.filter(g => !g.is_member);
 

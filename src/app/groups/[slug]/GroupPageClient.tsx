@@ -227,7 +227,7 @@ export default function GroupPageClient({ initialGroup }: GroupPageClientProps) 
           .limit(1);
 
         if (requests && requests.length > 0) {
-          const latestRequest = requests[0];
+          const latestRequest = requests[0] as any;
           if (latestRequest.status === 'pending') {
             setJoinRequestStatus('pending');
           } else if (latestRequest.status === 'approved') {

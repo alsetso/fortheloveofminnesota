@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return {
-    title: `Settings - ${group.name}`,
-    description: `Edit settings for ${group.name}`,
+    title: `Settings - ${(group as any).name}`,
+    description: `Edit settings for ${(group as any).name}`,
   };
 }
 
@@ -90,11 +90,11 @@ export default async function GroupSettingsPage({ params }: Props) {
   const { data: membership } = await supabase
     .from('group_members')
     .select('is_admin')
-    .eq('group_id', group.id)
+    .eq('group_id', (group as any).id)
     .eq('account_id', accountId)
     .maybeSingle();
 
-  if (!membership || !membership.is_admin) {
+  if (!membership || !(membership as any).is_admin) {
     redirect(`/groups/${slug}`);
   }
 

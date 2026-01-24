@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import type { Mention } from '@/types/mention';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
@@ -40,6 +40,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const mentionsRef = useRef<Mention[]>([]);
   const subscriptionRef = useRef<{ unsubscribe: () => void } | null>(null);
   const isAddingLayersRef = useRef<boolean>(false);
@@ -289,6 +290,12 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         const filters: any = {};
         if (mapId) {
           filters.map_id = mapId;
+          // For the live map, also include mentions with NULL map_id (all public mentions)
+          // This ensures the live map shows all mentions, not just those assigned to it
+          const isLiveMap = pathname === '/map/live' || pathname === '/live';
+          if (isLiveMap) {
+            filters.include_null_map_id = true;
+          }
         }
         if (year && !timeFilter) {
           filters.year = year;

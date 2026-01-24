@@ -73,7 +73,8 @@ export interface CreateMentionData {
 export interface MentionFilters {
   account_id?: string;
   city_id?: string;
-  map_id?: string; // Filter by city ID
+  map_id?: string; // Filter by map ID
+  include_null_map_id?: boolean; // If true, include mentions with NULL map_id (used for live/primary maps)
   collection_id?: string; // Filter by collection ID
   mention_type_id?: string; // Filter by mention type ID (single)
   mention_type_ids?: string[]; // Filter by mention type IDs (multiple)

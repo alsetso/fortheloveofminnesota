@@ -94,7 +94,16 @@ export class MentionService {
     }
 
     if (filters?.map_id) {
-      query = query.eq('map_id', filters.map_id);
+      if (filters.include_null_map_id) {
+        // For live/primary maps: show mentions with this map_id OR NULL map_id
+        query = query.or(`map_id.eq.${filters.map_id},map_id.is.null`);
+      } else {
+        // For specific maps: show only mentions with this map_id
+        query = query.eq('map_id', filters.map_id);
+      }
+    } else if (filters?.include_null_map_id) {
+      // If no map_id but include_null_map_id is true, show only NULL map_id mentions
+      query = query.is('map_id', null);
     }
 
     if (filters?.mention_type_ids && filters.mention_type_ids.length > 0) {

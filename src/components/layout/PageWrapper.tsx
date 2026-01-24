@@ -16,7 +16,6 @@ import {
   UserGroupIcon,
   UsersIcon,
   SparklesIcon,
-  ChartBarIcon,
   RssIcon
 } from '@heroicons/react/24/outline';
 import { 
@@ -26,7 +25,6 @@ import {
   UserGroupIcon as UserGroupIconSolid,
   UsersIcon as UsersIconSolid,
   SparklesIcon as SparklesIconSolid,
-  ChartBarIcon as ChartBarIconSolid,
   RssIcon as RssIconSolid
 } from '@heroicons/react/24/solid';
 
@@ -102,7 +100,6 @@ export default function PageWrapper({
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
     { label: 'Gov', href: '/gov', icon: BuildingLibraryIcon, iconSolid: BuildingLibraryIconSolid },
     { label: 'Groups', href: '/groups', icon: UserGroupIcon, iconSolid: UserGroupIconSolid },
-    { label: 'Analytics', href: '/analytics', icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
   ], []);
 
   // Set mounted flag on client side only

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserIcon, Cog6ToothIcon, CreditCardIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { UserIcon, Cog6ToothIcon, CreditCardIcon, EyeIcon, ChartBarIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -377,7 +377,7 @@ export default function AccountDropdown({
                     <button
                       onClick={() => {
                         setIsOpen(false);
-                        openAccount('settings');
+                        router.push('/settings');
                       }}
                       className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
                     >
@@ -393,6 +393,16 @@ export default function AccountDropdown({
                     >
                       <CreditCardIcon className="w-4 h-4 text-gray-500" />
                       Billing
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push('/analytics');
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                    >
+                      <ChartBarIcon className="w-4 h-4 text-gray-500" />
+                      Analytics
                     </button>
                   <button
                     onClick={handleSignOut}

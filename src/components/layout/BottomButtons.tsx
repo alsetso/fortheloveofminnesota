@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { CameraIcon, Cog6ToothIcon, ChartBarIcon, MapPinIcon, UserIcon, XMarkIcon, HomeIcon, InformationCircleIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { CameraIcon as CameraIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, ChartBarIcon as ChartBarIconSolid, MapPinIcon as MapPinIconSolid, UserIcon as UserIconSolid, HomeIcon as HomeIconSolid, MagnifyingGlassIcon as MagnifyingGlassIconSolid } from '@heroicons/react/24/solid';
+import { CameraIcon, Cog6ToothIcon, MapPinIcon, UserIcon, XMarkIcon, HomeIcon, InformationCircleIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CameraIcon as CameraIconSolid, Cog6ToothIcon as Cog6ToothIconSolid, MapPinIcon as MapPinIconSolid, UserIcon as UserIconSolid, HomeIcon as HomeIconSolid, MagnifyingGlassIcon as MagnifyingGlassIconSolid } from '@heroicons/react/24/solid';
 import Image from 'next/image';
 import { useAuthStateSafe, useAuth } from '@/features/auth';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
@@ -249,23 +249,6 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
                     <MagnifyingGlassIconSolid className={`w-4 h-4 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
                   ) : (
                     <MagnifyingGlassIcon className={`w-4 h-4 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
-                  )}
-                </button>
-
-                {/* Analytics Button */}
-                <button
-                  onClick={() => onButtonClick('analytics')}
-                  className={`w-8 h-8 rounded-full transition-colors ${
-                    activeButton === 'analytics'
-                      ? useWhiteText ? 'bg-white/20' : 'bg-gray-100'
-                      : 'hover:bg-gray-50/50'
-                  }`}
-                  aria-label="Analytics"
-                >
-                  {activeButton === 'analytics' ? (
-                    <ChartBarIconSolid className={`w-4 h-4 ${useWhiteText ? 'text-white' : 'text-gray-900'}`} />
-                  ) : (
-                    <ChartBarIcon className={`w-4 h-4 ${useWhiteText ? 'text-white/80' : 'text-gray-600'}`} />
                   )}
                 </button>
 

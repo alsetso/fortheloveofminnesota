@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserIcon, Cog6ToothIcon, CreditCardIcon } from '@heroicons/react/24/outline';
+import { UserIcon, Cog6ToothIcon, CreditCardIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useAdminImpersonationSafe } from '@/contexts/AdminImpersonationContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 
 interface AccountDropdownProps {
@@ -38,6 +39,15 @@ export default function AccountDropdown({
   } = useAuthStateSafe();
 
   const { openWelcome, openAccount, openCreateAccount } = useAppModalContextSafe();
+  const {
+    selectedAccountId,
+    setSelectedAccountId,
+    allAccounts: adminAllAccounts,
+    isLoadingAccounts: isLoadingAdminAccounts,
+    isImpersonating,
+  } = useAdminImpersonationSafe();
+
+  const isAdmin = account?.role === 'admin';
 
   // Fetch all user accounts when dropdown opens
   useEffect(() => {
@@ -280,6 +290,81 @@ export default function AccountDropdown({
                         </svg>
                         Create New Account
                       </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Admin Impersonation Section */}
+              {isAdmin && (
+                <div className="border-t border-gray-200">
+                  <div className="px-[10px] py-1.5 text-[10px] font-medium text-gray-500 uppercase tracking-wide bg-gray-50">
+                    Admin: Track As
+                  </div>
+                  {isLoadingAdminAccounts ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto">
+                      <button
+                        onClick={() => {
+                          setSelectedAccountId(null);
+                          setIsOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left ${
+                          !isImpersonating ? 'bg-blue-50' : ''
+                        }`}
+                      >
+                        <EyeIcon className={`w-4 h-4 ${!isImpersonating ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-900">
+                            {AccountService.getDisplayName(account)}
+                          </p>
+                          <p className="text-[10px] text-gray-500">Your account</p>
+                        </div>
+                        {!isImpersonating && (
+                          <div className="w-2 h-2 rounded-full bg-blue-500" title="Active" />
+                        )}
+                      </button>
+                      {adminAllAccounts
+                        .filter((acc) => acc.id !== account?.id)
+                        .slice(0, 20)
+                        .map((acc) => {
+                          const isSelected = acc.id === selectedAccountId;
+                          return (
+                            <button
+                              key={acc.id}
+                              onClick={() => {
+                                setSelectedAccountId(isSelected ? null : acc.id);
+                                setIsOpen(false);
+                              }}
+                              className={`w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left ${
+                                isSelected ? 'bg-blue-50' : ''
+                              }`}
+                            >
+                              <ProfilePhoto account={acc} size="sm" editable={false} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-gray-900 truncate">
+                                  {AccountService.getDisplayName(acc)}
+                                </p>
+                                <p className="text-[10px] text-gray-500 truncate">
+                                  {acc.username || acc.email || 'No username'}
+                                </p>
+                              </div>
+                              {isSelected && (
+                                <div className="w-2 h-2 rounded-full bg-blue-500" title="Selected" />
+                              )}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                  {isImpersonating && (
+                    <div className="border-t border-gray-200 px-[10px] py-1.5 bg-blue-50">
+                      <p className="text-[10px] text-blue-700 font-medium">
+                        Tracking analytics as selected account
+                      </p>
                     </div>
                   )}
                 </div>

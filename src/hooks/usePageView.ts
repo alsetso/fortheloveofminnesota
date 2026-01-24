@@ -1,18 +1,28 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useAdminImpersonationSafe } from '@/contexts/AdminImpersonationContext';
 
 interface UsePageViewOptions {
   page_url?: string; // Optional - defaults to window.location.pathname
   enabled?: boolean;
+  /** Override account ID for tracking (admin impersonation) */
+  accountId?: string | null;
 }
 
 /**
  * Hook to track page views using the simplified page_url system
  * Automatically uses current page path if page_url not provided
+ * For admins: Uses selected account ID from AdminImpersonationContext if available
  */
-export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {}) {
+export function usePageView({ page_url, enabled = true, accountId }: UsePageViewOptions = {}) {
   const hasTracked = useRef(false);
+  const { selectedAccountId, isImpersonating } = useAdminImpersonationSafe();
+  
+  // Use provided accountId, or admin-selected account, or null (will be determined server-side)
+  const trackingAccountId = accountId !== undefined 
+    ? accountId 
+    : (isImpersonating ? selectedAccountId : undefined);
 
   useEffect(() => {
     if (!enabled || hasTracked.current) return;
@@ -34,8 +44,10 @@ export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {
     // Generate or get device ID from localStorage (shared across tabs on same device)
     let deviceId: string | null = null;
     if (typeof window !== 'undefined') {
+      const isUuid = (value: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
       deviceId = localStorage.getItem('analytics_device_id');
-      if (!deviceId) {
+      if (!deviceId || !isUuid(deviceId)) {
         deviceId = crypto.randomUUID();
         localStorage.setItem('analytics_device_id', deviceId);
       }
@@ -46,6 +58,7 @@ export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {
       referrer_url: referrer || null,
       user_agent: userAgent || null,
       session_id: deviceId, // Using session_id column to store device_id
+      ...(trackingAccountId !== undefined && { account_id: trackingAccountId }),
     };
     
     // Use requestIdleCallback if available, otherwise setTimeout
@@ -75,7 +88,7 @@ export function usePageView({ page_url, enabled = true }: UsePageViewOptions = {
       // Fallback: delay by 1 second
       setTimeout(trackView, 1000);
     }
-  }, [page_url, enabled]);
+  }, [page_url, enabled, trackingAccountId]);
 }
 
 

@@ -88,12 +88,27 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
     };
   }
 
-  // Get account with subscription fields
-  const { data: account, error: accountError } = await supabase
-    .from('accounts')
-    .select('plan, billing_mode, subscription_status, stripe_subscription_id')
-    .eq('user_id', user.id)
-    .maybeSingle() as { data: { plan: string; billing_mode: string; subscription_status: string | null; stripe_subscription_id: string | null } | null; error: any };
+  // Get active account with subscription fields (respects account dropdown)
+  const activeAccountId = cookieStore.get('active_account_id')?.value || null;
+
+  const accountQuery = activeAccountId
+    ? supabase
+        .from('accounts')
+        .select('plan, billing_mode, subscription_status, stripe_subscription_id')
+        .eq('id', activeAccountId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+    : supabase
+        .from('accounts')
+        .select('plan, billing_mode, subscription_status, stripe_subscription_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+  const { data: account, error: accountError } = (await accountQuery) as {
+    data: { plan: string; billing_mode: string; subscription_status: string | null; stripe_subscription_id: string | null } | null;
+    error: any;
+  };
 
   if (accountError || !account) {
     // Return default state if account doesn't exist

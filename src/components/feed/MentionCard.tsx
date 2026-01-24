@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface MentionCardProps {
   mention: {
@@ -18,21 +18,28 @@ interface MentionCardProps {
 }
 
 export default function MentionCard({ mention }: MentionCardProps) {
+  const router = useRouter();
   const truncatedDescription = mention.description
     ? mention.description.length > 45
       ? mention.description.substring(0, 45) + '...'
       : mention.description
     : 'No description';
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Navigate to /live with coordinates and mention ID - will trigger URL watcher to zoom, highlight mention, and open sheet
+    router.push(`/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
+  };
+
   return (
-    <Link
-      href={`/map?lat=${mention.lat}&lng=${mention.lng}&zoom=15`}
-      className="block bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
+    <button
+      onClick={handleClick}
+      className="w-full text-left block bg-gray-50 border border-gray-200 rounded-md p-[10px] hover:bg-gray-100 transition-colors"
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         {/* Mention Type Emoji */}
         {mention.mention_type && (
-          <div className="flex-shrink-0 text-lg">
+          <div className="flex-shrink-0 text-sm text-gray-600 leading-none mt-0.5">
             {mention.mention_type.emoji}
           </div>
         )}
@@ -40,11 +47,11 @@ export default function MentionCard({ mention }: MentionCardProps) {
         {/* Content */}
         <div className="flex-1 min-w-0">
           {mention.mention_type && (
-            <div className="text-xs font-medium text-gray-600 mb-1">
+            <div className="text-xs font-medium text-gray-600 mb-0.5">
               {mention.mention_type.name}
             </div>
           )}
-          <p className="text-sm text-gray-900 line-clamp-2">
+          <p className="text-xs text-gray-900 line-clamp-2">
             {truncatedDescription}
           </p>
         </div>
@@ -55,11 +62,11 @@ export default function MentionCard({ mention }: MentionCardProps) {
             <img
               src={mention.image_url}
               alt="Mention"
-              className="w-12 h-12 rounded object-cover"
+              className="w-10 h-10 rounded-md object-cover border border-gray-200"
             />
           </div>
         )}
       </div>
-    </Link>
+    </button>
   );
 }

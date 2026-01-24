@@ -3,6 +3,7 @@ import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import type { BillingPlan } from '@/lib/billing/types';
 
 const updatePlanSchema = z.object({
   slug: z.string().min(1).max(50).optional(),
@@ -47,7 +48,7 @@ export async function PATCH(
         
         if (!validation.success) {
           return NextResponse.json(
-            { error: 'Invalid request data', details: validation.error.errors },
+            { error: 'Invalid request data', details: validation.error.issues },
             { status: 400 }
           );
         }
@@ -64,7 +65,7 @@ export async function PATCH(
           p_description: validation.data.description,
           p_stripe_price_id_monthly: validation.data.stripe_price_id_monthly,
           p_stripe_price_id_yearly: validation.data.stripe_price_id_yearly,
-        });
+        } as any).returns<BillingPlan>();
         
         if (error) {
           console.error('[Admin Billing API] Error updating plan:', error);
@@ -125,7 +126,7 @@ export async function DELETE(
         const { data: plan, error } = await supabase.rpc('update_billing_plan', {
           p_id: id,
           p_is_active: false,
-        });
+        } as any).returns<BillingPlan>();
         
         if (error) {
           console.error('[Admin Billing API] Error deleting plan:', error);

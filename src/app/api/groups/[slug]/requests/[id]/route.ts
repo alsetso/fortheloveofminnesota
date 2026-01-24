@@ -64,11 +64,11 @@ export async function PATCH(
         const { data: membership } = await supabase
           .from('group_members')
           .select('is_admin')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .single();
 
-        if (!membership || !membership.is_admin) {
+        if (!membership || !(membership as any).is_admin) {
           return NextResponse.json(
             { error: 'Only group admins can approve/deny requests' },
             { status: 403 }
@@ -80,7 +80,7 @@ export async function PATCH(
           .from('group_requests')
           .select('id, status, group_id')
           .eq('id', id)
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .single();
 
         if (!requestData) {
@@ -90,7 +90,7 @@ export async function PATCH(
           );
         }
 
-        if (requestData.status !== 'pending') {
+        if ((requestData as any).status !== 'pending') {
           return NextResponse.json(
             { error: 'Request has already been processed' },
             { status: 400 }
@@ -103,7 +103,7 @@ export async function PATCH(
           .update({
             status,
             processed_by_account_id: accountId,
-          })
+          } as any)
           .eq('id', id)
           .select(`
             id,

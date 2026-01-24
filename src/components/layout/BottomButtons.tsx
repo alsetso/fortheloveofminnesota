@@ -8,6 +8,7 @@ import Image from 'next/image';
 import { useAuthStateSafe, useAuth } from '@/features/auth';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { supabase } from '@/lib/supabase';
+import { getPaidPlanBorderClasses, isPaidPlan } from '@/lib/billing/planHelpers';
 
 export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'info' | 'search' | null;
 
@@ -290,8 +291,8 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
           <button
             onClick={() => onButtonClick('settings')}
             className={`w-14 h-14 rounded-full overflow-hidden transition-colors ${
-              (account.plan === 'contributor' || account.plan === 'plus')
-                ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
+              isPaidPlan(account.plan)
+                ? getPaidPlanBorderClasses(account.plan)
                 : useTransparentUI
                   ? 'bg-white/10 border-2 border-white/30 hover:bg-white/20 hover:border-white/40'
                   : 'bg-white border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
@@ -305,7 +306,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
                   alt={account.username || 'Account'}
                   width={56}
                   height={56}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-full"
                   unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
                 />
               ) : (

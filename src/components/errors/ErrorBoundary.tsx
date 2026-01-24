@@ -1,7 +1,7 @@
 'use client';
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import PageLayout from '../layout/PageLayout';
+import SimplePageLayout from '../layout/SimplePageLayout';
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 interface Props {
@@ -26,6 +26,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    // Show toast if available
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('show-error-toast', {
+        detail: { message: error.message || 'An unexpected error occurred' }
+      }));
+    }
   }
 
   handleReset = () => {
@@ -40,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <PageLayout showHeader={true} showFooter={true}>
+        <SimplePageLayout>
           <div className="min-h-[60vh] flex items-center justify-center px-4">
             <div className="max-w-md w-full text-center">
               <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -63,7 +70,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </button>
             </div>
           </div>
-        </PageLayout>
+        </SimplePageLayout>
       );
     }
 

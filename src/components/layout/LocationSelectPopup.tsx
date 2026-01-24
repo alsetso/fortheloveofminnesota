@@ -13,6 +13,9 @@ interface LocationSelectPopupProps {
   lng: number;
   address: string | null;
   mapMeta?: Record<string, any> | null;
+  mentionTypeId?: string | null;
+  mentionTypeName?: string | null;
+  onAddToMap?: (coordinates: { lat: number; lng: number }, mapMeta?: Record<string, any> | null, mentionTypeId?: string | null) => void;
 }
 
 /**
@@ -27,6 +30,9 @@ export default function LocationSelectPopup({
   lng,
   address,
   mapMeta,
+  mentionTypeId: propMentionTypeId,
+  mentionTypeName: propMentionTypeName,
+  onAddToMap,
 }: LocationSelectPopupProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -99,8 +105,31 @@ export default function LocationSelectPopup({
     };
   }, [showMapMetaInfo]);
 
-  // Fetch selected mention type from URL parameters (only for single type selection)
+  // Fetch selected mention type from URL parameters or props (props take priority)
   useEffect(() => {
+    // If mention type is passed via props (from custom mention button), use it
+    if (propMentionTypeId) {
+      const fetchPropMentionType = async () => {
+        const { data: allTypes } = await supabase
+          .from('mention_types')
+          .select('id, name, emoji')
+          .eq('is_active', true);
+        
+        if (allTypes) {
+          const matchingType = allTypes.find(type => type.id === propMentionTypeId);
+          
+          if (matchingType) {
+            setSelectedMentionTypeId(matchingType.id);
+            setSelectedMentionType({ name: matchingType.name, emoji: matchingType.emoji });
+          }
+        }
+      };
+      
+      fetchPropMentionType();
+      return;
+    }
+    
+    // Otherwise, check URL parameters
     const typeParam = searchParams.get('type');
     const typesParam = searchParams.get('types');
     
@@ -142,7 +171,7 @@ export default function LocationSelectPopup({
       setSelectedMentionTypeId(null);
       setSelectedMentionType(null);
     }
-  }, [searchParams]);
+  }, [searchParams, propMentionTypeId]);
 
   const handleClose = () => {
     if (popupRef.current) {
@@ -154,15 +183,22 @@ export default function LocationSelectPopup({
   };
 
   const handleAddToMap = () => {
-    // Navigate to /add page with lat, lng, and mention type (if selected) as query parameters
-    const params = new URLSearchParams();
-    params.set('lat', lat.toString());
-    params.set('lng', lng.toString());
-    if (selectedMentionTypeId) {
-      params.set('mention_type_id', selectedMentionTypeId);
+    // If onAddToMap callback provided, use it (opens create form inline)
+    // Otherwise, fall back to navigation for backward compatibility
+    if (onAddToMap) {
+      onAddToMap({ lat, lng }, mapMeta || null, selectedMentionTypeId || null);
+      handleClose();
+    } else {
+      // Fallback: navigate to /add page
+      const params = new URLSearchParams();
+      params.set('lat', lat.toString());
+      params.set('lng', lng.toString());
+      if (selectedMentionTypeId) {
+        params.set('mention_type_id', selectedMentionTypeId);
+      }
+      router.push(`/add?${params.toString()}`);
+      handleClose();
     }
-    router.push(`/add?${params.toString()}`);
-    handleClose();
   };
 
   const handleCopyAddress = async () => {

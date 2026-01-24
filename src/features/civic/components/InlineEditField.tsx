@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, type KeyboardEvent, type RefObject } from 
 import { PencilIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { useToast } from '@/features/ui/hooks/useToast';
+import { useAuthStateSafe } from '@/features/auth';
 import { updateCivicFieldWithLogging } from '../utils/civicEditLogger';
 import type { CivicTable } from '../utils/permissions';
+import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 
 interface InlineEditFieldProps {
   table: CivicTable;
@@ -33,12 +35,17 @@ export default function InlineEditField({
   placeholder,
 }: InlineEditFieldProps) {
   const supabase = useSupabaseClient();
+  const { account } = useAuthStateSafe();
   const { success, error: showError } = useToast();
+  const { hasFeature, isLoading: isEntitlementsLoading } = useBillingEntitlementsSafe();
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  // Billing-schema feature gate (updates automatically when account dropdown changes)
+  const hasAccess = !!account && !isEntitlementsLoading && hasFeature('civic_edits');
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -50,6 +57,15 @@ export default function InlineEditField({
   }, [isEditing, type]);
 
   const handleStartEdit = () => {
+    // Check subscription access before allowing edit
+    if (!hasAccess) {
+      showError(
+        'Subscription Required',
+        'Editing government data requires a Contributor, Professional, or Business subscription with an active subscription. Upgrade to contribute.'
+      );
+      return;
+    }
+    
     setEditValue(value || '');
     setIsEditing(true);
     setError(null);
@@ -174,13 +190,15 @@ export default function InlineEditField({
       <span className="text-xs text-gray-900 flex-1">
         {value || <span className="text-gray-400 italic">(empty)</span>}
       </span>
-      <button
-        onClick={handleStartEdit}
-        className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded transition-all"
-        title="Edit"
-      >
-        <PencilIcon className="w-3 h-3" />
-      </button>
+      {hasAccess && (
+        <button
+          onClick={handleStartEdit}
+          className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded transition-all"
+          title="Edit"
+        >
+          <PencilIcon className="w-3 h-3" />
+        </button>
+      )}
     </div>
   );
 }

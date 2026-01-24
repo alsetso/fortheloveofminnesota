@@ -25,8 +25,9 @@ export function createErrorResponse(
  */
 export function createSuccessResponse<T>(
   data: T,
-  status: number = 200
+  status: number = 200,
+  headers?: HeadersInit
 ): NextResponse<T> {
-  return NextResponse.json(data, { status });
+  return NextResponse.json(data, { status, headers });
 }
 

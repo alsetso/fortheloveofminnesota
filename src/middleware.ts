@@ -152,15 +152,15 @@ export async function middleware(req: NextRequest) {
   // Note: This is a basic CSP. You may need to adjust based on your specific needs
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com", // Stripe.js CDN + Google Analytics
-    "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com", // Stripe.js script elements + Google Analytics
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://connect.facebook.net", // Stripe.js CDN + Google Analytics + Facebook Pixel
+    "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com https://www.googletagmanager.com https://connect.facebook.net", // Stripe.js script elements + Google Analytics + Facebook Pixel
     "worker-src 'self' blob:", // Mapbox uses blob URLs for Web Workers
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts + Tailwind
     "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com", // Google Fonts stylesheets
-    "img-src 'self' data: https: blob:", // Allow blob URLs for camera previews
+    "img-src 'self' data: https: blob:", // Allow blob URLs for camera previews and Facebook tracking pixel
     "media-src 'self' blob: https:", // Allow blob URLs for video previews and https for Supabase videos
     "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts fonts
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com https://api.stripe.com https://www.google-analytics.com https://www.googletagmanager.com", // Stripe API + Google Analytics
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com https://api.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net", // Stripe API + Google Analytics + Facebook Pixel
     "frame-src 'self' https://js.stripe.com https://hooks.stripe.com", // Stripe Checkout and webhooks
     "frame-ancestors 'none'",
   ].join('; ');

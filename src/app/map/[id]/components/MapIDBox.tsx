@@ -8,14 +8,17 @@ import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, In
 import { useMapboxMap } from '../hooks/useMapboxMap';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import MapPinForm from './MapPinForm';
-import AccountDropdown from '@/features/auth/components/AccountDropdown';
-import MapIdSettingsModal from './MapIdSettingsModal';
 import MapAreaDrawModal from './MapAreaDrawModal';
 import MapIDDetails from './MapIDDetails';
 import MapEntitySlideUp from './MapEntitySlideUp';
+import MapInfoCard from './MapInfoCard';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
+import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
+import StateBoundaryLayer from '@/features/map/components/StateBoundaryLayer';
+import CountyBoundariesLayer from '@/features/map/components/CountyBoundariesLayer';
 
 interface MapIDBoxProps {
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
@@ -28,6 +31,10 @@ interface MapIDBoxProps {
     center?: [number, number];
     zoom?: number;
   } | null;
+  showDistricts?: boolean;
+  showCTU?: boolean;
+  showStateBoundary?: boolean;
+  showCountyBoundaries?: boolean;
   title?: string;
   description?: string | null;
   visibility?: 'public' | 'private' | 'shared';
@@ -39,6 +46,7 @@ interface MapIDBoxProps {
     image_url: string | null;
   } | null;
   viewCount?: number | null;
+  hideCreator?: boolean;
   onMapLoad?: (map: MapboxMapInstance) => void;
   onMapUpdate?: (updatedData: any) => void;
   map_account_id?: string | null;
@@ -70,23 +78,57 @@ interface MapArea {
   updated_at: string;
 }
 
+interface MapLayerPolygonEntity {
+  layerId: string;
+  title: string;
+  subtitle?: string | null;
+  properties: Record<string, unknown>;
+  geometryType?: string | null;
+  geometry?: GeoJSON.Geometry | GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
+}
+
 const PINS_SOURCE_ID = 'map-pins';
 const PINS_LAYER_ID = 'map-pins-points';
 const AREAS_SOURCE_ID = 'map-areas';
 const AREAS_LAYER_ID = 'map-areas-fill';
 const AREAS_OUTLINE_LAYER_ID = 'map-areas-outline';
 
-export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, description, visibility, account, viewCount, onMapLoad, onMapUpdate, map_account_id, current_account_id, created_at, updated_at }: MapIDBoxProps) {
+const SELECTED_SOURCE_ID = 'map-selected-entity';
+const SELECTED_POINT_LAYER_ID = 'map-selected-point';
+const SELECTED_POLYGON_FILL_LAYER_ID = 'map-selected-polygon-fill';
+const SELECTED_POLYGON_OUTLINE_LAYER_ID = 'map-selected-polygon-outline';
+
+export default function MapIDBox({
+  mapStyle,
+  mapId,
+  isOwner,
+  meta,
+  showDistricts = false,
+  showCTU = false,
+  showStateBoundary = false,
+  showCountyBoundaries = false,
+  title,
+  description,
+  visibility,
+  account,
+  viewCount,
+  hideCreator = false,
+  onMapLoad,
+  onMapUpdate,
+  map_account_id,
+  current_account_id,
+  created_at,
+  updated_at,
+}: MapIDBoxProps) {
   const router = useRouter();
   const mapContainer = useRef<HTMLDivElement>(null);
   const { account: currentAccount } = useAuthStateSafe();
   const { openAccount, openWelcome } = useAppModalContextSafe();
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [pinMode, setPinMode] = useState(false);
   const [showAreaDrawModal, setShowAreaDrawModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [selectedEntity, setSelectedEntity] = useState<MapPin | MapArea | null>(null);
-  const [selectedEntityType, setSelectedEntityType] = useState<'pin' | 'area' | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<MapPin | MapArea | MapLayerPolygonEntity | null>(null);
+  const [selectedEntityType, setSelectedEntityType] = useState<'pin' | 'area' | 'layer' | null>(null);
   const [loadingEntity, setLoadingEntity] = useState(false);
   const { mapInstance, mapLoaded } = useMapboxMap({
     mapStyle,
@@ -99,6 +141,363 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
   const [showPinForm, setShowPinForm] = useState(false);
   const [pinFormCoords, setPinFormCoords] = useState<{ lat: number; lng: number } | null>(null);
   const clickHandlerAddedRef = useRef(false);
+  const hiddenLayersRef = useRef<Map<string, 'visible' | 'none' | undefined>>(new Map());
+
+  const clearSelection = useCallback(() => {
+    setSelectedEntity(null);
+    setSelectedEntityType(null);
+  }, []);
+
+  const isPinOrAreaLayerId = useCallback((layerId: unknown): boolean => {
+    return (
+      typeof layerId === 'string' &&
+      (layerId === PINS_LAYER_ID || layerId === AREAS_LAYER_ID || layerId === AREAS_OUTLINE_LAYER_ID)
+    );
+  }, []);
+
+  const isLayerPolygonLayerId = useCallback((layerId: unknown): boolean => {
+    if (typeof layerId !== 'string') return false;
+    if (layerId === 'county-boundaries-fill') return true;
+    if (layerId === 'county-boundaries-outline') return true;
+    if (layerId === 'county-boundaries-highlight-fill') return true;
+    if (layerId === 'county-boundaries-highlight-outline') return true;
+    if (layerId === 'ctu-boundaries-fill') return true;
+    if (layerId === 'ctu-boundaries-outline') return true;
+    if (layerId === 'ctu-boundaries-highlight-fill') return true;
+    if (layerId === 'ctu-boundaries-highlight-outline') return true;
+    if (layerId === 'state-boundary-fill') return true;
+    if (layerId === 'state-boundary-outline') return true;
+    if (layerId === 'state-boundary-highlight-fill') return true;
+    if (layerId === 'state-boundary-highlight-outline') return true;
+    if (/^congressional-district-\d+-(fill|outline|highlight-fill|highlight-outline)$/.test(layerId)) return true;
+    return false;
+  }, []);
+
+  const buildLayerPolygonEntity = useCallback((feature: any): MapLayerPolygonEntity | null => {
+    const layerId: unknown = feature?.layer?.id;
+    if (typeof layerId !== 'string') return null;
+
+    const rawProps = feature?.properties;
+    const properties: Record<string, unknown> =
+      rawProps && typeof rawProps === 'object'
+        ? Object.fromEntries(Object.entries(rawProps as Record<string, unknown>))
+        : {};
+
+    const geometryType: string | null =
+      feature?.geometry && typeof feature.geometry.type === 'string' ? feature.geometry.type : null;
+    const geometry: GeoJSON.Geometry | null =
+      feature?.geometry && typeof feature.geometry === 'object' ? (feature.geometry as GeoJSON.Geometry) : null;
+
+    let title = 'Layer Feature';
+    let subtitle: string | null = null;
+
+    if (layerId.startsWith('county-boundaries-')) {
+      title = typeof properties.county_name === 'string' && properties.county_name.trim().length > 0
+        ? properties.county_name
+        : 'County';
+      subtitle = 'County boundary';
+    } else if (layerId.startsWith('ctu-boundaries-')) {
+      const name =
+        typeof properties.feature_name === 'string' && properties.feature_name.trim().length > 0
+          ? properties.feature_name
+          : 'CTU';
+      const ctuClass = typeof properties.ctu_class === 'string' ? properties.ctu_class : null;
+      const county = typeof properties.county_name === 'string' ? properties.county_name : null;
+      title = name;
+      subtitle = [ctuClass, county].filter(Boolean).join(' • ') || 'CTU boundary';
+    } else if (layerId.startsWith('state-boundary-')) {
+      title = 'Minnesota';
+      subtitle = 'State boundary';
+    } else {
+      const districtMatch = layerId.match(/^congressional-district-(\d+)-/);
+      if (districtMatch?.[1]) {
+        title = `Congressional District ${districtMatch[1]}`;
+        subtitle = 'Congressional district';
+      } else {
+        title = layerId;
+      }
+    }
+
+    return {
+      layerId,
+      title,
+      subtitle,
+      properties,
+      geometryType,
+      geometry,
+    };
+  }, []);
+
+  const getAllInteractiveLayerIds = useCallback((mapboxMap: any): string[] => {
+    const ids = new Set<string>();
+    // Pins/areas
+    ids.add(PINS_LAYER_ID);
+    ids.add(AREAS_LAYER_ID);
+    ids.add(AREAS_OUTLINE_LAYER_ID);
+    // Known boundary layers
+    [
+      'county-boundaries-fill',
+      'county-boundaries-outline',
+      'county-boundaries-highlight-fill',
+      'county-boundaries-highlight-outline',
+      'ctu-boundaries-fill',
+      'ctu-boundaries-outline',
+      'ctu-boundaries-highlight-fill',
+      'ctu-boundaries-highlight-outline',
+      'state-boundary-fill',
+      'state-boundary-outline',
+      'state-boundary-highlight-fill',
+      'state-boundary-highlight-outline',
+    ].forEach((id) => ids.add(id));
+
+    // Congressional layers are dynamic per district number; discover from style
+    try {
+      const style = typeof mapboxMap.getStyle === 'function' ? mapboxMap.getStyle() : null;
+      const layers: any[] = Array.isArray(style?.layers) ? style.layers : [];
+      for (const layer of layers) {
+        const id = layer?.id;
+        if (typeof id !== 'string') continue;
+        if (/^congressional-district-\d+-(fill|outline|highlight-fill|highlight-outline)$/.test(id)) {
+          ids.add(id);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return Array.from(ids);
+  }, []);
+
+  const hideOtherRecordLayers = useCallback((mapboxMap: any) => {
+    const ids = getAllInteractiveLayerIds(mapboxMap);
+    for (const id of ids) {
+      if (!mapboxMap.getLayer || !mapboxMap.setLayoutProperty) continue;
+      if (!mapboxMap.getLayer(id)) continue;
+      if (!hiddenLayersRef.current.has(id)) {
+        try {
+          const prev = mapboxMap.getLayoutProperty(id, 'visibility') as 'visible' | 'none' | undefined;
+          hiddenLayersRef.current.set(id, prev);
+        } catch {
+          hiddenLayersRef.current.set(id, undefined);
+        }
+      }
+      try {
+        mapboxMap.setLayoutProperty(id, 'visibility', 'none');
+      } catch {
+        // ignore
+      }
+    }
+  }, [getAllInteractiveLayerIds]);
+
+  const restoreOtherRecordLayers = useCallback((mapboxMap: any) => {
+    if (!mapboxMap.getLayer || !mapboxMap.setLayoutProperty) return;
+    for (const [id, prev] of hiddenLayersRef.current.entries()) {
+      if (!mapboxMap.getLayer(id)) continue;
+      try {
+        mapboxMap.setLayoutProperty(id, 'visibility', prev ?? 'visible');
+      } catch {
+        // ignore
+      }
+    }
+    hiddenLayersRef.current.clear();
+  }, []);
+
+  const ensureSelectedOverlay = useCallback((mapboxMap: any) => {
+    if (!mapboxMap || typeof mapboxMap.getSource !== 'function' || typeof mapboxMap.addSource !== 'function') return;
+
+    if (!mapboxMap.getSource(SELECTED_SOURCE_ID)) {
+      mapboxMap.addSource(SELECTED_SOURCE_ID, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+    }
+
+    const addLayerIfMissing = (layer: any) => {
+      if (typeof mapboxMap.getLayer !== 'function' || typeof mapboxMap.addLayer !== 'function') return;
+      if (mapboxMap.getLayer(layer.id)) return;
+      mapboxMap.addLayer(layer);
+    };
+
+    addLayerIfMissing({
+      id: SELECTED_POLYGON_FILL_LAYER_ID,
+      type: 'fill',
+      source: SELECTED_SOURCE_ID,
+      filter: ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']],
+      paint: {
+        'fill-color': '#2563eb',
+        'fill-opacity': 0.22,
+      },
+    });
+
+    addLayerIfMissing({
+      id: SELECTED_POLYGON_OUTLINE_LAYER_ID,
+      type: 'line',
+      source: SELECTED_SOURCE_ID,
+      filter: ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']],
+      paint: {
+        'line-color': '#2563eb',
+        'line-width': 3,
+        'line-opacity': 1,
+      },
+    });
+
+    addLayerIfMissing({
+      id: SELECTED_POINT_LAYER_ID,
+      type: 'circle',
+      source: SELECTED_SOURCE_ID,
+      filter: ['==', ['geometry-type'], 'Point'],
+      paint: {
+        'circle-radius': 10,
+        'circle-color': '#2563eb',
+        'circle-opacity': 1,
+        'circle-stroke-width': 3,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-opacity': 1,
+      },
+    });
+  }, []);
+
+  const setSelectedOverlayFeature = useCallback((mapboxMap: any, feature: GeoJSON.Feature | null) => {
+    if (!mapboxMap || typeof mapboxMap.getSource !== 'function') return;
+    const source = mapboxMap.getSource(SELECTED_SOURCE_ID) as any;
+    if (!source || typeof source.setData !== 'function') return;
+    source.setData({
+      type: 'FeatureCollection',
+      features: feature ? [feature] : [],
+    });
+  }, []);
+
+  const computeBoundsFromGeometry = useCallback((geometry: GeoJSON.Geometry | null): [[number, number], [number, number]] | null => {
+    if (!geometry) return null;
+
+    let minLng = Infinity;
+    let minLat = Infinity;
+    let maxLng = -Infinity;
+    let maxLat = -Infinity;
+
+    const extend = (lng: number, lat: number) => {
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+      minLng = Math.min(minLng, lng);
+      minLat = Math.min(minLat, lat);
+      maxLng = Math.max(maxLng, lng);
+      maxLat = Math.max(maxLat, lat);
+    };
+
+    const walk = (coords: any) => {
+      if (!coords) return;
+      if (Array.isArray(coords) && coords.length === 2 && typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+        extend(coords[0], coords[1]);
+        return;
+      }
+      if (Array.isArray(coords)) {
+        for (const c of coords) walk(c);
+      }
+    };
+
+    // @ts-expect-error - geometry.coordinates is structurally present
+    walk(geometry.coordinates);
+
+    if (!Number.isFinite(minLng) || !Number.isFinite(minLat) || !Number.isFinite(maxLng) || !Number.isFinite(maxLat)) return null;
+    return [[minLng, minLat], [maxLng, maxLat]];
+  }, []);
+
+  // If switching into creation/draw modes, close any open selection sheet
+  useEffect(() => {
+    if (pinMode || showAreaDrawModal) {
+      clearSelection();
+    }
+  }, [pinMode, showAreaDrawModal, clearSelection]);
+
+  // Selection overlay + zoom-to-selection
+  useEffect(() => {
+    if (!mapLoaded || !mapInstance) return;
+    const mapboxMap = mapInstance as any;
+    if (mapboxMap.removed) return;
+
+    ensureSelectedOverlay(mapboxMap);
+
+    if (!selectedEntity || !selectedEntityType) {
+      setSelectedOverlayFeature(mapboxMap, null);
+      return;
+    }
+
+    if (selectedEntityType === 'pin') {
+      const pin = selectedEntity as MapPin;
+      if (typeof pin.lng === 'number' && typeof pin.lat === 'number') {
+        const feature: GeoJSON.Feature = {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [pin.lng, pin.lat] },
+          properties: { id: pin.id, kind: 'pin' },
+        };
+        setSelectedOverlayFeature(mapboxMap, feature);
+        if (typeof mapboxMap.flyTo === 'function') {
+          mapboxMap.flyTo({
+            center: [pin.lng, pin.lat],
+            zoom: Math.max(15, typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 15),
+            duration: 700,
+            essential: true,
+          });
+        }
+      }
+      return;
+    }
+
+    if (selectedEntityType === 'area') {
+      const area = selectedEntity as MapArea;
+      const geometry = (area.geometry as unknown as GeoJSON.Geometry) || null;
+      const feature: GeoJSON.Feature = {
+        type: 'Feature',
+        geometry,
+        properties: { id: area.id, kind: 'area' },
+      };
+      setSelectedOverlayFeature(mapboxMap, feature);
+      const bounds = computeBoundsFromGeometry(geometry);
+      if (bounds && typeof mapboxMap.fitBounds === 'function') {
+        mapboxMap.fitBounds(bounds, { padding: 70, duration: 700, essential: true });
+      }
+      return;
+    }
+
+    if (selectedEntityType === 'layer') {
+      const layer = selectedEntity as MapLayerPolygonEntity;
+      const geometry = (layer.geometry as GeoJSON.Geometry) || null;
+      if (!geometry) {
+        setSelectedOverlayFeature(mapboxMap, null);
+        return;
+      }
+      const feature: GeoJSON.Feature = {
+        type: 'Feature',
+        geometry,
+        properties: { layerId: layer.layerId, kind: 'layer' },
+      };
+      setSelectedOverlayFeature(mapboxMap, feature);
+      const bounds = computeBoundsFromGeometry(geometry);
+      if (bounds && typeof mapboxMap.fitBounds === 'function') {
+        mapboxMap.fitBounds(bounds, { padding: 70, duration: 700, essential: true });
+      }
+    }
+  }, [
+    mapLoaded,
+    mapInstance,
+    selectedEntity,
+    selectedEntityType,
+    ensureSelectedOverlay,
+    setSelectedOverlayFeature,
+    computeBoundsFromGeometry,
+  ]);
+
+  // Hide all other records while the selection sheet is open; restore on close
+  useEffect(() => {
+    if (!mapLoaded || !mapInstance) return;
+    const mapboxMap = mapInstance as any;
+    if (mapboxMap.removed) return;
+
+    const isOpen = selectedEntity !== null && selectedEntityType !== null;
+    if (isOpen) {
+      hideOtherRecordLayers(mapboxMap);
+    } else {
+      restoreOtherRecordLayers(mapboxMap);
+    }
+  }, [mapLoaded, mapInstance, selectedEntity, selectedEntityType, hideOtherRecordLayers, restoreOtherRecordLayers]);
 
   // Apply meta settings to map
   useEffect(() => {
@@ -491,6 +890,60 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
     };
   }, [mapLoaded, mapInstance, mapId, pinMode, showAreaDrawModal]);
 
+  // Handle boundary polygon clicks + click-to-dismiss on empty map
+  useEffect(() => {
+    if (!mapLoaded || !mapInstance || pinMode || showAreaDrawModal) return;
+
+    const mapboxMap = mapInstance as any;
+    if (mapboxMap.removed) return;
+
+    const handleMapClickForSelection = (e: any) => {
+      try {
+        const features: any[] = mapboxMap.queryRenderedFeatures(e.point);
+        if (!Array.isArray(features) || features.length === 0) {
+          clearSelection();
+          return;
+        }
+
+        // If clicking pins/areas, let their layer handlers control selection (and don't dismiss).
+        if (features.some((f) => isPinOrAreaLayerId(f?.layer?.id))) {
+          return;
+        }
+
+        const polygonFeature = features.find((f) => isLayerPolygonLayerId(f?.layer?.id));
+        if (polygonFeature) {
+          const layerEntity = buildLayerPolygonEntity(polygonFeature);
+          if (layerEntity) {
+            setSelectedEntity(layerEntity);
+            setSelectedEntityType('layer');
+            return;
+          }
+        }
+
+        // Clicked something else on the map; dismiss the sheet
+        clearSelection();
+      } catch {
+        clearSelection();
+      }
+    };
+
+    mapboxMap.on('click', handleMapClickForSelection);
+    return () => {
+      if (mapboxMap && !mapboxMap.removed) {
+        mapboxMap.off('click', handleMapClickForSelection);
+      }
+    };
+  }, [
+    mapLoaded,
+    mapInstance,
+    pinMode,
+    showAreaDrawModal,
+    clearSelection,
+    isPinOrAreaLayerId,
+    isLayerPolygonLayerId,
+    buildLayerPolygonEntity,
+  ]);
+
   // Handle map clicks for pin creation (owner only, when pin mode is active)
   useEffect(() => {
     // Only activate if pin mode is on and area draw modal is closed
@@ -650,14 +1103,6 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
         : account.first_name || 'User')
     : null;
 
-  // Truncate title to 25 characters
-  const truncatedTitle = title && title.length > 25 ? `${title.slice(0, 25)}...` : title;
-  
-  // Truncate username to 5 characters
-  const truncatedUsername = account?.username && account.username.length > 5 
-    ? `${account.username.slice(0, 5)}...` 
-    : account?.username;
-
   // Ensure only one mode is active at a time
   useEffect(() => {
     if (pinMode && showAreaDrawModal) {
@@ -685,119 +1130,59 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
 
   return (
     <div className="relative w-full h-full">
-      {/* Floating Header Container */}
-      <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-50 flex items-center gap-2 sm:gap-3">
-        {/* Floating Header */}
-        {(title || account) && (
-          <div className="group bg-white/95 backdrop-blur-sm rounded-md border border-gray-200 shadow-sm transition-all hover:bg-white">
-            <div className="flex items-center gap-1.5 sm:gap-2 px-2 py-1.5 sm:px-[10px] sm:py-[10px] h-8 sm:h-auto">
-              {/* Back Arrow */}
-              <button
-                onClick={() => router.push('/maps')}
-                className="flex-shrink-0 p-0.5 sm:p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                aria-label="Back to Maps"
-              >
-                <ArrowLeftIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
+      {/* Map Info Card - Replaces all floating elements */}
+      {mapLoaded && (
+        <>
+          <MapInfoCard
+            title={title}
+            description={description}
+            account={account}
+            viewCount={viewCount}
+            isOwner={isOwner}
+            hideCreator={hideCreator}
+            mapId={mapId}
+            onInfoClick={() => setShowInfoModal(true)}
+            onPinClick={() => {
+              if (pinMode) {
+                setPinMode(false);
+              } else {
+                clearSelection();
+                setPinMode(true);
+                setShowAreaDrawModal(false);
+              }
+            }}
+            onDrawClick={() => {
+              if (showAreaDrawModal) {
+                setShowAreaDrawModal(false);
+              } else {
+                clearSelection();
+                setShowAreaDrawModal(true);
+                setPinMode(false);
+              }
+            }}
+            pinMode={pinMode}
+            showAreaDrawModal={showAreaDrawModal}
+          />
 
-              {/* Map Title */}
-              {truncatedTitle && (
-                <div className="flex items-center gap-1">
-                  <h1 className="text-[10px] sm:text-xs font-semibold text-gray-900 truncate max-w-[120px] sm:max-w-[200px] group-hover:max-w-[250px] transition-all">
-                    {truncatedTitle}
-                  </h1>
-                  {isOwner && (
-                    <button
-                      onClick={() => setShowSettingsModal(true)}
-                      className="flex-shrink-0 p-0.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                      aria-label="Map Settings"
-                    >
-                      <Cog6ToothIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Owner Info */}
-              {account && (
-                <div className="flex items-center gap-1 sm:gap-1.5 pl-1.5 sm:pl-2 border-l border-gray-200">
-                  {account.image_url ? (
-                    <Link
-                      href={account.username ? `/profile/${account.username}` : '#'}
-                      className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full overflow-hidden border border-gray-200"
-                    >
-                      <Image
-                        src={account.image_url}
-                        alt={displayName || 'User'}
-                        width={24}
-                        height={24}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    </Link>
-                  ) : (
-                    <Link
-                      href={account.username ? `/profile/${account.username}` : '#'}
-                      className="flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gray-200 flex items-center justify-center border border-gray-200"
-                    >
-                      <span className="text-[9px] sm:text-[10px] text-gray-500 font-medium">
-                        {(account.first_name?.[0] || account.username?.[0] || 'U').toUpperCase()}
-                      </span>
-                    </Link>
-                  )}
-                  {truncatedUsername && (
-                    <Link
-                      href={`/profile/${account.username}`}
-                      className="hidden sm:inline text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors truncate max-w-[100px] sm:max-w-[120px] group-hover:max-w-[150px]"
-                      title={account.username || undefined}
-                    >
-                      @{truncatedUsername}
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      {/* Top Right Controls - Account & Upgrade */}
-      <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
-        {/* Upgrade Button */}
-        {currentAccount?.plan === 'hobby' && (
-          <button
-            onClick={() => router.push('/billing')}
-            className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
-          >
-            Upgrade
-          </button>
-        )}
-        {/* Account Dropdown */}
-        <AccountDropdown
-          variant="light"
-          onAccountClick={() => openAccount('settings')}
-          onSignInClick={() => openWelcome()}
-        />
-      </div>
-
-      {/* Floating View Count - Bottom Left */}
-      {viewCount !== null && viewCount !== undefined && (
-        <div className="absolute bottom-3 left-3 z-50">
-          <div className="bg-white/95 backdrop-blur-sm rounded-md border border-gray-200 shadow-sm transition-all hover:bg-white h-8 sm:h-auto">
-            <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-[10px] sm:py-[10px] h-full">
-              <EyeIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
-              <span className="text-[10px] sm:text-xs font-medium text-gray-700">
-                {viewCount.toLocaleString()}
-              </span>
-            </div>
-          </div>
-        </div>
+          {/* Saved boundary layers (exclusive, persisted via map.map_layers) */}
+          <CongressionalDistrictsLayer
+            map={mapInstance}
+            mapLoaded={mapLoaded}
+            visible={showDistricts}
+          />
+          <CTUBoundariesLayer map={mapInstance} mapLoaded={mapLoaded} visible={showCTU} />
+          <CountyBoundariesLayer
+            map={mapInstance}
+            mapLoaded={mapLoaded}
+            visible={showCountyBoundaries}
+          />
+          <StateBoundaryLayer map={mapInstance} mapLoaded={mapLoaded} visible={showStateBoundary} />
+        </>
       )}
 
       <div 
         ref={mapContainer} 
-        className="w-full h-full"
+        className="w-full h-full rounded-t-3xl overflow-hidden"
         style={{ margin: 0, padding: 0 }}
       />
       {!mapLoaded && (
@@ -834,95 +1219,6 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
         />
       )}
 
-      {/* Floating Action Buttons - Info, Pin and Draw */}
-      {mapLoaded && (
-        <div className="absolute bottom-3 right-3 z-50 flex flex-col gap-2">
-          {/* Info Button - Always visible */}
-          <button
-            onClick={() => setShowInfoModal(true)}
-            className="flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all bg-white/95 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white"
-            aria-label="Map Information"
-            title="Map Information"
-          >
-            <InformationCircleIcon className="w-5 h-5" />
-          </button>
-
-          {/* Pin Button - Owner only */}
-          {isOwner && (
-            <button
-              onClick={() => {
-                if (pinMode) {
-                  // Toggle off pin mode
-                  setPinMode(false);
-                } else {
-                  // Activate pin mode, deactivate draw mode
-                  setPinMode(true);
-                  setShowAreaDrawModal(false);
-                }
-              }}
-              className={`flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all ${
-                pinMode
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white/95 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white'
-              }`}
-              aria-label="Add Pin"
-              title={pinMode ? 'Exit Pin Mode' : 'Add Pin'}
-            >
-              <MapPinIcon className="w-5 h-5" />
-            </button>
-          )}
-
-          {/* Draw/Area Button - Owner only */}
-          {isOwner && (
-            <button
-              onClick={() => {
-                if (showAreaDrawModal) {
-                  // Close area draw modal
-                  setShowAreaDrawModal(false);
-                } else {
-                  // Open area draw modal, deactivate pin mode
-                  setShowAreaDrawModal(true);
-                  setPinMode(false);
-                }
-              }}
-              className={`flex items-center justify-center w-10 h-10 rounded-full border shadow-sm transition-all ${
-                showAreaDrawModal
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white/95 backdrop-blur-sm text-gray-700 border-gray-200 hover:bg-white'
-              }`}
-              aria-label="Draw Area"
-              title={showAreaDrawModal ? 'Close Draw Tool' : 'Draw Area'}
-            >
-              <PencilSquareIcon className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Settings Modal */}
-      {isOwner && (
-        <MapIdSettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => setShowSettingsModal(false)}
-          mapId={mapId}
-          initialData={{
-            title: title || '',
-            description: description || null,
-            visibility: visibility || 'private',
-            map_style: mapStyle,
-            meta: meta || null,
-          }}
-          onUpdate={(updatedData) => {
-            if (onMapUpdate) {
-              onMapUpdate(updatedData);
-            }
-            // Refresh the page to show updated data
-            if (typeof window !== 'undefined') {
-              window.location.reload();
-            }
-          }}
-        />
-      )}
 
       {/* Area Draw Modal */}
       {isOwner && (
@@ -987,6 +1283,7 @@ export default function MapIDBox({ mapStyle, mapId, isOwner, meta, title, descri
                 account={account || null}
                 map_account_id={map_account_id || ''}
                 current_account_id={current_account_id || null}
+                hideCreator={hideCreator}
                 created_at={created_at}
                 updated_at={updated_at}
               />

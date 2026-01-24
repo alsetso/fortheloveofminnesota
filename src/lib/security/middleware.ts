@@ -55,7 +55,7 @@ export async function withSecurity<T>(
     accountId?: string;
   }) => Promise<T>,
   options: {
-    rateLimit?: keyof typeof RATE_LIMITS | 'none';
+    rateLimit?: keyof typeof RATE_LIMITS | 'none' | { windowMs: number; maxRequests: number };
     requireAuth?: boolean;
     requireAdmin?: boolean;
     maxRequestSize?: number;
@@ -82,7 +82,7 @@ export async function withSecurity<T>(
   
   // Apply rate limiting
   if (rateLimit !== 'none') {
-    const config = RATE_LIMITS[rateLimit];
+    const config = typeof rateLimit === 'string' ? RATE_LIMITS[rateLimit] : rateLimit;
     const rateLimitCheck = await withRateLimit(config, auth.userId || undefined)(request);
     
     if (!rateLimitCheck.allowed && rateLimitCheck.response) {
@@ -99,10 +99,12 @@ export async function withSecurity<T>(
   // Check authentication requirements
   if (requireAdminFlag) {
     const { requireAdmin } = await import('./accessControl');
-    const adminCheck = await requireAdmin();
+    // For API routes, use request cookies directly
+    const adminCheck = await requireAdmin(request.cookies);
     if (!adminCheck.success) {
+      const errorData = JSON.parse(await adminCheck.error.text());
       return NextResponse.json(
-        JSON.parse(await adminCheck.error.text()),
+        errorData,
         { status: adminCheck.error.status }
       );
     }
@@ -114,7 +116,8 @@ export async function withSecurity<T>(
   
   if (requireAuthFlag) {
     const { requireAuth } = await import('./accessControl');
-    const authCheck = await requireAuth();
+    // For API routes, use request cookies directly
+    const authCheck = await requireAuth(request.cookies);
     if (!authCheck.success) {
       return NextResponse.json(
         JSON.parse(await authCheck.error.text()),

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { UserIcon, CameraIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { isPaidPlan } from '@/lib/billing/planHelpers';
 
 interface ProfileCardProps {
   account: {
@@ -110,31 +111,33 @@ export default function ProfileCard({
           {/* Profile Image */}
           <div
             onClick={onProfileImageClick}
-            className={`relative w-16 h-16 -mt-10 rounded-full overflow-hidden ${onProfileImageClick ? 'cursor-pointer group' : ''} border-4 ${
-              (account.plan === 'contributor' || account.plan === 'plus')
-                ? 'border-yellow-500'
+            className={`relative w-16 h-16 -mt-10 rounded-full overflow-hidden ${onProfileImageClick ? 'cursor-pointer group' : ''} ${
+              isPaidPlan(account.plan)
+                ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                 : darkMode
-                  ? 'border-black'
-                  : 'border-white'
+                  ? 'border-4 border-black'
+                  : 'border-4 border-white'
             }`}
           >
-            {account.image_url ? (
-              <Image
-                src={account.image_url}
-                alt={account.username || 'Profile'}
-                fill
-                className="object-cover"
-                unoptimized={account.image_url.includes('supabase.co')}
-              />
-            ) : (
-              <div className={`w-full h-full flex items-center justify-center ${
-                darkMode ? 'bg-white/20' : 'bg-gray-200'
-              }`}>
-                <UserIcon className={`w-8 h-8 ${darkMode ? 'text-white/70' : 'text-gray-400'}`} />
-              </div>
-            )}
+            <div className="w-full h-full rounded-full overflow-hidden bg-white">
+              {account.image_url ? (
+                <Image
+                  src={account.image_url}
+                  alt={account.username || 'Profile'}
+                  fill
+                  className="object-cover rounded-full"
+                  unoptimized={account.image_url.includes('supabase.co')}
+                />
+              ) : (
+                <div className={`w-full h-full flex items-center justify-center rounded-full ${
+                  darkMode ? 'bg-white/20' : 'bg-gray-200'
+                }`}>
+                  <UserIcon className={`w-8 h-8 ${darkMode ? 'text-white/70' : 'text-gray-400'}`} />
+                </div>
+              )}
+            </div>
             {onProfileImageClick && (
-              <div className={`absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ${
+              <div className={`absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full ${
                 darkMode ? 'bg-black/50' : 'bg-black/30'
               }`}>
                 <CameraIcon className="w-5 h-5 text-white shrink-0" />

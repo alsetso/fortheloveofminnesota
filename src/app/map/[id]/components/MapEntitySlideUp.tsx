@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { XMarkIcon, MapPinIcon, PencilSquareIcon, TrashIcon, PencilIcon, CheckIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MapPinIcon, PencilSquareIcon, TrashIcon, PencilIcon, CheckIcon, CameraIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import EmojiPicker from './EmojiPicker';
@@ -29,11 +29,22 @@ interface MapArea {
   updated_at: string;
 }
 
+interface MapLayerPolygon {
+  layerId: string;
+  title: string;
+  subtitle?: string | null;
+  properties: Record<string, unknown>;
+  geometryType?: string | null;
+}
+
+type MapEntityType = 'pin' | 'area' | 'layer';
+type MapEntity = MapPin | MapArea | MapLayerPolygon;
+
 interface MapEntitySlideUpProps {
   isOpen: boolean;
   onClose: () => void;
-  entity: MapPin | MapArea | null;
-  entityType: 'pin' | 'area' | null;
+  entity: MapEntity | null;
+  entityType: MapEntityType | null;
   isOwner: boolean;
   mapId: string;
   onEntityDeleted?: () => void;
@@ -86,7 +97,7 @@ export default function MapEntitySlideUp({
   }, [isOpen, entity, entityType]);
 
   const handleDelete = async () => {
-    if (!entity || !showDeleteConfirm) return;
+    if (!entity || !showDeleteConfirm || entityType === 'layer') return;
 
     setIsDeleting(true);
     try {
@@ -272,8 +283,15 @@ export default function MapEntitySlideUp({
   if (!isOpen || !entity || !entityType) return null;
 
   const isPin = entityType === 'pin';
+  const isLayer = entityType === 'layer';
   const pin = isPin ? (entity as MapPin) : null;
-  const area = !isPin ? (entity as MapArea) : null;
+  const area = !isPin && !isLayer ? (entity as MapArea) : null;
+  const layer = isLayer ? (entity as MapLayerPolygon) : null;
+
+  const layerProperties = layer?.properties ? Object.entries(layer.properties) : [];
+  const displayLayerProps = layerProperties
+    .filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v))
+    .slice(0, 16);
 
   return (
     <>
@@ -294,11 +312,13 @@ export default function MapEntitySlideUp({
           <div className="flex items-center gap-2">
             {isPin ? (
               <MapPinIcon className="w-4 h-4 text-gray-600" />
+            ) : isLayer ? (
+              <Squares2X2Icon className="w-4 h-4 text-gray-600" />
             ) : (
               <PencilSquareIcon className="w-4 h-4 text-gray-600" />
             )}
             <h3 className="text-xs font-semibold text-gray-900">
-              {isPin ? 'Pin Details' : 'Area Details'}
+              {isPin ? 'Pin Details' : isLayer ? 'Layer Details' : 'Area Details'}
             </h3>
           </div>
           <div className="flex items-center gap-1">
@@ -638,6 +658,57 @@ export default function MapEntitySlideUp({
                   </div>
                 )}
               </div>
+            </>
+          )}
+
+          {/* Layer Polygon Content */}
+          {isLayer && layer && (
+            <>
+              <div>
+                <div className="text-[10px] font-medium text-gray-500 mb-0.5">Layer</div>
+                <div className="text-xs font-semibold text-gray-900">{layer.title}</div>
+                {layer.subtitle ? (
+                  <div className="text-[10px] text-gray-500 mt-0.5">{layer.subtitle}</div>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <div className="text-[10px] font-medium text-gray-500 mb-0.5">Layer ID</div>
+                  <div className="text-gray-600 break-all">{layer.layerId}</div>
+                </div>
+                {layer.geometryType ? (
+                  <div>
+                    <div className="text-[10px] font-medium text-gray-500 mb-0.5">Geometry</div>
+                    <div className="text-gray-600">{layer.geometryType}</div>
+                  </div>
+                ) : null}
+              </div>
+
+              {displayLayerProps.length > 0 ? (
+                <div>
+                  <div className="text-[10px] font-medium text-gray-500 mb-1">Properties</div>
+                  <div className="border border-gray-200 rounded-md overflow-hidden">
+                    <div className="divide-y divide-gray-200">
+                      {displayLayerProps.map(([k, v]) => (
+                        <div key={k} className="grid grid-cols-3 gap-2 px-[10px] py-2">
+                          <div className="col-span-1 text-[10px] font-medium text-gray-500 truncate">{k}</div>
+                          <div className="col-span-2 text-xs text-gray-900 break-words">
+                            {v === null ? '—' : String(v)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {layerProperties.length > displayLayerProps.length ? (
+                    <div className="text-[10px] text-gray-500 mt-1">
+                      Showing {displayLayerProps.length} of {layerProperties.length}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500">No properties</div>
+              )}
             </>
           )}
 

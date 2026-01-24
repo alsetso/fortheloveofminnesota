@@ -18,6 +18,9 @@ export interface MapItem {
   requiresPro?: boolean;
   status?: 'active' | 'coming_soon' | 'unlisted';
   view_count?: number;
+  is_primary?: boolean;
+  hide_creator?: boolean;
+  collection_type?: 'community' | 'professional' | 'user' | 'atlas' | 'gov' | null;
   meta?: {
     screenshot_url?: string;
     buildingsEnabled?: boolean;

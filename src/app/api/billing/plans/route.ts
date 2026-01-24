@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
           .from('billing_plans')
           .select('*')
           .eq('is_active', true)
-          .order('display_order', { ascending: true });
+          .order('display_order', { ascending: true })
+          .returns<BillingPlan[]>();
         
         if (plansError) {
           console.error('[Billing API] Error fetching plans:', plansError);
@@ -42,7 +43,8 @@ export async function GET(request: NextRequest) {
           .select('*')
           .eq('is_active', true)
           .order('category', { ascending: true })
-          .order('name', { ascending: true });
+          .order('name', { ascending: true })
+          .returns<BillingFeature[]>();
         
         if (featuresError) {
           console.error('[Billing API] Error fetching features:', featuresError);
@@ -64,10 +66,11 @@ export async function GET(request: NextRequest) {
           featuresBySlug.set(feature.slug, feature);
         });
         
-        // Fetch plan-feature relationships (direct assignments only)
+        // Fetch plan-feature relationships (direct assignments only) WITH LIMITS
         const { data: planFeatures, error: planFeaturesError } = await supabase
           .from('billing_plan_features')
-          .select('plan_id, feature_id');
+          .select('plan_id, feature_id, limit_value, limit_type')
+          .returns<Array<{plan_id: string; feature_id: string; limit_value: number | null; limit_type: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>>();
         
         if (planFeaturesError) {
           console.error('[Billing API] Error fetching plan-feature relationships:', planFeaturesError);
@@ -77,18 +80,27 @@ export async function GET(request: NextRequest) {
           );
         }
         
-        // Build a map of plan_id -> directly assigned feature_ids
+        // Build a map of plan_id -> directly assigned feature_ids with limits
         const directPlanFeaturesMap = new Map<string, Set<string>>();
+        const featureLimitsMap = new Map<string, {limit_value: number | null; limit_type: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>();
+        
         (planFeatures || []).forEach((pf) => {
           if (!directPlanFeaturesMap.has(pf.plan_id)) {
             directPlanFeaturesMap.set(pf.plan_id, new Set());
           }
           directPlanFeaturesMap.get(pf.plan_id)?.add(pf.feature_id);
+          
+          // Store limit info with composite key: plan_id:feature_id
+          const key = `${pf.plan_id}:${pf.feature_id}`;
+          featureLimitsMap.set(key, {
+            limit_value: pf.limit_value,
+            limit_type: pf.limit_type
+          });
         });
         
         // For each plan, get all features (including inherited from lower tiers)
         // Calculate inheritance manually since PostgREST can't access billing schema functions
-        const plansWithFeatures = (plans || []).map((plan: any) => {
+        const plansWithFeatures = (plans || []).map((plan: BillingPlan) => {
           // Get directly assigned features for this plan
           const directFeatureIds = directPlanFeaturesMap.get(plan.id) || new Set();
           const directFeatures: BillingFeature[] = Array.from(directFeatureIds)
@@ -97,12 +109,12 @@ export async function GET(request: NextRequest) {
           
           // Get all lower-tier plans (display_order < current)
           const lowerTierPlans = (plans || []).filter(
-            (p: any) => p.display_order < plan.display_order && p.is_active
+            (p: BillingPlan) => p.display_order < plan.display_order && p.is_active
           );
           
           // Collect all features from lower-tier plans (inherited features)
           const inheritedFeatureIds = new Set<string>();
-          lowerTierPlans.forEach((lowerPlan: any) => {
+          lowerTierPlans.forEach((lowerPlan: BillingPlan) => {
             const lowerPlanFeatureIds = directPlanFeaturesMap.get(lowerPlan.id) || new Set();
             lowerPlanFeatureIds.forEach((featureId) => {
               inheritedFeatureIds.add(featureId);
@@ -115,9 +127,22 @@ export async function GET(request: NextRequest) {
             .map((featureId) => featuresMap.get(featureId))
             .filter((f): f is BillingFeature => f !== undefined);
           
-          // Combine direct and inherited features
-          const allPlanFeatures: (BillingFeature & { isInherited: boolean })[] = [
-            ...directFeatures.map((f) => ({ ...f, isInherited: false })),
+          // Combine direct and inherited features WITH LIMIT DATA
+          const allPlanFeatures: (BillingFeature & { 
+            isInherited: boolean;
+            limit_value?: number | null;
+            limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null;
+          })[] = [
+            ...directFeatures.map((f) => {
+              const key = `${plan.id}:${f.id}`;
+              const limits = featureLimitsMap.get(key);
+              return { 
+                ...f, 
+                isInherited: false,
+                limit_value: limits?.limit_value,
+                limit_type: limits?.limit_type
+              };
+            }),
             ...inheritedFeatures.map((f) => ({ ...f, isInherited: true })),
           ];
           

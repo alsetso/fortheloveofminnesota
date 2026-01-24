@@ -2,7 +2,40 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
-import { getAccountSubscriptionState } from '@/lib/subscriptionServer';
+
+async function getActiveAccountIdForUser(
+  supabase: ReturnType<typeof createServerClient<Database>>,
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  userId: string
+): Promise<string | null> {
+  const activeAccountId = cookieStore.get('active_account_id')?.value || null;
+
+  if (activeAccountId) {
+    const { data: active, error } = await supabase
+      .from('accounts')
+      .select('id')
+      .eq('id', activeAccountId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!error && active && typeof (active as { id?: unknown }).id === 'string') {
+      return (active as { id: string }).id;
+    }
+  }
+
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (fallbackError || !fallback || typeof (fallback as { id?: unknown }).id !== 'string') {
+    return null;
+  }
+
+  return (fallback as { id: string }).id;
+}
 
 /**
  * Check if user has access to a specific feature
@@ -12,13 +45,6 @@ import { getAccountSubscriptionState } from '@/lib/subscriptionServer';
  * @returns true if user has access to the feature, false otherwise
  */
 export const hasFeatureAccess = cache(async (featureSlug: string): Promise<boolean> => {
-  const subscriptionState = await getAccountSubscriptionState();
-  
-  // If user is not authenticated or doesn't have active subscription, no features
-  if (!subscriptionState.isActive && !subscriptionState.isComped) {
-    return false;
-  }
-  
   const cookieStore = await cookies();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -47,11 +73,16 @@ export const hasFeatureAccess = cache(async (featureSlug: string): Promise<boole
   if (authError || !user) {
     return false;
   }
+
+  const accountId = await getActiveAccountIdForUser(supabase, cookieStore, user.id);
+  if (!accountId) {
+    return false;
+  }
   
   // Call Supabase function to check feature access
   // Use public schema wrapper for PostgREST compatibility
-  const { data, error } = await supabase.rpc('user_has_feature', {
-    user_id: user.id,
+  const { data, error } = await supabase.rpc('account_has_feature', {
+    account_id: accountId,
     feature_slug: featureSlug,
   });
   
@@ -69,12 +100,6 @@ export const hasFeatureAccess = cache(async (featureSlug: string): Promise<boole
  * @returns Array of feature slugs available to the user
  */
 export const getUserFeatures = cache(async (): Promise<string[]> => {
-  const subscriptionState = await getAccountSubscriptionState();
-  
-  if (!subscriptionState.isActive && !subscriptionState.isComped) {
-    return [];
-  }
-  
   const cookieStore = await cookies();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -103,11 +128,16 @@ export const getUserFeatures = cache(async (): Promise<string[]> => {
   if (authError || !user) {
     return [];
   }
+
+  const accountId = await getActiveAccountIdForUser(supabase, cookieStore, user.id);
+  if (!accountId) {
+    return [];
+  }
   
   // Call Supabase function to get user features
   // Use public schema wrapper for PostgREST compatibility
-  const { data, error } = await supabase.rpc('get_user_features', {
-    user_id: user.id,
+  const { data, error } = await supabase.rpc('get_account_features_with_limits', {
+    account_id: accountId,
   });
   
   if (error) {

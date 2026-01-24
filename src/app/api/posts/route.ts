@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         const account_id = searchParams.get('account_id');
         const group_id = searchParams.get('group_id');
         const mention_time = searchParams.get('mention_time') as '24h' | '7d' | 'all' | null;
+        const mention_type_id = searchParams.get('mention_type_id');
         const limit = parseInt(searchParams.get('limit') || '20', 10);
         const offset = parseInt(searchParams.get('offset') || '0', 10);
 
@@ -88,6 +89,11 @@ export async function GET(request: NextRequest) {
         // Filter by account
         if (account_id) {
           query = query.eq('account_id', account_id);
+        }
+
+        // Filter by mention_type_id
+        if (mention_type_id) {
+          query = query.eq('mention_type_id', mention_type_id);
         }
 
         const { data: posts, error } = await query;

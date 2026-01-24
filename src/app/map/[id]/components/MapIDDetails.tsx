@@ -19,6 +19,7 @@ interface MapIDDetailsProps {
   } | null;
   map_account_id: string; // The account_id of the map owner
   current_account_id?: string | null; // The current user's account ID
+  hideCreator?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -32,6 +33,7 @@ export default function MapIDDetails({
   account,
   map_account_id,
   current_account_id,
+  hideCreator = false,
   created_at,
   updated_at,
 }: MapIDDetailsProps) {
@@ -64,7 +66,7 @@ export default function MapIDDetails({
       </div>
 
       {/* Owner */}
-      {account && (
+      {account && !hideCreator && (
         <div className="space-y-1.5">
           <div className="text-[10px] font-medium text-gray-500">Owner</div>
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">

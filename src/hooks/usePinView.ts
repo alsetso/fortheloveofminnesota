@@ -26,8 +26,10 @@ export function usePinView({ pin_id, enabled = true }: UsePinViewOptions) {
     // Generate or get device ID from localStorage (shared across tabs on same device)
     let deviceId: string | null = null;
     if (typeof window !== 'undefined') {
+      const isUuid = (value: string) =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
       deviceId = localStorage.getItem('analytics_device_id');
-      if (!deviceId) {
+      if (!deviceId || !isUuid(deviceId)) {
         deviceId = crypto.randomUUID();
         localStorage.setItem('analytics_device_id', deviceId);
       }

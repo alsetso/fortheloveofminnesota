@@ -9,7 +9,7 @@ import OrgPageClient from './OrgPageClient';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
-import OrgPageWrapper from './OrgPageWrapper';
+import StandardPageClient from '@/components/layout/StandardPageClient';
 
 export const revalidate = 3600;
 
@@ -88,7 +88,7 @@ export default async function OrgPage({ params }: Props) {
   const icon = getIconForOrgType(org.org_type);
 
   return (
-    <OrgPageWrapper>
+    <StandardPageClient contentClassName="h-full overflow-y-auto px-[10px] py-3">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={breadcrumbs} />
@@ -136,7 +136,7 @@ export default async function OrgPage({ params }: Props) {
           />
         </div>
       </div>
-    </OrgPageWrapper>
+    </StandardPageClient>
   );
 }
 

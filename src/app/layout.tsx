@@ -104,7 +104,9 @@ export default function RootLayout({
             s.parentNode.insertBefore(t,s)}(window, document,'script',
             'https://connect.facebook.net/en_US/fbevents.js');
             fbq('init', '342825829636878');
+            console.log('[Facebook Pixel] Initialized - ID: 342825829636878');
             fbq('track', 'PageView');
+            console.log('[Facebook Pixel] Tracked: PageView');
           `}
         </Script>
         <noscript>

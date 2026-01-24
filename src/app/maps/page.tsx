@@ -10,32 +10,40 @@ import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import MapCard from './components/MapCard';
-import { COMMUNITY_MAPS, PROFESSIONAL_MAPS } from './constants';
 import type { MapItem } from './types';
 
-type TabType = 'my-maps' | 'community' | 'professional';
+type TabType = 'my-maps' | 'community' | 'professional' | 'gov';
 
 export default function MapsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
-  const [userMaps, setUserMaps] = useState<MapItem[]>([]);
   const [accountMaps, setAccountMaps] = useState<MapItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [loadingAccountMaps, setLoadingAccountMaps] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [communityMaps, setCommunityMaps] = useState<MapItem[]>(() => 
-    COMMUNITY_MAPS.map(m => ({ ...m, view_count: 0 }))
-  );
+  const [communityMaps, setCommunityMaps] = useState<MapItem[]>([]);
+  const [professionalMaps, setProfessionalMaps] = useState<MapItem[]>([]);
+  const [userMapsCollection, setUserMapsCollection] = useState<MapItem[]>([]);
+  const [atlasMaps, setAtlasMaps] = useState<MapItem[]>([]);
+  const [govMaps, setGovMaps] = useState<MapItem[]>([]);
+  const [loadingCommunityMaps, setLoadingCommunityMaps] = useState(false);
+  const [loadingProfessionalMaps, setLoadingProfessionalMaps] = useState(false);
+  const [loadingUserMapsCollection, setLoadingUserMapsCollection] = useState(false);
+  const [loadingAtlasMaps, setLoadingAtlasMaps] = useState(false);
+  const [loadingGovMaps, setLoadingGovMaps] = useState(false);
   // Track which tabs have been fetched
-  const fetchedTabsRef = useRef<Set<TabType | 'user-generated'>>(new Set());
+  const fetchedTabsRef = useRef<Set<TabType>>(new Set());
   const hasFetchedAccountMapsRef = useRef<string | null>(null);
   
   // Get initial tab from URL or default
   const getInitialTab = (): TabType => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['my-maps', 'community', 'professional'].includes(tabParam)) {
+    // Redirect 'user' and 'atlas' tabs to 'community'
+    if (tabParam === 'user' || tabParam === 'atlas') {
+      return 'community';
+    }
+    if (tabParam && ['my-maps', 'community', 'professional', 'gov'].includes(tabParam)) {
       return tabParam as TabType;
     }
     return account ? 'my-maps' : 'community';
@@ -47,18 +55,20 @@ export default function MapsPage() {
   // Update active tab when URL param or account changes
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['my-maps', 'community', 'professional'].includes(tabParam)) {
+    // Redirect 'user' and 'atlas' tabs to 'community'
+    if (tabParam === 'user' || tabParam === 'atlas') {
+      router.push('/maps?tab=community');
+      setActiveTab('community');
+      return;
+    }
+    if (tabParam && ['my-maps', 'community', 'professional', 'gov'].includes(tabParam)) {
       setActiveTab(tabParam as TabType);
     } else if (account) {
       setActiveTab('my-maps');
     } else {
       setActiveTab('community');
     }
-  }, [searchParams, account?.id]);
-  const [professionalMaps, setProfessionalMaps] = useState<MapItem[]>(() => 
-    PROFESSIONAL_MAPS.map(m => ({ ...m, view_count: 0 }))
-  );
-  const [loadingProfessionalMaps, setLoadingProfessionalMaps] = useState(false);
+  }, [searchParams, account?.id, router]);
 
   // Filter maps based on search query
   const filteredCommunityMaps = useMemo(() => {
@@ -79,15 +89,6 @@ export default function MapsPage() {
     );
   }, [professionalMaps, searchQuery]);
 
-  const filteredUserMaps = useMemo(() => {
-    if (!searchQuery.trim()) return userMaps;
-    const query = searchQuery.toLowerCase();
-    return userMaps.filter(map => 
-      map.title.toLowerCase().includes(query) ||
-      (map.description && map.description.toLowerCase().includes(query))
-    );
-  }, [userMaps, searchQuery]);
-
   const filteredAccountMaps = useMemo(() => {
     if (!searchQuery.trim()) return accountMaps;
     const query = searchQuery.toLowerCase();
@@ -99,63 +100,8 @@ export default function MapsPage() {
 
 
 
-  // Fetch user-generated maps and stats - only when 'community' tab is selected
-  useEffect(() => {
-    if (activeTab !== 'community' || fetchedTabsRef.current.has('user-generated')) {
-      return;
-    }
 
-    fetchedTabsRef.current.add('user-generated');
-
-    const fetchMapsAndStats = async () => {
-      setLoading(true);
-      try {
-        // Fetch maps
-        const response = await fetch('/api/maps?visibility=public');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch maps: ${response.statusText}`);
-        }
-        const data = await response.json();
-        
-        if (!data.maps || data.maps.length === 0) {
-          setUserMaps([]);
-          setLoading(false);
-          return;
-        }
-
-        // Transform maps and collect map IDs
-        const transformedMaps = data.maps.map((map: any) => ({
-          ...map,
-          map_type: 'user' as const,
-        }));
-
-        const mapIds = transformedMaps.map((map: any) => map.id);
-
-        // Fetch stats for all maps in batch
-        const statsResponse = await fetch(`/api/maps/stats?ids=${mapIds.join(',')}`);
-        if (!statsResponse.ok) {
-          console.warn('Failed to fetch map stats, continuing without stats');
-        }
-        const statsData = await statsResponse.json();
-
-        // Combine maps with stats
-        const mapsWithStats = transformedMaps.map((map: any) => ({
-          ...map,
-          view_count: statsData.stats?.[map.id]?.total_views || 0,
-        }));
-
-        setUserMaps(mapsWithStats);
-      } catch (err) {
-        console.error('Error fetching maps:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMapsAndStats();
-  }, [activeTab]);
-
-  // Fetch community map stats - only when 'community' tab is selected
+  // Fetch community maps - only when 'community' tab is selected
   useEffect(() => {
     if (activeTab !== 'community' || fetchedTabsRef.current.has('community')) {
       return;
@@ -163,22 +109,53 @@ export default function MapsPage() {
 
     fetchedTabsRef.current.add('community');
 
-    const fetchCommunityStats = async () => {
+    const fetchCommunityMaps = async () => {
+      setLoadingCommunityMaps(true);
       try {
-        const mentionStats = await fetch('/api/analytics/special-map-stats?map_identifier=mention').then(r => r.json());
+        const response = await fetch('/api/maps?collection_type=community&visibility=public');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch community maps: ${response.statusText}`);
+        }
+        const data = await response.json();
+        
+        if (!data.maps || data.maps.length === 0) {
+          setCommunityMaps([]);
+          setLoadingCommunityMaps(false);
+          return;
+        }
 
-        setCommunityMaps(prev => prev.map(map => {
-          if (map.id === 'mention') {
-            return { ...map, view_count: mentionStats.stats?.total_views || 0 };
-          }
-          return map;
+        const transformedMaps = data.maps.map((map: any) => ({
+          ...map,
+          map_type: 'community' as const,
+          href: map.custom_slug ? `/map/${map.custom_slug}` : `/map/${map.id}`,
         }));
+
+        const mapIds = transformedMaps.map((map: any) => map.id);
+
+        if (mapIds.length > 0) {
+          const statsResponse = await fetch(`/api/maps/stats?ids=${mapIds.join(',')}`);
+          if (!statsResponse.ok) {
+            console.warn('Failed to fetch community map stats, continuing without stats');
+          }
+          const statsData = await statsResponse.json();
+
+          const mapsWithStats = transformedMaps.map((map: any) => ({
+            ...map,
+            view_count: statsData.stats?.[map.id]?.total_views || 0,
+          }));
+
+          setCommunityMaps(mapsWithStats);
+        } else {
+          setCommunityMaps(transformedMaps);
+        }
       } catch (err) {
-        console.error('Error fetching community map stats:', err);
+        console.error('Error fetching community maps:', err);
+      } finally {
+        setLoadingCommunityMaps(false);
       }
     };
 
-    fetchCommunityStats();
+    fetchCommunityMaps();
   }, [activeTab]);
 
   // Fetch account's maps (all visibilities) - only when 'my-maps' tab is selected
@@ -251,7 +228,7 @@ export default function MapsPage() {
   }, [activeTab, account?.id]);
 
 
-  // Fetch professional map stats - only when 'professional' tab is selected
+  // Fetch professional maps - only when 'professional' tab is selected
   useEffect(() => {
     if (activeTab !== 'professional' || fetchedTabsRef.current.has('professional')) {
       return;
@@ -259,35 +236,225 @@ export default function MapsPage() {
 
     fetchedTabsRef.current.add('professional');
 
-    const fetchProfessionalStats = async () => {
+    const fetchProfessionalMaps = async () => {
       setLoadingProfessionalMaps(true);
       try {
-        const [fraudStats, realestateStats, skipTracingStats] = await Promise.all([
-          fetch('/api/analytics/special-map-stats?map_identifier=fraud').then(r => r.json()).catch(() => ({ stats: { total_views: 0 } })),
-          fetch('/api/analytics/special-map-stats?map_identifier=realestate').then(r => r.json()).catch(() => ({ stats: { total_views: 0 } })),
-          fetch('/api/analytics/special-map-stats?map_identifier=skip-tracing').then(r => r.json()).catch(() => ({ stats: { total_views: 0 } })),
-        ]);
+        const response = await fetch('/api/maps?collection_type=professional&visibility=public');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch professional maps: ${response.statusText}`);
+        }
+        const data = await response.json();
+        
+        if (!data.maps || data.maps.length === 0) {
+          setProfessionalMaps([]);
+          setLoadingProfessionalMaps(false);
+          return;
+        }
 
-        setProfessionalMaps(prev => prev.map(map => {
-          if (map.id === 'fraud') {
-            return { ...map, view_count: fraudStats.stats?.total_views || 0 };
-          }
-          if (map.id === 'realestate') {
-            return { ...map, view_count: realestateStats.stats?.total_views || 0 };
-          }
-          if (map.id === 'skip-tracing') {
-            return { ...map, view_count: skipTracingStats.stats?.total_views || 0 };
-          }
-          return map;
+        const transformedMaps = data.maps.map((map: any) => ({
+          ...map,
+          map_type: 'professional' as const,
+          requiresPro: true,
+          href: map.custom_slug ? `/map/${map.custom_slug}` : `/map/${map.id}`,
         }));
+
+        const mapIds = transformedMaps.map((map: any) => map.id);
+
+        if (mapIds.length > 0) {
+          const statsResponse = await fetch(`/api/maps/stats?ids=${mapIds.join(',')}`);
+          if (!statsResponse.ok) {
+            console.warn('Failed to fetch professional map stats, continuing without stats');
+          }
+          const statsData = await statsResponse.json();
+
+          const mapsWithStats = transformedMaps.map((map: any) => ({
+            ...map,
+            view_count: statsData.stats?.[map.id]?.total_views || 0,
+          }));
+
+          setProfessionalMaps(mapsWithStats);
+        } else {
+          setProfessionalMaps(transformedMaps);
+        }
       } catch (err) {
-        console.error('Error fetching professional map stats:', err);
+        console.error('Error fetching professional maps:', err);
       } finally {
         setLoadingProfessionalMaps(false);
       }
     };
 
-    fetchProfessionalStats();
+    fetchProfessionalMaps();
+  }, [activeTab]);
+
+  // Fetch atlas maps - only when 'atlas' tab is selected
+  useEffect(() => {
+    if (activeTab !== 'atlas' || fetchedTabsRef.current.has('atlas')) {
+      return;
+    }
+
+    fetchedTabsRef.current.add('atlas');
+
+    const fetchAtlasMaps = async () => {
+      setLoadingAtlasMaps(true);
+      try {
+        const response = await fetch('/api/maps?collection_type=atlas&visibility=public');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch atlas maps: ${response.statusText}`);
+        }
+        const data = await response.json();
+        
+        if (!data.maps || data.maps.length === 0) {
+          setAtlasMaps([]);
+          setLoadingAtlasMaps(false);
+          return;
+        }
+
+        const transformedMaps = data.maps.map((map: any) => ({
+          ...map,
+          map_type: 'atlas' as const,
+          href: map.custom_slug ? `/map/${map.custom_slug}` : `/map/${map.id}`,
+        }));
+
+        const mapIds = transformedMaps.map((map: any) => map.id);
+
+        if (mapIds.length > 0) {
+          const statsResponse = await fetch(`/api/maps/stats?ids=${mapIds.join(',')}`);
+          if (!statsResponse.ok) {
+            console.warn('Failed to fetch atlas map stats, continuing without stats');
+          }
+          const statsData = await statsResponse.json();
+
+          const mapsWithStats = transformedMaps.map((map: any) => ({
+            ...map,
+            view_count: statsData.stats?.[map.id]?.total_views || 0,
+          }));
+
+          setAtlasMaps(mapsWithStats);
+        } else {
+          setAtlasMaps(transformedMaps);
+        }
+      } catch (err) {
+        console.error('Error fetching atlas maps:', err);
+      } finally {
+        setLoadingAtlasMaps(false);
+      }
+    };
+
+    fetchAtlasMaps();
+  }, [activeTab]);
+
+  // Fetch user collection maps - only when 'user' tab is selected
+  useEffect(() => {
+    if (activeTab !== 'user' || fetchedTabsRef.current.has('user')) {
+      return;
+    }
+
+    fetchedTabsRef.current.add('user');
+
+    const fetchUserMapsCollection = async () => {
+      setLoadingUserMapsCollection(true);
+      try {
+        const response = await fetch('/api/maps?collection_type=user&visibility=public');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch user collection maps: ${response.statusText}`);
+        }
+        const data = await response.json();
+        
+        if (!data.maps || data.maps.length === 0) {
+          setUserMapsCollection([]);
+          setLoadingUserMapsCollection(false);
+          return;
+        }
+
+        const transformedMaps = data.maps.map((map: any) => ({
+          ...map,
+          map_type: 'user' as const,
+          href: map.custom_slug ? `/map/${map.custom_slug}` : `/map/${map.id}`,
+        }));
+
+        const mapIds = transformedMaps.map((map: any) => map.id);
+
+        if (mapIds.length > 0) {
+          const statsResponse = await fetch(`/api/maps/stats?ids=${mapIds.join(',')}`);
+          if (!statsResponse.ok) {
+            console.warn('Failed to fetch user collection map stats, continuing without stats');
+          }
+          const statsData = await statsResponse.json();
+
+          const mapsWithStats = transformedMaps.map((map: any) => ({
+            ...map,
+            view_count: statsData.stats?.[map.id]?.total_views || 0,
+          }));
+
+          setUserMapsCollection(mapsWithStats);
+        } else {
+          setUserMapsCollection(transformedMaps);
+        }
+      } catch (err) {
+        console.error('Error fetching user collection maps:', err);
+      } finally {
+        setLoadingUserMapsCollection(false);
+      }
+    };
+
+    fetchUserMapsCollection();
+  }, [activeTab]);
+
+  // Fetch gov maps - only when 'gov' tab is selected
+  useEffect(() => {
+    if (activeTab !== 'gov' || fetchedTabsRef.current.has('gov')) {
+      return;
+    }
+
+    fetchedTabsRef.current.add('gov');
+
+    const fetchGovMaps = async () => {
+      setLoadingGovMaps(true);
+      try {
+        const response = await fetch('/api/maps?collection_type=gov&visibility=public');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch gov maps: ${response.statusText}`);
+        }
+        const data = await response.json();
+        
+        if (!data.maps || data.maps.length === 0) {
+          setGovMaps([]);
+          setLoadingGovMaps(false);
+          return;
+        }
+
+        const transformedMaps = data.maps.map((map: any) => ({
+          ...map,
+          map_type: 'gov' as const,
+          href: map.custom_slug ? `/map/${map.custom_slug}` : `/map/${map.id}`,
+        }));
+
+        const mapIds = transformedMaps.map((map: any) => map.id);
+
+        if (mapIds.length > 0) {
+          const statsResponse = await fetch(`/api/maps/stats?ids=${mapIds.join(',')}`);
+          if (!statsResponse.ok) {
+            console.warn('Failed to fetch gov map stats, continuing without stats');
+          }
+          const statsData = await statsResponse.json();
+
+          const mapsWithStats = transformedMaps.map((map: any) => ({
+            ...map,
+            view_count: statsData.stats?.[map.id]?.total_views || 0,
+          }));
+
+          setGovMaps(mapsWithStats);
+        } else {
+          setGovMaps(transformedMaps);
+        }
+      } catch (err) {
+        console.error('Error fetching gov maps:', err);
+      } finally {
+        setLoadingGovMaps(false);
+      }
+    };
+
+    fetchGovMaps();
   }, [activeTab]);
 
   // Get current tab's maps and loading state
@@ -302,14 +469,24 @@ export default function MapsPage() {
       case 'community':
         return {
           maps: filteredCommunityMaps,
-          loading: false,
-          emptyMessage: 'No maps found',
+          loading: loadingCommunityMaps,
+          emptyMessage: 'No community maps found',
         };
       case 'professional':
         return {
           maps: filteredProfessionalMaps,
           loading: loadingProfessionalMaps,
           emptyMessage: 'No professional maps found',
+        };
+      case 'gov':
+        return {
+          maps: govMaps.filter(map => 
+            !searchQuery.trim() || 
+            map.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (map.description && map.description.toLowerCase().includes(searchQuery.toLowerCase()))
+          ),
+          loading: loadingGovMaps,
+          emptyMessage: 'No government maps found',
         };
       default:
         return {
@@ -328,9 +505,11 @@ export default function MapsPage() {
       case 'my-maps':
         return filteredAccountMaps.length;
       case 'community':
-        return filteredCommunityMaps.length + filteredUserMaps.length;
+        return filteredCommunityMaps.length;
       case 'professional':
         return filteredProfessionalMaps.length;
+      case 'gov':
+        return govMaps.length;
       default:
         return 0;
     }
@@ -378,10 +557,13 @@ export default function MapsPage() {
             {/* Tabs and Content */}
             <div className="space-y-3">
               {/* Tabs */}
-              <div className="flex items-center gap-1 border-b border-gray-200">
+              <div className="flex items-center gap-1 border-b border-gray-200 overflow-x-auto scrollbar-hide">
                 <button
-                  onClick={() => setActiveTab('community')}
-                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                  onClick={() => {
+                    setActiveTab('community');
+                    router.push('/maps?tab=community');
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === 'community'
                       ? 'border-gray-900 text-gray-900'
                       : 'border-transparent text-gray-600 hover:text-gray-900'
@@ -390,8 +572,11 @@ export default function MapsPage() {
                   Community <span className="text-gray-500">({getTabCount('community')})</span>
                 </button>
                 <button
-                  onClick={() => setActiveTab('professional')}
-                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                  onClick={() => {
+                    setActiveTab('professional');
+                    router.push('/maps?tab=professional');
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                     activeTab === 'professional'
                       ? 'border-gray-900 text-gray-900'
                       : 'border-transparent text-gray-600 hover:text-gray-900'
@@ -399,10 +584,26 @@ export default function MapsPage() {
                 >
                   Professional <span className="text-gray-500">({getTabCount('professional')})</span>
                 </button>
+                <button
+                  onClick={() => {
+                    setActiveTab('gov');
+                    router.push('/maps?tab=gov');
+                  }}
+                  className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    activeTab === 'gov'
+                      ? 'border-gray-900 text-gray-900'
+                      : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Government <span className="text-gray-500">({getTabCount('gov')})</span>
+                </button>
                 {account && (
                   <button
-                    onClick={() => setActiveTab('my-maps')}
-                    className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors ${
+                    onClick={() => {
+                      setActiveTab('my-maps');
+                      router.push('/maps?tab=my-maps');
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                       activeTab === 'my-maps'
                         ? 'border-gray-900 text-gray-900'
                         : 'border-transparent text-gray-600 hover:text-gray-900'
@@ -426,69 +627,7 @@ export default function MapsPage() {
               </div>
 
               {/* Maps Grid */}
-                {activeTab === 'community' ? (
-                  <div className="space-y-3">
-                    {/* Featured Community Maps (Mentions) */}
-                    {filteredCommunityMaps.length > 0 && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2">
-                        {filteredCommunityMaps.map((map) => (
-                          <MapCard 
-                            key={map.id} 
-                            map={map} 
-                            account={account} 
-                            isFeatured={map.id === 'mention'}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    
-                    {/* Border separator */}
-                    {filteredCommunityMaps.length > 0 && filteredUserMaps.length > 0 && (
-                      <div className="border-t border-gray-200 pt-3">
-                        <h3 className="text-xs font-semibold text-gray-900 mb-2">Made by users like you</h3>
-                        {loading ? (
-                          <div className="text-xs text-gray-500">Loading maps...</div>
-                        ) : filteredUserMaps.length === 0 ? (
-                          <div className="text-xs text-gray-500">No user-generated maps yet</div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
-                            {filteredUserMaps.map((map) => (
-                              <MapCard 
-                                key={map.id} 
-                                map={map} 
-                                account={account} 
-                                isSmall={true}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* User-generated maps only (if no community maps) */}
-                    {filteredCommunityMaps.length === 0 && (
-                      <>
-                        <h3 className="text-xs font-semibold text-gray-900 mb-2">Made by users like you</h3>
-                        {loading ? (
-                          <div className="text-xs text-gray-500">Loading maps...</div>
-                        ) : filteredUserMaps.length === 0 ? (
-                          <div className="text-xs text-gray-500">No user-generated maps yet</div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
-                            {filteredUserMaps.map((map) => (
-                              <MapCard 
-                                key={map.id} 
-                                map={map} 
-                                account={account} 
-                                isSmall={true}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ) : currentTabData.loading ? (
+                {currentTabData.loading ? (
                   <div className="text-xs text-gray-500">Loading maps...</div>
                 ) : currentTabData.maps.length === 0 ? (
                   <div className="text-xs text-gray-500">{currentTabData.emptyMessage}</div>

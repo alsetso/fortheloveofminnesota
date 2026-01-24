@@ -57,11 +57,11 @@ export async function GET(
         const { data: membership } = await supabase
           .from('group_members')
           .select('is_admin')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .single();
 
-        if (!membership || !membership.is_admin) {
+        if (!membership || !(membership as any).is_admin) {
           return NextResponse.json(
             { error: 'Only group admins can view join requests' },
             { status: 403 }
@@ -167,7 +167,8 @@ export async function POST(
           .select('id, visibility')
           .eq('slug', slug)
           .eq('is_active', true)
-          .single();
+          .single()
+          .returns<{ id: string; visibility: string }>();
 
         if (!group) {
           return NextResponse.json(
@@ -177,7 +178,7 @@ export async function POST(
         }
 
         // Only allow requests for private groups
-        if (group.visibility !== 'private') {
+        if ((group as any).visibility !== 'private') {
           return NextResponse.json(
             { error: 'Join requests are only for private groups. Public groups can be joined directly.' },
             { status: 400 }
@@ -188,7 +189,7 @@ export async function POST(
         const { data: existingMember } = await supabase
           .from('group_members')
           .select('id')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .maybeSingle();
 
@@ -203,7 +204,7 @@ export async function POST(
         const { data: existingRequest } = await supabase
           .from('group_requests')
           .select('id, status')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .eq('status', 'pending')
           .maybeSingle();
@@ -219,11 +220,11 @@ export async function POST(
         const { data: request, error } = await supabase
           .from('group_requests')
           .insert({
-            group_id: group.id,
+            group_id: (group as any).id,
             account_id: accountId,
             message: message?.trim() || null,
             status: 'pending',
-          })
+          } as any)
           .select(`
             id,
             group_id,

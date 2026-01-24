@@ -6,7 +6,10 @@ import { ToastProvider } from '@/features/ui/contexts/ToastContext';
 import { ProfileProvider } from '@/features/profiles/contexts/ProfileContext';
 import { WindowManagerProvider } from '@/components/ui/WindowManager';
 import { AppModalProvider } from '@/contexts/AppModalContext';
+import { BillingEntitlementsProvider } from '@/contexts/BillingEntitlementsContext';
+import { AdminImpersonationProvider } from '@/contexts/AdminImpersonationContext';
 import { StripeProvider } from './StripeProvider';
+import { GlobalErrorHandler } from '@/components/utils/GlobalErrorHandler';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -17,17 +20,22 @@ export function Providers({ children }: ProvidersProps) {
     <StripeProvider>
       <AuthProvider>
         <AuthStateProvider>
-          <ProfileProvider>
-            <ToastProvider>
-              <WindowManagerProvider>
-                <Suspense fallback={null}>
-                  <AppModalProvider>
-                    {children}
-                  </AppModalProvider>
-                </Suspense>
-              </WindowManagerProvider>
-            </ToastProvider>
-          </ProfileProvider>
+          <AdminImpersonationProvider>
+            <ProfileProvider>
+              <ToastProvider>
+                <GlobalErrorHandler />
+                <WindowManagerProvider>
+                  <Suspense fallback={null}>
+                    <AppModalProvider>
+                      <BillingEntitlementsProvider>
+                        {children}
+                      </BillingEntitlementsProvider>
+                    </AppModalProvider>
+                  </Suspense>
+                </WindowManagerProvider>
+              </ToastProvider>
+            </ProfileProvider>
+          </AdminImpersonationProvider>
         </AuthStateProvider>
       </AuthProvider>
     </StripeProvider>

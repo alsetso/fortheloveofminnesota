@@ -19,7 +19,7 @@ const checkFeatureQuerySchema = z.object({
 export async function GET(request: NextRequest) {
   return withSecurity(
     request,
-    async (req, { userId }) => {
+    async (req, { userId, accountId }) => {
       try {
         const supabase = await createServerClientWithAuth(cookies());
         
@@ -30,6 +30,13 @@ export async function GET(request: NextRequest) {
           return NextResponse.json(
             { error: 'Unauthorized' },
             { status: 401 }
+          );
+        }
+
+        if (!accountId) {
+          return NextResponse.json(
+            { error: 'Account not found', message: 'No active account selected' },
+            { status: 404 }
           );
         }
         
@@ -54,11 +61,11 @@ export async function GET(request: NextRequest) {
         
         const { feature } = validation.data;
         
-        // Check feature access using the public schema wrapper
-        const { data: hasAccess, error } = await supabase.rpc('user_has_feature', {
-          user_id: user.id,
+        // Check feature access (account-scoped; respects active account selection)
+        const { data: hasAccess, error } = await supabase.rpc('account_has_feature', {
+          account_id: accountId,
           feature_slug: feature,
-        });
+        } as any);
         
         if (error) {
           console.error('[Billing API] Error checking feature:', error);
@@ -77,8 +84,9 @@ export async function GET(request: NextRequest) {
           .maybeSingle();
         
         return NextResponse.json({
-          hasAccess: hasAccess === true,
+          hasAccess: Boolean(hasAccess),
           feature: featureData || null,
+          accountId,
         });
       } catch (error) {
         console.error('[Billing API] Error:', error);
@@ -90,7 +98,7 @@ export async function GET(request: NextRequest) {
     },
     {
       requireAuth: true,
-      rateLimit: { requests: 200, window: 60 },
+      rateLimit: { windowMs: 60 * 1000, maxRequests: 200 },
     }
   );
 }

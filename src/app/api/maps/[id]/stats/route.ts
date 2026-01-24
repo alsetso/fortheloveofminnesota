@@ -10,7 +10,7 @@ import { commonSchemas } from '@/lib/security/validation';
 
 /**
  * GET /api/maps/[id]/stats
- * Returns view statistics for a map
+ * Returns view statistics for a map (supports both UUID and custom_slug)
  * 
  * Security:
  * - Rate limited: 200 requests/minute (authenticated) or 100/min (public)
@@ -22,8 +22,14 @@ const mapStatsQuerySchema = z.object({
 });
 
 const mapStatsPathSchema = z.object({
-  id: commonSchemas.uuid,
+  id: z.string().min(1).max(200), // Accept both UUID and slug
 });
+
+// Helper to check if string is a valid UUID
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
 
 export async function GET(
   request: NextRequest,
@@ -41,7 +47,7 @@ export async function GET(
           return pathValidation.error;
         }
         
-        const { id: validatedId } = pathValidation.data;
+        const { id: identifier } = pathValidation.data;
         
         // Validate query parameters
         const url = new URL(req.url);
@@ -75,9 +81,27 @@ export async function GET(
       }
     );
 
+        // Resolve identifier to map_id (handle both UUID and slug)
+        let mapId: string;
+        if (isUUID(identifier)) {
+          mapId = identifier;
+        } else {
+          // Look up map by custom_slug
+          const { data: map, error: mapError } = await supabase
+            .from('map')
+            .select('id')
+            .eq('custom_slug', identifier)
+            .single();
+          
+          if (mapError || !map) {
+            return createErrorResponse('Map not found', 404);
+          }
+          mapId = map.id;
+        }
+
         // Get stats using get_url_stats function
         // Maps are tracked as /map/{map_id} URLs
-        const mapUrl = `/map/${validatedId}`;
+        const mapUrl = `/map/${mapId}`;
         const { data, error } = await supabase.rpc('get_url_stats', {
           p_url: mapUrl,
           p_hours: hours,

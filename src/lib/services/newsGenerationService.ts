@@ -14,6 +14,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { getApiKey } from '@/lib/security/apiKeys';
+import { generateUUID } from '@/lib/utils/uuid';
 
 const RAPIDAPI_HOST = 'real-time-news-data.p.rapidapi.com';
 const RAPIDAPI_BASE_URL = 'https://real-time-news-data.p.rapidapi.com/search';
@@ -25,9 +26,29 @@ export interface NewsGenerationOptions {
   lang?: string; // e.g., 'en'
 }
 
+export interface ParsedArticle {
+  article_id: string;
+  title: string;
+  link: string;
+  snippet: string | null;
+  photo_url: string | null;
+  thumbnail_url: string | null;
+  published_at: string;
+  published_date: string;
+  authors: string[];
+  source_url: string | null;
+  source_name: string | null;
+  source_logo_url: string | null;
+  source_favicon_url: string | null;
+  source_publication_id: string | null;
+  related_topics: string[];
+}
+
 export interface NewsGenerationResult {
   success: boolean;
   promptId?: string;
+  articles?: ParsedArticle[];
+  articlesExtracted?: boolean;
   error?: string;
 }
 
@@ -60,8 +81,10 @@ export async function generateNews(
       lang: options.lang || 'en',
     });
 
+    const apiUrl = `${RAPIDAPI_BASE_URL}?${params.toString()}`;
+
     // Call RapidAPI
-    const response = await fetch(`${RAPIDAPI_BASE_URL}?${params.toString()}`, {
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'X-RapidAPI-Host': RAPIDAPI_HOST,
@@ -86,11 +109,54 @@ export async function generateNews(
       };
     }
 
+    // Parse articles from API response
+    const rawArticles = data.data || [];
+    const parsedArticles: ParsedArticle[] = [];
+    const now = new Date();
+
+    for (const article of rawArticles) {
+      try {
+        let publishedAt: Date;
+        try {
+          publishedAt = article.publishedAt 
+            ? new Date(article.publishedAt) 
+            : now;
+        } catch {
+          publishedAt = now;
+        }
+
+        // Convert to Central Time for published_date
+        const centralTime = new Date(publishedAt.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+        const publishedDate = centralTime.toISOString().split('T')[0];
+
+        parsedArticles.push({
+          article_id: article.id || generateUUID(),
+          title: article.title || 'Untitled',
+          link: article.link || '',
+          snippet: article.snippet || null,
+          photo_url: article.photoUrl || null,
+          thumbnail_url: article.thumbnailUrl || null,
+          published_at: publishedAt.toISOString(),
+          published_date: publishedDate,
+          authors: Array.isArray(article.authors) ? article.authors : [],
+          source_url: article.source?.url || null,
+          source_name: article.source?.name || null,
+          source_logo_url: article.source?.logoUrl || null,
+          source_favicon_url: article.source?.faviconUrl || null,
+          source_publication_id: article.source?.publicationId || null,
+          related_topics: Array.isArray(article.relatedTopics) ? article.relatedTopics : [],
+        });
+      } catch (err) {
+        // Skip invalid articles
+        continue;
+      }
+    }
+
     // Build API response object for database
     const apiResponse = {
       requestId: data.request_id || null,
-      articles: data.data || [],
-      count: Array.isArray(data.data) ? data.data.length : 0,
+      articles: rawArticles,
+      count: parsedArticles.length,
       query: options.query,
       timePublished: options.timePublished || '1d',
       country: options.country || 'US',
@@ -98,7 +164,7 @@ export async function generateNews(
       generatedAt: new Date().toISOString(),
     };
 
-    // Save to database via Supabase RPC
+    // Save prompt to database (without extracting articles yet)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -110,6 +176,27 @@ export async function generateNews(
     }
 
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    // Verify the account exists
+    const { data: accountData, error: accountError } = await supabase
+      .from('accounts')
+      .select('id, role')
+      .eq('id', accountId)
+      .maybeSingle();
+
+    if (accountError) {
+      return {
+        success: false,
+        error: `Account lookup error: ${accountError.message}`,
+      };
+    }
+
+    if (!accountData) {
+      return {
+        success: false,
+        error: `Account not found: ${accountId}`,
+      };
+    }
 
     const { data: promptData, error: dbError } = await supabase.rpc(
       'insert_prompt',
@@ -134,9 +221,12 @@ export async function generateNews(
       };
     }
 
+    const promptId = promptData[0].id;
+
     return {
       success: true,
-      promptId: promptData[0].id,
+      promptId,
+      articles: parsedArticles,
     };
   } catch (error) {
     return {

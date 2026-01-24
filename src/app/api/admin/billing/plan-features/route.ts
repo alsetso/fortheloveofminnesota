@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         
         if (!validation.success) {
           return NextResponse.json(
-            { error: 'Invalid request data', details: validation.error.errors },
+            { error: 'Invalid request data', details: validation.error.issues },
             { status: 400 }
           );
         }
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         const { data, error } = await supabase.rpc('assign_billing_plan_features', {
           p_plan_id: plan_id,
           p_feature_ids: feature_ids,
-        });
+        } as any);
         
         if (error) {
           console.error('[Admin Billing API] Error assigning features:', error);
@@ -89,7 +89,7 @@ export async function DELETE(request: NextRequest) {
         
         if (!validation.success) {
           return NextResponse.json(
-            { error: 'Invalid request data', details: validation.error.errors },
+            { error: 'Invalid request data', details: validation.error.issues },
             { status: 400 }
           );
         }
@@ -100,7 +100,7 @@ export async function DELETE(request: NextRequest) {
         const { data, error } = await supabase.rpc('remove_billing_plan_feature', {
           p_plan_id: plan_id,
           p_feature_id: feature_id,
-        });
+        } as any);
         
         if (error) {
           console.error('[Admin Billing API] Error removing feature:', error);

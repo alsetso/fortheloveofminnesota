@@ -3,6 +3,7 @@ import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import type { BillingFeature } from '@/lib/billing/types';
 
 const createFeatureSchema = z.object({
   slug: z.string().min(1).max(100),
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
         
         // Group by category
         const grouped = (features || []).reduce((acc, feature) => {
-          const category = feature.category || 'uncategorized';
+          const category = (feature as any).category || 'uncategorized';
           if (!acc[category]) {
             acc[category] = [];
           }
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
         
         if (!validation.success) {
           return NextResponse.json(
-            { error: 'Invalid request data', details: validation.error.errors },
+            { error: 'Invalid request data', details: validation.error.issues },
             { status: 400 }
           );
         }
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
           p_category: validation.data.category || null,
           p_emoji: validation.data.emoji || null,
           p_is_active: validation.data.is_active ?? true,
-        });
+        } as any).returns<BillingFeature>();
         
         if (error) {
           console.error('[Admin Billing API] Error creating feature:', error);

@@ -3,6 +3,7 @@ import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import type { BillingFeature } from '@/lib/billing/types';
 
 const updateFeatureSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
@@ -44,7 +45,7 @@ export async function PATCH(
         
         if (!validation.success) {
           return NextResponse.json(
-            { error: 'Invalid request data', details: validation.error.errors },
+            { error: 'Invalid request data', details: validation.error.issues },
             { status: 400 }
           );
         }
@@ -58,7 +59,7 @@ export async function PATCH(
           p_category: validation.data.category,
           p_emoji: validation.data.emoji,
           p_is_active: validation.data.is_active,
-        });
+        } as any).returns<BillingFeature>();
         
         if (error) {
           console.error('[Admin Billing API] Error updating feature:', error);
@@ -120,7 +121,7 @@ export async function DELETE(
         const { error } = await supabase.rpc('update_billing_feature', {
           p_id: id,
           p_is_active: false,
-        });
+        } as any);
         
         // Note: Hard delete would require a separate function if needed
         

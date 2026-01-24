@@ -290,14 +290,6 @@ export default function MapSettingsContent({
             </button>
             <button
               onClick={() => {
-                const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
-                if (!isPro && onUpgrade) {
-                  onUpgrade('All Time Filter');
-                  return;
-                }
-                if (onProToast) {
-                  onProToast('All time filter');
-                }
                 onTimeFilterChange('all');
                 window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
                   detail: { timeFilter: 'all' }
@@ -312,6 +304,19 @@ export default function MapSettingsContent({
               All time
             </button>
           </div>
+          {/* Paid Feature Notice */}
+          {timeFilter === 'all' && (
+            <div className={`mt-2 p-2 rounded-md border text-xs space-y-1 ${
+              darkMode
+                ? 'bg-blue-500/10 border-blue-400/20 text-blue-200'
+                : 'bg-blue-50 border-blue-200 text-blue-700'
+            }`}>
+              <div className="font-semibold">All time filter</div>
+              <div className={darkMode ? 'text-blue-300' : 'text-blue-600'}>
+                Paid plan feature with temporary use
+              </div>
+            </div>
+          )}
         </div>
       )}
 

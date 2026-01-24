@@ -32,6 +32,7 @@ const pageViewSchema = z.object({
     .or(z.literal('').transform(() => null)),
   session_id: z.string().max(200).optional().nullable(),
   user_agent: z.string().max(500).optional().nullable(),
+  account_id: z.string().uuid().optional().nullable(), // Admin impersonation
 });
 
 export async function POST(request: NextRequest) {
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
           return validation.error;
         }
         
-        const { page_url, referrer_url, session_id, user_agent } = validation.data;
+        const { page_url, referrer_url, session_id, user_agent, account_id } = validation.data;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -73,18 +74,54 @@ export async function POST(request: NextRequest) {
       }
     );
 
-        // Get current user account (optional - for authenticated users)
-        // Use accountId from security context if available, otherwise fetch
-        let finalAccountId: string | null = accountId || null;
-        if (!finalAccountId) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const { data: account } = await supabase
-              .from('accounts')
-              .select('id')
-              .eq('user_id', user.id)
-              .maybeSingle() as { data: { id: string } | null; error: any };
-            finalAccountId = (account as { id: string } | null)?.id || null;
+        // Determine account ID for tracking
+        // Priority: 1) Provided account_id (admin impersonation), 2) Security context accountId, 3) Fetch from auth
+        let finalAccountId: string | null = null;
+        
+        // If account_id is provided (admin impersonation), verify admin access
+        if (account_id) {
+          // Verify requester is admin
+          const { data: requesterAccount } = await supabase
+            .from('accounts')
+            .select('role')
+            .eq('id', accountId || '')
+            .maybeSingle() as { data: { role: string } | null; error: any };
+          
+          if (requesterAccount?.role !== 'admin') {
+            return NextResponse.json(
+              { error: 'Admin access required for account impersonation' },
+              { status: 403 }
+            );
+          }
+          
+          // Verify target account exists
+          const { data: targetAccount } = await supabase
+            .from('accounts')
+            .select('id')
+            .eq('id', account_id)
+            .maybeSingle() as { data: { id: string } | null; error: any };
+          
+          if (!targetAccount) {
+            return NextResponse.json(
+              { error: 'Target account not found' },
+              { status: 404 }
+            );
+          }
+          
+          finalAccountId = account_id;
+        } else {
+          // Use accountId from security context if available, otherwise fetch
+          finalAccountId = accountId || null;
+          if (!finalAccountId) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { data: account } = await supabase
+                .from('accounts')
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle() as { data: { id: string } | null; error: any };
+              finalAccountId = (account as { id: string } | null)?.id || null;
+            }
           }
         }
 

@@ -1,27 +1,33 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { ReactNode, useState, useEffect, useMemo } from 'react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Script from 'next/script';
+import { Toaster } from 'react-hot-toast';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import HamburgerMenu from './HamburgerMenu';
+import ContentTypeFilters from './ContentTypeFilters';
+import { usePageView } from '@/hooks/usePageView';
 import { 
   HomeIcon, 
   MapIcon, 
-  NewspaperIcon, 
   BuildingLibraryIcon, 
   UserGroupIcon,
+  UsersIcon,
   SparklesIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  RssIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
   MapIcon as MapIconSolid, 
-  NewspaperIcon as NewspaperIconSolid, 
   BuildingLibraryIcon as BuildingLibraryIconSolid, 
   UserGroupIcon as UserGroupIconSolid,
+  UsersIcon as UsersIconSolid,
   SparklesIcon as SparklesIconSolid,
-  ChartBarIcon as ChartBarIconSolid
+  ChartBarIcon as ChartBarIconSolid,
+  RssIcon as RssIconSolid
 } from '@heroicons/react/24/solid';
 
 interface AccountDropdownProps {
@@ -37,7 +43,15 @@ interface PageWrapperProps {
   accountDropdownProps?: AccountDropdownProps;
   searchResultsComponent?: ReactNode;
   className?: string;
+  /** Enable automatic page view tracking. Default: true */
+  trackPageView?: boolean;
 }
+
+// Default empty handlers to reduce prop boilerplate
+const defaultAccountDropdownProps: AccountDropdownProps = {
+  onAccountClick: () => {},
+  onSignInClick: () => {},
+};
 
 /**
  * Global page wrapper with 10vh header and 90vh content area
@@ -45,63 +59,117 @@ interface PageWrapperProps {
  * - Content: 90vh, white background, rounded top corners, scrollable (or 80vh when #search is active)
  * - When #search is active: Header expands to 20vh with full-width search and mention type filters
  */
-export default function PageWrapper({ children, headerContent, searchComponent, showAccountDropdown = true, accountDropdownProps, searchResultsComponent, className = '' }: PageWrapperProps) {
+export default function PageWrapper({ 
+  children, 
+  headerContent, 
+  searchComponent, 
+  showAccountDropdown = true, 
+  accountDropdownProps = defaultAccountDropdownProps, 
+  searchResultsComponent, 
+  className = '',
+  trackPageView = true
+}: PageWrapperProps) {
   const pathname = usePathname();
   // Initialize as false to avoid hydration mismatch - will be set correctly on client mount
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const navItems = [
+  // Automatically track page views for all pages using PageWrapper
+  // Uses current pathname, tracks once per page load
+  usePageView({ 
+    page_url: pathname || '/', 
+    enabled: trackPageView 
+  });
+
+  // Initialize Facebook Pixel on client side
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).fbq) {
+      // Facebook Pixel is already initialized in layout.tsx, but ensure it's available
+      // Track page view for Facebook Pixel
+      if ((window as any).fbq) {
+        (window as any).fbq('track', 'PageView');
+      }
+    }
+  }, [pathname]);
+
+  // Memoize navItems to prevent recreation on every render
+  const navItems = useMemo(() => [
     { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
     { label: 'Live', href: '/live', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
-    { label: 'Feed', href: '/feed', icon: NewspaperIcon, iconSolid: NewspaperIconSolid },
+    { label: 'News', href: '/news', icon: RssIcon, iconSolid: RssIconSolid },
+    { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
     { label: 'Gov', href: '/gov', icon: BuildingLibraryIcon, iconSolid: BuildingLibraryIconSolid },
     { label: 'Groups', href: '/groups', icon: UserGroupIcon, iconSolid: UserGroupIconSolid },
     { label: 'Analytics', href: '/analytics', icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
-  ];
+  ], []);
 
   // Set mounted flag on client side only
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Check for #search hash parameter - works with both hashchange events and router navigation
+  // Consolidated hash checking - handles all hash change scenarios in one effect
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || typeof window === 'undefined') return;
 
     const checkHash = () => {
       setIsSearchMode(window.location.hash === '#search');
     };
 
-    // Check immediately on mount
+    // Initial check
     checkHash();
 
     // Listen for hashchange events (browser navigation and manual dispatches)
     window.addEventListener('hashchange', checkHash);
     
-    // Also listen for popstate (browser back/forward)
+    // Listen for popstate (browser back/forward)
     window.addEventListener('popstate', checkHash);
 
     return () => {
       window.removeEventListener('hashchange', checkHash);
       window.removeEventListener('popstate', checkHash);
     };
-  }, [mounted]);
+  }, [mounted, pathname]); // Include pathname to check hash when route changes
 
-  // Also check hash when pathname changes (Next.js router might update pathname)
+  // Track Facebook Pixel page views on route changes
   useEffect(() => {
-    if (mounted && typeof window !== 'undefined') {
-      setIsSearchMode(window.location.hash === '#search');
+    if (typeof window !== 'undefined' && (window as any).fbq) {
+      (window as any).fbq('track', 'PageView');
     }
-  }, [pathname, mounted]);
+  }, [pathname]);
 
   return (
-    <div 
-      className={`relative w-full h-screen overflow-hidden bg-black flex flex-col ${className}`} 
-      style={{ maxWidth: '100vw' }}
-    >
+    <>
+      {/* Global Toast System - react-hot-toast (same as admin billing page) */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            fontSize: '12px',
+            padding: '10px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      
+      <div 
+        className={`relative w-full h-screen overflow-hidden bg-black flex flex-col ${className}`} 
+        style={{ maxWidth: '100vw' }}
+      >
       {/* Header - Flexible height based on content, black background */}
       <header 
         className="flex flex-col flex-shrink-0 bg-black border-b border-white/5"
@@ -133,7 +201,7 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
           )}
             </div>
           
-            {/* Mobile Header Layout (Logo, Search, Account) */}
+            {/* Mobile Header Layout (Logo, Search, Header Content, Account) */}
             <div className="lg:hidden col-span-12 flex items-center justify-between gap-2 px-1">
               <div className="flex-shrink-0">
                 <button
@@ -146,7 +214,8 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
               <div className="flex-1 flex justify-center px-2">
                 {searchComponent && <div className="w-full max-w-sm">{searchComponent}</div>}
               </div>
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex items-center gap-1">
+                {headerContent}
                 {showAccountDropdown && (
                   <AccountDropdown 
                     variant="dark"
@@ -161,7 +230,10 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
             <div className="hidden lg:flex lg:col-span-6 justify-center px-4">
               <div className="flex items-center justify-around w-full max-w-[800px]">
                 {navItems.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+                  // Home is active on both '/' and '/feed' routes
+                  const isActive = item.href === '/' 
+                    ? (pathname === '/' || pathname === '/feed')
+                    : (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href)));
                   const Icon = isActive ? item.iconSolid : item.icon;
                   return (
                     <Link
@@ -179,16 +251,17 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
               </div>
             </div>
             
-            {/* 3rd Column: Account Dropdown (Aligns with right sidebar) */}
-          {showAccountDropdown && (
-              <div className="hidden lg:flex lg:col-span-3 justify-end">
+            {/* 3rd Column: Header Content, Account Dropdown (Aligns with right sidebar) */}
+          <div className="hidden lg:flex lg:col-span-3 justify-end items-center gap-2">
+            {headerContent}
+            {showAccountDropdown && (
               <AccountDropdown 
                 variant="dark"
                 onAccountClick={accountDropdownProps?.onAccountClick}
                 onSignInClick={accountDropdownProps?.onSignInClick}
               />
-            </div>
-          )}
+            )}
+          </div>
           </div>
         </div>
 
@@ -213,7 +286,7 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
             
             {/* Bottom Row: Content Type Filters */}
             <div className="flex-shrink-0 px-2 pt-1 pb-1 flex justify-center border-t border-white/5">
-            <ContentTypeFilters />
+              <ContentTypeFilters />
             </div>
           </div>
         )}
@@ -234,7 +307,10 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
         <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-[400px]">
           <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-2xl shadow-2xl px-2 py-2 flex items-center justify-around">
             {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+              // Home is active on both '/' and '/feed' routes
+              const isActive = item.href === '/' 
+                ? (pathname === '/' || pathname === '/feed')
+                : (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href)));
               const Icon = isActive ? item.iconSolid : item.icon;
               return (
                 <Link
@@ -256,70 +332,6 @@ export default function PageWrapper({ children, headerContent, searchComponent, 
       {/* Full Screen Menu */}
       <HamburgerMenu isOpen={isMenuOpen} onOpenChange={setIsMenuOpen} />
     </div>
-  );
-}
-
-// Content Type Filters Component
-function ContentTypeFilters() {
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-
-  const contentTypes = [
-    { id: 'posts', label: 'Posts' },
-    { id: 'mentions', label: 'Mentions' },
-    { id: 'groups', label: 'Groups' },
-    { id: 'users', label: 'Users' },
-  ];
-
-  // Initialize selected type from URL
-  useEffect(() => {
-    const contentTypeParam = searchParams.get('content_type');
-    
-    if (contentTypeParam && contentTypes.some(ct => ct.id === contentTypeParam)) {
-      setSelectedType(contentTypeParam);
-    } else {
-      setSelectedType(null);
-    }
-  }, [searchParams]);
-
-  const handleTypeSelect = (typeId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    // Single select: if clicking the same type, deselect it
-    if (selectedType === typeId) {
-      params.delete('content_type');
-      setSelectedType(null);
-    } else {
-      params.set('content_type', typeId);
-      setSelectedType(typeId);
-    }
-    
-    // Always delete content_types param (legacy support)
-    params.delete('content_types');
-
-    router.push(`${pathname}?${params.toString()}#search`);
-  };
-
-  return (
-    <div className="flex flex-wrap gap-4 items-center">
-      {contentTypes.map((type) => {
-        const isSelected = selectedType === type.id;
-        return (
-          <button
-            key={type.id}
-            onClick={() => handleTypeSelect(type.id)}
-            className={`text-sm font-medium transition-opacity whitespace-nowrap ${
-              isSelected
-                ? 'text-white opacity-100'
-                : 'text-white opacity-50 hover:opacity-75'
-            }`}
-          >
-            {type.label}
-          </button>
-        );
-      })}
-    </div>
+    </>
   );
 }

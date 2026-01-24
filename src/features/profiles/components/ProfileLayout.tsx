@@ -4,7 +4,6 @@ import { ReactNode, useState } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import ProfileCard from './ProfileCard';
 import type { ProfileAccount } from '@/types/profile';
-import SimpleNav from '@/components/layout/SimpleNav';
 
 interface ProfileLayoutProps {
   account: ProfileAccount;
@@ -20,12 +19,7 @@ export default function ProfileLayout({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#f4f2ef] flex flex-col">
-      {/* Header */}
-      <SimpleNav />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
+    <div className="flex-1 flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -65,6 +59,5 @@ export default function ProfileLayout({
           {children}
         </main>
       </div>
-    </div>
   );
 }

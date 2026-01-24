@@ -3,6 +3,7 @@ import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
+import type { BillingPlan, BillingFeature, FeatureLimitType } from '@/lib/billing/types';
 
 const createPlanSchema = z.object({
   slug: z.string().min(1).max(50),
@@ -34,7 +35,8 @@ export async function GET(request: NextRequest) {
         const { data: plans, error: plansError } = await supabase
           .from('billing_plans')
           .select('*')
-          .order('display_order', { ascending: true });
+          .order('display_order', { ascending: true })
+          .returns<BillingPlan[]>();
         
         if (plansError) {
           console.error('[Admin Billing API] Error fetching plans:', plansError);
@@ -48,11 +50,12 @@ export async function GET(request: NextRequest) {
         // Query plan_features view to get feature_id for each plan
         const plansWithFeatures = await Promise.all(
           (plans || []).map(async (plan) => {
-            // Get directly assigned features (not inherited)
+            // Get directly assigned features with their limits
             const { data: planFeatures } = await supabase
               .from('billing_plan_features')
-              .select('feature_id')
-              .eq('plan_id', plan.id);
+              .select('feature_id, limit_value, limit_type')
+              .eq('plan_id', plan.id)
+              .returns<Array<{feature_id: string; limit_value: number | null; limit_type: FeatureLimitType | null}>>();
             
             if (!planFeatures || planFeatures.length === 0) {
               return {
@@ -67,15 +70,24 @@ export async function GET(request: NextRequest) {
               .from('billing_features')
               .select('id, slug, name')
               .in('id', featureIds)
-              .eq('is_active', true);
+              .eq('is_active', true)
+              .returns<Array<{id: string; slug: string; name: string}>>();
             
-            return {
-              ...plan,
-              features: (features || []).map((f) => ({
+            // Merge feature details with limit data
+            const featuresWithLimits = (features || []).map((f) => {
+              const planFeature = planFeatures.find((pf) => pf.feature_id === f.id);
+              return {
                 feature_id: f.id,
                 feature_slug: f.slug,
                 feature_name: f.name,
-              })),
+                limit_value: planFeature?.limit_value ?? null,
+                limit_type: planFeature?.limit_type ?? null,
+              };
+            });
+            
+            return {
+              ...plan,
+              features: featuresWithLimits,
             };
           })
         );
@@ -112,7 +124,7 @@ export async function POST(request: NextRequest) {
         
         if (!validation.success) {
           return NextResponse.json(
-            { error: 'Invalid request data', details: validation.error.errors },
+            { error: 'Invalid request data', details: validation.error.issues },
             { status: 400 }
           );
         }
@@ -127,7 +139,7 @@ export async function POST(request: NextRequest) {
           p_description: validation.data.description || null,
           p_stripe_price_id_monthly: validation.data.stripe_price_id_monthly || null,
           p_stripe_price_id_yearly: validation.data.stripe_price_id_yearly || null,
-        });
+        } as any).returns<BillingPlan>();
         
         if (error) {
           console.error('[Admin Billing API] Error creating plan:', error);

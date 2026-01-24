@@ -119,9 +119,12 @@ export async function GET(request: NextRequest) {
           statsMap[result.map_id] = result.stats;
         });
 
+        // Cache stats for 5 minutes (they don't change frequently)
         return createSuccessResponse({
           success: true,
           stats: statsMap,
+        }, 200, {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {

@@ -11,8 +11,8 @@ interface GovTabContextType {
 
 const GovTabContext = createContext<GovTabContextType | undefined>(undefined);
 
-export function GovTabProvider({ children }: { children: ReactNode }) {
-  const [activeTab, setActiveTab] = useState<Tab>('orgs');
+export function GovTabProvider({ children, initialTab = 'orgs' }: { children: ReactNode; initialTab?: Tab }) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   return (
     <GovTabContext.Provider value={{ activeTab, setActiveTab }}>

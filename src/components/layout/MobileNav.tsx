@@ -4,8 +4,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { UserIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
-import { EllipsisHorizontalIcon as EllipsisHorizontalIconSolid } from '@heroicons/react/24/solid';
+import { UserIcon, PlusIcon, EllipsisHorizontalIcon, NewspaperIcon } from '@heroicons/react/24/outline';
+import { EllipsisHorizontalIcon as EllipsisHorizontalIconSolid, NewspaperIcon as NewspaperIconSolid } from '@heroicons/react/24/solid';
 import { useAuthStateSafe } from '@/features/auth';
 import { getMobileNavItems, type MobileNavItemId } from '@/features/sidebar/config/mobileNavConfig';
 import { useResponsiveNavItems } from './useResponsiveNavItems';
@@ -132,6 +132,7 @@ export default function MobileNav({
 
   const profileHref = account?.username ? `/profile/${account.username}` : '/account/settings';
   const isProfileActive = account?.username ? pathname === `/profile/${account.username}` : pathname?.startsWith('/account');
+  const isNewsActive = pathname === '/news';
   
   const secondaryNavItems = getMobileNavItems(account);
 
@@ -143,9 +144,18 @@ export default function MobileNav({
     router.push(profileHref);
   }, [router, profileHref]);
 
-  // Build all nav items (Secondary items, Create, Profile)
+  // Build all nav items (News, Secondary items, Create, Profile)
   const allNavItems = useMemo<NavItem[]>(() => {
     const items: NavItem[] = [
+      {
+        id: 'news',
+        type: 'link' as const,
+        href: '/news',
+        label: 'News',
+        icon: NewspaperIcon,
+        iconSolid: NewspaperIconSolid,
+        isActive: isNewsActive,
+      } as LinkNavItem,
       ...secondaryNavItems.map<ButtonNavItem>(item => ({
       id: item.id,
         type: 'button',
@@ -176,7 +186,7 @@ export default function MobileNav({
       } as LinkNavItem] : []),
   ];
     return items;
-  }, [secondaryNavItems, activeSecondaryContent, onSecondaryContentClick, onCreateClick, isCreateActive, account, profileHref, isProfileActive, handleProfileClick]);
+  }, [secondaryNavItems, activeSecondaryContent, onSecondaryContentClick, onCreateClick, isCreateActive, account, profileHref, isProfileActive, handleProfileClick, isNewsActive]);
 
   // Calculate visible vs overflow items
   const { visibleItems, overflowItems, containerRef } = useResponsiveNavItems(allNavItems, {

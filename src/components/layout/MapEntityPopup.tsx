@@ -14,11 +14,14 @@ import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
 import YouTubePreview from '@/features/mentions/components/YouTubePreview';
 import LikeButton from '@/components/mentions/LikeButton';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
+import type { Mention } from '@/types/mention';
 
 interface MapEntityPopupProps {
   isOpen: boolean;
   onClose: () => void;
   type: 'pin' | 'location' | null;
+  /** Callback when a nearby mention is clicked - updates URL and switches to mention view */
+  onMentionSelect?: (mentionId: string, lat: number, lng: number) => void;
   data: {
     // Pin/Mention data
     id?: string;
@@ -60,7 +63,7 @@ interface MapEntityPopupProps {
  * iOS-style popup that appears above mobile nav (z-[60])
  * Shows pin or location details
  */
-export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntityPopupProps) {
+export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionSelect }: MapEntityPopupProps) {
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -68,6 +71,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
   const [showMenu, setShowMenu] = useState(false);
   const [likesCount, setLikesCount] = useState(data?.likes_count || 0);
   const [isLiked, setIsLiked] = useState(data?.is_liked || false);
+  const [nearbyMentions, setNearbyMentions] = useState<Mention[]>([]);
+  const [isLoadingNearby, setIsLoadingNearby] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user, account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -191,6 +196,55 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
       setIsLiked(data.is_liked || false);
     }
   }, [data]);
+
+  // Fetch nearby mentions when popup opens with location data
+  useEffect(() => {
+    if (!isOpen || type !== 'location' || !data?.coordinates) {
+      setNearbyMentions([]);
+      return;
+    }
+
+    const fetchNearbyMentions = async () => {
+      setIsLoadingNearby(true);
+      try {
+        const lat = data.coordinates!.lat;
+        const lng = data.coordinates!.lng;
+        const radius = 0.5; // 500 meters
+        
+        const latDelta = radius / 111;
+        const lngDelta = radius / 78;
+        
+        const bbox = {
+          minLat: lat - latDelta,
+          maxLat: lat + latDelta,
+          minLng: lng - lngDelta,
+          maxLng: lng + lngDelta,
+        };
+        
+        const fetchedMentions = await MentionService.getMentions({ bbox });
+        
+        // Sort by distance
+        const sortedMentions = fetchedMentions.sort((a, b) => {
+          const distA = Math.sqrt(Math.pow(a.lat - lat, 2) + Math.pow(a.lng - lng, 2));
+          const distB = Math.sqrt(Math.pow(b.lat - lat, 2) + Math.pow(b.lng - lng, 2));
+          return distA - distB;
+        });
+        
+        setNearbyMentions(sortedMentions.slice(0, 5)); // Limit to 5 nearby
+      } catch (err) {
+        console.error('Error fetching nearby mentions:', err);
+        setNearbyMentions([]);
+      } finally {
+        setIsLoadingNearby(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      fetchNearbyMentions();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, type, data?.coordinates]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -841,6 +895,91 @@ export default function MapEntityPopup({ isOpen, onClose, type, data }: MapEntit
                       </div>
                     )}
                   </>
+                )}
+
+                {/* Nearby Mentions - Only for location type */}
+                {type === 'location' && data.coordinates && (
+                  <div className="mt-4 border-t border-gray-200 pt-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <MapPinIcon className="w-3.5 h-3.5 text-gray-600" />
+                      <h3 className={`text-xs font-medium ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                        Nearby Mentions
+                      </h3>
+                      {nearbyMentions.length > 0 && (
+                        <span className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                          ({nearbyMentions.length})
+                        </span>
+                      )}
+                    </div>
+
+                    {isLoadingNearby ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className={`w-4 h-4 border-2 ${useWhiteText ? 'border-white/30 border-t-white' : 'border-gray-300 border-t-gray-600'} rounded-full animate-spin`} />
+                      </div>
+                    ) : nearbyMentions.length > 0 ? (
+                      <div className="space-y-2">
+                        {nearbyMentions.map((mention) => {
+                          const truncatedDescription = mention.description
+                            ? mention.description.length > 45
+                              ? mention.description.substring(0, 45) + '...'
+                              : mention.description
+                            : 'No description';
+                          
+                          return (
+                            <button
+                              key={mention.id}
+                              onClick={() => {
+                                if (onMentionSelect) {
+                                  onMentionSelect(mention.id, mention.lat, mention.lng);
+                                  handleClose();
+                                } else {
+                                  // Fallback: navigate directly
+                                  handleClose();
+                                  router.push(`/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
+                                }
+                              }}
+                              className={`w-full text-left block rounded-md p-[10px] transition-colors ${
+                                useTransparentUI
+                                  ? 'bg-white/10 border border-white/20 hover:bg-white/20'
+                                  : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                              }`}
+                            >
+                              <div className="flex items-start gap-2">
+                                {mention.mention_type && (
+                                  <div className={`flex-shrink-0 text-sm leading-none mt-0.5 ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>
+                                    {mention.mention_type.emoji}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  {mention.mention_type && (
+                                    <div className={`text-xs font-medium mb-0.5 ${useWhiteText ? 'text-white/90' : 'text-gray-600'}`}>
+                                      {mention.mention_type.name}
+                                    </div>
+                                  )}
+                                  <p className={`text-xs line-clamp-2 ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                                    {truncatedDescription}
+                                  </p>
+                                </div>
+                                {mention.image_url && (
+                                  <div className="flex-shrink-0">
+                                    <img
+                                      src={mention.image_url}
+                                      alt="Mention"
+                                      className="w-10 h-10 rounded-md object-cover border border-gray-200"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className={`text-xs text-center py-4 ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        No mentions found at this location
+                      </div>
+                    )}
+                  </div>
                 )}
               </>
             )}

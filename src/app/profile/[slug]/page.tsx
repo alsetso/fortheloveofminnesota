@@ -8,6 +8,7 @@ import PageViewTracker from '@/components/analytics/PageViewTracker';
 import ProfileMentionsList from '@/features/profiles/components/ProfileMentionsList';
 import Link from 'next/link';
 import { MapIcon } from '@heroicons/react/24/outline';
+import PageWrapper from '@/components/layout/PageWrapper';
 
 export const dynamic = 'force-dynamic';
 
@@ -222,33 +223,35 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <>
       <PageViewTracker page_url={`/profile/${slug}`} />
-      <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile}>
-        {/* Main Content Area */}
-        <div className="space-y-6">
-          {/* Profile Header - Inline */}
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-            <Link
-              href={`/profile/${slug}/map`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-            >
-              <MapIcon className="w-5 h-5" />
-              View Map
-            </Link>
-          </div>
-
-          {/* Mentions List Section */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Mentions</h2>
+      <PageWrapper>
+        <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile}>
+          {/* Main Content Area */}
+          <div className="space-y-6">
+            {/* Profile Header - Inline */}
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+              <Link
+                href={`/profile/${slug}/map`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <MapIcon className="w-5 h-5" />
+                View Map
+              </Link>
             </div>
-            <ProfileMentionsList
-              pins={mentions}
-              isOwnProfile={isOwnProfile}
-            />
+
+            {/* Mentions List Section */}
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Mentions</h2>
+              </div>
+              <ProfileMentionsList
+                pins={mentions}
+                isOwnProfile={isOwnProfile}
+              />
+            </div>
           </div>
-        </div>
-      </ProfileLayout>
+        </ProfileLayout>
+      </PageWrapper>
     </>
   );
 }

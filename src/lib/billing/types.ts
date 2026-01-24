@@ -29,11 +29,22 @@ export interface BillingFeature {
   updated_at: string;
 }
 
+export type FeatureLimitType = 'count' | 'storage_mb' | 'boolean' | 'unlimited';
+
 export interface PlanFeature {
   id: string;
   plan_id: string;
   feature_id: string;
+  limit_value: number | null;
+  limit_type: FeatureLimitType | null;
   created_at: string;
+}
+
+export interface FeatureLimit {
+  has_feature: boolean;
+  limit_value: number | null;
+  limit_type: FeatureLimitType | null;
+  is_unlimited: boolean;
 }
 
 export type FeatureCategory = 'maps' | 'analytics' | 'content' | 'profile' | string;

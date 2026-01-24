@@ -468,10 +468,15 @@ CREATE OR REPLACE FUNCTION public.insert_prompt(
 ) AS $$
 DECLARE
   v_prompt_id UUID;
+  v_extract_count INTEGER;
 BEGIN
   INSERT INTO news.prompt (account_id, user_input, api_response)
   VALUES (p_account_id, p_user_input, p_api_response)
   RETURNING news.prompt.id INTO v_prompt_id;
+  
+  -- Manually trigger article extraction
+  -- (Trigger should fire automatically, but we call it explicitly to ensure it happens)
+  SELECT news.extract_articles_from_prompt(v_prompt_id) INTO v_extract_count;
   
   RETURN QUERY
   SELECT 
@@ -487,7 +492,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION public.insert_prompt IS 
-  'Inserts a new prompt into news.prompt. Trigger automatically extracts articles to news.generated.';
+  'Inserts a new prompt into news.prompt and extracts articles to news.generated.';
 
 -- Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.get_news_by_date_range TO authenticated, anon;

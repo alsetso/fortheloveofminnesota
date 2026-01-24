@@ -51,6 +51,11 @@ export default function CreatePostModal({
     screenshot?: string;
   } | null>(null);
   const [selectedMediaType, setSelectedMediaType] = useState<'image' | 'mention' | 'map' | null>(null);
+  const [selectedMentionTypeId, setSelectedMentionTypeId] = useState<string | null>(null);
+  const [showMentionTypesModal, setShowMentionTypesModal] = useState(false);
+  const [mentionTypes, setMentionTypes] = useState<Array<{ id: string; emoji: string; name: string }>>([]);
+  const [isLoadingMentionTypes, setIsLoadingMentionTypes] = useState(false);
+  const [mentionTypeSearchQuery, setMentionTypeSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +91,32 @@ export default function CreatePostModal({
                          account?.plan === 'plus' || 
                          account?.plan === 'business' || 
                          account?.plan === 'gov';
+
+  // Fetch mention types (only active ones for public selection)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const fetchMentionTypes = async () => {
+      setIsLoadingMentionTypes(true);
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data, error } = await supabase
+          .from('mention_types')
+          .select('id, emoji, name')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+        setMentionTypes(data || []);
+      } catch (err) {
+        console.error('Error fetching mention types:', err);
+      } finally {
+        setIsLoadingMentionTypes(false);
+      }
+    };
+
+    fetchMentionTypes();
+  }, [isOpen]);
 
   // Fetch user's groups
   useEffect(() => {
@@ -222,6 +253,9 @@ export default function CreatePostModal({
       setVisibility('public');
       setShowPrivacyMenu(false);
       setSelectedMediaType(null);
+      setSelectedMentionTypeId(null);
+      setShowMentionTypesModal(false);
+      setMentionTypeSearchQuery('');
     }
   }, [isOpen, lockGroupId, initialGroupId]);
 
@@ -384,6 +418,7 @@ export default function CreatePostModal({
           content: content.trim(),
           visibility: visibility,
           group_id: selectedGroupId || null,
+          mention_type_id: selectedMentionTypeId || null,
           mention_ids: selectedMentionIds.length > 0 ? selectedMentionIds : null,
           images: images.length > 0 ? images : null,
           map_data: mapData ? {
@@ -413,6 +448,7 @@ export default function CreatePostModal({
       setImages([]);
       setSelectedMentionIds([]);
       setShowMentionsList(false);
+      setSelectedMentionTypeId(null);
       onPostCreated?.();
       onClose();
     } catch (err) {
@@ -635,6 +671,46 @@ export default function CreatePostModal({
                 </select>
               </div>
             )}
+
+            {/* Mention Type Tag Selector */}
+            <div className="mb-3">
+              {selectedMentionTypeId && mentionTypes.length > 0 ? (
+                // Show selected tag
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-gray-50">
+                  <span className="text-lg leading-none">
+                    {mentionTypes.find(t => t.id === selectedMentionTypeId)?.emoji}
+                  </span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {mentionTypes.find(t => t.id === selectedMentionTypeId)?.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMentionTypeId(null)}
+                    className="w-5 h-5 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors text-gray-400 hover:text-gray-600"
+                    title="Remove tag"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                // Show Add Tag button
+                <button
+                  type="button"
+                  onClick={() => setShowMentionTypesModal(true)}
+                  className="relative inline-flex items-center gap-2 px-3 py-2 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
+                  title="Add tag"
+                >
+                  <span className="text-xl font-bold text-red-500 group-hover:text-red-600 transition-colors">
+                    #
+                  </span>
+                  <span className="text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">
+                    Add tag
+                  </span>
+                </button>
+              )}
+            </div>
 
             {/* Title Input */}
             {showTitle && (
@@ -1104,6 +1180,94 @@ export default function CreatePostModal({
             </div>
           </form>
           </div>
+
+          {/* Mention Types Modal */}
+          {showMentionTypesModal && (
+            <>
+              <div
+                className="fixed inset-0 bg-black/50 z-[102]"
+                onClick={() => {
+                  setShowMentionTypesModal(false);
+                  setMentionTypeSearchQuery('');
+                }}
+              />
+              <div className="fixed inset-0 z-[103] flex items-center justify-center p-4 pointer-events-none">
+                <div
+                  className="bg-white rounded-lg shadow-xl w-full max-w-[500px] pointer-events-auto max-h-[80vh] flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">Select Tag</h3>
+                    <button
+                      onClick={() => {
+                        setShowMentionTypesModal(false);
+                        setMentionTypeSearchQuery('');
+                      }}
+                      className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                    >
+                      <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Search Input */}
+                  <div className="p-4 border-b border-gray-200">
+                    <input
+                      type="text"
+                      value={mentionTypeSearchQuery}
+                      onChange={(e) => setMentionTypeSearchQuery(e.target.value)}
+                      placeholder="Search tags..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Mention Types List */}
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {isLoadingMentionTypes ? (
+                      <div className="flex items-center justify-center py-8">
+                        <span className="text-sm text-gray-500">Loading tags...</span>
+                      </div>
+                    ) : (() => {
+                      const filteredTypes = mentionTypes.filter((type) =>
+                        type.name.toLowerCase().includes(mentionTypeSearchQuery.toLowerCase())
+                      );
+
+                      return filteredTypes.length === 0 ? (
+                        <div className="flex items-center justify-center py-8">
+                          <span className="text-sm text-gray-500">No tags found</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-3">
+                          {filteredTypes.map((type) => (
+                            <button
+                              key={type.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedMentionTypeId(type.id);
+                                setShowMentionTypesModal(false);
+                                setMentionTypeSearchQuery('');
+                              }}
+                              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-md border transition-all ${
+                                selectedMentionTypeId === type.id
+                                  ? 'border-gray-900 bg-gray-50 opacity-100'
+                                  : 'border-gray-200 bg-white opacity-60 hover:opacity-80'
+                              }`}
+                            >
+                              <span className="text-lg leading-none">{type.emoji}</span>
+                              <span className="text-sm font-medium text-gray-900">{type.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </>

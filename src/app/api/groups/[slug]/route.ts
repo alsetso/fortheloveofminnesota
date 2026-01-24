@@ -108,15 +108,16 @@ export async function GET(
           const { data: membership } = await supabase
             .from('group_members')
             .select('is_admin')
-            .eq('group_id', group.id)
+            .eq('group_id', (group as any).id)
             .eq('account_id', accountId)
-            .maybeSingle();
+            .maybeSingle()
+            .returns<{ is_admin: boolean } | null>();
 
-          group.is_member = !!membership;
-          group.is_admin = membership?.is_admin || false;
+          (group as any).is_member = !!membership;
+          (group as any).is_admin = membership?.is_admin || false;
         } else {
-          group.is_member = false;
-          group.is_admin = false;
+          (group as any).is_member = false;
+          (group as any).is_admin = false;
         }
 
         return NextResponse.json({ group });
@@ -176,7 +177,8 @@ export async function PATCH(
           .select('id')
           .eq('slug', slug)
           .eq('is_active', true)
-          .single();
+          .single()
+          .returns<{ id: string }>();
 
         if (!group) {
           return NextResponse.json(
@@ -189,11 +191,11 @@ export async function PATCH(
         const { data: membership } = await supabase
           .from('group_members')
           .select('is_admin')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .single();
 
-        if (!membership || !membership.is_admin) {
+        if (!membership || !(membership as any).is_admin) {
           return NextResponse.json(
             { error: 'Only group admins can update groups' },
             { status: 403 }
@@ -216,8 +218,8 @@ export async function PATCH(
         // Update group
         const { data: updatedGroup, error } = await supabase
           .from('groups')
-          .update(updateData)
-          .eq('id', group.id)
+          .update(updateData as any)
+          .eq('id', (group as any).id)
           .select(`
             id,
             name,
@@ -251,8 +253,8 @@ export async function PATCH(
         }
 
         if (updatedGroup) {
-          updatedGroup.is_member = true;
-          updatedGroup.is_admin = true;
+          (updatedGroup as any).is_member = true;
+          (updatedGroup as any).is_admin = true;
         }
 
         return NextResponse.json({ group: updatedGroup });
@@ -305,7 +307,8 @@ export async function DELETE(
           .select('id')
           .eq('slug', slug)
           .eq('is_active', true)
-          .single();
+          .single()
+          .returns<{ id: string }>();
 
         if (!group) {
           return NextResponse.json(
@@ -318,11 +321,11 @@ export async function DELETE(
         const { data: membership } = await supabase
           .from('group_members')
           .select('is_admin')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .single();
 
-        if (!membership || !membership.is_admin) {
+        if (!membership || !(membership as any).is_admin) {
           return NextResponse.json(
             { error: 'Only group admins can delete groups' },
             { status: 403 }
@@ -332,8 +335,8 @@ export async function DELETE(
         // Soft delete
         const { error } = await supabase
           .from('groups')
-          .update({ is_active: false })
-          .eq('id', group.id);
+          .update({ is_active: false } as any)
+          .eq('id', (group as any).id);
 
         if (error) {
           console.error('[Groups API] Error deleting group:', error);

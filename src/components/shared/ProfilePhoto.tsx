@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { UserIcon } from '@heroicons/react/24/outline';
 import { Account, AccountService } from '@/features/auth';
+import { getPaidPlanBorderClasses } from '@/lib/billing/planHelpers';
 
 interface ProfilePhotoProps {
   account?: Account | null;
@@ -126,19 +127,10 @@ export default function ProfilePhoto({
     }
   };
 
-  const isPro = account?.plan === 'contributor' || 
-                account?.plan === 'plus' || 
-                account?.plan === 'professional' || 
-                account?.plan === 'business';
-
   return (
     <div className={`relative ${className}`}>
       {/* Profile Photo */}
-      <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400 relative ${
-        isPro 
-          ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
-          : 'border border-gray-200'
-      }`}>
+      <div className={`${sizeClasses[size]} rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-gray-400 relative ${getPaidPlanBorderClasses(account?.plan)}`}>
         <div className="w-full h-full rounded-full overflow-hidden bg-white relative">
           {avatarUrl && !imageError ? (
             <Image

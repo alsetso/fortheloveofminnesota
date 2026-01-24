@@ -13,22 +13,27 @@ import {
   buildMentionsLabelLayout,
   buildMentionsLabelPaint,
   buildMentionsIconLayout,
+  mentionsLayerStyles,
 } from '@/features/map/config/layerStyles';
 
 interface MentionsLayerProps {
   map: MapboxMapInstance;
   mapLoaded: boolean;
   onLoadingChange?: (isLoading: boolean) => void;
+  /** Optional mention ID to highlight on the map */
+  selectedMentionId?: string | null;
 }
 
 /**
  * MentionsLayer component manages Mapbox mention visualization
  * Handles fetching, formatting, and real-time updates
  */
-export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: MentionsLayerProps) {
+export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId }: MentionsLayerProps) {
   const sourceId = 'map-mentions';
   const pointLayerId = 'map-mentions-point';
   const pointLabelLayerId = 'map-mentions-point-label';
+  const highlightLayerId = 'map-mentions-highlight';
+  const highlightSourceId = 'map-mentions-highlight-source';
   
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -53,7 +58,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>('7d');
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>(null);
   const [isLoadingMentions, setIsLoadingMentions] = useState(false);
 
   // Notify parent of loading state changes
@@ -96,6 +101,122 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
       window.removeEventListener('reload-mentions', handleReloadMentions);
     };
   }, []);
+
+  // Update highlight when selectedMentionId changes
+  useEffect(() => {
+    if (!mapLoaded || !map) return;
+
+    const mapboxMap = map as any;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
+    // Helper to check if base layer exists
+    const checkBaseLayerExists = () => {
+      try {
+        return mapboxMap.getLayer(pointLayerId) !== undefined;
+      } catch {
+        return false;
+      }
+    };
+
+    const updateHighlight = () => {
+      if (!selectedMentionId) {
+        // Remove highlight
+        try {
+          if (mapboxMap.getLayer(highlightLayerId)) {
+            mapboxMap.removeLayer(highlightLayerId);
+          }
+          if (mapboxMap.getSource(highlightSourceId)) {
+            mapboxMap.removeSource(highlightSourceId);
+          }
+        } catch (e) {
+          // Ignore if doesn't exist
+        }
+        return;
+      }
+
+      // Wait for base layer to exist before adding highlight
+      if (!checkBaseLayerExists()) {
+        // Retry after a short delay if base layer doesn't exist yet
+        timeoutId = setTimeout(() => {
+          if (checkBaseLayerExists()) {
+            updateHighlight();
+          }
+        }, 100);
+        return;
+      }
+
+      // Find selected mention in current mentions
+      const selectedMention = mentionsRef.current.find(m => m.id === selectedMentionId);
+      if (!selectedMention) return;
+
+      // Create highlight GeoJSON
+      const highlightGeoJSON = {
+        type: 'FeatureCollection' as const,
+        features: [{
+          type: 'Feature' as const,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [selectedMention.lng, selectedMention.lat],
+          },
+          properties: {
+            id: selectedMention.id,
+          },
+        }],
+      };
+
+      try {
+        // Remove existing highlight
+        if (mapboxMap.getLayer(highlightLayerId)) {
+          mapboxMap.removeLayer(highlightLayerId);
+        }
+        if (mapboxMap.getSource(highlightSourceId)) {
+          mapboxMap.removeSource(highlightSourceId);
+        }
+
+        // Add highlight source
+        mapboxMap.addSource(highlightSourceId, {
+          type: 'geojson',
+          data: highlightGeoJSON,
+        });
+
+        // Add highlight circle layer - only if base layer exists
+        if (!mapboxMap.getLayer(highlightLayerId) && checkBaseLayerExists()) {
+          mapboxMap.addLayer({
+            id: highlightLayerId,
+            type: 'circle',
+            source: highlightSourceId,
+            paint: {
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 8,
+                10, 12,
+                14, 16,
+                18, 20,
+                20, 24,
+              ],
+              'circle-color': '#3b82f6',
+              'circle-stroke-width': 3,
+              'circle-stroke-color': '#2563eb',
+              'circle-opacity': 0.3,
+              'circle-stroke-opacity': 1.0,
+            },
+          }, pointLayerId);
+        }
+      } catch (e) {
+        console.warn('[MentionsLayer] Error updating highlight:', e);
+      }
+    };
+
+    updateHighlight();
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [selectedMentionId, mapLoaded, map, pointLayerId, highlightLayerId, highlightSourceId]);
 
   // Fetch mentions and add to map
   useEffect(() => {
@@ -495,6 +616,28 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
           return;
         }
 
+        // Build icon-size expression - make selected mention larger
+        // Mapbox requires 'zoom' to be at top level, so we always use interpolate with zoom
+        // and for each zoom level, use a case expression to return the size directly
+        // When selectedMentionId is null, just use base sizes
+        const baseIconSize = mentionsLayerStyles.point.icon.size;
+        const iconSizeExpression = selectedMentionId
+          ? [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              // For each zoom level, use case to return 1.5x size if selected, normal size otherwise
+              0, ['case', ['==', ['get', 'id'], selectedMentionId], 0.375, 0.25],
+              5, ['case', ['==', ['get', 'id'], selectedMentionId], 0.6, 0.4],
+              10, ['case', ['==', ['get', 'id'], selectedMentionId], 0.975, 0.65],
+              12, ['case', ['==', ['get', 'id'], selectedMentionId], 1.2, 0.8],
+              14, ['case', ['==', ['get', 'id'], selectedMentionId], 1.65, 1.1],
+              16, ['case', ['==', ['get', 'id'], selectedMentionId], 1.95, 1.3],
+              18, ['case', ['==', ['get', 'id'], selectedMentionId], 2.25, 1.5],
+              20, ['case', ['==', ['get', 'id'], selectedMentionId], 2.7, 1.8],
+            ]
+          : baseIconSize;
+
         // Add points as mention icons with zoom-based sizing
         try {
           const iconLayout = buildMentionsIconLayout();
@@ -502,10 +645,11 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
             id: pointLayerId,
             type: 'symbol',
             source: sourceId,
-          layout: {
+            layout: {
               ...iconLayout,
-            'icon-image': iconExpression,
-          },
+              'icon-image': iconExpression,
+              'icon-size': iconSizeExpression, // Use conditional size expression
+            },
           });
         } catch (e) {
           console.error('[MentionsLayer] Error adding point layer:', e);
@@ -534,6 +678,81 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange }: Menti
           }
           isAddingLayersRef.current = false;
           return;
+        }
+
+        // Add highlight circle for selected mention (blue ring)
+        if (selectedMentionId) {
+          try {
+            // Find the selected mention in the GeoJSON
+            const selectedFeature = geoJSON.features.find(
+              (f: any) => f.properties?.id === selectedMentionId
+            );
+
+            if (selectedFeature) {
+              // Create highlight source with just the selected mention
+              const highlightGeoJSON = {
+                type: 'FeatureCollection' as const,
+                features: [selectedFeature],
+              };
+
+              // Remove existing highlight source/layer if present
+              try {
+                if (mapboxMap.getLayer(highlightLayerId)) {
+                  mapboxMap.removeLayer(highlightLayerId);
+                }
+                if (mapboxMap.getSource(highlightSourceId)) {
+                  mapboxMap.removeSource(highlightSourceId);
+                }
+              } catch (e) {
+                // Ignore if doesn't exist
+              }
+
+              // Add highlight source
+              mapboxMap.addSource(highlightSourceId, {
+                type: 'geojson',
+                data: highlightGeoJSON,
+              });
+
+              // Add highlight circle layer (blue ring around selected mention)
+              mapboxMap.addLayer({
+                id: highlightLayerId,
+                type: 'circle',
+                source: highlightSourceId,
+                paint: {
+                  'circle-radius': [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    0, 8,   // Small at low zoom
+                    10, 12, // Medium at zoom 10
+                    14, 16, // Larger at zoom 14
+                    18, 20, // Full size at zoom 18
+                    20, 24  // Largest at max zoom
+                  ],
+                  'circle-color': '#3b82f6', // Blue color
+                  'circle-stroke-width': 3,
+                  'circle-stroke-color': '#2563eb', // Darker blue border
+                  'circle-opacity': 0.3, // Semi-transparent fill
+                  'circle-stroke-opacity': 1.0, // Solid border
+                },
+              }, pointLayerId); // Insert before point layer so it appears behind
+            }
+          } catch (e) {
+            console.warn('[MentionsLayer] Error adding highlight layer:', e);
+            // Continue even if highlight fails
+          }
+        } else {
+          // Remove highlight if no selected mention
+          try {
+            if (mapboxMap.getLayer(highlightLayerId)) {
+              mapboxMap.removeLayer(highlightLayerId);
+            }
+            if (mapboxMap.getSource(highlightSourceId)) {
+              mapboxMap.removeSource(highlightSourceId);
+            }
+          } catch (e) {
+            // Ignore if doesn't exist
+          }
         }
 
         isAddingLayersRef.current = false;

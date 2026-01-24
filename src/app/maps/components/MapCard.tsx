@@ -66,11 +66,11 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
     return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/${lng},${lat},${zoom}/${width}x${height}@2x?access_token=${MAP_CONFIG.MAPBOX_TOKEN}`;
   }, [map?.map_type, map?.thumbnail, map?.map_style, map?.meta?.center, map?.meta?.zoom]);
 
-  // Truncate description to 90 characters
+  // Truncate description to 120 characters
   const truncatedDescription = useMemo(() => {
     if (!map.description) return null;
-    if (map.description.length <= 90) return map.description;
-    return map.description.substring(0, 90).trim() + '...';
+    if (map.description.length <= 120) return map.description;
+    return map.description.substring(0, 120).trim() + '...';
   }, [map.description]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -159,7 +159,7 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
               </div>
             )}
             {/* Owner Badge - Floating label in top left */}
-            {map.account && (
+            {map.account && !map.hide_creator && (
               <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-sm rounded flex items-center gap-1">
                 {map.account.image_url ? (
                   <div className="w-3 h-3 rounded-full overflow-hidden flex-shrink-0 border border-white/20">
@@ -221,7 +221,7 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
         {/* Title */}
         <h3 className="text-xs font-semibold text-gray-900 mb-0.5 line-clamp-1">{map.title}</h3>
         
-        {/* Description - Truncated to 90 characters */}
+        {/* Description - Truncated to 120 characters */}
         {truncatedDescription && (
           <p className="text-xs text-gray-600 mb-1 line-clamp-2">{truncatedDescription}</p>
         )}

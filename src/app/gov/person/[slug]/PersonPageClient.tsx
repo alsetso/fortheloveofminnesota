@@ -1,9 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { usePageView } from '@/hooks/usePageView';
-import { useAuthStateSafe } from '@/features/auth';
 import PersonEditModal from './PersonEditModal';
 import EditButton from '@/features/civic/components/EditButton';
 import type { CivicPerson } from '@/features/civic/services/civicService';
@@ -13,28 +10,28 @@ interface PersonPageClientProps {
   isAdmin: boolean;
 }
 
+/**
+ * Client component for person page actions (edit button/modal).
+ * Only renders edit functionality for admins.
+ */
 export default function PersonPageClient({ person, isAdmin }: PersonPageClientProps) {
-  const router = useRouter();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  usePageView();
 
-  const handleSave = () => {
-    router.refresh();
-  };
-
-  const { account } = useAuthStateSafe();
-  const isAuthenticated = !!account;
-  
-  if (!isAuthenticated && !isAdmin) return null;
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <>
-      <EditButton onClick={() => setIsEditModalOpen(true)} />
+      <EditButton onClick={() => setIsEditModalOpen(true)} label="Edit" />
       <PersonEditModal
         isOpen={isEditModalOpen}
         person={person}
         onClose={() => setIsEditModalOpen(false)}
-        onSave={handleSave}
+        onSave={() => {
+          setIsEditModalOpen(false);
+          window.location.reload();
+        }}
         isAdmin={isAdmin}
       />
     </>

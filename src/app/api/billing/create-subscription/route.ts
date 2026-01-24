@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { createServiceClient, createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
+import type { BillingPlan } from '@/lib/billing/types';
 
 /**
  * Create Subscription with Payment Method
@@ -102,7 +103,8 @@ export async function POST(request: NextRequest) {
           .select('stripe_price_id_monthly, stripe_price_id_yearly, slug, name')
           .eq('slug', planSlug)
           .eq('is_active', true)
-          .maybeSingle();
+          .maybeSingle()
+          .returns<Pick<BillingPlan, 'stripe_price_id_monthly' | 'stripe_price_id_yearly' | 'slug' | 'name'>>();
         
         if (planError || !plan) {
           return NextResponse.json(

@@ -13,8 +13,44 @@ import CommunityBanner from '@/features/civic/components/CommunityBanner';
 import ImageUpload from '@/features/civic/components/ImageUpload';
 import { updateCivicFieldWithLogging } from '@/features/civic/utils/civicEditLogger';
 import Link from 'next/link';
+import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 
 type Tab = 'orgs' | 'people' | 'roles';
+
+// Extract numeric district number for sorting (moved outside component for performance)
+const extractDistrictNumber = (district: string | null): number => {
+  if (!district) return 999999;
+  const match = district.match(/\d+/);
+  if (match) {
+    return parseInt(match[0], 10);
+  }
+  return 999999;
+};
+
+// Extract suffix for secondary sorting (moved outside component for performance)
+const extractDistrictSuffix = (district: string | null): string => {
+  if (!district) return '';
+  const match = district.match(/\d+([A-Za-z]+)/);
+  return match ? match[1].toUpperCase() : '';
+};
+
+// Sort by district number (ascending), then by suffix, then by name
+const sortPeopleByDistrict = (a: { district: string | null; name: string }, b: { district: string | null; name: string }) => {
+  const numA = extractDistrictNumber(a.district);
+  const numB = extractDistrictNumber(b.district);
+  
+  if (numA !== numB) {
+    return numA - numB;
+  }
+  
+  const suffixA = extractDistrictSuffix(a.district);
+  const suffixB = extractDistrictSuffix(b.district);
+  if (suffixA !== suffixB) {
+    return suffixA.localeCompare(suffixB);
+  }
+  
+  return a.name.localeCompare(b.name);
+};
 
 interface OrgRecord {
   id: string;
@@ -69,6 +105,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
   const { success, error: showError } = useToast();
   const { activeTab, setActiveTab } = useGovTab();
   const isAuthenticated = !!account;
+  const { hasFeature, isLoading: isEntitlementsLoading } = useBillingEntitlementsSafe();
   const [orgs, setOrgs] = useState<OrgRecord[]>([]);
   const [people, setPeople] = useState<PersonRecord[]>([]);
   const [roles, setRoles] = useState<RoleRecord[]>([]);
@@ -78,6 +115,9 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
   const [searchQuery, setSearchQuery] = useState('');
 
   const supabase = useSupabaseClient();
+
+  // Billing-schema feature gate (updates automatically when account dropdown changes)
+  const hasContributorAccess = isAuthenticated && !isEntitlementsLoading && hasFeature('civic_edits');
 
   const handleRefresh = useCallback(() => {
     setLoadedTabs(new Set());
@@ -89,6 +129,28 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
     if (loadedTabs.has(activeTab) && refreshKey === 0) {
       setLoading(false);
       return;
+    }
+
+    // Check sessionStorage cache (only if not refreshing)
+    if (refreshKey === 0) {
+      try {
+        const cacheKey = `gov_tables_${activeTab}_cache`;
+        const cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            if (activeTab === 'orgs') setOrgs(data);
+            else if (activeTab === 'people') setPeople(data);
+            else if (activeTab === 'roles') setRoles(data);
+            setLoadedTabs(prev => new Set(prev).add(activeTab));
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (err) {
+        // Cache read failed, continue with fetch
+      }
     }
 
     setLoading(true);
@@ -112,12 +174,21 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           parent_name: org.parent_id ? orgsMap.get(org.parent_id) || null : null,
         }));
 
+        // Cache the result
+        try {
+          sessionStorage.setItem('gov_tables_orgs_cache', JSON.stringify({
+            data: orgsWithParents,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          // Cache write failed, continue
+        }
+
         setOrgs(orgsWithParents);
       } else if (activeTab === 'people') {
         const { data: peopleData, error: peopleError } = await supabase
           .from('people')
-          .select('id, name, slug, party, photo_url, district, email, phone, address, created_at')
-          .order('name');
+          .select('id, name, slug, party, photo_url, district, email, phone, address, created_at');
         if (peopleError) throw peopleError;
 
         // Fetch all roles
@@ -147,7 +218,20 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           roles: rolesByPerson.get(person.id) || [],
         }));
 
-        setPeople(peopleWithRoles);
+        // Sort by district number (ascending), then by suffix, then by name
+        const sortedPeople = [...peopleWithRoles].sort(sortPeopleByDistrict);
+
+        // Cache the result
+        try {
+          sessionStorage.setItem('gov_tables_people_cache', JSON.stringify({
+            data: sortedPeople,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          // Cache write failed, continue
+        }
+
+        setPeople(sortedPeople);
       } else if (activeTab === 'roles') {
         const { data: rolesData, error: rolesError } = await supabase
           .from('roles')
@@ -200,6 +284,16 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           };
         });
 
+        // Cache the result
+        try {
+          sessionStorage.setItem('gov_tables_roles_cache', JSON.stringify({
+            data: rolesWithPeople,
+            timestamp: Date.now(),
+          }));
+        } catch (err) {
+          // Cache write failed, continue
+        }
+
         setRoles(rolesWithPeople);
       }
       setLoadedTabs(prev => new Set(prev).add(activeTab));
@@ -245,6 +339,17 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
       (person.roles?.some(role => role.toLowerCase().includes(query)))
     );
   }, [people, searchQuery]);
+
+  // Calculate party counts
+  const partyCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    people.forEach(person => {
+      if (person.party) {
+        counts.set(person.party, (counts.get(person.party) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [people]);
 
   const filteredRoles = useMemo(() => {
     if (!searchQuery.trim()) return roles;
@@ -376,7 +481,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Description
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Slug</th>
@@ -385,7 +490,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
                       Website
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                 </tr>
@@ -402,7 +507,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       </Link>
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="orgs"
                           recordId={org.id}
@@ -431,7 +536,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       {org.parent_name || '-'}
                     </td>
                     <td className="p-1.5">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="orgs"
                           recordId={org.id}
@@ -462,6 +567,22 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
         )}
 
         {activeTab === 'people' && (
+          <div className="space-y-3">
+            {/* Party Counts Summary */}
+            {partyCounts.size > 0 && (
+              <div className="bg-gray-50 border-b border-gray-200 p-[10px]">
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="text-xs font-medium text-gray-700">Party counts:</span>
+                  {Array.from(partyCounts.entries())
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([party, count]) => (
+                      <span key={party} className="text-xs text-gray-600">
+                        {party} <span className="font-semibold text-gray-900">({count})</span>
+                      </span>
+                    ))}
+                </div>
+              </div>
+            )}
           <div className="overflow-x-auto">
             {filteredPeople.length === 0 ? (
               <div className="p-[10px] text-center">
@@ -486,7 +607,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Photo
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Name</th>
@@ -494,32 +615,32 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Party
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       District
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Roles</th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Email
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Phone
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Address
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700">ID</th>
@@ -579,7 +700,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     </td>
                     <td className="p-1.5 text-gray-600 border-r border-gray-100">{person.slug || '-'}</td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -593,7 +714,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -623,7 +744,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -646,7 +767,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -669,7 +790,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -691,6 +812,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
               </tbody>
             </table>
             )}
+          </div>
           </div>
         )}
 
@@ -719,7 +841,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Title
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Person</th>
@@ -727,19 +849,19 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Start Date
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       End Date
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
                       Current
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                 </tr>
@@ -748,7 +870,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                 {filteredRoles.map((role) => (
                   <tr key={role.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="roles"
                           recordId={role.id}
@@ -811,7 +933,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="roles"
                           recordId={role.id}
@@ -826,7 +948,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="roles"
                           recordId={role.id}
@@ -981,7 +1103,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Description
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Slug</th>
@@ -990,7 +1112,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
                       Website
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                 </tr>
@@ -1007,7 +1129,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       </Link>
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="orgs"
                           recordId={org.id}
@@ -1036,7 +1158,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       {org.parent_name || '-'}
                     </td>
                     <td className="p-1.5">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="orgs"
                           recordId={org.id}
@@ -1091,7 +1213,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Photo
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Name</th>
@@ -1099,32 +1221,32 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Party
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       District
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Roles</th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Email
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Phone
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Address
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700">ID</th>
@@ -1184,7 +1306,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     </td>
                     <td className="p-1.5 text-gray-600 border-r border-gray-100">{person.slug || '-'}</td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -1198,7 +1320,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -1228,7 +1350,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -1251,7 +1373,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -1274,7 +1396,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="people"
                           recordId={person.id}
@@ -1324,7 +1446,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Title
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">Person</th>
@@ -1332,19 +1454,19 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       Start Date
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700 border-r border-gray-200">
                     <div className="flex items-center gap-1">
                       End Date
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                   <th className="p-1.5 text-left font-semibold text-gray-700">
                     <div className="flex items-center gap-1">
                       Current
-                      {isAuthenticated && <EditableFieldBadge />}
+                      {isAuthenticated && hasContributorAccess && <EditableFieldBadge />}
                     </div>
                   </th>
                 </tr>
@@ -1353,7 +1475,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                 {filteredRoles.map((role) => (
                   <tr key={role.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="roles"
                           recordId={role.id}
@@ -1416,7 +1538,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="roles"
                           recordId={role.id}
@@ -1431,7 +1553,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       )}
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
-                      {isAuthenticated && account?.id ? (
+                      {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
                           table="roles"
                           recordId={role.id}
@@ -1512,10 +1634,24 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
             >
               Sign in
             </button>
-            {' '}to edit civic data
+            {' '}with a Contributor, Professional, or Business subscription to edit civic data
           </p>
         </div>
       )}
+
+      {/* Subscription Required Prompt */}
+      {isAuthenticated && !hasContributorAccess && (
+        <div className="mt-3 bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+          <p className="text-xs text-gray-600">
+            Editing government data requires a{' '}
+            <Link href="/billing" className="text-gray-900 font-medium hover:underline">
+              Contributor, Professional, or Business subscription
+            </Link>
+            {' '}with an active subscription.
+          </p>
+        </div>
+      )}
+
     </div>
   );
 }

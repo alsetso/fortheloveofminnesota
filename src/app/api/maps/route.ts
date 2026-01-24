@@ -22,6 +22,7 @@ import { commonSchemas } from '@/lib/security/validation';
 const mapsQuerySchema = z.object({
   visibility: z.enum(['public', 'private', 'shared']).optional(),
   account_id: commonSchemas.uuid.optional(),
+  collection_type: z.enum(['community', 'professional', 'user', 'atlas', 'gov']).optional(),
   limit: z.coerce.number().int().positive().max(100).default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
 });
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
           return validation.error;
         }
         
-        const { visibility, account_id, limit, offset } = validation.data;
+        const { visibility, account_id, collection_type, limit, offset } = validation.data;
 
     // Build query
     let query = supabase
@@ -55,10 +56,14 @@ export async function GET(request: NextRequest) {
         description,
         visibility,
         map_style,
+        map_layers,
         type,
         custom_slug,
         tags,
         meta,
+        is_primary,
+        hide_creator,
+        collection_type,
         created_at,
         updated_at,
         account:accounts!inner(
@@ -80,6 +85,12 @@ export async function GET(request: NextRequest) {
           query = query.eq('account_id', account_id);
         }
 
+        if (collection_type) {
+          // Backward-compat: some older maps used `type` for categorization.
+          // Treat collection_type filter as (collection_type = X OR type = X).
+          query = query.or(`collection_type.eq.${collection_type},type.eq.${collection_type}`);
+        }
+
     // For anonymous users, only show public maps
     // For authenticated users, RLS will handle visibility (public + own private)
     if (!auth) {
@@ -98,11 +109,17 @@ export async function GET(request: NextRequest) {
           return createErrorResponse('Failed to fetch maps', 500);
         }
 
+        // Add cache headers for public maps
+        const headers: HeadersInit = {};
+        if (!account_id && visibility === 'public') {
+          headers['Cache-Control'] = 'public, s-maxage=300, stale-while-revalidate=600';
+        }
+
         return createSuccessResponse({
           maps: maps || [],
           limit,
           offset,
-        });
+        }, 200, headers);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[Maps API] Error:', error);
@@ -127,7 +144,9 @@ export async function GET(request: NextRequest) {
  * - Request size limit: 1MB
  * - Input validation with Zod
  * - Requires authentication
- * - Requires Contributor plan
+ * - Requires Contributor plan (pro/plus) or admin role
+ * - Admin-only fields: is_primary, hide_creator, collection_type, custom_slug
+ * - RLS policies enforce ownership at database level
  */
 const createMapSchema = z.object({
   title: z.string().min(1).max(200),
@@ -141,6 +160,9 @@ const createMapSchema = z.object({
     text: z.string(),
   })).max(20).default([]),
   meta: z.record(z.string(), z.unknown()).default({}),
+  is_primary: z.boolean().optional(),
+  hide_creator: z.boolean().optional(),
+  collection_type: z.enum(['community', 'professional', 'user', 'atlas', 'gov']).optional().nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -156,6 +178,7 @@ export async function POST(request: NextRequest) {
         
         // Verify user session is loaded
         const { data: { user: supabaseUser }, error: userError } = await supabase.auth.getUser();
+        
         if (userError || !supabaseUser || supabaseUser.id !== userId) {
           return createErrorResponse('Authentication failed', 401);
         }
@@ -165,7 +188,6 @@ export async function POST(request: NextRequest) {
         if (!validation.success) {
           return validation.error;
         }
-        
         const {
           title,
           description,
@@ -175,6 +197,9 @@ export async function POST(request: NextRequest) {
           custom_slug,
           tags,
           meta,
+          is_primary,
+          hide_creator,
+          collection_type,
         } = validation.data;
 
         // Get account_id (already validated in security middleware)
@@ -197,16 +222,73 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Check if user has pro plan (required for map creation)
-        const { data: account } = await supabase
+        // Check if user has pro plan (required for map creation) or is admin
+        const { data: account, error: accountError } = await supabase
           .from('accounts')
-          .select('plan')
+          .select('plan, role')
           .eq('id', finalAccountId)
           .single();
 
-        const accountData = account as { plan: string } | null;
-        if (accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
-          return createErrorResponse('Map creation is only available for Contributor subscribers. Upgrade to Contributor to create maps.', 403);
+        if (accountError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Maps API] Error fetching account:', accountError);
+          }
+          return createErrorResponse('Failed to verify account', 500);
+        }
+
+        const accountData = account as { plan: string; role: string } | null;
+        const isAdmin = accountData?.role === 'admin';
+        
+        // Admins can bypass all limits
+        if (!isAdmin) {
+          // Count existing maps for this account
+          const { count: currentMapCount, error: mapsError } = await supabase
+            .from('map')
+            .select('*', { count: 'exact', head: true })
+            .eq('account_id', finalAccountId);
+
+          if (mapsError) {
+            if (process.env.NODE_ENV === 'development') {
+              console.error('[Maps API] Error counting user maps:', mapsError);
+            }
+            return createErrorResponse('Failed to check map limit', 500);
+          }
+
+          const used = currentMapCount ?? 0;
+
+          const { data: mapRows, error: mapFeatureError } = await supabase.rpc('get_account_feature_limit', {
+            account_id: finalAccountId,
+            feature_slug: 'custom_maps',
+          } as any);
+
+          const mapLimit = Array.isArray(mapRows) && mapRows.length > 0 ? (mapRows[0] as any) : null;
+
+          if (mapFeatureError || !mapLimit || !mapLimit.has_feature) {
+            return createErrorResponse(
+              'Map creation is not available on your current plan. Upgrade to create maps.',
+              403
+            );
+          }
+
+          if (mapLimit.is_unlimited) {
+            // Allowed
+          } else if (mapLimit.limit_type === 'count' && mapLimit.limit_value !== null && used >= mapLimit.limit_value) {
+            return createErrorResponse(
+              `Map limit reached. You have ${used}/${mapLimit.limit_value} maps. Upgrade your plan to create more maps.`,
+              403
+            );
+          }
+        }
+
+        // Check if user is admin (required for is_primary, hide_creator, and custom_slug)
+        // Non-admins can set collection_type to 'community', but other values require admin
+        if ((is_primary !== undefined || hide_creator !== undefined || custom_slug !== undefined) && !isAdmin) {
+          return createErrorResponse('Admin role required to set is_primary, hide_creator, or custom_slug', 403);
+        }
+        
+        // Non-admins can only set collection_type to 'community' or null
+        if (collection_type !== undefined && !isAdmin && collection_type && collection_type !== 'community') {
+          return createErrorResponse('Only admins can set collection_type to values other than "community"', 403);
         }
 
         // Validate custom_slug if provided (already validated in schema, but check uniqueness)
@@ -233,6 +315,13 @@ export async function POST(request: NextRequest) {
           custom_slug: custom_slug?.trim() || null,
           tags: tags || [],
           meta: meta || {},
+          // Allow non-admins to set collection_type to 'community'
+          collection_type: collection_type || null,
+          ...(isAdmin && {
+            is_primary: is_primary ?? false,
+            hide_creator: hide_creator ?? false,
+            custom_slug: custom_slug?.trim() || null,
+          }),
         };
 
         const { data: map, error } = await supabase
@@ -245,6 +334,7 @@ export async function POST(request: NextRequest) {
             description,
             visibility,
             map_style,
+            map_layers,
             type,
             custom_slug,
             tags,

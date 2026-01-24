@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
+import type { BillingPlan } from '@/lib/billing/types';
 
 /**
  * Check if a plan has a price ID configured
@@ -38,7 +39,8 @@ export async function GET(request: NextRequest) {
       .select('stripe_price_id_monthly, stripe_price_id_yearly')
       .eq('slug', planSlug)
       .eq('is_active', true)
-      .maybeSingle();
+      .maybeSingle()
+      .returns<Pick<BillingPlan, 'stripe_price_id_monthly' | 'stripe_price_id_yearly'>>();
 
     if (planError || !plan) {
       return NextResponse.json({

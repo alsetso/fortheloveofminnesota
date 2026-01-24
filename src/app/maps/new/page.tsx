@@ -27,7 +27,15 @@ export default function NewMapPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
-  const totalSteps = 6;
+  const [mapLimit, setMapLimit] = useState<{current: number; max: number | null; type: string} | null>(null);
+  const isAdmin = account?.role === 'admin';
+  const totalSteps = isAdmin ? 7 : 6; // Add admin step if user is admin
+  
+  // Admin-only settings
+  const [isPrimary, setIsPrimary] = useState(false);
+  const [hideCreator, setHideCreator] = useState(false);
+  const [collectionType, setCollectionType] = useState<'community' | 'professional' | 'user' | 'atlas' | 'gov' | null>(null);
+  const [customSlug, setCustomSlug] = useState('');
 
   // Meta settings
   const [meta, setMeta] = useState<{
@@ -41,6 +49,52 @@ export default function NewMapPage() {
     pitch: 60,
     terrainEnabled: false,
   });
+
+  // Fetch map limit on mount
+  useEffect(() => {
+    if (!user || !account) return;
+    
+    const fetchMapLimit = async () => {
+      try {
+        // Get user's map count
+        const mapsResponse = await fetch(`/api/maps?account_id=${account.id}`);
+        if (mapsResponse.ok) {
+          const mapsData = await mapsResponse.json();
+          const currentCount = mapsData.maps?.length || 0;
+          
+          // Get account features to find map limit (account-scoped; includes limits)
+          const featuresResponse = await fetch('/api/billing/user-features');
+          if (featuresResponse.ok) {
+            const featuresData = await featuresResponse.json();
+            const features: any[] = Array.isArray(featuresData.features) ? featuresData.features : [];
+
+            const limited = features.find((f) => f.slug === 'custom_maps');
+
+            if (limited && (limited.is_unlimited || limited.limit_type === 'unlimited')) {
+              setMapLimit({ current: currentCount, max: null, type: 'unlimited' });
+              return;
+            }
+
+            if (limited) {
+              setMapLimit({
+                current: currentCount,
+                max: limited.limit_value ?? null,
+                type: limited.limit_type || 'count',
+              });
+              return;
+            }
+
+            // No explicit entitlement row returned (treat as no access)
+            setMapLimit({ current: currentCount, max: 0, type: 'count' });
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch map limit:', err);
+      }
+    };
+    
+    fetchMapLimit();
+  }, [user, account]);
 
   // Mapbox state
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -183,19 +237,31 @@ export default function NewMapPage() {
   }, [meta, mapLoaded, applyMetaSettings]);
 
   const handleNext = () => {
-    if (currentStep < totalSteps) {
+    if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handleBack = () => {
-    if (currentStep > 1) {
+    if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Prevent form submission on Enter key unless on final step
+    if (e.key === 'Enter' && currentStep < totalSteps - 1) {
+      e.preventDefault();
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Only allow submission on the final step
+    if (currentStep < totalSteps - 1) {
+      return;
+    }
 
     if (!user) {
       setError('Please sign in to create maps');
@@ -229,13 +295,20 @@ export default function NewMapPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-          body: JSON.stringify({
-            title: title.trim(),
-            description: description.trim() || null,
-            visibility,
-            map_style: mapStyle,
-            meta: finalMeta,
+        credentials: 'include',
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+          visibility,
+          map_style: mapStyle,
+          meta: finalMeta,
+          ...(isAdmin && {
+            is_primary: isPrimary,
+            hide_creator: hideCreator,
+            collection_type: collectionType,
+            custom_slug: customSlug.trim() || null,
           }),
+        }),
       });
 
       if (!response.ok) {
@@ -250,9 +323,13 @@ export default function NewMapPage() {
       }
       
       const data = await response.json();
+      const createdMap = data.map || data;
 
-      // Success - navigate to maps page
-      router.push('/maps');
+      // Success - navigate to the created map (use slug if available, otherwise id)
+      const mapUrl = createdMap.custom_slug 
+        ? `/map/${createdMap.custom_slug}`
+        : `/map/${createdMap.id}`;
+      router.push(mapUrl);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create map';
       console.error('[NewMapPage] Error creating map:', errorMessage, err);
@@ -306,7 +383,11 @@ export default function NewMapPage() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setMapStyle('street')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMapStyle('street');
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium border rounded-md transition-colors ${
                   mapStyle === 'street'
                     ? 'bg-gray-100 border-gray-300 text-gray-900'
@@ -318,7 +399,11 @@ export default function NewMapPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setMapStyle('satellite')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMapStyle('satellite');
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium border rounded-md transition-colors ${
                   mapStyle === 'satellite'
                     ? 'bg-gray-100 border-gray-300 text-gray-900'
@@ -330,7 +415,11 @@ export default function NewMapPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setMapStyle('light')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMapStyle('light');
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium border rounded-md transition-colors ${
                   mapStyle === 'light'
                     ? 'bg-gray-100 border-gray-300 text-gray-900'
@@ -342,7 +431,11 @@ export default function NewMapPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setMapStyle('dark')}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMapStyle('dark');
+                }}
                 className={`flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium border rounded-md transition-colors ${
                   mapStyle === 'dark'
                     ? 'bg-gray-100 border-gray-300 text-gray-900'
@@ -387,25 +480,14 @@ export default function NewMapPage() {
               <h2 className="text-sm font-semibold text-gray-900">3D Buildings</h2>
               <p className="text-xs text-gray-600">Enable 3D building extrusions</p>
             </div>
-            <div className="flex items-center justify-center">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-700">Off</span>
-                <button
-                  type="button"
-                  onClick={() => setMeta(prev => ({ ...prev, buildingsEnabled: !prev.buildingsEnabled }))}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    meta.buildingsEnabled ? 'bg-indigo-600' : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                      meta.buildingsEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className="text-xs text-gray-700">On</span>
-              </div>
-            </div>
+            <select
+              value={meta.buildingsEnabled ? 'enabled' : 'disabled'}
+              onChange={(e) => setMeta(prev => ({ ...prev, buildingsEnabled: e.target.value === 'enabled' }))}
+              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+            >
+              <option value="disabled">Disabled</option>
+              <option value="enabled">Enabled</option>
+            </select>
           </div>
         );
 
@@ -470,6 +552,99 @@ export default function NewMapPage() {
           </div>
         );
 
+      case 6: // Admin Settings (only visible to admins)
+        if (!isAdmin) {
+          // Skip this step if not admin
+          return null;
+        }
+        return (
+          <div className="space-y-3">
+            <div className="text-center space-y-1">
+              <h2 className="text-sm font-semibold text-gray-900">Admin Settings</h2>
+              <p className="text-xs text-gray-600">Configure advanced map settings</p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label htmlFor="is_primary" className="text-xs font-medium text-gray-900">
+                  Mark as Primary
+                </label>
+                <select
+                  id="is_primary"
+                  value={isPrimary ? 'yes' : 'no'}
+                  onChange={(e) => setIsPrimary(e.target.value === 'yes')}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+                <p className="text-[10px] text-gray-500">
+                  Mark this map as the primary/canonical map
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="hide_creator" className="text-xs font-medium text-gray-900">
+                  Hide Creator
+                </label>
+                <select
+                  id="hide_creator"
+                  value={hideCreator ? 'yes' : 'no'}
+                  onChange={(e) => setHideCreator(e.target.value === 'yes')}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+                <p className="text-[10px] text-gray-500">
+                  Hide the creator badge on the map card
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="collection_type" className="text-xs font-medium text-gray-900">
+                  Collection Type
+                </label>
+                <select
+                  id="collection_type"
+                  value={collectionType || ''}
+                  onChange={(e) => setCollectionType(e.target.value as typeof collectionType || null)}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                >
+                  <option value="">None</option>
+                  <option value="community">Community</option>
+                  <option value="professional">Professional</option>
+                  <option value="user">User</option>
+                  <option value="atlas">Atlas</option>
+                  <option value="gov">Government</option>
+                </select>
+                <p className="text-[10px] text-gray-500">
+                  Categorize this map for the maps listing page
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="custom_slug" className="text-xs font-medium text-gray-900">
+                  Custom Slug
+                </label>
+                <input
+                  id="custom_slug"
+                  type="text"
+                  value={customSlug}
+                  onChange={(e) => {
+                    const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    setCustomSlug(value);
+                  }}
+                  className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                  placeholder="my-custom-map-slug"
+                  pattern="[a-z0-9-]+"
+                  minLength={3}
+                  maxLength={100}
+                />
+                <p className="text-[10px] text-gray-500">
+                  Custom URL slug (lowercase, alphanumeric and hyphens only, 3-100 characters). If set, map will be accessible at /map/{customSlug || 'slug'}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -500,6 +675,39 @@ export default function NewMapPage() {
             {/* Left Side - Form Steps */}
             <div className="flex-1 lg:max-w-md w-full">
               <div className="space-y-3">
+                {/* Map Limit Indicator */}
+                {mapLimit && !isAdmin && mapLimit.type !== 'unlimited' && (
+                  <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-gray-900">Maps Created</span>
+                      <span className="text-xs font-semibold text-gray-700">
+                        {mapLimit.current} / {mapLimit.max === null ? '∞' : mapLimit.max}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div
+                        className={`h-1.5 rounded-full transition-all ${
+                          mapLimit.max !== null && mapLimit.current >= mapLimit.max
+                            ? 'bg-red-500'
+                            : mapLimit.max !== null && mapLimit.current / mapLimit.max > 0.8
+                            ? 'bg-yellow-500'
+                            : 'bg-green-500'
+                        }`}
+                        style={{
+                          width: mapLimit.max !== null
+                            ? `${Math.min((mapLimit.current / mapLimit.max) * 100, 100)}%`
+                            : '0%'
+                        }}
+                      />
+                    </div>
+                    {mapLimit.max !== null && mapLimit.current >= mapLimit.max && (
+                      <p className="text-[10px] text-red-600 mt-1.5">
+                        Map limit reached. <a href="/billing" className="underline font-medium">Upgrade your plan</a> to create more maps.
+                      </p>
+                    )}
+                  </div>
+                )}
+                
                 {/* Header */}
                 <div className="bg-white border border-gray-200 rounded-md p-[10px]">
                   <h1 className="text-sm font-semibold text-gray-900">Create New Map</h1>
@@ -516,7 +724,7 @@ export default function NewMapPage() {
                 </div>
 
                 {/* Step Content */}
-                <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-md p-[10px]">
+                <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="bg-white border border-gray-200 rounded-md p-[10px]">
                   {renderStepContent()}
 
                   {/* Navigation */}

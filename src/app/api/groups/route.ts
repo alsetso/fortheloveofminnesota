@@ -79,18 +79,19 @@ export async function GET(request: NextRequest) {
 
         // For authenticated users, check membership and admin status
         if (accountId && groups) {
-          const groupIds = groups.map(g => g.id);
+          const groupIds = (groups as any[]).map((g: any) => g.id);
           const { data: memberships } = await supabase
             .from('group_members')
             .select('group_id, is_admin')
             .eq('account_id', accountId)
-            .in('group_id', groupIds);
+            .in('group_id', groupIds)
+            .returns<Array<{ group_id: string; is_admin: boolean }>>();
 
           const membershipMap = new Map(
-            (memberships || []).map(m => [m.group_id, { is_member: true, is_admin: m.is_admin }])
+            (memberships || []).map((m: any) => [m.group_id, { is_member: true, is_admin: m.is_admin }])
           );
 
-          groups.forEach(group => {
+          (groups as any[]).forEach((group: any) => {
             const membership = membershipMap.get(group.id);
             group.is_member = membership?.is_member || false;
             group.is_admin = membership?.is_admin || false;
@@ -161,14 +162,14 @@ export async function POST(request: NextRequest) {
 
         // Check if user has Contributor, Professional, or Business plan
         const hasContributorAccess = 
-          account.plan === 'contributor' || 
-          account.plan === 'professional' || 
-          account.plan === 'business' ||
-          account.plan === 'plus'; // Legacy plus plan also has access
+          (account as any).plan === 'contributor' || 
+          (account as any).plan === 'professional' || 
+          (account as any).plan === 'business' ||
+          (account as any).plan === 'plus'; // Legacy plus plan also has access
 
         const isActive = 
-          account.subscription_status === 'active' || 
-          account.subscription_status === 'trialing';
+          (account as any).subscription_status === 'active' || 
+          (account as any).subscription_status === 'trialing';
 
         if (!hasContributorAccess || !isActive) {
           return NextResponse.json(
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
             image_url: image_url || null,
             visibility,
             created_by_account_id: accountId,
-          })
+          } as any)
           .select(`
             id,
             name,
@@ -246,8 +247,8 @@ export async function POST(request: NextRequest) {
         // Creator is automatically added as admin by trigger
         // Add membership info
         if (group) {
-          group.is_member = true;
-          group.is_admin = true;
+          (group as any).is_member = true;
+          (group as any).is_admin = true;
         }
 
         return NextResponse.json({ group }, { status: 201 });

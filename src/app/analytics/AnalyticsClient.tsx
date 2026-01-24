@@ -19,18 +19,19 @@ interface View {
   viewer_image_url: string | null;
   referrer_url: string | null;
   user_agent: string | null;
-  view_type: 'profile' | 'mention' | 'post' | 'other';
+  view_type: 'profile' | 'mention' | 'post' | 'map' | 'other';
   content_title: string | null;
   content_preview: string | null;
 }
 
 type TimeFilter = '24h' | '7d' | '30d' | '90d' | 'all';
-type ViewFilter = 'all' | 'profile' | 'mention' | 'post';
+type ViewFilter = 'all' | 'profile' | 'mention' | 'post' | 'map';
 
 interface AnalyticsClientProps {
   profileViews: number;
   mentionViews: number;
   postViews: number;
+  mapViews: number;
   allViews: View[];
   hasVisitorIdentitiesAccess: boolean;
   timeFilter: TimeFilter;
@@ -40,6 +41,7 @@ export default function AnalyticsClient({
   profileViews,
   mentionViews,
   postViews,
+  mapViews,
   allViews,
   hasVisitorIdentitiesAccess,
   timeFilter: initialTimeFilter,
@@ -48,12 +50,62 @@ export default function AnalyticsClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const totalViews = profileViews + mentionViews + postViews;
+  const totalViews = profileViews + mentionViews + postViews + mapViews;
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [filter, setFilter] = useState<ViewFilter>('all');
   const [displayLimit, setDisplayLimit] = useState(50); // Production-ready: pagination
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(initialTimeFilter);
   const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false);
+
+  const totalCounts = useMemo(() => {
+    return {
+      all: totalViews,
+      profile: profileViews,
+      mention: mentionViews,
+      post: postViews,
+      map: mapViews,
+    } as const;
+  }, [totalViews, profileViews, mentionViews, postViews, mapViews]);
+
+  const loadedCounts = useMemo(() => {
+    return {
+      all: allViews.length,
+      profile: allViews.filter(v => v.view_type === 'profile').length,
+      mention: allViews.filter(v => v.view_type === 'mention').length,
+      post: allViews.filter(v => v.view_type === 'post').length,
+      map: allViews.filter(v => v.view_type === 'map').length,
+    } as const;
+  }, [allViews]);
+
+  const getTotalCountForFilter = (f: ViewFilter) => {
+    switch (f) {
+      case 'all':
+        return totalCounts.all;
+      case 'profile':
+        return totalCounts.profile;
+      case 'mention':
+        return totalCounts.mention;
+      case 'post':
+        return totalCounts.post;
+      case 'map':
+        return totalCounts.map;
+    }
+  };
+
+  const getLoadedCountForFilter = (f: ViewFilter) => {
+    switch (f) {
+      case 'all':
+        return loadedCounts.all;
+      case 'profile':
+        return loadedCounts.profile;
+      case 'mention':
+        return loadedCounts.mention;
+      case 'post':
+        return loadedCounts.post;
+      case 'map':
+        return loadedCounts.map;
+    }
+  };
 
   // Update time filter when URL changes
   useEffect(() => {
@@ -125,6 +177,8 @@ export default function AnalyticsClient({
         return 'Mention';
       case 'post':
         return 'Post';
+      case 'map':
+        return 'Map';
       default:
         return 'Other';
     }
@@ -138,6 +192,8 @@ export default function AnalyticsClient({
         return 'bg-green-100 text-green-700 border-green-200';
       case 'post':
         return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'map':
+        return 'bg-indigo-100 text-indigo-700 border-indigo-200';
       default:
         return 'bg-gray-100 text-gray-700 border-gray-200';
     }
@@ -168,6 +224,13 @@ export default function AnalyticsClient({
       return null;
     }
     
+    if (view.view_type === 'map') {
+      // Extract map ID or slug from URL
+      const mapMatch = view.url.match(/^\/map\/([^/?]+)/);
+      if (mapMatch) return `/map/${mapMatch[1]}`;
+      return null;
+    }
+    
     return null;
   };
 
@@ -177,18 +240,12 @@ export default function AnalyticsClient({
   }, [allViews, filter, displayLimit]);
 
   const hasMoreViews = useMemo(() => {
-    const allFiltered = filter === 'all' ? allViews : allViews.filter(view => view.view_type === filter);
-    return allFiltered.length > displayLimit;
+    const loaded = getLoadedCountForFilter(filter);
+    return loaded > displayLimit;
   }, [allViews, filter, displayLimit]);
 
-  const filterCounts = useMemo(() => {
-    return {
-      all: allViews.length,
-      profile: allViews.filter(v => v.view_type === 'profile').length,
-      mention: allViews.filter(v => v.view_type === 'mention').length,
-      post: allViews.filter(v => v.view_type === 'post').length,
-    };
-  }, [allViews]);
+  const totalForFilter = getTotalCountForFilter(filter);
+  const loadedForFilter = getLoadedCountForFilter(filter);
 
   const stats = [
     {
@@ -209,6 +266,12 @@ export default function AnalyticsClient({
       description: 'Total views across all your posts',
       color: 'purple',
     },
+    {
+      label: 'Map Views',
+      value: mapViews.toLocaleString(),
+      description: 'Total views across all your maps',
+      color: 'indigo',
+    },
   ];
 
   const getStatCardColor = (color: string) => {
@@ -219,6 +282,8 @@ export default function AnalyticsClient({
         return 'border-green-200 bg-green-50';
       case 'purple':
         return 'border-purple-200 bg-purple-50';
+      case 'indigo':
+        return 'border-indigo-200 bg-indigo-50';
       default:
         return 'border-gray-200 bg-white';
     }
@@ -322,7 +387,7 @@ export default function AnalyticsClient({
             <div className="flex items-center gap-2">
               <EyeIcon className="w-4 h-4 text-gray-700" />
               <h2 className="text-sm font-semibold text-gray-900">
-                All Views ({filteredViews.length.toLocaleString()})
+                All Views ({totalForFilter.toLocaleString()})
               </h2>
               {filter !== 'all' && (
                 <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
@@ -352,7 +417,7 @@ export default function AnalyticsClient({
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  All ({filterCounts.all})
+                  All ({totalCounts.all})
                 </button>
                 <button
                   onClick={() => {
@@ -365,7 +430,7 @@ export default function AnalyticsClient({
                       : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                   }`}
                 >
-                  Profile ({filterCounts.profile})
+                  Profile ({totalCounts.profile})
                 </button>
                 <button
                   onClick={() => {
@@ -378,7 +443,7 @@ export default function AnalyticsClient({
                       : 'bg-green-100 text-green-700 hover:bg-green-200'
                   }`}
                 >
-                  Mention ({filterCounts.mention})
+                  Mention ({totalCounts.mention})
                 </button>
                 <button
                   onClick={() => {
@@ -391,7 +456,20 @@ export default function AnalyticsClient({
                       : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
                   }`}
                 >
-                  Post ({filterCounts.post})
+                  Post ({totalCounts.post})
+                </button>
+                <button
+                  onClick={() => {
+                    setFilter('map');
+                    setIsAccordionOpen(false);
+                  }}
+                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+                    filter === 'map'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                  }`}
+                >
+                  Map ({totalCounts.map})
                 </button>
               </div>
             </div>
@@ -543,8 +621,13 @@ export default function AnalyticsClient({
                   onClick={() => setDisplayLimit(prev => prev + 50)}
                   className="w-full px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
                 >
-                  Load More ({filteredViews.length} of {filter === 'all' ? allViews.length : allViews.filter(v => v.view_type === filter).length} shown)
+                  Load More ({filteredViews.length} of {loadedForFilter} loaded)
                 </button>
+                {loadedForFilter < totalForFilter && (
+                  <p className="mt-1 text-[10px] text-gray-500 text-center">
+                    Showing most recent {loadedForFilter.toLocaleString()} of {totalForFilter.toLocaleString()}
+                  </p>
+                )}
               </div>
             )}
           </div>

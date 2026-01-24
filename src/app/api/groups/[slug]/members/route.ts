@@ -41,7 +41,8 @@ export async function GET(
           .select('id, visibility')
           .eq('slug', slug)
           .eq('is_active', true)
-          .single();
+          .single()
+          .returns<{ id: string; visibility: string }>();
 
         if (!group) {
           return NextResponse.json(
@@ -54,7 +55,7 @@ export async function GET(
         const { data: membership } = await supabase
           .from('group_members')
           .select('is_admin')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .maybeSingle();
 
@@ -82,7 +83,7 @@ export async function GET(
               image_url
             )
           `)
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .order('is_admin', { ascending: false })
           .order('joined_at', { ascending: true })
           .range(offset, offset + limit - 1);
@@ -144,7 +145,8 @@ export async function POST(
           .select('id, visibility')
           .eq('slug', slug)
           .eq('is_active', true)
-          .single();
+          .single()
+          .returns<{ id: string; visibility: string }>();
 
         if (!group) {
           return NextResponse.json(
@@ -157,7 +159,7 @@ export async function POST(
         const { data: existingMember } = await supabase
           .from('group_members')
           .select('id')
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .eq('account_id', accountId)
           .maybeSingle();
 
@@ -171,7 +173,7 @@ export async function POST(
         // For private groups, check if user is admin (to add others)
         // For now, we'll only allow joining public groups directly
         // Private group joining will require admin invitation (future feature)
-        if (group.visibility === 'private') {
+        if ((group as any).visibility === 'private') {
           return NextResponse.json(
             { error: 'Private groups require an invitation to join' },
             { status: 403 }
@@ -182,10 +184,10 @@ export async function POST(
         const { data: member, error } = await supabase
           .from('group_members')
           .insert({
-            group_id: group.id,
+            group_id: (group as any).id,
             account_id: accountId,
             is_admin: false,
-          })
+          } as any)
           .select(`
             id,
             group_id,
@@ -262,7 +264,8 @@ export async function DELETE(
           .select('id')
           .eq('slug', slug)
           .eq('is_active', true)
-          .single();
+          .single()
+          .returns<{ id: string }>();
 
         if (!group) {
           return NextResponse.json(
@@ -278,11 +281,11 @@ export async function DELETE(
           const { data: membership } = await supabase
             .from('group_members')
             .select('is_admin')
-            .eq('group_id', group.id)
+            .eq('group_id', (group as any).id)
             .eq('account_id', accountId)
             .single();
 
-          if (!membership || !membership.is_admin) {
+          if (!membership || !(membership as any).is_admin) {
             return NextResponse.json(
               { error: 'Only group admins can remove members' },
               { status: 403 }

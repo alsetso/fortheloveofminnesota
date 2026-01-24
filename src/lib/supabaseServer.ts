@@ -10,6 +10,8 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient as createSSRClient } from '@supabase/ssr';
 import { Database } from '@/types/supabase';
 import { cookies } from 'next/headers';
+import type { NextRequest } from 'next/server';
+import type { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -48,10 +50,10 @@ export function createServerClient() {
  * 
  * Uses the same pattern as getServerAuth() to ensure consistency
  * 
- * @param cookieStore Optional cookie store (for API routes, pass request cookies or Promise)
+ * @param cookieStore Optional cookie store (for API routes, pass request.cookies or cookies() from next/headers)
  */
 export async function createServerClientWithAuth(
-  cookieStore?: ReturnType<typeof cookies> | Promise<ReturnType<typeof cookies>>
+  cookieStore?: ReturnType<typeof cookies> | Promise<ReturnType<typeof cookies>> | ReadonlyRequestCookies
 ) {
   if (!supabaseAnonKey) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
@@ -62,9 +64,17 @@ export async function createServerClientWithAuth(
   }
 
   // Use provided cookie store or get from next/headers
-  const cookieStoreToUse = cookieStore 
-    ? await Promise.resolve(cookieStore)
-    : await cookies();
+  let cookieStoreToUse: ReturnType<typeof cookies> | ReadonlyRequestCookies;
+  if (cookieStore) {
+    // Check if it's NextRequest.cookies (ReadonlyRequestCookies - has getAll method directly)
+    if ('getAll' in cookieStore && typeof cookieStore.getAll === 'function' && !('set' in cookieStore)) {
+      cookieStoreToUse = cookieStore as ReadonlyRequestCookies;
+    } else {
+      cookieStoreToUse = await Promise.resolve(cookieStore as ReturnType<typeof cookies>);
+    }
+  } else {
+    cookieStoreToUse = await cookies();
+  }
 
   // Use createServerClient from @supabase/ssr for cookie-based auth
   return createSSRClient<Database>(
@@ -73,8 +83,7 @@ export async function createServerClientWithAuth(
     {
       cookies: {
         getAll() {
-          const store = cookieStoreToUse as Awaited<ReturnType<typeof cookies>>;
-          return store.getAll();
+          return cookieStoreToUse.getAll();
         },
         setAll() {
           // Server components can't set cookies - no-op

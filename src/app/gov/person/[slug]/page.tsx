@@ -8,7 +8,7 @@ import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
-import PersonPageWrapper from './PersonPageWrapper';
+import StandardPageClient from '@/components/layout/StandardPageClient';
 
 export const revalidate = 3600;
 
@@ -98,7 +98,7 @@ export default async function PersonPage({ params }: Props) {
   });
 
   return (
-    <PersonPageWrapper>
+    <StandardPageClient contentClassName="h-full overflow-y-auto px-[10px] py-3">
       <div className="max-w-4xl mx-auto">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
@@ -128,7 +128,7 @@ export default async function PersonPage({ params }: Props) {
             <PersonPageClient person={person} isAdmin={isAdmin} />
           </div>
           
-          <LastEditedIndicator tableName="people" recordId={person.id} />
+          {isAdmin && <LastEditedIndicator tableName="people" recordId={person.id} />}
           
           {/* Contact Information */}
           <div className="bg-white rounded-md border border-gray-200 p-[10px] space-y-1.5">
@@ -227,17 +227,19 @@ export default async function PersonPage({ params }: Props) {
         )}
 
         {/* Page Break */}
-        <div className="mt-6 pt-6 border-t border-gray-300">
-          {/* Edit History */}
-          <EntityEditHistory 
-            tableName="people" 
-            recordId={person.id} 
-            recordName={person.name}
-            showHeader={true}
-          />
-        </div>
+        {isAdmin && (
+          <div className="mt-6 pt-6 border-t border-gray-300">
+            {/* Edit History */}
+            <EntityEditHistory 
+              tableName="people" 
+              recordId={person.id} 
+              recordName={person.name}
+              showHeader={true}
+            />
+          </div>
+        )}
       </div>
-    </PersonPageWrapper>
+    </StandardPageClient>
   );
 }
 

@@ -7,7 +7,6 @@
 // Layout Components
 export { default as SimplePageLayout } from './layout/SimplePageLayout';
 export { default as SimpleNav } from './layout/SimpleNav';
-export { default as PageLayout } from './layout/PageLayout';
 
 // Provider Components
 export { Providers } from './providers/Providers';

@@ -135,9 +135,10 @@ export default function CTUBoundariesLayer({
       'UNORGANIZED TERRITORY': '#F5A623', // Orange
     };
 
-    // Add fill layer (before mentions so mentions appear on top)
-    const mentionsPointLayerId = 'map-mentions-point';
-    const beforeId = mapboxMap.getLayer(mentionsPointLayerId) ? mentionsPointLayerId : undefined;
+    // Add fill layer (keep other layers on top when present)
+    const beforeId = ['map-mentions-point', 'map-pins-points', 'map-areas-fill'].find((layerId) =>
+      mapboxMap.getLayer(layerId)
+    );
 
     mapboxMap.addLayer({
       id: fillLayerId,

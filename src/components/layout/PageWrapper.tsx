@@ -164,12 +164,13 @@ export default function PageWrapper({
       />
       
       <div 
-        className={`relative w-full h-screen overflow-hidden bg-black flex flex-col ${className}`} 
-        style={{ maxWidth: '100vw' }}
+        className={`relative w-full h-screen overflow-hidden flex flex-col ${className}`} 
+        style={{ maxWidth: '100vw', backgroundColor: '#000000' }}
       >
       {/* Header - Flexible height based on content, black background */}
       <header 
-        className="flex flex-col flex-shrink-0 bg-black border-b border-white/5"
+        className="flex flex-col flex-shrink-0 border-b border-white/5"
+        style={{ backgroundColor: '#000000' }}
       >
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           {/* Top Row: Logo, Search, Nav, Account */}
@@ -303,7 +304,7 @@ export default function PageWrapper({
       {/* Floating Mobile Nav (Visible only on mobile) */}
       {!isSearchMode && (
         <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-[400px]">
-          <div className="bg-black/80 backdrop-blur-lg border border-white/10 rounded-2xl shadow-2xl px-2 py-2 flex items-center justify-around">
+          <div className="backdrop-blur-lg border border-white/10 rounded-2xl shadow-2xl px-2 py-2 flex items-center justify-around" style={{ backgroundColor: '#000000' }}>
             {navItems.map((item) => {
               // Home is active on both '/' and '/feed' routes
               const isActive = item.href === '/' 

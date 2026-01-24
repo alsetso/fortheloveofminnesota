@@ -15,15 +15,12 @@ import MentionLocationSheet from '@/components/live/MentionLocationSheet';
 import { supabase } from '@/lib/supabase';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { ArrowPathIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import CreateMentionPopup from '@/components/layout/CreateMentionPopup';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
-import CameraModal from '@/components/camera/CameraModal';
 import BottomButtonsPopup from '@/components/layout/BottomButtonsPopup';
 import MentionTypeFilterPopup from '@/components/layout/MentionTypeFilterPopup';
 import MapSettingsContent from '@/components/layout/MapSettingsContent';
 import LocationPermissionModal from '@/components/layout/LocationPermissionModal';
 import { useLocation } from '@/features/map/hooks/useLocation';
-import CameraImagePreview from '@/components/layout/CameraImagePreview';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import { useLivePageModals } from '../hooks/useLivePageModals';
 import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
@@ -74,11 +71,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   const loadingToastIdRef = useRef<string | null>(null);
   const hoveredMentionIdRef = useRef<string | null>(null);
   const isHoveringMentionRef = useRef(false);
-  const isTransitioningToCreateRef = useRef(false);
-  const temporaryMarkerRef = useRef<any>(null);
-  const [createTabSelectedLocation, setCreateTabSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [createTabMapMeta, setCreateTabMapMeta] = useState<Record<string, any> | null>(null);
-  const [createTabFullAddress, setCreateTabFullAddress] = useState<string | null>(null);
   
   // Location select popup state (for map clicks)
   const [locationSelectPopup, setLocationSelectPopup] = useState<{
@@ -103,8 +95,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   const {
     modal,
     isAccountModalOpen,
-    openCreate,
-    closeCreate,
     openAccount,
     openMapStyles,
     openDynamicSearch,
@@ -149,11 +139,11 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
     }
   }, [reverseGeocodeAddress, locationSelectPopup.isOpen, locationSelectPopup.lat, locationSelectPopup.lng]);
 
-  // Pin marker hook - shows white pin when location popup is open, red when create form is open
-  const pinColor = isModalOpen('create') ? 'red' : (locationSelectPopup.isOpen ? 'white' : undefined);
+  // Pin marker hook - shows white pin when location popup is open
+  const pinColor = locationSelectPopup.isOpen ? 'white' : undefined;
   const pinCoordinates = locationSelectPopup.isOpen 
     ? { lat: locationSelectPopup.lat, lng: locationSelectPopup.lng }
-    : (createTabSelectedLocation || null);
+    : null;
   
   usePinMarker({
     map: mapInstanceRef.current,
@@ -180,17 +170,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   const [showCountyBoundaries, setShowCountyBoundaries] = useState(false);
   const [hoveredCounty, setHoveredCounty] = useState<any | null>(null);
   
-  // Camera state (not modal state - these are data states)
-  const [capturedImageBlob, setCapturedImageBlob] = useState<Blob | null>(null);
-  const [capturedImagePreview, setCapturedImagePreview] = useState<string | null>(null);
-  const [waitingForLocation, setWaitingForLocation] = useState(false);
-  
-  // Waiting for location with mention type pre-selected
-  const [waitingForLocationWithMentionType, setWaitingForLocationWithMentionType] = useState<{
-    active: boolean;
-    mentionTypeId: string | null;
-    mentionTypeName: string | null;
-  }>({ active: false, mentionTypeId: null, mentionTypeName: null });
   
   // Time filter state (for map settings)
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('all');
@@ -492,26 +471,16 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
     requestLocation();
   }, [requestLocation, closeLocationPermission]);
 
-  // Listen for mention-created event from inline form to refresh mentions layer
+  // Listen for mention-created event to refresh mentions layer
   useEffect(() => {
     const handleMentionCreatedEvent = () => {
-      // Don't increment refresh key - this causes component remount and fitBounds to run again
-      // Instead, dispatch a reload event that MentionsLayer listens to
+      // Dispatch a reload event that MentionsLayer listens to
       window.dispatchEvent(new CustomEvent('reload-mentions'));
     };
 
-    const handleRemoveTempPin = () => {
-      if (temporaryMarkerRef.current) {
-        temporaryMarkerRef.current.remove();
-        temporaryMarkerRef.current = null;
-      }
-    };
-
     window.addEventListener('mention-created', handleMentionCreatedEvent);
-    window.addEventListener('mention-created-remove-temp-pin', handleRemoveTempPin);
     return () => {
       window.removeEventListener('mention-created', handleMentionCreatedEvent);
-      window.removeEventListener('mention-created-remove-temp-pin', handleRemoveTempPin);
     };
   }, []);
 
@@ -535,135 +504,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
     };
   }, [openAccount]);
 
-  // Maintain preview marker when create sheet is open
-  useEffect(() => {
-    const isCreateOpen = isModalOpen('create');
-    if (isCreateOpen && createTabSelectedLocation && account && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
-      // Ensure marker exists and is properly positioned
-      const ensurePreviewMarker = async () => {
-        try {
-          const mapbox = await import('mapbox-gl');
-          const currentMap = mapInstanceRef.current;
-          if (!currentMap || (currentMap as any).removed) return;
-
-          const { lat, lng } = createTabSelectedLocation;
-
-          // If marker doesn't exist or is at wrong position, create/update it
-          if (!temporaryMarkerRef.current) {
-            const el = document.createElement('div');
-            el.className = 'mention-preview-marker';
-            el.style.cssText = `
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              pointer-events: none;
-            `;
-
-            // Account image circle
-            const imageContainer = document.createElement('div');
-            imageContainer.style.cssText = `
-              width: 40px;
-              height: 40px;
-              border-radius: 50%;
-              border: 2px solid white;
-              overflow: hidden;
-              background-color: white;
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-            `;
-
-            if (account.image_url) {
-              const img = document.createElement('img');
-              img.src = account.image_url;
-              img.style.cssText = `
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-              `;
-              img.onerror = () => {
-                const initial = document.createElement('div');
-                initial.style.cssText = `
-                  width: 100%;
-                  height: 100%;
-                  display: flex;
-                  align-items: center;
-                  justify-center;
-                  background-color: #f3f4f6;
-                  color: #6b7280;
-                  font-size: 14px;
-                  font-weight: 500;
-                `;
-                initial.textContent = account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'U';
-                imageContainer.innerHTML = '';
-                imageContainer.appendChild(initial);
-              };
-              imageContainer.appendChild(img);
-            } else {
-              const initial = document.createElement('div');
-              initial.style.cssText = `
-                width: 100%;
-                height: 100%;
-                display: flex;
-                align-items: center;
-                justify-center;
-                background-color: #f3f4f6;
-                color: #6b7280;
-                font-size: 14px;
-                font-weight: 500;
-              `;
-              initial.textContent = account.username?.[0]?.toUpperCase() || account.first_name?.[0]?.toUpperCase() || 'U';
-              imageContainer.appendChild(initial);
-            }
-
-            el.appendChild(imageContainer);
-
-            // Preview label
-            const label = document.createElement('div');
-            label.style.cssText = `
-              margin-top: 4px;
-              padding: 2px 6px;
-              background-color: rgba(0, 0, 0, 0.6);
-              color: white;
-              font-size: 10px;
-              font-weight: 500;
-              border-radius: 4px;
-              white-space: nowrap;
-            `;
-            label.textContent = 'Preview';
-            el.appendChild(label);
-
-            const marker = new mapbox.Marker({
-              element: el,
-              anchor: 'bottom',
-            })
-              .setLngLat([lng, lat])
-              .addTo(currentMap as any);
-
-            temporaryMarkerRef.current = marker;
-          } else {
-            // Update position if marker exists but is at wrong location
-            const currentLngLat = temporaryMarkerRef.current.getLngLat();
-            const tolerance = 0.0001; // Small tolerance for floating point comparison
-            if (Math.abs(currentLngLat.lng - lng) > tolerance || Math.abs(currentLngLat.lat - lat) > tolerance) {
-              temporaryMarkerRef.current.setLngLat([lng, lat]);
-            }
-          }
-        } catch (err) {
-          console.error('[LiveMap] Error ensuring preview marker:', err);
-        }
-      };
-
-      ensurePreviewMarker();
-    } else if (!isCreateOpen && temporaryMarkerRef.current) {
-      // Only remove marker when create sheet closes (not during transition)
-      if (!isTransitioningToCreateRef.current) {
-        temporaryMarkerRef.current.remove();
-        temporaryMarkerRef.current = null;
-      }
-    }
-  }, [isModalOpen('create'), createTabSelectedLocation, account]);
 
 
   // State for unified mention location sheet
@@ -684,11 +524,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
       const address = customEvent.detail?.address;
       
       if (mention && mention.id && typeof mention.lat === 'number' && typeof mention.lng === 'number') {
-        // Remove red pin marker when clicking on a mention
-        if (temporaryMarkerRef.current) {
-          temporaryMarkerRef.current.remove();
-          temporaryMarkerRef.current = null;
-        }
         
         // Update search input with mention address
         if (address) {
@@ -718,8 +553,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   }, []);
 
 
-  // Handler for "Add Mention" button from layer popups (still opens create form)
-  // Note: Map clicks now show LocationSelectPopup instead
+  // Handler for "Add Mention" button from layer popups - navigate to /add
   useEffect(() => {
     const handleShowLocationForMention = async (event: Event) => {
       const customEvent = event as CustomEvent<{
@@ -728,184 +562,23 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
         map_meta?: Record<string, any>;
         full_address?: string | null;
       }>;
-      const { lat, lng, map_meta, full_address } = customEvent.detail || {};
+      const { lat, lng } = customEvent.detail || {};
       if (!lat || !lng) return;
 
-      // Set flag to prevent popup from removing marker during transition
-      isTransitioningToCreateRef.current = true;
-
-      // Set location state FIRST (before any async operations or closing popups)
-      setCreateTabSelectedLocation({ lat, lng });
-      setCreateTabMapMeta(map_meta || null);
-      setCreateTabFullAddress(full_address || null);
-
-      // Close any open popups/tabs
-      closeAll();
-
-      // Open create form
-      openCreate({ lat, lng, map_meta });
-
-      // Transform existing white pin to red pin when create form opens
-      setTimeout(() => {
-        if (temporaryMarkerRef.current && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
-          const markerElement = temporaryMarkerRef.current.getElement();
-          if (markerElement) {
-            // The pin element itself is the circle, find the dot inside
-            const pinDot = markerElement.querySelector('.map-click-pin-dot') as HTMLElement;
-            
-            if (markerElement && pinDot) {
-              // Change white pin to red pin
-              markerElement.style.backgroundColor = '#ef4444'; // red-500
-              markerElement.style.borderColor = '#ef4444';
-              
-              // Change black dot to white dot
-              pinDot.style.backgroundColor = '#ffffff'; // white
-            }
-          }
-        }
-        
-        // Clear flag
-        isTransitioningToCreateRef.current = false;
-      }, 50);
-    };
-    
-    // Handler for opening create mention from filter sidebar
-    const handleOpenCreateFromFilter = () => {
-      // Set state to wait for location selection with mention type
-      if (selectedMentionTypes.length === 1) {
-        setWaitingForLocationWithMentionType({
-          active: true,
-          mentionTypeId: selectedMentionTypes[0].id,
-          mentionTypeName: selectedMentionTypes[0].name,
-        });
-      }
+      // Navigate to /add page with location
+      const params = new URLSearchParams();
+      params.set('lat', lat.toString());
+      params.set('lng', lng.toString());
+      router.push(`/add?${params.toString()}`);
     };
 
     window.addEventListener('show-location-for-mention', handleShowLocationForMention);
-    window.addEventListener('open-create-mention-from-filter', handleOpenCreateFromFilter);
-    
-    // Handle edit mention event - opens create container at 100%
-    const handleShowLocationForMentionEdit = async (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        lat: number;
-        lng: number;
-        map_meta?: Record<string, any>;
-        full_address?: string | null;
-        mention_id?: string;
-        description?: string;
-        image_url?: string | null;
-        video_url?: string | null;
-        media_type?: 'image' | 'video' | 'none';
-        mention_type_id?: string | null;
-        collection_id?: string | null;
-      }>;
-      const { lat, lng, map_meta, full_address } = customEvent.detail || {};
-      if (!lat || !lng) return;
-
-      // Set flag to prevent popup from removing marker during transition
-      isTransitioningToCreateRef.current = true;
-
-      // Set location state FIRST (before any async operations or closing popups)
-      setCreateTabSelectedLocation({ lat, lng });
-      setCreateTabMapMeta(map_meta || null);
-      setCreateTabFullAddress(full_address || null);
-
-      // Close any open popups/tabs
-      closeAll();
-
-      // Open create form with edit mode (100% width/height)
-      openCreate({ 
-        lat, 
-        lng, 
-        map_meta, 
-        isEditMode: true, 
-        editData: {
-          mention_id: customEvent.detail.mention_id,
-          description: customEvent.detail.description,
-          image_url: customEvent.detail.image_url,
-          video_url: customEvent.detail.video_url,
-          media_type: customEvent.detail.media_type,
-          mention_type_id: customEvent.detail.mention_type_id,
-          collection_id: customEvent.detail.collection_id,
-        }
-      });
-
-      // Transform existing white pin to red pin when create form opens
-      setTimeout(() => {
-        if (temporaryMarkerRef.current && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
-          const markerElement = temporaryMarkerRef.current.getElement();
-          if (markerElement) {
-            // The pin element itself is the circle, find the dot inside
-            const pinDot = markerElement.querySelector('.map-click-pin-dot') as HTMLElement;
-            
-            if (markerElement && pinDot) {
-              // Change white pin to red pin
-              markerElement.style.backgroundColor = '#ef4444'; // red-500
-              markerElement.style.borderColor = '#ef4444';
-              
-              // Change black dot to white dot
-              pinDot.style.backgroundColor = '#ffffff'; // white
-            }
-          }
-        }
-        
-        // Clear flag
-        isTransitioningToCreateRef.current = false;
-      }, 50);
-    };
-
-    window.addEventListener('show-location-for-mention-edit', handleShowLocationForMentionEdit);
     
     return () => {
       window.removeEventListener('show-location-for-mention', handleShowLocationForMention);
-      window.removeEventListener('open-create-mention-from-filter', handleOpenCreateFromFilter);
-      window.removeEventListener('show-location-for-mention-edit', handleShowLocationForMentionEdit);
     };
-  }, [account, closeAll, openCreate, setCreateTabSelectedLocation, setCreateTabMapMeta, createTabSelectedLocation, createTabMapMeta]);
+  }, [router]);
 
-  // Maintain red pin when create sheet is open - ensures it persists at correct location
-  useEffect(() => {
-    const isCreateOpen = isModalOpen('create');
-    
-    // When create form closes, remove marker (unless transitioning)
-    if (!isCreateOpen && temporaryMarkerRef.current && !isTransitioningToCreateRef.current) {
-      temporaryMarkerRef.current.remove();
-      temporaryMarkerRef.current = null;
-      return;
-    }
-
-    // When create form is open, ensure marker exists at correct location and is red
-    if (isCreateOpen && createTabSelectedLocation && mapInstanceRef.current && !(mapInstanceRef.current as any).removed) {
-      const { lat, lng } = createTabSelectedLocation;
-
-      // If marker exists, verify it's at correct location and is red
-      if (temporaryMarkerRef.current) {
-        const currentLngLat = temporaryMarkerRef.current.getLngLat();
-        const tolerance = 0.0001;
-        const isCorrectLocation = 
-          Math.abs(currentLngLat.lng - lng) < tolerance && 
-          Math.abs(currentLngLat.lat - lat) < tolerance;
-        
-        if (!isCorrectLocation) {
-          // Update position if marker is at wrong location
-          temporaryMarkerRef.current.setLngLat([lng, lat]);
-        }
-        
-        // Ensure marker is red (transform if needed)
-        const markerElement = temporaryMarkerRef.current.getElement();
-        if (markerElement) {
-          const pinDot = markerElement.querySelector('.map-click-pin-dot') as HTMLElement;
-          
-          if (markerElement && pinDot) {
-            // Ensure it's red with white dot
-            markerElement.style.backgroundColor = '#ef4444';
-            markerElement.style.borderColor = '#ef4444';
-            pinDot.style.backgroundColor = '#ffffff';
-          }
-        }
-      }
-    }
-  }, [isModalOpen('create'), createTabSelectedLocation]);
 
   // Listen for mention hover events to prevent mention creation
   useEffect(() => {
@@ -1208,11 +881,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
                 // Fetch full record asynchronously
                 fetchFullRecord();
                 
-                // Hide create mention form if open
-                if (isModalOpen('create')) {
-                  closeCreate();
-                }
-                
                 // Still drop a pin at the click location
                 // (continue with pin marker code below)
               }
@@ -1223,7 +891,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           }
           
           // If a layer was clicked, we've already handled it above
-          // Continue to drop pin but don't open create form
+          // Continue to drop pin
           const layerWasClicked = layerType !== null;
           
           if (!layerWasClicked) {
@@ -1231,21 +899,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
             window.dispatchEvent(new CustomEvent('map-location-click', {
               detail: { lat, lng }
             }));
-            
-            // If waiting for location after camera capture, set location and open create form
-            if (waitingForLocation && capturedImageBlob) {
-              setCreateTabSelectedLocation({ lat, lng });
-              setWaitingForLocation(false);
-              // Open create mention popup with captured image and selected location
-              openCreate();
-              return;
-            }
-            
-            // If Create sheet is open, update the selected location
-            if (isModalOpen('create')) {
-              setCreateTabSelectedLocation({ lat, lng });
-              return;
-            }
           }
           
           // Trigger reverse geocode hook
@@ -1302,14 +955,9 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
             lng,
             address: null, // Will be updated when reverse geocode completes
             mapMeta: mapMeta,
-            mentionTypeId: waitingForLocationWithMentionType.active ? waitingForLocationWithMentionType.mentionTypeId : null,
-            mentionTypeName: waitingForLocationWithMentionType.active ? waitingForLocationWithMentionType.mentionTypeName : null,
+            mentionTypeId: selectedMentionTypes.length === 1 ? selectedMentionTypes[0].id : null,
+            mentionTypeName: selectedMentionTypes.length === 1 ? selectedMentionTypes[0].name : null,
           });
-          
-          // Clear waiting state after location is selected
-          if (waitingForLocationWithMentionType.active) {
-            setWaitingForLocationWithMentionType({ active: false, mentionTypeId: null, mentionTypeName: null });
-          }
         });
 
 
@@ -1339,15 +987,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
 
     return () => {
       mounted = false;
-      // Remove temporary marker on cleanup
-      if (temporaryMarkerRef.current) {
-        try {
-          temporaryMarkerRef.current.remove();
-        } catch {
-          // Ignore cleanup errors
-        }
-        temporaryMarkerRef.current = null;
-      }
       if (mapInstanceRef.current) {
         try {
           if (!mapInstanceRef.current.removed) {
@@ -1448,7 +1087,9 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
               mentionTypeName={selectedMentionTypes[0].name}
               mentionTypeEmoji={selectedMentionTypes[0].emoji}
               onClick={() => {
-                window.dispatchEvent(new CustomEvent('open-create-mention-from-filter'));
+                const params = new URLSearchParams();
+                params.set('mention_type_id', selectedMentionTypes[0].id);
+                router.push(`/add?${params.toString()}`);
               }}
             />
           )}
@@ -1524,44 +1165,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           )}
         </div>
 
-      {/* Camera Modal */}
-      <CameraModal
-        isOpen={isModalOpen('camera')}
-        onClose={() => {
-          closeCamera();
-          // Only clear image state if we're not waiting for location (user manually closed)
-          if (!waitingForLocation) {
-            setCapturedImageBlob(null);
-            setCapturedImagePreview(null);
-            setWaitingForLocation(false);
-          }
-        }}
-        onImageCaptured={(blob) => {
-          console.log('[LiveMap] Image captured from camera, blob size:', blob.size);
-          setCapturedImageBlob(blob);
-          
-          // Create preview URL for display
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setCapturedImagePreview(reader.result as string);
-            
-            // If create mention form is already open with coordinates, send media directly to it
-            // Otherwise, wait for location selection
-            if (isModalOpen('create') && createTabSelectedLocation) {
-              // Form is open with location - media will be passed via initialImageBlob prop
-              // Don't set waitingForLocation, just close camera modal
-              closeCamera();
-              console.log('[LiveMap] Image preview created, sending to open create mention form');
-            } else {
-              // Form not open or no location - wait for location selection
-              setWaitingForLocation(true);
-              closeCamera();
-              console.log('[LiveMap] Image preview created, waiting for location selection');
-            }
-          };
-          reader.readAsDataURL(blob);
-        }}
-      />
 
 
 
@@ -1598,51 +1201,17 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
         mentionTypeId={locationSelectPopup.mentionTypeId}
         mentionTypeName={locationSelectPopup.mentionTypeName}
         onAddToMap={(coordinates, mapMeta, mentionTypeId) => {
-          // Set location state and open create form inline
-          setCreateTabSelectedLocation(coordinates);
-          setCreateTabMapMeta(mapMeta || null);
-          closeAll();
-          openCreate({ lat: coordinates.lat, lng: coordinates.lng, map_meta: mapMeta });
+          // Navigate to /add page with location and mention type
+          const params = new URLSearchParams();
+          params.set('lat', coordinates.lat.toString());
+          params.set('lng', coordinates.lng.toString());
+          if (mentionTypeId) {
+            params.set('mention_type_id', mentionTypeId);
+          }
+          router.push(`/add?${params.toString()}`);
         }}
       />
 
-      {/* Create Popup - Only opened via "Add Label" button */}
-      <CreateMentionPopup
-        isOpen={isModalOpen('create') && !isAccountModalOpen}
-        onClose={() => {
-          closeCreate();
-          setCreateTabSelectedLocation(null);
-          setCreateTabMapMeta(null);
-          setCreateTabFullAddress(null);
-          setCapturedImageBlob(null);
-          setCapturedImagePreview(null);
-          setWaitingForLocation(false);
-          // Remove temporary marker when create popup closes
-          if (temporaryMarkerRef.current) {
-            temporaryMarkerRef.current.remove();
-            temporaryMarkerRef.current = null;
-          }
-        }}
-        isEditMode={modal?.data?.isEditMode || false}
-        editData={modal?.data?.editData || null}
-            map={mapInstanceRef.current}
-            mapLoaded={mapLoaded}
-            initialCoordinates={createTabSelectedLocation}
-            initialMapMeta={createTabMapMeta}
-            initialFullAddress={createTabFullAddress}
-            initialImageBlob={capturedImageBlob}
-        onMentionCreated={() => {
-              closeCreate();
-              setCreateTabSelectedLocation(null);
-          setCreateTabMapMeta(null);
-          setCreateTabFullAddress(null);
-              // Clear captured image state after mention is created
-              setCapturedImageBlob(null);
-              setCapturedImagePreview(null);
-              setWaitingForLocation(false);
-              setMentionsRefreshKey(prev => prev + 1);
-            }}
-          />
 
       {/* Unified Mention Location Sheet - Shows when clicking mention or location on map */}
       <MentionLocationSheet
@@ -1651,11 +1220,6 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           setIsMentionSheetOpen(false);
           setSelectedMentionForSheet(null);
           setLocationDataForSheet(null);
-          // Only remove red pin marker when sheet closes if we're not transitioning to create
-          if (temporaryMarkerRef.current && !isTransitioningToCreateRef.current && !isModalOpen('create')) {
-            temporaryMarkerRef.current.remove();
-            temporaryMarkerRef.current = null;
-          }
         }}
         selectedMention={selectedMentionForSheet}
         locationData={locationDataForSheet}

@@ -183,22 +183,15 @@ export default function LocationSelectPopup({
   };
 
   const handleAddToMap = () => {
-    // If onAddToMap callback provided, use it (opens create form inline)
-    // Otherwise, fall back to navigation for backward compatibility
-    if (onAddToMap) {
-      onAddToMap({ lat, lng }, mapMeta || null, selectedMentionTypeId || null);
-      handleClose();
-    } else {
-      // Fallback: navigate to /add page
-      const params = new URLSearchParams();
-      params.set('lat', lat.toString());
-      params.set('lng', lng.toString());
-      if (selectedMentionTypeId) {
-        params.set('mention_type_id', selectedMentionTypeId);
-      }
-      router.push(`/add?${params.toString()}`);
-      handleClose();
+    // Always navigate to /add page
+    const params = new URLSearchParams();
+    params.set('lat', lat.toString());
+    params.set('lng', lng.toString());
+    if (selectedMentionTypeId) {
+      params.set('mention_type_id', selectedMentionTypeId);
     }
+    router.push(`/add?${params.toString()}`);
+    handleClose();
   };
 
   const handleCopyAddress = async () => {

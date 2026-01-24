@@ -74,27 +74,16 @@ export default function MentionTypeFilterContent({ onClose, showHeader = false }
     }
   }, [mentionTypes, searchParams]);
 
-  // Handle type selection (single select, immediate application)
+  // Handle type selection - navigate to /add page with mention_type
   const handleTypeSelect = (typeId: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    // If clicking the same type, deselect it
-    if (selectedTypeId === typeId) {
-      setSelectedTypeId(null);
-      params.delete('type');
-      params.delete('types');
-      router.push(`/live?${params.toString()}`);
-      return;
-    }
-    
-    // Select new type
-    setSelectedTypeId(typeId);
     const selectedType = mentionTypes.find(t => t.id === typeId);
     if (selectedType) {
-      const slug = mentionTypeNameToSlug(selectedType.name);
-      params.set('type', slug);
-      params.delete('types');
-      router.push(`/live?${params.toString()}`);
+      const params = new URLSearchParams();
+      params.set('mention_type_id', typeId);
+      router.push(`/add?${params.toString()}`);
+      if (onClose) {
+        onClose();
+      }
     }
   };
 

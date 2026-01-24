@@ -283,9 +283,9 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
                       <span>View Profile</span>
                     </Link>
                   )}
-                  {post.map_data && (
+                  {post.map_data! && (
                     <Link
-                      href={`/live?lat=${post.map_data.lat}&lng=${post.map_data.lng}`}
+                      href={`/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -356,8 +356,8 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
           {/* Images - Filter out map screenshot if it exists in map_data */}
           {post.images && post.images.length > 0 && (() => {
             // Filter out map screenshot from images if it exists in map_data
-            const filteredImages = post.map_data?.screenshot
-              ? post.images.filter(img => img.url !== post.map_data.screenshot)
+            const filteredImages = post.map_data!?.screenshot
+              ? post.images.filter(img => img.url !== post.map_data!.screenshot)
               : post.images;
             
             if (filteredImages.length === 0) return null;
@@ -404,8 +404,8 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
 
           {/* Image Modal */}
           {selectedImageIndex !== null && post.images && (() => {
-            const filteredImages = post.map_data?.screenshot
-              ? post.images.filter(img => img.url !== post.map_data.screenshot)
+            const filteredImages = post.map_data!?.screenshot
+              ? post.images.filter(img => img.url !== post.map_data!.screenshot)
               : post.images;
             const image = filteredImages[selectedImageIndex];
             if (!image) return null;
@@ -464,33 +464,33 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
           })()}
 
           {/* Map Data / Location */}
-          {post.map_data && (
+          {post.map_data! && (
             <div className="mb-4">
-              {post.map_data.screenshot && (
+              {post.map_data!.screenshot && (
                 <div className="mb-2 rounded-lg overflow-hidden border border-gray-200">
                   <img
-                    src={post.map_data.screenshot}
+                    src={post.map_data!.screenshot}
                     alt="Map preview"
                     className="w-full h-auto"
                   />
                 </div>
               )}
               <Link
-                href={`/live?lat=${post.map_data.lat}&lng=${post.map_data.lng}&zoom=15`}
+                href={`/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}&zoom=15`}
                 className="block bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <MapPinIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900">
-                      {post.map_data.place_name || post.map_data.address || 'Location'}
+                      {post.map_data!.place_name || post.map_data!.address || 'Location'}
                     </div>
-                    {post.map_data.address && post.map_data.place_name && (
-                      <div className="text-xs text-gray-500">{post.map_data.address}</div>
+                    {post.map_data!.address && post.map_data!.place_name && (
+                      <div className="text-xs text-gray-500">{post.map_data!.address}</div>
                     )}
-                    {post.map_data.type && (
+                    {post.map_data!.type && (
                       <div className="text-xs text-gray-500 mt-1">
-                        {post.map_data.type === 'area' ? 'Area' : post.map_data.type === 'pin' ? 'Pin' : 'Area & Pin'}
+                        {post.map_data!.type === 'area' ? 'Area' : post.map_data!.type === 'pin' ? 'Pin' : 'Area & Pin'}
                       </div>
                     )}
                   </div>

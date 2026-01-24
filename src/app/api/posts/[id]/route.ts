@@ -179,7 +179,7 @@ export async function PATCH(
           );
         }
 
-        if (post.account_id !== accountId) {
+        if ((post as any).account_id !== accountId) {
           return NextResponse.json(
             { error: 'You can only update your own posts' },
             { status: 403 }
@@ -262,7 +262,7 @@ export async function PATCH(
         // Update post
         const { data: updatedPost, error } = await supabase
           .from('posts')
-          .update(updateData)
+          .update(updateData as never)
           .eq('id', id)
           .select(`
             id,
@@ -307,7 +307,8 @@ export async function PATCH(
         }
 
         // Fetch mentions if referenced
-        if (updatedPost && updatedPost.mention_ids && Array.isArray(updatedPost.mention_ids) && updatedPost.mention_ids.length > 0) {
+        const updatedPostData = updatedPost as any;
+        if (updatedPostData && updatedPostData.mention_ids && Array.isArray(updatedPostData.mention_ids) && updatedPostData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
             .from('mentions')
             .select(`
@@ -322,12 +323,12 @@ export async function PATCH(
                 name
               )
             `)
-            .in('id', updatedPost.mention_ids);
+            .in('id', updatedPostData.mention_ids);
 
-          updatedPost.mentions = mentions || [];
+          updatedPostData.mentions = mentions || [];
         }
 
-        return NextResponse.json({ post: updatedPost });
+        return NextResponse.json({ post: updatedPostData });
       } catch (error) {
         console.error('[Posts API] Error:', error);
         return NextResponse.json(
@@ -385,7 +386,7 @@ export async function DELETE(
           );
         }
 
-        if (post.account_id !== accountId) {
+        if ((post as any).account_id !== accountId) {
           return NextResponse.json(
             { error: 'You can only delete your own posts' },
             { status: 403 }

@@ -12,7 +12,7 @@ import PageViewTracker from '@/components/analytics/PageViewTracker';
 import MapCard from './components/MapCard';
 import type { MapItem } from './types';
 
-type TabType = 'my-maps' | 'community' | 'professional' | 'gov';
+type TabType = 'my-maps' | 'community' | 'professional' | 'gov' | 'atlas' | 'user';
 
 export default function MapsPage() {
   const router = useRouter();

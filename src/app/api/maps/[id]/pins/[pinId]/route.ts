@@ -67,7 +67,7 @@ export async function GET(
           if (mapError || !map) {
             return createErrorResponse('Map not found', 404);
           }
-          mapId = map.id;
+          mapId = (map as any).id;
         }
 
         // Fetch pin (RLS will filter based on permissions)
@@ -157,7 +157,7 @@ export async function PUT(
           if (mapError || !map) {
             return createErrorResponse('Map not found', 404);
           }
-          mapId = map.id;
+          mapId = (map as any).id;
         }
         
         // Check if pin exists
@@ -207,7 +207,7 @@ export async function PUT(
         // Update pin
         const { data: updatedPin, error: updateError } = await supabase
           .from('map_pins')
-          .update(updateData as any)
+          .update(updateData as never)
           .eq('id', validatedPinId)
           .select()
           .single();

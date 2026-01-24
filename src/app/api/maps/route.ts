@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
             feature_slug: 'custom_maps',
           } as any);
 
-          const mapLimit = Array.isArray(mapRows) && mapRows.length > 0 ? (mapRows[0] as any) : null;
+          const mapLimit = Array.isArray(mapRows) && (mapRows as any[]).length > 0 ? (mapRows[0] as any) : null;
 
           if (mapFeatureError || !mapLimit || !mapLimit.has_feature) {
             return createErrorResponse(

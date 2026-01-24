@@ -96,7 +96,7 @@ export async function GET(
           if (mapError || !map) {
             return createErrorResponse('Map not found', 404);
           }
-          mapId = map.id;
+          mapId = (map as any).id;
         }
 
         // Get stats using get_url_stats function

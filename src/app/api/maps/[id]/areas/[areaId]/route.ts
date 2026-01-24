@@ -66,7 +66,7 @@ export async function GET(
           if (mapError || !map) {
             return createErrorResponse('Map not found', 404);
           }
-          mapId = map.id;
+          mapId = (map as any).id;
         }
 
         // Fetch area (RLS will filter based on permissions)
@@ -156,7 +156,7 @@ export async function PUT(
           if (mapError || !map) {
             return createErrorResponse('Map not found', 404);
           }
-          mapId = map.id;
+          mapId = (map as any).id;
         }
         
         // Check if area exists
@@ -172,17 +172,17 @@ export async function PUT(
         }
 
         // Check if user owns the map
-        const { data: map, error: mapError } = await supabase
+        const { data: mapCheck, error: mapError } = await supabase
           .from('map')
           .select('account_id')
           .eq('id', mapId)
           .single();
 
-        if (mapError || !map) {
+        if (mapError || !mapCheck) {
           return createErrorResponse('Map not found', 404);
         }
 
-        if ((map as any).account_id !== accountId) {
+        if ((mapCheck as any).account_id !== accountId) {
           return createErrorResponse('Forbidden - you do not own this map', 403);
         }
         
@@ -203,7 +203,7 @@ export async function PUT(
         // Update area
         const { data: updatedArea, error: updateError } = await supabase
           .from('map_areas')
-          .update(updateData as any)
+          .update(updateData as never)
           .eq('id', validatedAreaId)
           .select()
           .single();

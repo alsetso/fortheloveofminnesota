@@ -47,6 +47,7 @@ export default function SearchResults() {
     mentions: [],
     groups: [],
     users: [],
+    news: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

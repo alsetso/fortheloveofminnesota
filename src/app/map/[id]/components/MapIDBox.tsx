@@ -144,6 +144,17 @@ export default function MapIDBox({
   const clickHandlerAddedRef = useRef(false);
   const hiddenLayersRef = useRef<Map<string, 'visible' | 'none' | undefined>>(new Map());
 
+  // Log when rendering mentions layer
+  useEffect(() => {
+    if (mapLoaded && mapInstance) {
+      console.log('[MapIDBox] Rendering MentionsLayer for map:', mapId, {
+        mapId,
+        mapLoaded,
+        hasMapInstance: !!mapInstance,
+      });
+    }
+  }, [mapLoaded, mapInstance, mapId]);
+
   const clearSelection = useCallback(() => {
     setSelectedEntity(null);
     setSelectedEntityType(null);
@@ -1180,14 +1191,11 @@ export default function MapIDBox({
           
           {/* Mentions Layer - Render mentions as pins on map */}
           {mapLoaded && mapInstance && (
-            <>
-              {console.log('[MapIDBox] Rendering MentionsLayer for map:', mapId)}
-              <MentionsLayer 
-                map={mapInstance} 
-                mapLoaded={mapLoaded}
-                mapId={mapId}
-              />
-            </>
+            <MentionsLayer 
+              map={mapInstance} 
+              mapLoaded={mapLoaded}
+              mapId={mapId}
+            />
           )}
         </>
       )}

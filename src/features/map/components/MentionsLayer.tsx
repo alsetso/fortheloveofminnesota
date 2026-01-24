@@ -318,11 +318,6 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
 
         mentionsRef.current = mentions;
         const geoJSON = MentionService.mentionsToGeoJSON(mentions);
-        
-        // Log for debugging
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[MentionsLayer] Loaded mentions:', mentions.length);
-        }
 
         isAddingLayersRef.current = true;
 
@@ -855,7 +850,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             
             // Debug: Log mention_type to check if it's properly set
             if (process.env.NODE_ENV === 'development') {
-              console.log('[MentionsLayer] Mention clicked:', {
+              // Mention clicked
+              {
                 id: mention.id,
                 mention_type: mention.mention_type,
                 mention_type_id: (mention as any).mention_type_id,

@@ -88,7 +88,7 @@ export async function GET(
               image_url
             )
           `)
-          .eq('group_id', group.id)
+          .eq('group_id', (group as any).id)
           .order('created_at', { ascending: false })
           .range(offset, offset + limit - 1);
 
@@ -224,7 +224,7 @@ export async function POST(
             account_id: accountId,
             message: message?.trim() || null,
             status: 'pending',
-          } as any)
+          } as never)
           .select(`
             id,
             group_id,

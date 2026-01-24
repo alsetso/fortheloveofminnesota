@@ -218,7 +218,7 @@ export async function PATCH(
         // Update group
         const { data: updatedGroup, error } = await supabase
           .from('groups')
-          .update(updateData as any)
+          .update(updateData as never)
           .eq('id', (group as any).id)
           .select(`
             id,
@@ -335,7 +335,7 @@ export async function DELETE(
         // Soft delete
         const { error } = await supabase
           .from('groups')
-          .update({ is_active: false } as any)
+          .update({ is_active: false } as never)
           .eq('id', (group as any).id);
 
         if (error) {

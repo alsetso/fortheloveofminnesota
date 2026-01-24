@@ -187,7 +187,7 @@ export async function POST(
             group_id: (group as any).id,
             account_id: accountId,
             is_admin: false,
-          } as any)
+          } as never)
           .select(`
             id,
             group_id,

@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
             image_url: image_url || null,
             visibility,
             created_by_account_id: accountId,
-          } as any)
+          } as never)
           .select(`
             id,
             name,

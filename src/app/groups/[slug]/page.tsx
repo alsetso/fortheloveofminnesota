@@ -80,7 +80,7 @@ export default async function GroupPage({ params }: Props) {
       .select('id')
       .eq('user_id', user.id)
       .single();
-    accountId = account?.id || null;
+    accountId = (account as any)?.id || null;
   }
 
   if (accountId) {

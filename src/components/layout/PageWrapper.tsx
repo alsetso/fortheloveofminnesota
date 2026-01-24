@@ -15,8 +15,7 @@ import {
   BuildingLibraryIcon, 
   UserGroupIcon,
   UsersIcon,
-  SparklesIcon,
-  RssIcon
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
@@ -24,8 +23,7 @@ import {
   BuildingLibraryIcon as BuildingLibraryIconSolid, 
   UserGroupIcon as UserGroupIconSolid,
   UsersIcon as UsersIconSolid,
-  SparklesIcon as SparklesIconSolid,
-  RssIcon as RssIconSolid
+  SparklesIcon as SparklesIconSolid
 } from '@heroicons/react/24/solid';
 
 interface AccountDropdownProps {
@@ -108,7 +106,6 @@ export default function PageWrapper({
     { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
     { label: 'Live', href: '/live', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
-    { label: 'News', href: '/news', icon: RssIcon, iconSolid: RssIconSolid },
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
     { label: 'Gov', href: '/gov', icon: BuildingLibraryIcon, iconSolid: BuildingLibraryIconSolid },
     { label: 'Groups', href: '/groups', icon: UserGroupIcon, iconSolid: UserGroupIconSolid },

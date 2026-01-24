@@ -286,12 +286,12 @@ export default function MentionLocationSheet({
 
   // Type guard to check if selectedMention is a full Mention
   const isFullMention = (m: typeof selectedMention): m is Mention => {
-    return m !== null && 'id' in m && typeof (m as any).lat === 'number' && typeof (m as any).lng === 'number';
+    return m !== null && m !== undefined && 'id' in m && typeof (m as any).lat === 'number' && typeof (m as any).lng === 'number';
   };
   
-  const fullMention = isFullMention(selectedMention) ? selectedMention : null;
+  const fullMention = selectedMention && isFullMention(selectedMention) ? selectedMention : null;
   const isOwner = user && account && fullMention && fullMention.account_id === account.id;
-  const videoUrl = fullMention?.video_url || selectedMention.video_url;
+  const videoUrl = fullMention?.video_url || (selectedMention as any)?.video_url;
   const youtubeUrls = videoUrl ? findYouTubeUrls(videoUrl) : [];
 
   return (
@@ -320,10 +320,10 @@ export default function MentionLocationSheet({
       >
         {/* Header - Compact */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-gray-200 flex-shrink-0">
-          {fullMention?.account || selectedMention.account ? (
+          {fullMention?.account || (selectedMention as any)?.account ? (
             <>
               {(() => {
-                const account = fullMention?.account || selectedMention.account;
+                const account = fullMention?.account || (selectedMention as any)?.account;
                 if (!account) return null;
                 
                 if (user && account.username) {
@@ -394,9 +394,9 @@ export default function MentionLocationSheet({
               </button>
               {showMenu && (
                 <div className="absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[140px] bg-white border border-gray-200">
-                  {(fullMention?.id || selectedMention.id) && (
+                  {(fullMention?.id || (selectedMention as any)?.id) && (
                     <Link
-                      href={`/mention/${fullMention?.id || selectedMention.id}`}
+                      href={`/mention/${fullMention?.id || (selectedMention as any)?.id}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-1.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -404,9 +404,9 @@ export default function MentionLocationSheet({
                       <span>More</span>
                     </Link>
                   )}
-                  {((fullMention?.account || selectedMention.account)?.username) && (
+                  {((fullMention?.account || (selectedMention as any)?.account)?.username) && (
                     <Link
-                      href={`/profile/${encodeURIComponent((fullMention?.account || selectedMention.account)!.username!)}`}
+                      href={`/profile/${encodeURIComponent((fullMention?.account || (selectedMention as any)?.account)!.username!)}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-1.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >

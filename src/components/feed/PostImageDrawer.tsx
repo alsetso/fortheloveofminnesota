@@ -117,7 +117,7 @@ export default function PostImageDrawer({
   };
 
   const handleSave = () => {
-    onImagesSave(images);
+    onImagesSave(images.map(img => ({ ...img, type: img.type || 'image' as const })));
     onClose();
   };
 

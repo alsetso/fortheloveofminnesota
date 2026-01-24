@@ -276,10 +276,10 @@ export default function SearchResults() {
                           })}
                         </span>
                       </div>
-                      {post.group && (
+                      {(post as any).group && (
                         <div className="flex items-center gap-1.5 text-xs text-gray-600 pt-1">
                           <UserGroupIcon className="w-3 h-3" />
-                          <span>{post.group.name}</span>
+                          <span>{(post as any).group.name}</span>
                         </div>
                       )}
                     </div>
@@ -355,9 +355,9 @@ export default function SearchResults() {
                                 <span className="text-xs font-medium text-gray-900">
                                   @{mention.account.username}
                                 </span>
-                                {(mention.account.first_name || mention.account.last_name) && (
+                                {((mention.account as any).first_name || (mention.account as any).last_name) && (
                                   <p className="text-xs text-gray-500">
-                                    {[mention.account.first_name, mention.account.last_name].filter(Boolean).join(' ')}
+                                    {[(mention.account as any).first_name, (mention.account as any).last_name].filter(Boolean).join(' ')}
                                   </p>
                                 )}
                               </div>

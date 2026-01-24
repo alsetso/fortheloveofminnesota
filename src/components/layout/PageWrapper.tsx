@@ -172,6 +172,9 @@ export default function PageWrapper({
         className="flex flex-col flex-shrink-0 border-b border-white/5"
         style={{ backgroundColor: '#000000' }}
       >
+        {/* Notification window placeholder - 20px height */}
+        <div className="h-5 w-full" style={{ height: '20px' }} />
+        
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           {/* Top Row: Logo, Search, Nav, Account */}
           <div className={`grid grid-cols-12 gap-6 items-center transition-all duration-300 h-14 ${isSearchMode ? 'opacity-0 h-0 overflow-hidden pointer-events-none' : 'opacity-100'}`}>

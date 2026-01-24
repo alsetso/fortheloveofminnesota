@@ -109,22 +109,18 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
     }
 
     if (contentType === 'posts') {
-      setPlaceholderText('Search posts...');
+      setPlaceholderText('Search..');
     } else if (contentType === 'mentions') {
-      setPlaceholderText('Search mentions...');
+      setPlaceholderText('Search..');
     } else if (contentType === 'groups') {
-      setPlaceholderText('Search groups...');
+      setPlaceholderText('Search..');
     } else if (contentType === 'users') {
-      setPlaceholderText('Search users...');
+      setPlaceholderText('Search..');
+    } else if (contentType === 'news') {
+      setPlaceholderText('Search..');
     } else {
-      // Default rotating placeholder when no filter is selected
-      setPlaceholderText('Enter address');
-      placeholderIntervalRef.current = setInterval(() => {
-        setPlaceholderText((prev) => {
-          if (prev === 'Enter address') return 'Enter "@" for username';
-          return 'Enter address';
-        });
-      }, 3000);
+      // Default placeholder
+      setPlaceholderText('Search..');
     }
 
     return () => {

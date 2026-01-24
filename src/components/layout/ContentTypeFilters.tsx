@@ -21,6 +21,7 @@ export default function ContentTypeFilters() {
     { id: 'mentions', label: 'Mentions' },
     { id: 'groups', label: 'Groups' },
     { id: 'users', label: 'Users' },
+    { id: 'news', label: 'News' },
   ], []);
 
   // Initialize selected type from URL

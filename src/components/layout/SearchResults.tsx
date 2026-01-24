@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { EyeIcon, UserGroupIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, UserGroupIcon, DocumentTextIcon, RssIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { supabase } from '@/lib/supabase';
@@ -13,13 +13,30 @@ import type { Group } from '@/types/group';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import { Account } from '@/features/auth';
 
-type ContentType = 'posts' | 'mentions' | 'groups' | 'users';
+type ContentType = 'posts' | 'mentions' | 'groups' | 'users' | 'news';
+
+interface NewsArticle {
+  id: string;
+  title: string;
+  link: string;
+  snippet: string | null;
+  photo_url: string | null;
+  thumbnail_url: string | null;
+  published_at: string;
+  published_date: string;
+  authors: string[];
+  source_name: string | null;
+  source_logo_url: string | null;
+  related_topics: string[];
+  created_at: string;
+}
 
 interface SearchResultsData {
   posts: Post[];
   mentions: Mention[];
   groups: Group[];
   users: any[]; // TODO: Add User type
+  news: NewsArticle[];
 }
 
 export default function SearchResults() {
@@ -47,14 +64,14 @@ export default function SearchResults() {
 
         if (contentTypesParam) {
           const types = contentTypesParam.split(',').map(s => s.trim()) as ContentType[];
-          selectedTypes = types.filter(t => ['posts', 'mentions', 'groups', 'users'].includes(t));
+          selectedTypes = types.filter(t => ['posts', 'mentions', 'groups', 'users', 'news'].includes(t));
         } else if (contentTypeParam) {
-          if (['posts', 'mentions', 'groups', 'users'].includes(contentTypeParam)) {
+          if (['posts', 'mentions', 'groups', 'users', 'news'].includes(contentTypeParam)) {
             selectedTypes = [contentTypeParam as ContentType];
           }
         } else {
           // Default to all types if none selected
-          selectedTypes = ['posts', 'mentions', 'groups', 'users'];
+          selectedTypes = ['posts', 'mentions', 'groups', 'users', 'news'];
         }
 
         const newResults: SearchResultsData = {
@@ -62,6 +79,7 @@ export default function SearchResults() {
           mentions: [],
           groups: [],
           users: [],
+          news: [],
         };
 
         // Fetch Posts
@@ -180,6 +198,19 @@ export default function SearchResults() {
           }
         }
 
+        // Fetch News
+        if (selectedTypes.includes('news')) {
+          try {
+            const response = await fetch('/api/news?limit=20', { credentials: 'include' });
+            if (response.ok) {
+              const data = await response.json();
+              newResults.news = data.articles || [];
+            }
+          } catch (err) {
+            console.error('Error fetching news:', err);
+          }
+        }
+
         setResults(newResults);
       } catch (err) {
         console.error('Error fetching search results:', err);
@@ -192,7 +223,7 @@ export default function SearchResults() {
     fetchResults();
   }, [searchParams]);
 
-  const totalResults = results.posts.length + results.mentions.length + results.groups.length + results.users.length;
+  const totalResults = results.posts.length + results.mentions.length + results.groups.length + results.users.length + results.news.length;
 
   if (loading) {
     return (
@@ -516,6 +547,71 @@ export default function SearchResults() {
                       </div>
                     </div>
                   </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* News Section */}
+          {results.news.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <RssIcon className="w-5 h-5 text-gray-600" />
+                <h3 className="text-md font-semibold text-gray-900">News ({results.news.length})</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {results.news.map((article) => (
+                  <a
+                    key={article.id}
+                    href={article.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                  >
+                    <div className="space-y-3">
+                      {article.photo_url || article.thumbnail_url ? (
+                        <div className="relative w-full h-48 rounded-md overflow-hidden bg-gray-200">
+                          <img
+                            src={article.photo_url || article.thumbnail_url || ''}
+                            alt={article.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : null}
+                      
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                          {article.title}
+                        </h4>
+                        {article.snippet && (
+                          <p className="text-xs text-gray-600 line-clamp-3">
+                            {article.snippet}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                          {article.source_logo_url && (
+                            <img
+                              src={article.source_logo_url}
+                              alt={article.source_name || 'Source'}
+                              className="w-4 h-4 object-contain"
+                            />
+                          )}
+                          <span className="line-clamp-1">
+                            {article.source_name || 'News'}
+                          </span>
+                        </div>
+                        <span>
+                          {new Date(article.published_at || article.published_date).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </a>
                 ))}
               </div>
             </div>

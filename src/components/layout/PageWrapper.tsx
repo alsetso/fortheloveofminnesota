@@ -284,6 +284,20 @@ export default function PageWrapper({
         {isSearchMode && (
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300 pt-1">
             <div className="flex items-center gap-2">
+              {/* Logo - Left of search input */}
+              <div className="flex-shrink-0">
+                <button
+                  onClick={() => setIsMenuOpen(true)}
+                  className="flex items-center justify-center hover:opacity-80 transition-opacity"
+                  aria-label="Open menu"
+                >
+                  <img
+                    src="/white-logo.png"
+                    alt="For the Love of Minnesota"
+                    className="w-7 h-7"
+                  />
+                </button>
+              </div>
               {/* Label area - shows selected content type */}
               {selectedLabel && (
                 <div className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-white bg-white/10 rounded-md">

@@ -22,7 +22,7 @@ export async function GET(
     const isAuthenticated = !!accountId;
 
     // Build query with relations
-    const query = supabase
+    let query = supabase
       .from('mentions')
       .select(`
         id,
@@ -62,15 +62,14 @@ export async function GET(
         )
       `)
       .eq('id', id)
-      .eq('archived', false)
-      .single();
+      .eq('archived', false);
 
     // For anonymous users, filter to public only
     if (!isAuthenticated) {
-      query.eq('visibility', 'public');
+      query = query.eq('visibility', 'public');
     }
 
-    const { data, error } = await query;
+    const { data, error } = await query.single();
 
     if (error) {
       return NextResponse.json(

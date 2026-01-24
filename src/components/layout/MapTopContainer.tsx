@@ -243,7 +243,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
       params.delete('type');
     }
     
-    router.push(`/live?${params.toString()}`);
+    router.push(`/map/live?${params.toString()}`);
   };
   const [placeholderText, setPlaceholderText] = useState<'Enter address' | 'Enter "@" for username'>('Enter address');
   const [dynamicSearchData, setDynamicSearchData] = useState<any>(null);
@@ -848,11 +848,11 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
 
   const handleLogoClick = useCallback(() => {
     // Route-aware navigation:
-    // - On /profile/* pages: go to /live
-    // - On /live page: go to / (homepage)
+    // - On /profile/* pages: go to /map/live
+    // - On /live or /map/live page: go to / (homepage)
     if (pathname?.startsWith('/profile/')) {
-      router.push('/live');
-    } else if (pathname === '/live') {
+      router.push('/map/live');
+    } else if (pathname === '/live' || pathname === '/map/live') {
       router.push('/');
     } else {
       // Fallback: go to homepage

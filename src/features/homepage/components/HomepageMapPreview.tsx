@@ -115,7 +115,7 @@ export default function HomepageMapPreview() {
       {/* View Map Button - Bottom Right */}
       <div className="absolute bottom-4 right-4 z-10 pointer-events-none">
         <button
-          onClick={() => router.push('/live')}
+          onClick={() => router.push('/map/live')}
           className="pointer-events-auto px-4 py-2 text-xs font-semibold text-gray-900 bg-white/90 backdrop-blur-sm hover:bg-white rounded-md transition-colors border border-gray-200 shadow-lg"
         >
           View Map

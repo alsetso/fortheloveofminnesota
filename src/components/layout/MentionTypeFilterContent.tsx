@@ -93,7 +93,7 @@ export default function MentionTypeFilterContent({ onClose, showHeader = false }
     const params = new URLSearchParams(searchParams.toString());
     params.delete('type');
     params.delete('types');
-    router.push(`/live?${params.toString()}`);
+    router.push(`/map/live?${params.toString()}`);
   };
 
   return (

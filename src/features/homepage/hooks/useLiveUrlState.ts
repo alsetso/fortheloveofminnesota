@@ -107,7 +107,7 @@ export function useLiveUrlState() {
 
   // Mark URL as processed after first check (prevents re-processing on every render)
   useEffect(() => {
-    if (!hasProcessedUrl && pathname === '/live') {
+    if (!hasProcessedUrl && (pathname === '/live' || pathname === '/map/live')) {
       const state = getUrlState();
       if (state.lat !== null && state.lng !== null) {
         setHasProcessedUrl(true);
@@ -117,7 +117,7 @@ export function useLiveUrlState() {
 
   // Reset processed flag when mentionId changes (allows re-processing for different mentions)
   useEffect(() => {
-    if (pathname === '/live') {
+    if (pathname === '/live' || pathname === '/map/live') {
       const state = getUrlState();
       if (state.mentionId) {
         // Reset processed flag when mentionId changes to allow re-highlighting
@@ -128,7 +128,7 @@ export function useLiveUrlState() {
 
   // Reset processed flag when navigating away
   useEffect(() => {
-    if (pathname !== '/live') {
+    if (pathname !== '/live' && pathname !== '/map/live') {
       setHasProcessedUrl(false);
     }
   }, [pathname]);

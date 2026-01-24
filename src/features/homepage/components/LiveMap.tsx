@@ -336,7 +336,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
       params.delete('type');
     }
     
-    router.push(`/live?${params.toString()}`);
+    router.push(`/map/live?${params.toString()}`);
   };
   
   // Handle reload mentions button click

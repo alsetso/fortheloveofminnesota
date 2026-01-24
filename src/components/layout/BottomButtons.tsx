@@ -41,7 +41,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
   const { user } = useAuth();
-  const isLivePage = pathname === '/live';
+  const isLivePage = pathname === '/live' || pathname === '/map/live';
   // Initialize with consistent defaults to avoid hydration mismatch
   const [useBlurStyle, setUseBlurStyle] = useState(false);
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>('streets');

@@ -498,7 +498,7 @@ export default function MentionLocationSheet({
                     onClick={() => {
                       handleClose();
                       const typeSlug = mentionTypeNameToSlug(mentionType.name);
-                      router.push(`/live?type=${typeSlug}`);
+                      router.push(`/map/live?type=${typeSlug}`);
                     }}
                     className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
                   >
@@ -672,7 +672,7 @@ export default function MentionLocationSheet({
                               onMentionSelect(mention.id, mention.lat, mention.lng);
                             } else {
                               // Fallback: update URL directly
-                              router.push(`/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
+                              router.push(`/map/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
                             }
                           }}
                           className="w-full text-left block bg-gray-50 border border-gray-200 rounded-md p-[10px] hover:bg-gray-100 transition-colors"

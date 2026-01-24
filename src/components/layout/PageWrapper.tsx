@@ -104,7 +104,7 @@ export default function PageWrapper({
   // Memoize navItems to prevent recreation on every render
   const navItems = useMemo(() => [
     { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
-    { label: 'Live', href: '/live', icon: MapIcon, iconSolid: MapIconSolid },
+    { label: 'Live', href: '/map/live', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
     { label: 'Gov', href: '/gov', icon: BuildingLibraryIcon, iconSolid: BuildingLibraryIconSolid },

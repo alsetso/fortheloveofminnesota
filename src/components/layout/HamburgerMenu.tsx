@@ -13,7 +13,7 @@ interface NavLink {
 
 const navLinks: NavLink[] = [
   { label: 'Home', href: '/' },
-  { label: 'Live Map', href: '/live' },
+  { label: 'Live Map', href: '/map/live' },
   { label: 'Maps', href: '/maps' },
   { label: 'Profile', href: '/profile', requiresAuth: true },
   { label: 'Account', href: '/account', requiresAuth: true },

@@ -57,7 +57,7 @@ export default function LiveMapAnalyticsCard() {
 
   return (
     <Link
-      href="/live"
+      href="/map/live"
       className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
     >
       <div className="space-y-3">

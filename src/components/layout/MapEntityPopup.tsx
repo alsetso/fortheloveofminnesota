@@ -610,7 +610,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
                               // Close popup first
                               handleClose();
                               // Navigate to /live with type filter
-                              router.push(`/live?type=${typeSlug}`);
+                              router.push(`/map/live?type=${typeSlug}`);
                             }}
                             className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
                               useWhiteText 
@@ -935,7 +935,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
                                 } else {
                                   // Fallback: navigate directly
                                   handleClose();
-                                  router.push(`/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
+                                  router.push(`/map/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
                                 }
                               }}
                               className={`w-full text-left block rounded-md p-[10px] transition-colors ${

@@ -285,7 +285,7 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
                   )}
                   {post.map_data! && (
                     <Link
-                      href={`/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}`}
+                      href={`/map/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -476,7 +476,7 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
                 </div>
               )}
               <Link
-                href={`/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}&zoom=15`}
+                href={`/map/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}&zoom=15`}
                 className="block bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
               >
                 <div className="flex items-center gap-2">

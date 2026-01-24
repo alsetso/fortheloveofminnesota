@@ -232,7 +232,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                     </Link>
                   )}
                   <Link
-                    href={`/live?lat=${mention.lat}&lng=${mention.lng}`}
+                    href={`/map/live?lat=${mention.lat}&lng=${mention.lng}`}
                     onClick={() => setShowMenu(false)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                   >

@@ -28,7 +28,7 @@ export default function MentionCard({ mention }: MentionCardProps) {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     // Navigate to /live with coordinates and mention ID - will trigger URL watcher to zoom, highlight mention, and open sheet
-    router.push(`/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
+    router.push(`/map/live?lat=${mention.lat}&lng=${mention.lng}&mentionId=${mention.id}`);
   };
 
   return (

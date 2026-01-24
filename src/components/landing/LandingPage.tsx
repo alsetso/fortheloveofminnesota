@@ -23,7 +23,7 @@ export default function LandingPage() {
   };
 
   const handleExploreMap = () => {
-    router.push('/live');
+    router.push('/map/live');
   };
 
   const handleProfileClick = () => {
@@ -554,7 +554,7 @@ export default function LandingPage() {
                         onClick={(e) => {
                           // Don't navigate if clicking the edit or eye icon
                           if ((e.target as HTMLElement).closest('svg')) return;
-                          router.push(`/live?type=${typeSlug}`);
+                          router.push(`/map/live?type=${typeSlug}`);
                         }}
                       >
                         <span className="text-xl">{type.emoji}</span>

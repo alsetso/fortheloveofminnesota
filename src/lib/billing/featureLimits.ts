@@ -10,7 +10,7 @@ export async function getAccountFeatureLimit(
 ): Promise<FeatureLimit> {
   const supabase = await createServerClientWithAuth();
 
-  const { data, error } = await supabase.rpc('get_account_feature_limit', {
+  const { data, error } = await (supabase.rpc as any)('get_account_feature_limit', {
     account_id: accountId,
     feature_slug: featureSlug,
   });
@@ -20,7 +20,7 @@ export async function getAccountFeatureLimit(
     return null;
   };
 
-  if (error || !data || !Array.isArray(data) || data.length === 0) {
+  if (error || !data || !Array.isArray(data) || (data as any[]).length === 0) {
     return {
       has_feature: false,
       limit_value: null,

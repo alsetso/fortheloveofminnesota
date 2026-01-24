@@ -87,7 +87,7 @@ export default function CreatePostModal({
 
   // Check if user can upload videos
   const canUploadVideo = account?.plan === 'contributor' || 
-                         account?.plan === 'professional' || 
+                         account?.plan === 'plus' || account?.plan === 'business' || 
                          account?.plan === 'plus' || 
                          account?.plan === 'business' || 
                          account?.plan === 'gov';

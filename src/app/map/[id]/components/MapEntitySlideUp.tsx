@@ -102,8 +102,8 @@ export default function MapEntitySlideUp({
     setIsDeleting(true);
     try {
       const endpoint = entityType === 'pin' 
-        ? `/api/maps/${mapId}/pins/${entity.id}`
-        : `/api/maps/${mapId}/areas/${entity.id}`;
+        ? `/api/maps/${mapId}/pins/${(entity as any).id}`
+        : `/api/maps/${mapId}/areas/${(entity as any).id}`;
 
       const response = await fetch(endpoint, {
         method: 'DELETE',

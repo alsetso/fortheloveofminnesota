@@ -81,7 +81,7 @@ export const hasFeatureAccess = cache(async (featureSlug: string): Promise<boole
   
   // Call Supabase function to check feature access
   // Use public schema wrapper for PostgREST compatibility
-  const { data, error } = await supabase.rpc('account_has_feature', {
+  const { data, error } = await (supabase.rpc as any)('account_has_feature', {
     account_id: accountId,
     feature_slug: featureSlug,
   });
@@ -136,7 +136,7 @@ export const getUserFeatures = cache(async (): Promise<string[]> => {
   
   // Call Supabase function to get user features
   // Use public schema wrapper for PostgREST compatibility
-  const { data, error } = await supabase.rpc('get_account_features_with_limits', {
+  const { data, error } = await (supabase.rpc as any)('get_account_features_with_limits', {
     account_id: accountId,
   });
   
@@ -145,7 +145,7 @@ export const getUserFeatures = cache(async (): Promise<string[]> => {
     return [];
   }
   
-  return (data || []).map((row: { feature_slug: string }) => row.feature_slug);
+  return ((data as any[]) || []).map((row: { feature_slug: string }) => row.feature_slug);
 });
 
 /**

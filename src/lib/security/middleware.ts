@@ -100,7 +100,7 @@ export async function withSecurity<T>(
   if (requireAdminFlag) {
     const { requireAdmin } = await import('./accessControl');
     // For API routes, use request cookies directly
-    const adminCheck = await requireAdmin(request.cookies);
+    const adminCheck = await requireAdmin(request.cookies as any);
     if (!adminCheck.success) {
       const errorData = JSON.parse(await adminCheck.error.text());
       return NextResponse.json(
@@ -117,7 +117,7 @@ export async function withSecurity<T>(
   if (requireAuthFlag) {
     const { requireAuth } = await import('./accessControl');
     // For API routes, use request cookies directly
-    const authCheck = await requireAuth(request.cookies);
+    const authCheck = await requireAuth(request.cookies as any);
     if (!authCheck.success) {
       return NextResponse.json(
         JSON.parse(await authCheck.error.text()),

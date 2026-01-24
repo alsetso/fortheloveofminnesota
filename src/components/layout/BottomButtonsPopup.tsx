@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
-export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account';
+export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'search';
 
 interface BottomButtonsPopupProps {
   isOpen: boolean;

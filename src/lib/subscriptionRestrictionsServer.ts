@@ -10,7 +10,7 @@ import { getServerAuth } from '@/lib/authServer';
 export async function hasContributorOrHigherAccess(): Promise<boolean> {
   const auth = await getServerAuth();
   
-  if (!auth || !auth.accountId) {
+  if (!auth || !(auth as any).accountId) {
     return false;
   }
 
@@ -20,7 +20,7 @@ export async function hasContributorOrHigherAccess(): Promise<boolean> {
   const { data: account, error } = await supabase
     .from('accounts')
     .select('plan, subscription_status')
-    .eq('id', auth.accountId)
+    .eq('id', (auth as any).accountId)
     .single();
 
   if (error || !account) {
@@ -28,16 +28,17 @@ export async function hasContributorOrHigherAccess(): Promise<boolean> {
   }
 
   // Check if user has Contributor, Professional, or Business plan
+  const accountData = account as any;
   const hasContributorAccess = 
-    account.plan === 'contributor' || 
-    account.plan === 'professional' || 
-    account.plan === 'business' ||
-    account.plan === 'plus'; // Legacy plus plan also has access
+    accountData.plan === 'contributor' || 
+    accountData.plan === 'professional' || 
+    accountData.plan === 'business' ||
+    accountData.plan === 'plus'; // Legacy plus plan also has access
 
   // Check if subscription is active
   const isActive = 
-    account.subscription_status === 'active' || 
-    account.subscription_status === 'trialing';
+    accountData.subscription_status === 'active' || 
+    accountData.subscription_status === 'trialing';
 
   return hasContributorAccess && isActive;
 }

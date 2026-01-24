@@ -66,6 +66,8 @@ const LAST_SELECTED_ACCOUNT_KEY = 'LAST_SELECTED_ACCOUNT';
 const OLD_ACCOUNT_STORAGE_KEY = 'mnuda_active_account_id'; // Legacy key for migration
 
 export function AuthStateProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  
   // Core auth state
   const [user, setUser] = useState<User | null>(null);
   const [account, setAccount] = useState<Account | null>(null);

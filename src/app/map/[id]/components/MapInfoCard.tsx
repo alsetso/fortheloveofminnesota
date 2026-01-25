@@ -67,8 +67,8 @@ export default function MapInfoCard({
 
   return (
     <>
-      {/* Floating Info Card - Bottom Center */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-md">
+      {/* Floating Info Card - Top Center */}
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] max-w-md">
         <div className="bg-white/95 backdrop-blur-sm rounded-lg border border-gray-200 shadow-lg overflow-hidden transition-all">
           {/* Collapsed State */}
           {!isExpanded && (
@@ -196,14 +196,6 @@ export default function MapInfoCard({
                   <span>Share</span>
                 </button>
 
-                {/* Info Button */}
-                <button
-                  onClick={onInfoClick}
-                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                >
-                  <InformationCircleIcon className="w-4 h-4" />
-                  <span>Info</span>
-                </button>
 
                 {/* Owner Actions */}
                 {isOwner && (

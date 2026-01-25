@@ -1141,7 +1141,7 @@ export default function MapIDBox({
             viewCount={viewCount}
             isOwner={isOwner}
             hideCreator={hideCreator}
-            onInfoClick={() => setShowInfoModal(true)}
+            onInfoClick={() => {}}
             onPinClick={() => {
               if (pinMode) {
                 setPinMode(false);
@@ -1270,53 +1270,6 @@ export default function MapIDBox({
         />
       )}
 
-      {/* Map Details Accordion - Top of Map Container */}
-      {title && (
-        <div className="absolute top-0 left-0 right-0 z-[60] px-[10px] pt-[10px] pointer-events-none">
-          <div className="max-w-2xl mx-auto pointer-events-auto">
-            <div className="bg-white rounded-b-md border border-gray-200 shadow-lg overflow-hidden transition-all">
-              {/* Accordion Header */}
-              <button
-                onClick={() => setShowInfoModal(!showInfoModal)}
-                className="w-full flex items-center justify-between px-[10px] py-[10px] hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <InformationCircleIcon className="w-4 h-4 text-gray-500" />
-                  <h2 className="text-sm font-semibold text-gray-900">Map Information</h2>
-                </div>
-                {showInfoModal ? (
-                  <ChevronUpIcon className="w-4 h-4 text-gray-500" />
-                ) : (
-                  <ChevronDownIcon className="w-4 h-4 text-gray-500" />
-                )}
-              </button>
-
-              {/* Accordion Content */}
-              <div
-                className={`overflow-hidden transition-all duration-300 ${
-                  showInfoModal ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
-                }`}
-              >
-                <div className="overflow-y-auto scrollbar-hide p-[10px] border-t border-gray-200">
-                  <MapIDDetails
-                    title={title}
-                    description={description || null}
-                    map_style={mapStyle}
-                    visibility={visibility || 'private'}
-                    viewCount={viewCount || null}
-                    account={account || null}
-                    map_account_id={map_account_id || ''}
-                    current_account_id={current_account_id || null}
-                    hideCreator={hideCreator}
-                    created_at={created_at}
-                    updated_at={updated_at}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Entity Slide-Up Modal */}
       <MapEntitySlideUp

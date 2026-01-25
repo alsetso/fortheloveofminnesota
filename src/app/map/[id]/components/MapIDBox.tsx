@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { useMapboxMap } from '../hooks/useMapboxMap';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import MapPinForm from './MapPinForm';
@@ -1270,45 +1270,49 @@ export default function MapIDBox({
         />
       )}
 
-      {/* Info Modal */}
+      {/* Map Details Accordion - Top of Map Container */}
       {title && (
-        <div
-          className={`fixed inset-0 z-[100] flex items-center justify-center p-[10px] transition-opacity ${
-            showInfoModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setShowInfoModal(false)}
-          />
-          <div className="relative w-full max-w-md bg-white rounded-md border border-gray-200 flex flex-col max-h-[90vh] shadow-lg">
-            {/* Header */}
-            <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-900">Map Information</h2>
+        <div className="absolute top-0 left-0 right-0 z-[60] px-[10px] pt-[10px] pointer-events-none">
+          <div className="max-w-2xl mx-auto pointer-events-auto">
+            <div className="bg-white rounded-b-md border border-gray-200 shadow-lg overflow-hidden transition-all">
+              {/* Accordion Header */}
               <button
-                onClick={() => setShowInfoModal(false)}
-                className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                aria-label="Close"
+                onClick={() => setShowInfoModal(!showInfoModal)}
+                className="w-full flex items-center justify-between px-[10px] py-[10px] hover:bg-gray-50 transition-colors"
               >
-                <XMarkIcon className="w-4 h-4" />
+                <div className="flex items-center gap-2">
+                  <InformationCircleIcon className="w-4 h-4 text-gray-500" />
+                  <h2 className="text-sm font-semibold text-gray-900">Map Information</h2>
+                </div>
+                {showInfoModal ? (
+                  <ChevronUpIcon className="w-4 h-4 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4 text-gray-500" />
+                )}
               </button>
-            </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-[10px]">
-              <MapIDDetails
-                title={title}
-                description={description || null}
-                map_style={mapStyle}
-                visibility={visibility || 'private'}
-                viewCount={viewCount || null}
-                account={account || null}
-                map_account_id={map_account_id || ''}
-                current_account_id={current_account_id || null}
-                hideCreator={hideCreator}
-                created_at={created_at}
-                updated_at={updated_at}
-              />
+              {/* Accordion Content */}
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  showInfoModal ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
+                <div className="overflow-y-auto scrollbar-hide p-[10px] border-t border-gray-200">
+                  <MapIDDetails
+                    title={title}
+                    description={description || null}
+                    map_style={mapStyle}
+                    visibility={visibility || 'private'}
+                    viewCount={viewCount || null}
+                    account={account || null}
+                    map_account_id={map_account_id || ''}
+                    current_account_id={current_account_id || null}
+                    hideCreator={hideCreator}
+                    created_at={created_at}
+                    updated_at={updated_at}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

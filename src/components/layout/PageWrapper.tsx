@@ -188,8 +188,8 @@ export default function PageWrapper({
         className="flex flex-col flex-shrink-0 border-b border-white/5"
         style={{ backgroundColor: '#000000' }}
       >
-        {/* Notification window placeholder - 20px height */}
-        <div className="h-5 w-full" style={{ height: '20px' }} />
+        {/* Notification window placeholder - 30px height */}
+        <div className="w-full" style={{ height: '30px' }} />
         
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
           {/* Top Row: Logo, Search, Nav, Account - Hidden completely in search mode */}

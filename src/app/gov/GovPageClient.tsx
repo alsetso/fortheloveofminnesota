@@ -12,7 +12,11 @@ import { UserIcon, ChartBarIcon, MapIcon } from '@heroicons/react/24/outline';
 import MapCard from '@/app/maps/components/MapCard';
 import type { MapItem } from '@/app/maps/types';
 
-export default function GovPageClient() {
+interface GovPageClientProps {
+  isAuthenticated: boolean;
+}
+
+export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
   const { openWelcome } = useAppModalContextSafe();
   const { account } = useAuthStateSafe();
   const [govMaps, setGovMaps] = useState<MapItem[]>([]);
@@ -159,79 +163,95 @@ export default function GovPageClient() {
             </p>
           </div>
 
-          {/* Dataset Cards */}
-          <div className="space-y-2">
-            <Link
-              href="/gov/people"
-              className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
-            >
-              <div className="flex items-start gap-2">
-                <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
-                  <UserIcon className="w-4 h-4 text-gray-700" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
-                      People
-                    </h2>
-                    <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+          {!isAuthenticated ? (
+            <div className="border border-gray-200 rounded-md bg-white p-[10px]">
+              <div className="text-center py-8 space-y-3">
+                <p className="text-xs text-gray-600">Sign in to view government data</p>
+                <button
+                  onClick={openWelcome}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                >
+                  Sign In
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Dataset Cards */}
+              <div className="space-y-2">
+                <Link
+                  href="/gov/people"
+                  className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
+                      <UserIcon className="w-4 h-4 text-gray-700" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                          People
+                        </h2>
+                        <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        View all Minnesota government officials and elected representatives. Search, filter, and edit person details.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600">
-                    View all Minnesota government officials and elected representatives. Search, filter, and edit person details.
-                  </p>
-                </div>
-              </div>
-            </Link>
+                </Link>
 
-            <Link
-              href="/gov/checkbook"
-              className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
-            >
-              <div className="flex items-start gap-2">
-                <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
-                  <ChartBarIcon className="w-4 h-4 text-gray-700" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
-                      State Checkbook
-                    </h2>
-                    <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                <Link
+                  href="/gov/checkbook"
+                  className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
+                      <ChartBarIcon className="w-4 h-4 text-gray-700" />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                          State Checkbook
+                        </h2>
+                        <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
+                      <p className="text-xs text-gray-600">
+                        Government financial data including contracts, payments, payroll, and budget information.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-600">
-                    Government financial data including contracts, payments, payroll, and budget information.
-                  </p>
-                </div>
+                </Link>
               </div>
-            </Link>
-          </div>
 
-          {/* Government Maps Section */}
-          {govMaps.length > 0 && (
-            <div className="mt-3 bg-white border border-gray-200 rounded-md p-[10px]">
-              <div className="flex items-center gap-1.5 mb-2">
-                <MapIcon className="w-3 h-3 text-gray-600" />
-                <h2 className="text-xs font-semibold text-gray-900">Government Maps</h2>
-              </div>
-              {loadingGovMaps ? (
-                <p className="text-xs text-gray-500">Loading maps...</p>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 w-full">
-                  {displayedMaps.map((map) => (
-                    <MapCard 
-                      key={map.id} 
-                      map={map} 
-                      account={account}
-                      fullWidth={true}
-                    />
-                  ))}
+              {/* Government Maps Section */}
+              {govMaps.length > 0 && (
+                <div className="mt-3 bg-white border border-gray-200 rounded-md p-[10px]">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <MapIcon className="w-3 h-3 text-gray-600" />
+                    <h2 className="text-xs font-semibold text-gray-900">Government Maps</h2>
+                  </div>
+                  {loadingGovMaps ? (
+                    <p className="text-xs text-gray-500">Loading maps...</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 w-full">
+                      {displayedMaps.map((map) => (
+                        <MapCard 
+                          key={map.id} 
+                          map={map} 
+                          account={account}
+                          fullWidth={true}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>

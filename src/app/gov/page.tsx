@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { getServerAuth } from '@/lib/authServer';
 import GovPageClient from './GovPageClient';
 
 export const revalidate = 3600;
@@ -34,5 +35,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function GovPage() {
-  return <GovPageClient />;
+  const auth = await getServerAuth();
+  return <GovPageClient isAuthenticated={!!auth} />;
 }

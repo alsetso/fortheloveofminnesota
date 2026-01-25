@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react';
 import { Group } from '@/types/group';
 import Link from 'next/link';
 import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
 export default function GroupsContent() {
-  const { account } = useAuthStateSafe();
+  const { account, user, isLoading: authLoading } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,6 +19,13 @@ export default function GroupsContent() {
   const otherGroups = groups.filter(g => !g.is_member);
 
   useEffect(() => {
+    if (authLoading) return;
+    
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchGroups = async () => {
       setIsLoading(true);
       setError(null);
@@ -39,7 +48,7 @@ export default function GroupsContent() {
     };
 
     fetchGroups();
-  }, []);
+  }, [user, authLoading]);
 
   const renderGroupItem = (group: Group) => (
     <Link
@@ -82,7 +91,7 @@ export default function GroupsContent() {
     </Link>
   );
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="space-y-4">
@@ -98,6 +107,27 @@ export default function GroupsContent() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Groups</h1>
+        </div>
+        <div className="border border-gray-200 rounded-lg bg-white p-8">
+          <div className="text-center py-8 space-y-3">
+            <p className="text-sm text-gray-600">Sign in to view groups</p>
+            <button
+              onClick={openWelcome}
+              className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            >
+              Sign In
+            </button>
+          </div>
         </div>
       </div>
     );

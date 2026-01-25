@@ -169,12 +169,16 @@ export default function AccountDropdown({
 
   const isDark = variant === 'dark';
 
-  // When not authenticated and not loading, show red sign-in button (no dropdown)
+  // When not authenticated and not loading, show blue hyperlink text (no dropdown)
   if (!isLoading && !account) {
     return (
       <button
         onClick={handleSignIn}
-        className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300 text-xs font-medium rounded-md transition-colors"
+        className={`text-sm font-medium transition-colors ${
+          isDark
+            ? 'text-blue-400 hover:text-blue-300'
+            : 'text-blue-600 hover:text-blue-700'
+        }`}
         aria-label="Sign in"
       >
         Sign In

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { Database } from '@/types/supabase';
 import type { AccountRole } from '@/features/auth/services/memberService';
+import { detectDevice } from '@/lib/deviceDetection';
 
 // Route protection configuration
 const ROUTE_PROTECTION: Record<string, { 
@@ -133,6 +134,16 @@ export async function middleware(req: NextRequest) {
       headers: req.headers,
     },
   });
+
+  // Detect device type for server-side decisions
+  const deviceInfo = detectDevice(req);
+  
+  // Add device info to response headers for downstream use (optional)
+  response.headers.set('X-Device-Platform', deviceInfo.platform);
+  response.headers.set('X-Is-Mobile', String(deviceInfo.isMobile));
+  response.headers.set('X-Is-Web-Browser', String(deviceInfo.isWebBrowser));
+  response.headers.set('X-Is-Native-App', String(deviceInfo.isNativeApp));
+  response.headers.set('X-Inferred-Screen-Size', deviceInfo.inferredScreenSize);
 
   // Add security headers
   response.headers.set('X-Content-Type-Options', 'nosniff');

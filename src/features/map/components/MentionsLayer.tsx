@@ -8,6 +8,7 @@ import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelp
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useToast } from '@/features/ui/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import {
   buildMentionsLabelLayout,
@@ -39,6 +40,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
+  const { error: showErrorToast } = useToast();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const mentionsRef = useRef<Mention[]>([]);
@@ -71,6 +73,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   const currentMentionRef = useRef<Mention | null>(null);
   const accountRef = useRef(account);
   const openWelcomeRef = useRef(openWelcome);
+  const showErrorToastRef = useRef(showErrorToast);
   
   // Keep account ref updated
   useEffect(() => {
@@ -81,6 +84,11 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   useEffect(() => {
     openWelcomeRef.current = openWelcome;
   }, [openWelcome]);
+  
+  // Keep showErrorToast ref updated
+  useEffect(() => {
+    showErrorToastRef.current = showErrorToast;
+  }, [showErrorToast]);
 
   // Listen for time filter changes
   useEffect(() => {
@@ -1195,6 +1203,13 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               });
             };
 
+            // Check if user is authenticated before showing mention details
+            // For public map pages, show toast if not logged in
+            if (!accountRef.current) {
+              showErrorToastRef.current('Must be logged in', 'Please sign in to view mention details');
+              return;
+            }
+            
             // Track view asynchronously (non-blocking)
             if ('requestIdleCallback' in window) {
               requestIdleCallback(trackMentionView, { timeout: 2000 });

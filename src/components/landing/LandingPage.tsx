@@ -7,11 +7,12 @@ import { useAuthStateSafe, AccountService } from '@/features/auth';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { PaperAirplaneIcon, HeartIcon } from '@heroicons/react/24/solid';
-import Image from 'next/image';
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useIOSStandalone } from '@/hooks/useIOSStandalone';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { PencilIcon, XMarkIcon, PlusIcon, EyeIcon, EyeSlashIcon, TrashIcon } from '@heroicons/react/24/outline';
+import PageWrapper from '@/components/layout/PageWrapper';
+import MapSearchInput from '@/components/layout/MapSearchInput';
+import SearchResults from '@/components/layout/SearchResults';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -43,7 +44,6 @@ export default function LandingPage() {
   }, [account?.created_at]);
 
   const displayName = account ? AccountService.getDisplayName(account) : '';
-  const isIOSStandalone = useIOSStandalone();
   const supabase = useSupabaseClient();
   const isAdmin = account?.role === 'admin';
 
@@ -223,63 +223,25 @@ export default function LandingPage() {
     }
   };
 
-  // Viewport height constants - 10vh header, 90vh content
-  const HEADER_HEIGHT_VH = 10; // 10vh
-  const CONTENT_HEIGHT_VH = 90; // 90vh
-
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-black" style={{ maxWidth: '100vw', height: '100vh' }}>
-      {/* Header - 50vh, black background */}
-      <header 
-        className="px-6 flex items-center justify-between flex-shrink-0 bg-black" 
-        style={{ 
-          height: `${HEADER_HEIGHT_VH}vh`,
-          minHeight: `${HEADER_HEIGHT_VH}vh`,
-          maxHeight: `${HEADER_HEIGHT_VH}vh`
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="relative w-10 h-10">
-            <Image
-              src="/white-logo.png"
-              alt="For the Love of Minnesota"
-              fill
-              className="object-contain"
-              unoptimized
-            />
-          </div>
-          <span className="text-white font-semibold text-sm">For the Love of Minnesota</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {user && account ? (
-            <button onClick={handleProfileClick} className="flex items-center justify-center">
-              <ProfilePhoto account={account} size="sm" />
-            </button>
-          ) : (
-            <button
-              onClick={handleGetStarted}
-              className="text-white text-sm font-medium hover:text-gray-300 transition-colors"
-            >
-              Sign In
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Content Area - 50vh, white background, rounded top corners, scrollable */}
+    <PageWrapper
+      headerContent={null}
+      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
+      accountDropdownProps={{
+        onAccountClick: () => {
+          if (account?.username) {
+            router.push(`/profile/${account.username}`);
+          }
+        },
+        onSignInClick: handleGetStarted,
+      }}
+      searchResultsComponent={<SearchResults />}
+    >
+      {/* Scroll Container - Handles scrolling inside the content area */}
       <div 
-        className="bg-white rounded-t-3xl flex-shrink-0 overflow-hidden"
-        style={{ 
-          height: `${CONTENT_HEIGHT_VH}vh`,
-          minHeight: `${CONTENT_HEIGHT_VH}vh`,
-          maxHeight: `${CONTENT_HEIGHT_VH}vh`
-        }}
+        ref={scrollContainerRef}
+        className="h-full overflow-y-auto overflow-x-hidden scrollbar-hide"
       >
-        {/* Scroll Container - Handles scrolling inside the content area */}
-        <div 
-          ref={scrollContainerRef}
-          className="h-full overflow-y-auto overflow-x-hidden scrollbar-hide"
-        >
           <div className="bg-white">
             {/* Hero Content */}
             <div className="flex flex-col items-center justify-center px-6 py-12 space-y-6">
@@ -665,7 +627,6 @@ export default function LandingPage() {
           </div>
           </div>
         </div>
-      </div>
 
       {/* Edit Mention Type Modal */}
       {isEditModalOpen && editingType && (
@@ -751,6 +712,6 @@ export default function LandingPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageWrapper>
   );
 }

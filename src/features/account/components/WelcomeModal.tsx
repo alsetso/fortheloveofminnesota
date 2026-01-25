@@ -26,6 +26,9 @@ function isValidEmail(email: string): boolean {
 const HAS_VISITED_KEY = 'welcome_modal_has_visited';
 const HAS_ATTEMPTED_SIGNIN_KEY = 'welcome_modal_has_attempted_signin';
 const STORED_EMAIL_KEY = 'user_email';
+// Last known account info for "Welcome Back" feature
+const LAST_ACCOUNT_USERNAME_KEY = 'last_account_username';
+const LAST_ACCOUNT_IMAGE_KEY = 'last_account_image';
 
 export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const router = useRouter();
@@ -77,6 +80,10 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const [emailError, setEmailError] = useState('');
   const [isEmailValid, setIsEmailValid] = useState(false);
   
+  // Last known account info for "Welcome Back" feature
+  const [lastAccountUsername, setLastAccountUsername] = useState<string | null>(null);
+  const [lastAccountImage, setLastAccountImage] = useState<string | null>(null);
+  
   // Refs for auto-focus
   const emailInputRef = useRef<HTMLInputElement>(null);
   const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -92,7 +99,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setMessageType(null);
       setEmailError('');
       
-      // Load stored email from localStorage
+      // Load stored email and last account info from localStorage
       if (typeof window !== 'undefined') {
         const storedEmail = localStorage.getItem(STORED_EMAIL_KEY);
         if (storedEmail) {
@@ -102,6 +109,12 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
           setEmail('');
           setIsEmailValid(false);
         }
+        
+        // Load last known account info for "Welcome Back" feature
+        const lastUsername = localStorage.getItem(LAST_ACCOUNT_USERNAME_KEY);
+        const lastImage = localStorage.getItem(LAST_ACCOUNT_IMAGE_KEY);
+        setLastAccountUsername(lastUsername);
+        setLastAccountImage(lastImage);
       }
     }
   }, [isOpen]);
@@ -142,8 +155,10 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   };
 
-  const handleSendOtp = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSendOtp = async (e?: FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
     
     if (!email) {
       setEmailError('Email address is required');
@@ -167,6 +182,8 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setHasVisitedBefore(true);
     }
 
+    // Immediate UI feedback: hide Getting Started, show loading, prepare for code input
+    setShowGettingStarted(false);
     setLoading(true);
     setMessage('');
     setEmailError('');
@@ -177,8 +194,10 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setAuthState('code-sent');
       setMessage('');
       setMessageType(null);
-      // Auto-focus first code input
-      setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
+      // Auto-focus first code input after a brief delay to ensure DOM is ready
+      setTimeout(() => {
+        codeInputRefs.current[0]?.focus();
+      }, 150);
     } catch (error: unknown) {
       console.error('OTP error:', error);
       setAuthState('error');
@@ -359,15 +378,10 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
             className="relative w-full max-w-md bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out pointer-events-auto animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Drag Handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-12 h-1 bg-gray-300 rounded-full" />
-            </div>
-
-            <div className="px-6 pb-6 pt-2 max-h-[85vh] overflow-y-auto">
+            <div className="px-6 pb-6 pt-6 max-h-[85vh] overflow-y-auto">
           {/* Header with Close Button */}
           <div className="flex items-center justify-between mb-4">
-            {!showGettingStarted && (
+            {!showGettingStarted ? (
               <button
                 onClick={() => setShowGettingStarted(true)}
                 className="p-2 -ml-2 text-gray-500 hover:text-gray-700 transition-colors"
@@ -375,22 +389,23 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               >
                 <ArrowLeftIcon className="w-5 h-5" />
               </button>
-            )}
-            {!showGettingStarted && (
-              <div className="flex-1 flex justify-center">
-                <div className="relative w-6 h-6">
-                  <Image
-                    src="/heart.png"
-                    alt="Heart"
-                    width={24}
-                    height={24}
-                    className="w-full h-full object-contain"
-                    unoptimized
-                  />
-                </div>
+            ) : (
+              <div className="text-sm font-bold text-gray-600">
+                Sign In
               </div>
             )}
-            {showGettingStarted && <div className="flex-1" />}
+            <div className="flex-1 flex justify-center">
+              <div className="relative w-6 h-6">
+                <Image
+                  src="/heart.png"
+                  alt="Heart"
+                  width={24}
+                  height={24}
+                  className="w-full h-full object-contain"
+                  unoptimized
+                />
+              </div>
+            </div>
             <button
               onClick={handleClose}
               className="p-2 -mr-2 text-gray-500 hover:text-gray-700 transition-colors"
@@ -407,43 +422,112 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               <div className="w-full">
                 {/* Branding */}
                 <div className="flex flex-col items-center justify-center mb-6">
-                  <div className="relative w-16 h-16 mb-3">
-                    <Image
-                      src="/logo.png"
-                      alt="For the Love of Minnesota"
-                      fill
-                      className="object-contain"
-                      priority
-                      unoptimized
-                    />
-                  </div>
-                  <h1 className="text-xl font-bold text-gray-900 mb-1">
-                    {hasVisitedBefore ? 'Welcome Back' : 'Welcome'}
-                  </h1>
-                  <p className="text-sm text-gray-600 text-center leading-relaxed max-w-sm">
-                    {hasVisitedBefore 
-                      ? 'Sign in to continue sharing what you love about Minnesota'
-                      : 'Sign in to start sharing what you love about Minnesota'
+                  {/* Last Account Image - Show if available */}
+                  {lastAccountImage && (
+                    <div className="relative w-16 h-16 mb-3 rounded-full overflow-hidden border-2 border-gray-200">
+                      <Image
+                        src={lastAccountImage}
+                        alt={lastAccountUsername || 'Account'}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                  
+                  <h1 className="text-2xl font-bold text-gray-900 mb-1 text-center">
+                    {lastAccountUsername ? (
+                      <>
+                        Welcome Back
+                        <br />
+                        <span className="text-2xl font-bold text-gray-900">@{lastAccountUsername}</span>
+                      </>
+                    ) : hasVisitedBefore 
+                      ? 'Welcome Back' 
+                      : 'Welcome'
                     }
-                  </p>
+                  </h1>
                 </div>
 
-                <button
-                  onClick={() => setShowGettingStarted(false)}
-                  className="w-full flex justify-center items-center gap-2 py-3.5 px-6 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all shadow-sm"
-                >
-                  Continue
-                </button>
+                {/* Show remembered email if available */}
+                {email && isValidEmail(email) ? (
+                  <div className="space-y-3 mb-4">
+                    <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                        <EnvelopeIcon className="w-5 h-5" />
+                      </div>
+                      <input
+                        type="email"
+                        readOnly
+                        value={email}
+                        className="w-full pl-12 pr-4 py-3.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-gray-50"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowGettingStarted(false)}
+                      className="w-full text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                    >
+                      Choose different email
+                    </button>
+                    <button
+                      onClick={() => handleSendOtp()}
+                      disabled={loading}
+                      className="w-full flex justify-center items-center gap-2 py-3.5 px-6 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] shadow-sm"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <PaperAirplaneIcon className="w-4 h-4" />
+                          Send Code
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowGettingStarted(false)}
+                    className="w-full flex justify-center items-center gap-2 py-3.5 px-6 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 active:scale-[0.98] transition-all shadow-sm"
+                  >
+                    Continue
+                  </button>
+                )}
               </div>
             )}
 
-            {/* Sign In Form Screen */}
+            {/* Sign In Form Screen / Code Input Screen */}
             {!showGettingStarted && (
               <div className="w-full">
                 {/* Title & Subtitle */}
                 <div className="text-center mb-6">
+                  {/* Last Account Image - Show above heading if available (only on email input step) */}
+                  {!otpSent && lastAccountImage && (
+                    <div className="flex justify-center mb-3">
+                      <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
+                        <Image
+                          src={lastAccountImage}
+                          alt={lastAccountUsername || 'Account'}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
                   <h1 className="text-xl font-bold text-gray-900 mb-2">
-                    {otpSent ? 'Enter Verification Code' : hasAttemptedSignin ? 'Sign In' : 'We\'ll send you a code!'}
+                    {otpSent 
+                      ? 'Enter Verification Code' 
+                      : lastAccountUsername 
+                        ? `Welcome Back @${lastAccountUsername}`
+                        : hasAttemptedSignin 
+                          ? 'Sign In' 
+                          : 'We\'ll send you a code!'
+                    }
                   </h1>
                   {!otpSent && (
                     <p className="text-sm text-gray-600 leading-relaxed">
@@ -481,7 +565,13 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
 
                 {/* Email Input */}
                 <div className="space-y-3">
-                  <form id="email-form" onSubmit={handleSendOtp}>
+                  <form 
+                    id="email-form" 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      // Prevent auto-submit - only allow button click
+                    }}
+                  >
                     <div className="relative">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                         <EnvelopeIcon className="w-5 h-5" />
@@ -515,6 +605,12 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                               value={email}
                               onChange={handleEmailChange}
                               onBlur={handleEmailBlur}
+                              onKeyDown={(e) => {
+                                // Prevent Enter key from auto-submitting
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                }
+                              }}
                               className={`w-full pl-12 pr-4 py-3.5 border rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors ${
                                 emailError 
                                   ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
@@ -528,9 +624,9 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                     </div>
                     {!otpSent && isEmailValid && !emailError && (
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={handleSendOtp}
                         disabled={loading}
-                        form="email-form"
                         className="w-full flex justify-center items-center gap-2 py-3.5 px-6 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] shadow-sm mt-3"
                       >
                         {loading ? (

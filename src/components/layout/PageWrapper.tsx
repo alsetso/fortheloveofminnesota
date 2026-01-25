@@ -9,6 +9,7 @@ import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import HamburgerMenu from './HamburgerMenu';
 import ContentTypeFilters from './ContentTypeFilters';
 import { usePageView } from '@/hooks/usePageView';
+import { useNativeIOSApp } from '@/hooks/useNativeIOSApp';
 import { 
   HomeIcon, 
   MapIcon, 
@@ -71,6 +72,7 @@ export default function PageWrapper({
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isNativeIOSApp = useNativeIOSApp();
   
   // Get selected content type for label
   const selectedContentType = searchParams.get('content_type');
@@ -104,7 +106,6 @@ export default function PageWrapper({
   // Memoize navItems to prevent recreation on every render
   const navItems = useMemo(() => [
     { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
-    { label: 'Live', href: '/map/live', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
     { label: 'Gov', href: '/gov', icon: BuildingLibraryIcon, iconSolid: BuildingLibraryIconSolid },
@@ -188,9 +189,9 @@ export default function PageWrapper({
         className="flex flex-col flex-shrink-0 border-b border-white/5"
         style={{ backgroundColor: '#000000' }}
       >
-        {/* Notification window placeholder - 30px height, only on small screens when mobile nav is visible */}
-        {!isSearchMode && (
-          <div className="lg:hidden w-full" style={{ height: '30px' }} />
+        {/* Notification window placeholder - 30px height, only on iOS native app */}
+        {!isSearchMode && isNativeIOSApp && (
+          <div className="w-full" style={{ height: '30px' }} />
         )}
         
         <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">

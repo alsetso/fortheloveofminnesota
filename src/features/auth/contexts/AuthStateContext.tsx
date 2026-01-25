@@ -418,6 +418,16 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     setIsLoading(true);
     try {
+      // Store last account info before signing out (for "Welcome Back" feature)
+      if (account && typeof window !== 'undefined') {
+        if (account.username) {
+          localStorage.setItem('last_account_username', account.username);
+        }
+        if (account.image_url) {
+          localStorage.setItem('last_account_image', account.image_url);
+        }
+      }
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       

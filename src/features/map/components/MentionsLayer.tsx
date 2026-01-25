@@ -176,36 +176,53 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           mapboxMap.removeSource(highlightSourceId);
         }
 
-        // Add highlight source
-        mapboxMap.addSource(highlightSourceId, {
-          type: 'geojson',
-          data: highlightGeoJSON,
-        });
+        // Add highlight source (check if it exists first)
+        if (!mapboxMap.getSource(highlightSourceId)) {
+          mapboxMap.addSource(highlightSourceId, {
+            type: 'geojson',
+            data: highlightGeoJSON,
+          });
+        } else {
+          // Source exists, just update data
+          const existingSource = mapboxMap.getSource(highlightSourceId) as any;
+          if (existingSource && existingSource.setData) {
+            existingSource.setData(highlightGeoJSON);
+          }
+        }
 
-        // Add highlight circle layer - only if base layer exists
+        // Add highlight circle layer - only if base layer exists and layer doesn't already exist
         if (!mapboxMap.getLayer(highlightLayerId) && checkBaseLayerExists()) {
-          mapboxMap.addLayer({
-            id: highlightLayerId,
-            type: 'circle',
-            source: highlightSourceId,
-            paint: {
-              'circle-radius': [
-                'interpolate',
-                ['linear'],
-                ['zoom'],
-                0, 8,
-                10, 12,
-                14, 16,
-                18, 20,
-                20, 24,
-              ],
-              'circle-color': '#3b82f6',
-              'circle-stroke-width': 3,
-              'circle-stroke-color': '#2563eb',
-              'circle-opacity': 0.3,
-              'circle-stroke-opacity': 1.0,
-            },
-          }, pointLayerId);
+          try {
+            mapboxMap.addLayer({
+              id: highlightLayerId,
+              type: 'circle',
+              source: highlightSourceId,
+              paint: {
+                'circle-radius': [
+                  'interpolate',
+                  ['linear'],
+                  ['zoom'],
+                  0, 8,
+                  10, 12,
+                  14, 16,
+                  18, 20,
+                  20, 24,
+                ],
+                'circle-color': '#3b82f6',
+                'circle-stroke-width': 3,
+                'circle-stroke-color': '#2563eb',
+                'circle-opacity': 0.3,
+                'circle-stroke-opacity': 1.0,
+              },
+            }, pointLayerId);
+          } catch (addError: any) {
+            // Ignore "already exists" errors (can happen in React Strict Mode)
+            if (addError?.message?.includes('already exists')) {
+              // Layer was added by another render, that's fine
+            } else {
+              console.warn('[MentionsLayer] Error adding highlight layer:', addError);
+            }
+          }
         }
       } catch (e) {
         console.warn('[MentionsLayer] Error updating highlight:', e);
@@ -567,7 +584,19 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, 64, 64);
               const imageData = ctx.getImageData(0, 0, 64, 64);
-              mapboxMap.addImage(fallbackImageId, imageData, { pixelRatio: 2 });
+              // Double-check before adding (race condition protection)
+              if (!mapboxMap.hasImage(fallbackImageId)) {
+                try {
+                  mapboxMap.addImage(fallbackImageId, imageData, { pixelRatio: 2 });
+                } catch (addError: any) {
+                  // Ignore "already exists" errors (can happen in React Strict Mode)
+                  if (addError?.message?.includes('already exists')) {
+                    // Image was added by another render, that's fine
+                  } else {
+                    throw addError;
+                  }
+                }
+              }
             }
           } catch (error) {
             console.error('[MentionsLayer] Failed to load fallback icon:', error);
@@ -707,7 +736,19 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 ctx.shadowOffsetY = 0;
                 
                 const imageData = ctx.getImageData(0, 0, size, size);
-                mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
+                // Double-check before adding (race condition protection)
+                if (!mapboxMap.hasImage(imageId)) {
+                  try {
+                    mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
+                  } catch (addError: any) {
+                    // Ignore "already exists" errors (can happen in React Strict Mode)
+                    if (addError?.message?.includes('already exists')) {
+                      // Image was added by another render, that's fine
+                    } else {
+                      throw addError;
+                    }
+                  }
+                }
                 accountImageIds.set(key, imageId);
               }
             }
@@ -791,44 +832,70 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
 
         // Add points as mention icons with zoom-based sizing
         try {
-          const iconLayout = buildMentionsIconLayout();
-          map.addLayer({
-            id: pointLayerId,
-            type: 'symbol',
-            source: sourceId,
-            layout: {
-              ...iconLayout,
-              'icon-image': iconExpression,
-              'icon-size': iconSizeExpression, // Use conditional size expression
-            },
-          });
-        } catch (e) {
-          console.error('[MentionsLayer] Error adding point layer:', e);
-          isAddingLayersRef.current = false;
-          return;
+          // Check if layer already exists before adding
+          if (mapboxMap.getLayer(pointLayerId)) {
+            // Layer already exists, skip adding
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[MentionsLayer] Point layer already exists, skipping add');
+            }
+          } else {
+            const iconLayout = buildMentionsIconLayout();
+            map.addLayer({
+              id: pointLayerId,
+              type: 'symbol',
+              source: sourceId,
+              layout: {
+                ...iconLayout,
+                'icon-image': iconExpression,
+                'icon-size': iconSizeExpression, // Use conditional size expression
+              },
+            });
+          }
+        } catch (e: any) {
+          // Ignore "already exists" errors (can happen in React Strict Mode)
+          if (e?.message?.includes('already exists')) {
+            // Layer was added by another render, that's fine
+          } else {
+            console.error('[MentionsLayer] Error adding point layer:', e);
+            isAddingLayersRef.current = false;
+            return;
+          }
         }
 
         // Add labels for points (positioned above mention icon)
         try {
-          mapboxMap.addLayer({
-            id: pointLabelLayerId,
-            type: 'symbol',
-            source: sourceId,
-            layout: buildMentionsLabelLayout(),
-            paint: buildMentionsLabelPaint(),
-          });
-        } catch (e) {
-          console.error('[MentionsLayer] Error adding label layer:', e);
-          // Try to remove the point layer if label layer failed
-          try {
-            if (mapboxMap.getLayer(pointLayerId)) {
-              mapboxMap.removeLayer(pointLayerId);
+          // Check if layer already exists before adding
+          if (mapboxMap.getLayer(pointLabelLayerId)) {
+            // Layer already exists, skip adding
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('[MentionsLayer] Label layer already exists, skipping add');
             }
-          } catch (removeError) {
-            // Ignore removal errors
+          } else {
+            mapboxMap.addLayer({
+              id: pointLabelLayerId,
+              type: 'symbol',
+              source: sourceId,
+              layout: buildMentionsLabelLayout(),
+              paint: buildMentionsLabelPaint(),
+            });
           }
-          isAddingLayersRef.current = false;
-          return;
+        } catch (e: any) {
+          // Ignore "already exists" errors (can happen in React Strict Mode)
+          if (e?.message?.includes('already exists')) {
+            // Layer was added by another render, that's fine
+          } else {
+            console.error('[MentionsLayer] Error adding label layer:', e);
+            // Try to remove the point layer if label layer failed
+            try {
+              if (mapboxMap.getLayer(pointLayerId)) {
+                mapboxMap.removeLayer(pointLayerId);
+              }
+            } catch (removeError) {
+              // Ignore removal errors
+            }
+            isAddingLayersRef.current = false;
+            return;
+          }
         }
 
         // Add highlight circle for selected mention (blue ring)
@@ -858,35 +925,55 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 // Ignore if doesn't exist
               }
 
-              // Add highlight source
-              mapboxMap.addSource(highlightSourceId, {
-                type: 'geojson',
-                data: highlightGeoJSON,
-              });
+              // Add highlight source (check if it exists first)
+              if (!mapboxMap.getSource(highlightSourceId)) {
+                mapboxMap.addSource(highlightSourceId, {
+                  type: 'geojson',
+                  data: highlightGeoJSON,
+                });
+              } else {
+                // Source exists, just update data
+                const existingSource = mapboxMap.getSource(highlightSourceId) as any;
+                if (existingSource && existingSource.setData) {
+                  existingSource.setData(highlightGeoJSON);
+                }
+              }
 
               // Add highlight circle layer (blue ring around selected mention)
-              mapboxMap.addLayer({
-                id: highlightLayerId,
-                type: 'circle',
-                source: highlightSourceId,
-                paint: {
-                  'circle-radius': [
-                    'interpolate',
-                    ['linear'],
-                    ['zoom'],
-                    0, 8,   // Small at low zoom
-                    10, 12, // Medium at zoom 10
-                    14, 16, // Larger at zoom 14
-                    18, 20, // Full size at zoom 18
-                    20, 24  // Largest at max zoom
-                  ],
-                  'circle-color': '#3b82f6', // Blue color
-                  'circle-stroke-width': 3,
-                  'circle-stroke-color': '#2563eb', // Darker blue border
-                  'circle-opacity': 0.3, // Semi-transparent fill
-                  'circle-stroke-opacity': 1.0, // Solid border
-                },
-              }, pointLayerId); // Insert before point layer so it appears behind
+              // Check if layer already exists before adding
+              if (!mapboxMap.getLayer(highlightLayerId)) {
+                try {
+                  mapboxMap.addLayer({
+                    id: highlightLayerId,
+                    type: 'circle',
+                    source: highlightSourceId,
+                    paint: {
+                      'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0, 8,   // Small at low zoom
+                        10, 12, // Medium at zoom 10
+                        14, 16, // Larger at zoom 14
+                        18, 20, // Full size at zoom 18
+                        20, 24  // Largest at max zoom
+                      ],
+                      'circle-color': '#3b82f6', // Blue color
+                      'circle-stroke-width': 3,
+                      'circle-stroke-color': '#2563eb', // Darker blue border
+                      'circle-opacity': 0.3, // Semi-transparent fill
+                      'circle-stroke-opacity': 1.0, // Solid border
+                    },
+                  }, pointLayerId); // Insert before point layer so it appears behind
+                } catch (addError: any) {
+                  // Ignore "already exists" errors (can happen in React Strict Mode)
+                  if (addError?.message?.includes('already exists')) {
+                    // Layer was added by another render, that's fine
+                  } else {
+                    throw addError;
+                  }
+                }
+              }
             }
           } catch (e) {
             console.warn('[MentionsLayer] Error adding highlight layer:', e);

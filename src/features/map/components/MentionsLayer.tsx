@@ -235,6 +235,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
       setIsLoadingMentions(true);
       
       try {
+        // Check if this is the live map
+        const isLiveMap = pathname === '/map/live' || pathname === '/live';
+        
         // Get year filter from URL
         const yearParam = searchParams.get('year');
         const year = yearParam ? parseInt(yearParam, 10) : undefined;
@@ -286,34 +289,175 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           }
         }
         
-        // Build filters object
-        const filters: any = {};
-        if (mapId) {
-          filters.map_id = mapId;
-          // For the live map, also include mentions with NULL map_id (all public mentions)
-          // This ensures the live map shows all mentions, not just those assigned to it
-          const isLiveMap = pathname === '/map/live' || pathname === '/live';
-          if (isLiveMap) {
-            filters.include_null_map_id = true;
-          }
-        }
-        if (year && !timeFilter) {
-          filters.year = year;
-        }
-        if (timeFilter) {
-          filters.timeFilter = timeFilter;
-        }
-        if (mentionTypeIds && mentionTypeIds.length > 0) {
-          // For multiple types, we need to use 'in' filter
-          if (mentionTypeIds.length === 1) {
-            filters.mention_type_id = mentionTypeIds[0];
-          } else {
-            // Multiple types - will need to handle in MentionService
-            filters.mention_type_ids = mentionTypeIds;
-          }
-        }
+        let mentions: Mention[] = [];
         
-        const mentions = await MentionService.getMentions(Object.keys(filters).length > 0 ? filters : undefined);
+        // For live map, use cached endpoint with client-side filtering
+        if (isLiveMap) {
+          const CACHE_KEY = 'live_map_mentions_cache';
+          const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+          
+          // Check sessionStorage cache first
+          try {
+            const cached = sessionStorage.getItem(CACHE_KEY);
+            if (cached) {
+              const { data, timestamp } = JSON.parse(cached);
+              const age = Date.now() - timestamp;
+              
+              if (age < CACHE_DURATION) {
+                // Use cached data immediately
+                mentions = data;
+                
+                // Apply client-side filters
+                if (mentionTypeIds && mentionTypeIds.length > 0) {
+                  mentions = mentions.filter(m => 
+                    m.mention_type?.id && mentionTypeIds!.includes(m.mention_type.id)
+                  );
+                }
+                
+                if (timeFilter) {
+                  const now = Date.now();
+                  const filterTime = timeFilter === '24h' 
+                    ? now - 24 * 60 * 60 * 1000
+                    : timeFilter === '7d'
+                    ? now - 7 * 24 * 60 * 60 * 1000
+                    : 0;
+                  
+                  if (filterTime > 0) {
+                    mentions = mentions.filter(m => {
+                      const mentionTime = new Date(m.created_at).getTime();
+                      return mentionTime >= filterTime;
+                    });
+                  }
+                }
+                
+                if (year) {
+                  mentions = mentions.filter(m => {
+                    if (!m.post_date) return false;
+                    const mentionYear = new Date(m.post_date).getFullYear();
+                    return mentionYear === year;
+                  });
+                }
+                
+                // Fetch fresh data in background (stale-while-revalidate)
+                fetch('/api/maps/live/mentions')
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.mentions && mounted) {
+                      // Update cache
+                      try {
+                        sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                          data: data.mentions,
+                          timestamp: Date.now(),
+                        }));
+                      } catch (err) {
+                        // Cache write failed, continue
+                      }
+                    }
+                  })
+                  .catch(() => {
+                    // Background fetch failed, continue with cached data
+                  });
+              }
+            }
+          } catch (err) {
+            // Cache read failed, continue with API fetch
+          }
+          
+          // If no valid cache, fetch from API
+          if (mentions.length === 0) {
+            try {
+              const response = await fetch('/api/maps/live/mentions');
+              if (response.ok) {
+                const data = await response.json();
+                mentions = data.mentions || [];
+                
+                // Store in cache
+                try {
+                  sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                    data: mentions,
+                    timestamp: Date.now(),
+                  }));
+                } catch (err) {
+                  // Cache write failed, continue
+                }
+                
+                // Apply client-side filters
+                if (mentionTypeIds && mentionTypeIds.length > 0) {
+                  mentions = mentions.filter(m => 
+                    m.mention_type?.id && mentionTypeIds!.includes(m.mention_type.id)
+                  );
+                }
+                
+                if (timeFilter) {
+                  const now = Date.now();
+                  const filterTime = timeFilter === '24h' 
+                    ? now - 24 * 60 * 60 * 1000
+                    : timeFilter === '7d'
+                    ? now - 7 * 24 * 60 * 60 * 1000
+                    : 0;
+                  
+                  if (filterTime > 0) {
+                    mentions = mentions.filter(m => {
+                      const mentionTime = new Date(m.created_at).getTime();
+                      return mentionTime >= filterTime;
+                    });
+                  }
+                }
+                
+                if (year) {
+                  mentions = mentions.filter(m => {
+                    if (!m.post_date) return false;
+                    const mentionYear = new Date(m.post_date).getFullYear();
+                    return mentionYear === year;
+                  });
+                }
+              } else {
+                // API failed, fallback to MentionService
+                throw new Error('API fetch failed');
+              }
+            } catch (err) {
+              // Fallback to MentionService
+              const filters: any = {
+                include_null_map_id: true,
+              };
+              if (mentionTypeIds && mentionTypeIds.length > 0) {
+                if (mentionTypeIds.length === 1) {
+                  filters.mention_type_id = mentionTypeIds[0];
+                } else {
+                  filters.mention_type_ids = mentionTypeIds;
+                }
+              }
+              if (year && !timeFilter) {
+                filters.year = year;
+              }
+              if (timeFilter) {
+                filters.timeFilter = timeFilter;
+              }
+              mentions = await MentionService.getMentions(filters);
+            }
+          }
+        } else {
+          // For non-live maps, use existing MentionService logic
+          const filters: any = {};
+          if (mapId) {
+            filters.map_id = mapId;
+          }
+          if (year && !timeFilter) {
+            filters.year = year;
+          }
+          if (timeFilter) {
+            filters.timeFilter = timeFilter;
+          }
+          if (mentionTypeIds && mentionTypeIds.length > 0) {
+            if (mentionTypeIds.length === 1) {
+              filters.mention_type_id = mentionTypeIds[0];
+            } else {
+              filters.mention_type_ids = mentionTypeIds;
+            }
+          }
+          
+          mentions = await MentionService.getMentions(Object.keys(filters).length > 0 ? filters : undefined);
+        }
         if (!mounted) return;
 
         mentionsRef.current = mentions;

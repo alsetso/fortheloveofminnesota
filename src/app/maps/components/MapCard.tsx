@@ -132,13 +132,11 @@ export default function MapCard({
     <div 
       className={`bg-white border rounded-lg overflow-hidden transition-all cursor-pointer flex flex-col w-full h-full min-h-0 ${
         isPrimaryCard 
-          ? 'border-2 border-indigo-200 shadow-md hover:shadow-lg hover:border-indigo-300' 
+          ? 'border border-gray-200 shadow-md hover:shadow-lg hover:border-gray-300' 
           : 'border border-gray-200 hover:border-gray-300'
       } ${
         canAccess && !isComingSoon 
-          ? isPrimaryCard 
-            ? 'hover:bg-indigo-50/30' 
-            : 'hover:bg-gray-50' 
+          ? 'hover:bg-gray-50' 
           : 'opacity-75'
       }`}
       onClick={(e) => {

@@ -249,25 +249,6 @@ export default function MapListItem({
                 </div>
               )}
             </div>
-            
-            {/* Owner Username Label - Always reserve space */}
-            <div className="h-[14px]">
-              {map.account && !map.settings?.presentation?.hide_creator && (
-                map.account.username ? (
-                  <Link
-                    href={`/profile/${map.account.username}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors truncate"
-                  >
-                    @{map.account.username}
-                  </Link>
-                ) : (
-                  <span className="text-[10px] text-gray-500 truncate">
-                    Platform Managed
-                  </span>
-                )
-              )}
-            </div>
           </div>
         </div>
 
@@ -287,14 +268,14 @@ export default function MapListItem({
           )}
           
           {/* Info Icon for Description */}
-          <div className="relative flex-shrink-0 pl-[50px]">
+          <div className="relative flex-shrink-0">
             <button
               ref={infoButtonRef}
               onClick={(e) => {
                 e.stopPropagation();
                 setShowDescription(!showDescription);
               }}
-              className="p-0.5 transition-colors text-gray-400 hover:text-blue-600"
+              className="p-0.5 transition-colors text-blue-600 hover:text-blue-700"
               aria-label="Show description"
             >
               <InformationCircleIcon className="w-3 h-3" />

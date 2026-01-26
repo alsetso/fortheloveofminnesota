@@ -409,62 +409,11 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   const statusDisplay = getStatusDisplay();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
-        <div className="max-w-2xl mx-auto px-3 py-3 flex items-center justify-between">
-          <Link 
-            href="/"
-            className="flex items-center gap-2 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeftIcon className="w-3 h-3" />
-            Back
-          </Link>
-          <h1 className="text-sm font-semibold text-gray-900">Settings</h1>
-          <div className="flex items-center gap-2">
-            {isEditing && (
-              <button
-                onClick={handleCancel}
-                disabled={isSaving}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            )}
-            <button
-              onClick={isEditing ? handleSave : handleEdit}
-              disabled={isSaving}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 flex items-center gap-1.5 ${
-                isEditing 
-                  ? 'text-white bg-gray-900 hover:bg-gray-800'
-                  : 'text-gray-700 bg-white border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {isSaving ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Saving...
-                </>
-              ) : isEditing ? (
-                <>
-                  <CheckIcon className="w-3 h-3" />
-                  Save
-                </>
-              ) : (
-                <>
-                  <PencilIcon className="w-3 h-3" />
-                  Edit
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-3 py-3 space-y-3">
-        {/* Account Switcher - Show if user has at least one admin account */}
-        {hasAdminAccount && (
+    <div className="h-full overflow-y-auto scrollbar-hide">
+      <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-3">
+          {/* Account Switcher - Show if user has at least one admin account */}
+          {hasAdminAccount && (
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">
             <button
               onClick={() => {
@@ -519,10 +468,10 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
               </div>
             )}
           </div>
-        )}
+          )}
 
-        {/* Profile Section */}
-        <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+          {/* Profile Section */}
+          <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
           {/* Cover Image */}
           <div className="relative h-32 bg-gradient-to-r from-gray-800 to-gray-900 group">
             {account.cover_image_url ? (
@@ -740,8 +689,8 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
           </div>
         </div>
 
-        {/* Privacy Settings - Single Row Cards */}
-        <div className="space-y-2">
+          {/* Privacy Settings - Single Row Cards */}
+          <div className="space-y-2">
           {/* Profile is searchable */}
           <div className="bg-white border border-gray-200 rounded-md p-3">
             <div className="flex items-center justify-between">
@@ -803,8 +752,8 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
           </div>
         </div>
 
-        {/* Manage Billing Section */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          {/* Manage Billing Section */}
+          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Manage Billing</h3>
           <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
             <div className="flex-1 min-w-0">
@@ -844,8 +793,8 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
           </div>
         </div>
 
-        {/* Business & Government Plans */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          {/* Business & Government Plans */}
+          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Business & Government Plans</h3>
           <div className="grid grid-cols-2 gap-2">
             {/* Business Card */}
@@ -888,8 +837,8 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
           </div>
         </div>
 
-        {/* Account Actions */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          {/* Account Actions */}
+          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">Account Actions</h3>
           
           {signOutError && (
@@ -920,6 +869,7 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
                 'Sign Out'
               )}
             </button>
+          </div>
           </div>
         </div>
       </div>

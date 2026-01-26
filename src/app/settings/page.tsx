@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
-import SettingsPageClient from '@/features/settings/components/SettingsPageClient';
+import SettingsPageWrapper from './SettingsPageWrapper';
 
 export const metadata = {
   title: 'Settings | Love of Minnesota',
@@ -61,5 +61,5 @@ export default async function SettingsPage() {
     redirect('/?modal=welcome');
   }
 
-  return <SettingsPageClient account={account} userEmail={user.email || ''} />;
+  return <SettingsPageWrapper account={account} userEmail={user.email || ''} />;
 }

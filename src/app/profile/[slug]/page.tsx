@@ -125,6 +125,12 @@ export default async function ProfilePage({ params }: Props) {
     .eq('is_active', true)
     .single();
 
+  if (!liveMap || typeof liveMap !== 'object' || !('id' in liveMap)) {
+    notFound();
+  }
+
+  const liveMapId = (liveMap as { id: string }).id;
+
   // Fetch mentions for this account (now map_pins on live map)
   // For visitors, only show public mentions; for owners, show all non-archived mentions
   let mentionsQuery = supabase
@@ -155,7 +161,7 @@ export default async function ProfilePage({ params }: Props) {
         name
       )
     `)
-    .eq('map_id', liveMap?.id)
+    .eq('map_id', liveMapId)
     .eq('account_id', accountData.id)
     .eq('archived', false)
     .eq('is_active', true)

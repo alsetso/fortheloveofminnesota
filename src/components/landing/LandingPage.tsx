@@ -47,10 +47,6 @@ export default function LandingPage() {
   const supabase = useSupabaseClient();
   const isAdmin = account?.role === 'admin';
 
-  // Homepage visit stats
-  const [visitStats, setVisitStats] = useState<{ last24Hours: number; previous24Hours: number; total: number } | null>(null);
-  const [showTotal, setShowTotal] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   // Mention types
   type MentionType = { id: string; emoji: string; name: string; is_active: boolean };
@@ -62,44 +58,6 @@ export default function LandingPage() {
   // Scroll container ref for content area
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Calculate if trending (volume + growth)
-  const isTrending = useMemo(() => {
-    if (!visitStats) return false;
-    const { last24Hours, previous24Hours } = visitStats;
-    
-    // Minimum volume threshold: 30+ visits
-    if (last24Hours < 30) return false;
-    
-    // If no previous data, any volume >= 30 is trending
-    if (previous24Hours === 0) return true;
-    
-    // Calculate growth percentage
-    const growth = ((last24Hours - previous24Hours) / previous24Hours) * 100;
-    
-    // Trending if 20%+ growth
-    return growth >= 20;
-  }, [visitStats]);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch('/api/analytics/homepage-stats');
-        if (response.ok) {
-          const data = await response.json();
-          setVisitStats(data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch homepage stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch mention types
   useEffect(() => {
@@ -316,27 +274,6 @@ export default function LandingPage() {
                 >
                   Add To Map
                 </Link>
-              )}
-              
-              {/* Live Analytics - Below Explore Map Button */}
-              {visitStats && (
-                <button
-                  onClick={() => setShowTotal(!showTotal)}
-                  className="w-full text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors flex items-center justify-center gap-1.5 pt-1"
-                >
-                  {loading ? (
-                    'Loading...'
-                  ) : (
-                    <>
-                      {isTrending && <span>🔥</span>}
-                      {showTotal ? (
-                        <span>{visitStats.total.toLocaleString()} total visits</span>
-                      ) : (
-                        <span>{visitStats.last24Hours.toLocaleString()} visits in 24h</span>
-                      )}
-                    </>
-                  )}
-                </button>
               )}
             </div>
 

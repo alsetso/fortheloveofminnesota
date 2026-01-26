@@ -15,6 +15,7 @@ import MapSearchInput from '@/components/layout/MapSearchInput';
 import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
+import { getMapUrl } from '@/lib/maps/urls';
 
 export default function NewMapPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function NewMapPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [mapLimit, setMapLimit] = useState<{current: number; max: number | null; type: string} | null>(null);
   const [customMapsFeature, setCustomMapsFeature] = useState<{slug: string; name: string; limit_value: number | null; limit_type: string | null; is_unlimited: boolean} | null>(null);
-  const [plans, setPlans] = useState<Array<{slug: string; name: string; display_order: number; features?: Array<{slug: string; limit_value?: number | null; limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>}>>([]);
+  const [plans, setPlans] = useState<Array<{slug: string; name: string; display_order: number; is_active?: boolean; features?: Array<{slug: string; limit_value?: number | null; limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>}>>([]);
   const isAdmin = account?.role === 'admin';
   const totalSteps = isAdmin ? 7 : 6; // Add admin step if user is admin
   
@@ -707,7 +708,7 @@ export default function NewMapPage() {
     
     // Find next plan (higher display_order)
     const nextPlan = plans
-      .filter(p => p.display_order > currentPlanOrder && p.is_active)
+      .filter(p => p.display_order > currentPlanOrder && (p.is_active !== false))
       .sort((a, b) => a.display_order - b.display_order)[0];
     
     if (!nextPlan) {

@@ -3,6 +3,10 @@
 import { useEffect, useState, useRef } from 'react';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 
+// Module-level cache to share CTU data across all component instances
+let ctuCache: any[] | null = null;
+let ctuFetchPromise: Promise<any[]> | null = null;
+
 interface CTUBoundariesLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
@@ -24,15 +28,45 @@ export default function CTUBoundariesLayer({
   const [hoveredCTU, setHoveredCTU] = useState<any | null>(null);
   const isAddingLayersRef = useRef(false);
 
-  // Fetch CTU boundaries
+  // Fetch CTU boundaries - only once across all component instances
   useEffect(() => {
     if (!visible) return;
 
     const fetchCTUs = async () => {
+      // If we have cached data, use it immediately
+      if (ctuCache) {
+        setCTUs(ctuCache);
+        return;
+      }
+
+      // If a fetch is already in progress, wait for it
+      if (ctuFetchPromise) {
+        try {
+          const data = await ctuFetchPromise;
+          setCTUs(data);
+        } catch (error) {
+          console.error('[CTUBoundariesLayer] Failed to fetch CTU boundaries:', error);
+        }
+        return;
+      }
+
+      // Start a new fetch
+      ctuFetchPromise = (async () => {
+        try {
+          const response = await fetch('/api/civic/ctu-boundaries');
+          if (!response.ok) throw new Error('Failed to fetch CTU boundaries');
+          const data = await response.json();
+          ctuCache = data; // Cache the result
+          ctuFetchPromise = null; // Clear the promise
+          return data;
+        } catch (error) {
+          ctuFetchPromise = null; // Clear the promise on error
+          throw error;
+        }
+      })();
+
       try {
-        const response = await fetch('/api/civic/ctu-boundaries');
-        if (!response.ok) throw new Error('Failed to fetch CTU boundaries');
-        const data = await response.json();
+        const data = await ctuFetchPromise;
         setCTUs(data);
       } catch (error) {
         console.error('[CTUBoundariesLayer] Failed to fetch CTU boundaries:', error);

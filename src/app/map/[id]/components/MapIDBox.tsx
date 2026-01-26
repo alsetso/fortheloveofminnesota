@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
@@ -11,9 +11,10 @@ import MapPinForm from './MapPinForm';
 import MapAreaDrawModal from './MapAreaDrawModal';
 import MapIDDetails from './MapIDDetails';
 import MapEntitySlideUp from './MapEntitySlideUp';
-import MapInfoCard from './MapInfoCard';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useToastContext } from '@/features/ui/contexts/ToastContext';
+import { createToast } from '@/features/ui/services/toast';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
 import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
@@ -39,6 +40,13 @@ interface MapIDBoxProps {
   title?: string;
   description?: string | null;
   visibility?: 'public' | 'private' | 'shared';
+  allowOthersToPostPins?: boolean;
+  allowOthersToAddAreas?: boolean;
+  pinPermissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+  areaPermissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+  onPinActionCheck?: () => boolean | undefined;
+  onAreaActionCheck?: () => boolean | undefined;
+  userPlan?: 'hobby' | 'contributor' | 'professional' | 'business';
   account?: {
     id: string;
     username: string | null;
@@ -54,6 +62,11 @@ interface MapIDBoxProps {
   current_account_id?: string | null;
   created_at?: string;
   updated_at?: string;
+  initialPins?: MapPin[];
+  initialAreas?: MapArea[];
+  auto_approve_members?: boolean;
+  membership_questions?: Array<{ id: number; question: string }>;
+  membership_rules?: string | null;
 }
 
 interface MapPin {
@@ -111,6 +124,13 @@ export default function MapIDBox({
   title,
   description,
   visibility,
+  allowOthersToPostPins = false,
+  allowOthersToAddAreas = false,
+  pinPermissions = null,
+  areaPermissions = null,
+  onPinActionCheck,
+  onAreaActionCheck,
+  userPlan,
   account,
   viewCount,
   hideCreator = false,
@@ -120,13 +140,46 @@ export default function MapIDBox({
   current_account_id,
   created_at,
   updated_at,
+  initialPins = [],
+  initialAreas = [],
+  auto_approve_members = false,
+  membership_questions = [],
+  membership_rules = null,
 }: MapIDBoxProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const mapContainer = useRef<HTMLDivElement>(null);
-  const { account: currentAccount } = useAuthStateSafe();
+  const { account: currentAccount, activeAccountId } = useAuthStateSafe();
   const { openAccount, openWelcome } = useAppModalContextSafe();
+  const { addToast } = useToastContext();
   const [pinMode, setPinMode] = useState(false);
   const [showAreaDrawModal, setShowAreaDrawModal] = useState(false);
+  
+  // Permission check handlers for pin/area actions
+  const handlePinModeToggle = useCallback(() => {
+    if (onPinActionCheck) {
+      const allowed = onPinActionCheck();
+      if (allowed === false) {
+        return; // Permission check failed, upgrade prompt shown
+      }
+    }
+    setPinMode(prev => !prev);
+  }, [onPinActionCheck]);
+  
+  const handleAreaDrawToggle = useCallback(() => {
+    if (onAreaActionCheck) {
+      const allowed = onAreaActionCheck();
+      if (allowed === false) {
+        return; // Permission check failed, upgrade prompt shown
+      }
+    }
+    setShowAreaDrawModal(true);
+  }, [onAreaActionCheck]);
+  
+  // Expose handlers for MapInfoCard (if used elsewhere)
+  // These will be called when pin/draw buttons are clicked
+  const handlePinClick = handlePinModeToggle;
+  const handleDrawClick = handleAreaDrawToggle;
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<MapPin | MapArea | MapLayerPolygonEntity | null>(null);
   const [selectedEntityType, setSelectedEntityType] = useState<'pin' | 'area' | 'layer' | null>(null);
@@ -137,12 +190,16 @@ export default function MapIDBox({
     meta,
     onMapLoad,
   });
-  const [pins, setPins] = useState<MapPin[]>([]);
-  const [areas, setAreas] = useState<MapArea[]>([]);
+  const [pins, setPins] = useState<MapPin[]>(initialPins);
+  const [areas, setAreas] = useState<MapArea[]>(initialAreas);
   const [showPinForm, setShowPinForm] = useState(false);
   const [pinFormCoords, setPinFormCoords] = useState<{ lat: number; lng: number } | null>(null);
   const clickHandlerAddedRef = useRef(false);
   const hiddenLayersRef = useRef<Map<string, 'visible' | 'none' | undefined>>(new Map());
+
+  // Use active account ID from dropdown
+  const currentAccountId = activeAccountId || currentAccount?.id || null;
+
 
   const clearSelection = useCallback(() => {
     setSelectedEntity(null);
@@ -522,38 +579,94 @@ export default function MapIDBox({
     // Note: Terrain would be applied here if needed
   }, [mapInstance, mapLoaded, meta]);
 
-  // Fetch pins and areas
+  // Update pins/areas when initial data changes (from parent)
   useEffect(() => {
-    if (!mapLoaded || !mapId) return;
+    if (initialPins.length > 0 || pins.length === 0) {
+      setPins(initialPins);
+    }
+  }, [initialPins]);
+
+  useEffect(() => {
+    if (initialAreas.length > 0 || areas.length === 0) {
+      setAreas(initialAreas);
+    }
+  }, [initialAreas]);
+
+  // Fetch pins and areas only if not provided initially (for refresh/updates)
+  useEffect(() => {
+    if (!mapLoaded || !mapId || (initialPins.length > 0 && initialAreas.length > 0)) return;
 
     const fetchData = async () => {
       try {
-        // Fetch pins
-        const pinsResponse = await fetch(`/api/maps/${mapId}/pins`);
-        if (pinsResponse.ok) {
-          const pinsData = await pinsResponse.json();
-          setPins(pinsData.pins || []);
-        } else if (pinsResponse.status === 404 || pinsResponse.status === 403) {
-          setPins([]);
+        // Only fetch if we don't have initial data
+        if (initialPins.length === 0) {
+          const pinsResponse = await fetch(`/api/maps/${mapId}/pins`);
+          if (pinsResponse.ok) {
+            const pinsData = await pinsResponse.json();
+            setPins(pinsData.pins || []);
+          } else if (pinsResponse.status === 404 || pinsResponse.status === 403) {
+            setPins([]);
+          }
         }
 
-        // Fetch areas
-        const areasResponse = await fetch(`/api/maps/${mapId}/areas`);
-        if (areasResponse.ok) {
-          const areasData = await areasResponse.json();
-          setAreas(areasData.areas || []);
-        } else if (areasResponse.status === 404 || areasResponse.status === 403) {
-          setAreas([]);
+        if (initialAreas.length === 0) {
+          const areasResponse = await fetch(`/api/maps/${mapId}/areas`);
+          if (areasResponse.ok) {
+            const areasData = await areasResponse.json();
+            setAreas(areasData.areas || []);
+          } else if (areasResponse.status === 404 || areasResponse.status === 403) {
+            setAreas([]);
+          }
         }
       } catch (err) {
         console.error('Error fetching map data:', err);
-        setPins([]);
-        setAreas([]);
+        if (initialPins.length === 0) setPins([]);
+        if (initialAreas.length === 0) setAreas([]);
       }
     };
 
     fetchData();
-  }, [mapLoaded, mapId]);
+  }, [mapLoaded, mapId, initialPins.length, initialAreas.length]);
+
+  // Load entity from URL parameters
+  useEffect(() => {
+    if (!mapLoaded || !mapId || pins.length === 0 && areas.length === 0) return;
+
+    const entityType = searchParams.get('entity');
+    const entityId = searchParams.get('entityId');
+
+    if (!entityType || !entityId) return;
+
+    const loadEntity = async () => {
+      setLoadingEntity(true);
+      try {
+        if (entityType === 'pin') {
+          const response = await fetch(`/api/maps/${mapId}/pins/${entityId}`);
+          if (response.ok) {
+            const pinData = await response.json();
+            setSelectedEntity(pinData);
+            setSelectedEntityType('pin');
+          }
+        } else if (entityType === 'area') {
+          const response = await fetch(`/api/maps/${mapId}/areas/${entityId}`);
+          if (response.ok) {
+            const areaData = await response.json();
+            setSelectedEntity(areaData);
+            setSelectedEntityType('area');
+          }
+        } else if (entityType === 'layer') {
+          // For layers, we need to find it from the map click handler
+          // This would need to be handled differently as layers come from mapbox features
+        }
+      } catch (err) {
+        console.error('Error loading entity from URL:', err);
+      } finally {
+        setLoadingEntity(false);
+      }
+    };
+
+    loadEntity();
+  }, [mapLoaded, mapId, searchParams, pins.length, areas.length]);
 
   // Add pins to map
   useEffect(() => {
@@ -947,8 +1060,21 @@ export default function MapIDBox({
 
   // Handle map clicks for pin creation (owner only, when pin mode is active)
   useEffect(() => {
+    // Check if user can add pins: owner OR (public map with collaboration enabled)
+    const canAddPins = isOwner || (visibility === 'public' && allowOthersToPostPins);
+    
+    // Additional permission check via callback (checks plan requirements)
+    if (pinMode && onPinActionCheck) {
+      const allowed = onPinActionCheck();
+      if (allowed === false) {
+        // Permission check failed, exit pin mode
+        setPinMode(false);
+        return;
+      }
+    }
+    
     // Only activate if pin mode is on and area draw modal is closed
-    if (!mapLoaded || !mapInstance || !isOwner || !pinMode || showAreaDrawModal || clickHandlerAddedRef.current) {
+    if (!mapLoaded || !mapInstance || !canAddPins || !pinMode || showAreaDrawModal || clickHandlerAddedRef.current) {
       // Cleanup if pin mode is off or area draw is active
       if (mapInstance && clickHandlerAddedRef.current) {
         const mapboxMap = mapInstance as any;
@@ -1000,6 +1126,19 @@ export default function MapIDBox({
             setPins(refreshData.pins || []);
           }
           setPinMode(false); // Exit pin mode after creating
+        } else {
+          // Handle permission errors - show upgrade prompt via custom event
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 403 && errorData.reason === 'plan_required') {
+            window.dispatchEvent(new CustomEvent('map-action-permission-denied', {
+              detail: {
+                action: 'pins',
+                requiredPlan: errorData.requiredPlan,
+                currentPlan: errorData.currentPlan,
+              }
+            }));
+            setPinMode(false); // Exit pin mode
+          }
         }
       } catch (err) {
         console.error('Error creating pin:', err);
@@ -1026,7 +1165,7 @@ export default function MapIDBox({
       }
       clickHandlerAddedRef.current = false;
     };
-  }, [mapLoaded, isOwner, mapInstance, mapId, pinMode, showAreaDrawModal]);
+  }, [mapLoaded, isOwner, visibility, allowOthersToPostPins, mapInstance, mapId, pinMode, showAreaDrawModal, onPinActionCheck]);
 
   // Cleanup pins layer and source on unmount
   useEffect(() => {
@@ -1131,38 +1270,10 @@ export default function MapIDBox({
 
   return (
     <div className="relative w-full h-full" style={{ minHeight: 0, height: '100%', width: '100%' }}>
-      {/* Map Info Card - Replaces all floating elements */}
+
+      {/* Map Info Card - Removed */}
       {mapLoaded && (
         <>
-          <MapInfoCard
-            title={title}
-            description={description}
-            account={account}
-            viewCount={viewCount}
-            isOwner={isOwner}
-            hideCreator={hideCreator}
-            onInfoClick={() => {}}
-            onPinClick={() => {
-              if (pinMode) {
-                setPinMode(false);
-              } else {
-                clearSelection();
-                setPinMode(true);
-                setShowAreaDrawModal(false);
-              }
-            }}
-            onDrawClick={() => {
-              if (showAreaDrawModal) {
-                setShowAreaDrawModal(false);
-              } else {
-                clearSelection();
-                setShowAreaDrawModal(true);
-                setPinMode(false);
-              }
-            }}
-            pinMode={pinMode}
-            showAreaDrawModal={showAreaDrawModal}
-          />
 
           {/* Saved boundary layers (exclusive, persisted via map.map_layers) */}
           <CongressionalDistrictsLayer
@@ -1243,7 +1354,7 @@ export default function MapIDBox({
 
 
       {/* Area Draw Modal */}
-      {isOwner && (
+      {(isOwner || (visibility === 'public' && allowOthersToAddAreas)) && (
         <MapAreaDrawModal
           isOpen={showAreaDrawModal}
           onClose={() => {
@@ -1282,6 +1393,7 @@ export default function MapIDBox({
         entityType={selectedEntityType}
         isOwner={isOwner}
         mapId={mapId}
+        visibility={visibility}
         onEntityDeleted={async () => {
           // Refresh pins or areas list
           try {

@@ -76,7 +76,7 @@ export default function PeoplePageClient({ searchParams, isAuthenticated }: Peop
   if (!isAuthenticated) {
     return (
       <div className="h-full overflow-y-auto scrollbar-hide">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-3">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div className="space-y-0.5">
               <h1 className="text-sm font-semibold text-gray-900">People</h1>
@@ -100,9 +100,9 @@ export default function PeoplePageClient({ searchParams, isAuthenticated }: Peop
     );
   }
 
-  return (
-    <div className="h-full overflow-y-auto scrollbar-hide">
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-3">
+    return (
+      <div className="h-full overflow-y-auto scrollbar-hide">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-0.5">
             <h1 className="text-sm font-semibold text-gray-900">People</h1>

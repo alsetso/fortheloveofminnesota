@@ -11,9 +11,9 @@ export class LikeService {
    */
   static async likeMention(mentionId: string, accountId: string): Promise<void> {
     const { error } = await supabase
-      .from('mentions_likes')
+      .from('map_pins_likes')
       .insert({
-        mention_id: mentionId,
+        map_pin_id: mentionId,
         account_id: accountId,
       });
 
@@ -34,9 +34,9 @@ export class LikeService {
    */
   static async unlikeMention(mentionId: string, accountId: string): Promise<void> {
     const { error } = await supabase
-      .from('mentions_likes')
+      .from('map_pins_likes')
       .delete()
-      .eq('mention_id', mentionId)
+      .eq('map_pin_id', mentionId)
       .eq('account_id', accountId);
 
     if (error) {
@@ -69,9 +69,9 @@ export class LikeService {
    */
   static async getLikeCount(mentionId: string): Promise<number> {
     const { count, error } = await supabase
-      .from('mentions_likes')
+      .from('map_pins_likes')
       .select('*', { count: 'exact', head: true })
-      .eq('mention_id', mentionId);
+      .eq('map_pin_id', mentionId);
 
     if (error) {
       console.error('[LikeService] Error getting like count:', error);
@@ -89,9 +89,9 @@ export class LikeService {
    */
   static async hasLiked(mentionId: string, accountId: string): Promise<boolean> {
     const { data, error } = await supabase
-      .from('mentions_likes')
+      .from('map_pins_likes')
       .select('id')
-      .eq('mention_id', mentionId)
+      .eq('map_pin_id', mentionId)
       .eq('account_id', accountId)
       .maybeSingle();
 
@@ -115,9 +115,9 @@ export class LikeService {
     }
 
     const { data, error } = await supabase
-      .from('mentions_likes')
-      .select('mention_id')
-      .in('mention_id', mentionIds);
+      .from('map_pins_likes')
+      .select('map_pin_id')
+      .in('map_pin_id', mentionIds);
 
     if (error) {
       console.error('[LikeService] Error getting like counts:', error);
@@ -129,8 +129,8 @@ export class LikeService {
     mentionIds.forEach(id => counts.set(id, 0));
     
     data?.forEach(like => {
-      const current = counts.get(like.mention_id) || 0;
-      counts.set(like.mention_id, current + 1);
+      const current = counts.get(like.map_pin_id) || 0;
+      counts.set(like.map_pin_id, current + 1);
     });
 
     return counts;
@@ -148,9 +148,9 @@ export class LikeService {
     }
 
     const { data, error } = await supabase
-      .from('mentions_likes')
-      .select('mention_id')
-      .in('mention_id', mentionIds)
+      .from('map_pins_likes')
+      .select('map_pin_id')
+      .in('map_pin_id', mentionIds)
       .eq('account_id', accountId);
 
     if (error) {
@@ -158,6 +158,6 @@ export class LikeService {
       throw new Error(`Failed to get liked mentions: ${error.message}`);
     }
 
-    return new Set(data?.map(like => like.mention_id) || []);
+    return new Set(data?.map(like => like.map_pin_id) || []);
   }
 }

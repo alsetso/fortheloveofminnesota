@@ -117,10 +117,18 @@ export default async function ProfilePage({ params }: Props) {
 
   const collections: Collection[] = (collectionsData || []) as Collection[];
 
-  // Fetch mentions for this account
+  // Get live map ID first
+  const { data: liveMap } = await supabase
+    .from('map')
+    .select('id')
+    .eq('slug', 'live')
+    .eq('is_active', true)
+    .single();
+
+  // Fetch mentions for this account (now map_pins on live map)
   // For visitors, only show public mentions; for owners, show all non-archived mentions
   let mentionsQuery = supabase
-    .from('mentions')
+    .from('map_pins')
     .select(`
       id, 
       lat, 
@@ -147,8 +155,10 @@ export default async function ProfilePage({ params }: Props) {
         name
       )
     `)
+    .eq('map_id', liveMap?.id)
     .eq('account_id', accountData.id)
     .eq('archived', false)
+    .eq('is_active', true)
     .order('created_at', { ascending: false });
 
   // If not owner, only show public mentions
@@ -162,16 +172,16 @@ export default async function ProfilePage({ params }: Props) {
   const mentionIds = (mentionsData || []).map((m: any) => m.id);
   let likesCounts = new Map<string, number>();
   
-  if (mentionIds.length > 0) {
+    if (mentionIds.length > 0) {
     const { data: likesData } = await supabase
-      .from('mentions_likes')
-      .select('mention_id')
-      .in('mention_id', mentionIds);
+      .from('map_pins_likes')
+      .select('map_pin_id')
+      .in('map_pin_id', mentionIds);
     
     if (likesData) {
-      likesData.forEach((like: { mention_id: string }) => {
-        const current = likesCounts.get(like.mention_id) || 0;
-        likesCounts.set(like.mention_id, current + 1);
+      likesData.forEach((like: { map_pin_id: string }) => {
+        const current = likesCounts.get(like.map_pin_id) || 0;
+        likesCounts.set(like.map_pin_id, current + 1);
       });
     }
   }

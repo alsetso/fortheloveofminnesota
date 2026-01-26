@@ -55,11 +55,11 @@ export async function GET(
         if (isUUID(identifier)) {
           mapId = identifier;
         } else {
-          // Look up map by custom_slug
+          // Look up map by slug
           const { data: map, error: mapError } = await supabase
             .from('map')
             .select('id')
-            .eq('custom_slug', identifier)
+            .eq('slug', identifier)
             .single();
           
           if (mapError || !map) {
@@ -146,12 +146,12 @@ export async function POST(
         let mapId: string;
         let mapQuery = supabase
           .from('map')
-          .select('id, account_id, visibility');
+          .select('id, account_id, visibility, settings');
         
         if (isUUID(identifier)) {
           mapQuery = mapQuery.eq('id', identifier);
         } else {
-          mapQuery = mapQuery.eq('custom_slug', identifier);
+          mapQuery = mapQuery.eq('slug', identifier);
         }
         
         const { data: map, error: mapError } = await mapQuery.single();
@@ -160,10 +160,86 @@ export async function POST(
           return createErrorResponse('Map not found', 404);
         }
 
-        // Check access: owner or public map
-        const isOwner = (map as any).account_id === accountId;
-        if (!isOwner && (map as any).visibility !== 'public') {
-          return createErrorResponse('Forbidden - you do not have access to this map', 403);
+        const mapData = map as { account_id: string; id: string; visibility: string; settings: any };
+        mapId = mapData.id;
+
+        // Check member role
+        const { data: member } = await supabase
+          .from('map_members')
+          .select('role')
+          .eq('map_id', mapId)
+          .eq('account_id', accountId)
+          .maybeSingle();
+
+        const memberRole = (member as { role?: string } | null)?.role;
+        const isOwner = mapData.account_id === accountId;
+        const isManager = memberRole === 'manager' || memberRole === 'owner';
+        const isEditor = memberRole === 'editor';
+        const isMember = isOwner || isManager || isEditor;
+
+        // Check collaboration settings
+        const settings = mapData.settings || {};
+        const collaboration = settings.collaboration || {};
+        const allowAreas = collaboration.allow_areas === true;
+        const isPublic = mapData.visibility === 'public';
+
+        // Access check: owner/manager/editor OR (public map with allow_areas enabled)
+        const canAddAreas = isMember || (isPublic && allowAreas);
+        
+        if (!canAddAreas) {
+          if (!isPublic) {
+            return createErrorResponse('Forbidden - you do not have access to this map', 403);
+          }
+          return createErrorResponse('Forbidden - this map does not allow others to add areas', 403);
+        }
+        
+        // NEW: Check plan-based permissions
+        if (!isOwner && !isManager) {
+          // Get user's account to check plan
+          const { data: userAccount } = await supabase
+            .from('accounts')
+            .select('plan, subscription_status')
+            .eq('id', accountId)
+            .single();
+          
+          if (userAccount && typeof userAccount === 'object' && 'plan' in userAccount) {
+            const areaPermissions = collaboration.area_permissions;
+            const requiredPlan = areaPermissions?.required_plan;
+            
+            // If plan requirement exists, check it
+            if (requiredPlan !== null && requiredPlan !== undefined) {
+              const PLAN_ORDER: Record<string, number> = {
+                hobby: 1,
+                contributor: 2,
+                professional: 3,
+                business: 4,
+              };
+              
+              const typedAccount = userAccount as { plan: string | null; subscription_status: string | null };
+              const userPlan = (typedAccount.plan || 'hobby') as string;
+              const userPlanOrder = PLAN_ORDER[userPlan] || 0;
+              const requiredPlanOrder = PLAN_ORDER[requiredPlan] || 0;
+              
+              // Check subscription status
+              const isActive = typedAccount.subscription_status === 'active' || typedAccount.subscription_status === 'trialing';
+              
+              if (!isActive) {
+                return createErrorResponse(
+                  `Your subscription is not active. Please activate your ${userPlan} plan to draw areas.`,
+                  403,
+                  { reason: 'subscription_inactive', requiredPlan, currentPlan: userPlan }
+                );
+              }
+              
+              if (userPlanOrder < requiredPlanOrder) {
+                return createErrorResponse(
+                  `This map requires a ${requiredPlan} plan to draw areas.`,
+                  403,
+                  { reason: 'plan_required', requiredPlan, currentPlan: userPlan }
+                );
+              }
+            }
+          }
         }
         
         // Validate request body

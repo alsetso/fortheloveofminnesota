@@ -1035,47 +1035,65 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
     >
         {/* Map and other components - no sidebar */}
         <div className="flex-1 flex relative overflow-hidden w-full h-full" style={{ minHeight: 0, minWidth: 0, height: '100%', width: '100%' }}>
-          {/* Top Controls - Loading, Filters, Reload */}
-          <div className="absolute top-4 left-4 right-4 z-40 pointer-events-none">
-            <div className="pointer-events-auto space-y-2">
-              {/* Selected Mention Type Filters */}
-              {!isLoadingMentions && selectedMentionTypes.length > 0 && (
-                <div className="flex flex-wrap gap-2 items-center">
-                  {selectedMentionTypes.map((type) => (
-                    <div
-                      key={type.id}
-                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white border-gray-200 text-gray-700"
-                    >
-                      <span className="text-base flex-shrink-0">{type.emoji}</span>
-                      <span className="font-medium leading-none">{type.name}</span>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleRemoveType(type.slug);
-                        }}
-                        className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-gray-500"
-                        aria-label={`Remove ${type.name} filter`}
-                      >
-                        <XCircleIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Reload Mentions Button */}
-              {mentionsLayerHidden && currentMapStyle !== 'satellite' && (
-                <button
-                  onClick={handleReloadMentions}
-                  className="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 border-2 border-red-500 bg-white hover:bg-red-50 text-gray-900"
-                >
-                  <ArrowPathIcon className="w-4 h-4" />
-                  Reload mentions
-                </button>
-              )}
+          {/* Top Controls - Loading, Filters, Reload - Hide mention type filters when type param exists (moved to header) */}
+          {searchParams.get('type') ? (
+            // Only show reload button when type param exists (mention types moved to header)
+            <div className="absolute top-4 left-4 right-4 z-40 pointer-events-none">
+              <div className="pointer-events-auto space-y-2">
+                {/* Reload Mentions Button */}
+                {mentionsLayerHidden && currentMapStyle !== 'satellite' && (
+                  <button
+                    onClick={handleReloadMentions}
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 border-2 border-red-500 bg-white hover:bg-red-50 text-gray-900"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    Reload mentions
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="absolute top-4 left-4 right-4 z-40 pointer-events-none">
+              <div className="pointer-events-auto space-y-2">
+                {/* Selected Mention Type Filters - Only show when no type param */}
+                {!isLoadingMentions && selectedMentionTypes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {selectedMentionTypes.map((type) => (
+                      <div
+                        key={type.id}
+                        className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white border-gray-200 text-gray-700"
+                      >
+                        <span className="text-base flex-shrink-0">{type.emoji}</span>
+                        <span className="font-medium leading-none">{type.name}</span>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveType(type.slug);
+                          }}
+                          className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-gray-500"
+                          aria-label={`Remove ${type.name} filter`}
+                        >
+                          <XCircleIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Reload Mentions Button */}
+                {mentionsLayerHidden && currentMapStyle !== 'satellite' && (
+                  <button
+                    onClick={handleReloadMentions}
+                    className="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap flex items-center justify-center gap-1.5 border-2 border-red-500 bg-white hover:bg-red-50 text-gray-900"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    Reload mentions
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Mapbox Container */}
           <div 

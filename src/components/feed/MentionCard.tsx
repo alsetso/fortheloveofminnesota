@@ -15,9 +15,10 @@ interface MentionCardProps {
       name: string;
     } | null;
   };
+  compact?: boolean;
 }
 
-export default function MentionCard({ mention }: MentionCardProps) {
+export default function MentionCard({ mention, compact = false }: MentionCardProps) {
   const router = useRouter();
   const truncatedDescription = mention.description
     ? mention.description.length > 45
@@ -34,24 +35,26 @@ export default function MentionCard({ mention }: MentionCardProps) {
   return (
     <button
       onClick={handleClick}
-      className="w-full text-left block bg-gray-50 border border-gray-200 rounded-md p-[10px] hover:bg-gray-100 transition-colors"
+      className={`w-full text-left block bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors max-w-full overflow-hidden ${
+        compact ? 'p-1' : 'p-[10px]'
+      }`}
     >
-      <div className="flex items-start gap-2">
+      <div className={`flex items-start ${compact ? 'gap-1' : 'gap-2'}`}>
         {/* Mention Type Emoji */}
         {mention.mention_type && (
-          <div className="flex-shrink-0 text-sm text-gray-600 leading-none mt-0.5">
+          <div className={`flex-shrink-0 text-gray-600 leading-none ${compact ? 'text-xs mt-0' : 'text-sm mt-0.5'}`}>
             {mention.mention_type.emoji}
           </div>
         )}
 
         {/* Content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           {mention.mention_type && (
-            <div className="text-xs font-medium text-gray-600 mb-0.5">
+            <div className={`text-xs font-medium text-gray-600 ${compact ? 'mb-0 leading-tight' : 'mb-0.5'}`}>
               {mention.mention_type.name}
             </div>
           )}
-          <p className="text-xs text-gray-900 line-clamp-2">
+          <p className={`text-xs text-gray-900 line-clamp-2 ${compact ? 'leading-tight' : ''}`}>
             {truncatedDescription}
           </p>
         </div>
@@ -62,7 +65,7 @@ export default function MentionCard({ mention }: MentionCardProps) {
             <img
               src={mention.image_url}
               alt="Mention"
-              className="w-10 h-10 rounded-md object-cover border border-gray-200"
+              className={`rounded-md object-cover border border-gray-200 ${compact ? 'w-7 h-7' : 'w-10 h-10'}`}
             />
           </div>
         )}

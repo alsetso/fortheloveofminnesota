@@ -67,7 +67,9 @@ export async function POST(request: NextRequest) {
         const finalAccountId = accountId || null;
 
         // Record map view using record_url_visit function
-        // Convert map ID to URL format: /map/{map_id}
+        // IMPORTANT: Always use UUID (map_id) for tracking, never slug
+        // This ensures tracking persists even if the map's slug changes
+        // URL format: /map/{map_id} where map_id is always a UUID
         const mapUrl = `/map/${map_id}`;
         const { data, error } = await supabase.rpc('record_url_visit', {
           p_url: mapUrl,

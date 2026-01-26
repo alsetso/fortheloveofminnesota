@@ -35,6 +35,8 @@ interface FeatureWithPlan extends BillingFeature {
   isInherited?: boolean;
   limit_value?: number | null;
   limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null;
+  increase?: number | null;
+  previousLimit?: number | null;
 }
 
 export default function BillingAdminClient() {
@@ -262,6 +264,25 @@ export default function BillingAdminClient() {
       plans.flatMap((p) => p.features?.map((f) => f.feature_slug) || [])
     );
     return allFeatures.filter((f) => !allAssignedSlugs.has(f.slug));
+  };
+
+  // Group features by category
+  const groupFeaturesByCategory = (features: FeatureWithPlan[]): Record<string, FeatureWithPlan[]> => {
+    return features.reduce((acc, feature) => {
+      const category = feature.category || 'uncategorized';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(feature);
+      return acc;
+    }, {} as Record<string, FeatureWithPlan[]>);
+  };
+
+  // Sort categories alphabetically, with 'uncategorized' last
+  const sortCategories = (categories: string[]): string[] => {
+    const sorted = categories.filter(c => c !== 'uncategorized').sort();
+    const uncategorized = categories.filter(c => c === 'uncategorized');
+    return [...sorted, ...uncategorized];
   };
 
   // Move feature to a plan (with optimistic updates)
@@ -777,17 +798,20 @@ export default function BillingAdminClient() {
             {unassignedFeatures.length === 0 ? (
               <p className="text-xs text-gray-500 text-center py-4">Drop features here to unassign</p>
             ) : (
-              unassignedFeatures.map((feature) => (
-                <FeatureCard
-                  key={feature.id}
-                  feature={feature}
-                  onEdit={(planId) => {
+              sortCategories(Object.keys(groupFeaturesByCategory(unassignedFeatures))).map((category) => {
+                const categoryFeatures = groupFeaturesByCategory(unassignedFeatures)[category];
+                return (
+                <GroupedFeatureCard
+                  key={category}
+                  category={category}
+                  features={categoryFeatures}
+                  onEdit={(feature, planId) => {
                     setEditingFeature(feature);
                     setEditingPlanId(planId || null);
                   }}
-                  onEditLimits={() => setEditingLimitsFeature(feature)}
-                  onDelete={() => handleDeleteFeature(feature.id)}
-                  onClone={() => {
+                  onEditLimits={(feature) => setEditingLimitsFeature(feature)}
+                  onDelete={(feature) => handleDeleteFeature(feature.id)}
+                  onClone={(feature) => {
                     setShowCreateFeature(true);
                     setEditingFeature({
                       ...feature,
@@ -800,12 +824,13 @@ export default function BillingAdminClient() {
                   showLeftArrow={false}
                   showRightArrow={false}
                   currentPlanId={null}
-                  isExpanded={expandedFeatureId === feature.id}
-                  onToggleExpand={() => {
-                    setExpandedFeatureId(expandedFeatureId === feature.id ? null : feature.id);
+                  expandedFeatureId={expandedFeatureId}
+                  onToggleExpand={(featureId) => {
+                    setExpandedFeatureId(expandedFeatureId === featureId ? null : featureId);
                   }}
                 />
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -877,18 +902,21 @@ export default function BillingAdminClient() {
                     <p className="text-xs text-gray-500 text-center py-4">Drop features here</p>
                   ) : (
                     <>
-                      {/* New Features (not in lower tiers) */}
-                      {newFeatures.map((feature) => (
-                        <FeatureCard
-                          key={feature.id}
-                          feature={feature}
-                          onEdit={(planId) => {
+                      {/* New Features (not in lower tiers) - Grouped by category */}
+                      {sortCategories(Object.keys(groupFeaturesByCategory(newFeatures))).map((category) => {
+                        const categoryFeatures = groupFeaturesByCategory(newFeatures)[category];
+                        return (
+                        <GroupedFeatureCard
+                          key={category}
+                          category={category}
+                          features={categoryFeatures}
+                          onEdit={(feature, planId) => {
                             setEditingFeature(feature);
                             setEditingPlanId(planId || null);
                           }}
-                          onEditLimits={() => setEditingLimitsFeature(feature)}
-                          onDelete={() => handleDeleteFeature(feature.id)}
-                          onClone={() => {
+                          onEditLimits={(feature) => setEditingLimitsFeature(feature)}
+                          onDelete={(feature) => handleDeleteFeature(feature.id)}
+                          onClone={(feature) => {
                             setShowCreateFeature(true);
                             setEditingFeature({
                               ...feature,
@@ -901,13 +929,14 @@ export default function BillingAdminClient() {
                           showLeftArrow={false}
                           showRightArrow={false}
                           currentPlanId={plan.id}
-                          isExpanded={expandedFeatureId === feature.id}
-                          onToggleExpand={() => {
-                            setExpandedFeatureId(expandedFeatureId === feature.id ? null : feature.id);
+                          expandedFeatureId={expandedFeatureId}
+                          onToggleExpand={(featureId) => {
+                            setExpandedFeatureId(expandedFeatureId === featureId ? null : featureId);
                           }}
                           isNew={true}
                         />
-                      ))}
+                        );
+                      })}
                       
                       {/* Upgraded Inherited Section */}
                       {upgradedCount > 0 && (
@@ -932,17 +961,20 @@ export default function BillingAdminClient() {
                             
                             {isUpgradedExpanded && (
                               <div className="mt-2 space-y-2">
-                                {upgradedFeatures.map((feature) => (
-                                  <FeatureCard
-                                    key={feature.id}
-                                    feature={feature}
-                                    onEdit={(planId) => {
+                                {sortCategories(Object.keys(groupFeaturesByCategory(upgradedFeatures))).map((category) => {
+                                  const categoryFeatures = groupFeaturesByCategory(upgradedFeatures)[category];
+                                  return (
+                                  <GroupedFeatureCard
+                                    key={category}
+                                    category={category}
+                                    features={categoryFeatures}
+                                    onEdit={(feature, planId) => {
                                       setEditingFeature(feature);
                                       setEditingPlanId(planId || null);
                                     }}
-                                    onEditLimits={() => setEditingLimitsFeature(feature)}
-                                    onDelete={() => handleDeleteFeature(feature.id)}
-                                    onClone={() => {
+                                    onEditLimits={(feature) => setEditingLimitsFeature(feature)}
+                                    onDelete={(feature) => handleDeleteFeature(feature.id)}
+                                    onClone={(feature) => {
                                       setShowCreateFeature(true);
                                       setEditingFeature({
                                         ...feature,
@@ -955,14 +987,14 @@ export default function BillingAdminClient() {
                                     showLeftArrow={false}
                                     showRightArrow={false}
                                     currentPlanId={plan.id}
-                                    isExpanded={expandedFeatureId === feature.id}
-                                    onToggleExpand={() => {
-                                      setExpandedFeatureId(expandedFeatureId === feature.id ? null : feature.id);
+                                    expandedFeatureId={expandedFeatureId}
+                                    onToggleExpand={(featureId) => {
+                                      setExpandedFeatureId(expandedFeatureId === featureId ? null : featureId);
                                     }}
                                     isUpgraded={true}
-                                    upgradeIncrease={feature.increase}
                                   />
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -991,20 +1023,23 @@ export default function BillingAdminClient() {
                         </span>
                       </button>
                       
-                      {/* Expanded Inherited Features */}
+                      {/* Expanded Inherited Features - Grouped by category */}
                       {isInheritedExpanded && (
                         <div className="mt-2 space-y-2">
-                          {inheritedFeatures.map((feature) => (
-                            <FeatureCard
-                              key={feature.id}
-                              feature={feature}
-                              onEdit={(planId) => {
+                          {sortCategories(Object.keys(groupFeaturesByCategory(inheritedFeatures))).map((category) => {
+                            const categoryFeatures = groupFeaturesByCategory(inheritedFeatures)[category];
+                            return (
+                            <GroupedFeatureCard
+                              key={category}
+                              category={category}
+                              features={categoryFeatures}
+                              onEdit={(feature, planId) => {
                                 setEditingFeature(feature);
                                 setEditingPlanId(planId || null);
                               }}
-                              onEditLimits={() => setEditingLimitsFeature(feature)}
-                              onDelete={() => handleDeleteFeature(feature.id)}
-                              onClone={() => {
+                              onEditLimits={(feature) => setEditingLimitsFeature(feature)}
+                              onDelete={(feature) => handleDeleteFeature(feature.id)}
+                              onClone={(feature) => {
                                 setShowCreateFeature(true);
                                 setEditingFeature({
                                   ...feature,
@@ -1017,13 +1052,14 @@ export default function BillingAdminClient() {
                               showLeftArrow={false}
                               showRightArrow={false}
                               currentPlanId={null}
-                              isExpanded={expandedFeatureId === feature.id}
-                              onToggleExpand={() => {
-                                setExpandedFeatureId(expandedFeatureId === feature.id ? null : feature.id);
+                              expandedFeatureId={expandedFeatureId}
+                              onToggleExpand={(featureId) => {
+                                setExpandedFeatureId(expandedFeatureId === featureId ? null : featureId);
                               }}
                               isInherited={true}
                             />
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1099,6 +1135,242 @@ interface FeatureCardProps {
   isNew?: boolean;
 }
 
+interface GroupedFeatureCardProps {
+  category: string;
+  features: FeatureWithPlan[];
+  onEdit: (feature: FeatureWithPlan, planId?: string) => void;
+  onEditLimits: (feature: FeatureWithPlan) => void;
+  onDelete: (feature: FeatureWithPlan) => void;
+  onClone: (feature: FeatureWithPlan) => void;
+  plans: PlanWithFeatures[];
+  showLeftArrow: boolean;
+  showRightArrow: boolean;
+  currentPlanId: string | null;
+  expandedFeatureId: string | null;
+  onToggleExpand: (featureId: string) => void;
+  isInherited?: boolean;
+  isUpgraded?: boolean;
+  isNew?: boolean;
+}
+
+function GroupedFeatureCard({
+  category,
+  features,
+  onEdit,
+  onEditLimits,
+  onDelete,
+  onClone,
+  plans,
+  showLeftArrow,
+  showRightArrow,
+  currentPlanId,
+  expandedFeatureId,
+  onToggleExpand,
+  isInherited = false,
+  isUpgraded = false,
+  isNew = false,
+}: GroupedFeatureCardProps) {
+  // Determine card styling based on features
+  const hasInactive = features.some(f => !f.is_active);
+  const allInactive = features.every(f => !f.is_active);
+  
+  return (
+    <div
+      className={`border rounded-md p-[10px] transition-all ${
+        isInherited
+          ? 'border-dashed border-gray-300 bg-gray-50/50 opacity-75'
+          : isUpgraded
+          ? 'border-solid border-blue-200 bg-blue-50/30 hover:bg-blue-50/50'
+          : allInactive 
+          ? 'border-gray-200 bg-gray-50 opacity-60 hover:bg-gray-100' 
+          : 'border-gray-200 bg-white hover:bg-gray-50'
+      }`}
+    >
+      {/* Category Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-1.5">
+          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
+            allInactive 
+              ? 'bg-gray-200 text-gray-400' 
+              : 'bg-gray-100 text-gray-700'
+          }`}>
+            {category}
+          </span>
+          {isNew && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-700 border border-green-300">
+              new
+            </span>
+          )}
+          <span className="text-[10px] text-gray-500">
+            ({features.length} {features.length === 1 ? 'feature' : 'features'})
+          </span>
+        </div>
+      </div>
+
+      {/* Features List */}
+      <div className="space-y-1.5">
+        {features.map((feature) => {
+          const isExpanded = expandedFeatureId === feature.id;
+          const isInactive = !feature.is_active;
+          const upgradeIncrease = (feature as any).increase;
+
+          return (
+            <div
+              key={feature.id}
+              className={`border rounded p-1.5 transition-all relative group ${
+                isInherited
+                  ? 'border-dashed border-gray-200 bg-gray-50/30'
+                  : isUpgraded
+                  ? 'border-solid border-blue-100 bg-blue-50/20 hover:bg-blue-50/40'
+                  : isInactive 
+                  ? 'border-gray-200 bg-gray-50/50 opacity-60' 
+                  : 'border-gray-200 bg-white hover:bg-gray-50'
+              }`}
+              draggable={!isExpanded && !isInherited}
+              onDragStart={(e) => {
+                if (isExpanded || isInherited) {
+                  e.preventDefault();
+                  return;
+                }
+                const event = new CustomEvent('featureDragStart', { detail: { id: feature.id, slug: feature.slug } });
+                window.dispatchEvent(event);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', feature.id);
+                e.currentTarget.style.opacity = '0.5';
+              }}
+              onDragEnd={(e) => {
+                e.currentTarget.style.opacity = isInactive ? '0.6' : '1';
+                const event = new CustomEvent('featureDragEnd');
+                window.dispatchEvent(event);
+              }}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('button, [role="button"], .cursor-pointer') || isInherited) {
+                  return;
+                }
+                onToggleExpand(feature.id);
+              }}
+            >
+              {/* Feature Name Row */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {feature.emoji && (
+                    <span className={`text-xs flex-shrink-0 ${isInactive ? 'opacity-50' : ''}`}>{feature.emoji}</span>
+                  )}
+                  <div className={`text-[10px] font-medium truncate flex items-center gap-1.5 ${
+                    isInherited ? 'text-gray-600' : isUpgraded ? 'text-blue-900' : isInactive ? 'text-gray-400' : 'text-gray-900'
+                  }`}>
+                    <span>{feature.name}</span>
+                    {isUpgraded && upgradeIncrease !== null && upgradeIncrease > 0 && (
+                      <span className="text-[9px] text-blue-600 font-semibold">+{upgradeIncrease}</span>
+                    )}
+                    {isInherited && (
+                      <span className="text-[9px] text-gray-500 italic">← inherited</span>
+                    )}
+                    {isInactive && (
+                      <span className="text-[9px] text-gray-400 italic">(Soon)</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Limit Count Badge */}
+                {feature.limit_type && (currentPlanId || isInherited) && (
+                  <div className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                    isUpgraded
+                      ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                      : feature.limit_type === 'unlimited' 
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : feature.limit_type === 'boolean'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'bg-gray-100 text-gray-700 border border-gray-200'
+                  }`}>
+                    {feature.limit_type === 'unlimited' && '∞'}
+                    {feature.limit_type === 'count' && feature.limit_value !== null && feature.limit_value}
+                    {feature.limit_type === 'storage_mb' && feature.limit_value !== null && `${feature.limit_value}MB`}
+                    {feature.limit_type === 'boolean' && '✓'}
+                  </div>
+                )}
+              </div>
+
+              {/* Expanded Content */}
+              {isExpanded && (
+                <div className="mt-1.5 pt-1.5 border-t border-gray-100 space-y-1.5">
+                  {feature.description && (
+                    <div>
+                      <div className="text-[9px] font-medium text-gray-500 uppercase mb-0.5">Description</div>
+                      <div className="text-[10px] text-gray-700">{feature.description}</div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[9px] font-medium text-gray-500 uppercase mb-0.5">Slug</div>
+                    <div className="text-[10px] text-gray-700 font-mono">{feature.slug}</div>
+                  </div>
+                  {(currentPlanId || isInherited) && feature.limit_type && (
+                    <div>
+                      <div className="text-[9px] font-medium text-gray-500 uppercase mb-0.5">Limit</div>
+                      <div className="text-[10px] text-gray-700">
+                        {feature.limit_type === 'unlimited' && '∞ Unlimited'}
+                        {feature.limit_type === 'count' && `Count: ${feature.limit_value || 0}`}
+                        {feature.limit_type === 'storage_mb' && `Storage: ${feature.limit_value || 0} MB`}
+                        {feature.limit_type === 'boolean' && 'Boolean (Yes/No)'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions Row */}
+              {!isInherited && (
+                <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-all max-h-0 group-hover:max-h-8 overflow-hidden">
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditLimits(feature);
+                    }}
+                    className="cursor-pointer text-gray-500 hover:text-blue-600 transition-colors"
+                    title="Edit Limits"
+                  >
+                    <AdjustmentsHorizontalIcon className="w-3 h-3" />
+                  </div>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(feature, currentPlanId || undefined);
+                    }}
+                    className="cursor-pointer text-gray-500 hover:text-gray-900 transition-colors"
+                    title="Edit"
+                  >
+                    <PencilIcon className="w-3 h-3" />
+                  </div>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClone(feature);
+                    }}
+                    className="cursor-pointer text-gray-500 hover:text-gray-900 transition-colors"
+                    title="Clone"
+                  >
+                    <DocumentDuplicateIcon className="w-3 h-3" />
+                  </div>
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(feature);
+                    }}
+                    className="cursor-pointer text-gray-500 hover:text-red-600 transition-colors"
+                    title="Delete"
+                  >
+                    <TrashIcon className="w-3 h-3" />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FeatureCard({
   feature,
   onEdit,
@@ -1126,13 +1398,13 @@ function FeatureCard({
           : isUpgraded
           ? 'border-solid border-blue-200 bg-blue-50/30 hover:bg-blue-50/50 cursor-move'
           : isInactive 
-          ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed' 
+          ? 'border-gray-200 bg-gray-50 opacity-60 hover:bg-gray-100 cursor-move' 
           : 'border-gray-200 bg-white hover:bg-gray-50 cursor-move'
       }`}
-      draggable={!isExpanded && !isInactive && !isInherited}
+      draggable={!isExpanded && !isInherited}
       onDragStart={(e) => {
-        // Don't start drag if expanded, inactive, or inherited
-        if (isExpanded || isInactive || isInherited) {
+        // Don't start drag if expanded or inherited
+        if (isExpanded || isInherited) {
           e.preventDefault();
           return;
         }

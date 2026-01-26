@@ -5,28 +5,9 @@ import { useSearchParams } from 'next/navigation';
 import { Post } from '@/types/post';
 import PostCreationForm from './PostCreationForm';
 import FeedPost from './FeedPost';
-import GroupsSidebar from './GroupsSidebar';
-import MentionTypeFilter from './MentionTypeFilter';
-import MentionTimeFilter from './MentionTimeFilter';
-import LiveMapAnalyticsCard from './LiveMapAnalyticsCard';
 import { useAuthStateSafe } from '@/features/auth';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 
-export default function FeedContent({
-  leftSidebarVisible = true,
-  rightSidebarVisible = true,
-  leftPanelOpen = false,
-  rightPanelOpen = false,
-  onRequestCloseLeftPanel,
-  onRequestCloseRightPanel,
-}: {
-  leftSidebarVisible?: boolean;
-  rightSidebarVisible?: boolean;
-  leftPanelOpen?: boolean;
-  rightPanelOpen?: boolean;
-  onRequestCloseLeftPanel?: () => void;
-  onRequestCloseRightPanel?: () => void;
-}) {
+export default function FeedContent() {
   const { account } = useAuthStateSafe();
   const searchParams = useSearchParams();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -127,85 +108,10 @@ export default function FeedContent({
     }
   };
 
-  const centerColSpanClass =
-    leftSidebarVisible && rightSidebarVisible
-      ? 'lg:col-span-6'
-      : leftSidebarVisible || rightSidebarVisible
-        ? 'lg:col-span-9'
-        : 'lg:col-span-12';
-
   return (
     <div className="h-full overflow-y-auto scrollbar-hide">
-      {/* Mobile left panel (filters) */}
-      {leftPanelOpen && (
-        <div className="lg:hidden fixed inset-0 z-[80]">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label="Close filters panel"
-            onClick={onRequestCloseLeftPanel}
-          />
-          <div className="absolute left-0 top-0 bottom-0 w-[86%] max-w-[360px] bg-white border-r border-gray-200 overflow-y-auto">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-              <div className="text-sm font-semibold text-gray-900">Filters</div>
-              <button
-                type="button"
-                onClick={onRequestCloseLeftPanel}
-                className="w-8 h-8 rounded-md hover:bg-gray-50 flex items-center justify-center transition-colors"
-                aria-label="Close filters panel"
-              >
-                <XMarkIcon className="w-5 h-5 text-gray-700" />
-              </button>
-            </div>
-            <div className="p-3 space-y-3">
-              <MentionTimeFilter />
-              <MentionTypeFilter />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile right panel (more) */}
-      {rightPanelOpen && (
-        <div className="lg:hidden fixed inset-0 z-[80]">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/40"
-            aria-label="Close sidebar panel"
-            onClick={onRequestCloseRightPanel}
-          />
-          <div className="absolute right-0 top-0 bottom-0 w-[86%] max-w-[360px] bg-white border-l border-gray-200 overflow-y-auto">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
-              <div className="text-sm font-semibold text-gray-900">More</div>
-              <button
-                type="button"
-                onClick={onRequestCloseRightPanel}
-                className="w-8 h-8 rounded-md hover:bg-gray-50 flex items-center justify-center transition-colors"
-                aria-label="Close sidebar panel"
-              >
-                <XMarkIcon className="w-5 h-5 text-gray-700" />
-              </button>
-            </div>
-            <div className="p-3 space-y-3">
-              <LiveMapAnalyticsCard />
-              <GroupsSidebar />
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {leftSidebarVisible && (
-            <div className="hidden lg:block lg:col-span-3">
-              <div className="lg:sticky lg:top-6 space-y-6">
-                <MentionTimeFilter />
-                <MentionTypeFilter />
-              </div>
-            </div>
-          )}
-
-          <div className={`${centerColSpanClass} space-y-4`}>
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-4">
             {account && <PostCreationForm onPostCreated={handlePostCreated} />}
 
             {isLoading && posts.length === 0 && (
@@ -256,16 +162,6 @@ export default function FeedContent({
             {!isLoading && posts.length === 0 && !error && (
               <div className="text-center text-gray-500 text-sm py-8">No posts yet. Be the first to post!</div>
             )}
-          </div>
-
-          {rightSidebarVisible && (
-            <div className="hidden lg:block lg:col-span-3">
-              <div className="lg:sticky lg:top-6 space-y-6">
-                <LiveMapAnalyticsCard />
-                <GroupsSidebar />
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -35,7 +35,7 @@ export default function MentionTimeFilter() {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hidden lg:block">
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
       <h2 className="text-sm font-semibold text-gray-900 mb-3">Mention Time Filter</h2>
       <div className="flex gap-1 rounded-md px-1 py-1 bg-gray-50 border border-gray-200">
         <button

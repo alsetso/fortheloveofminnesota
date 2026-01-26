@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserIcon, Cog6ToothIcon, CreditCardIcon, EyeIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { UserIcon, Cog6ToothIcon, CreditCardIcon, EyeIcon, ChartBarIcon, MapIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAdminImpersonationSafe } from '@/contexts/AdminImpersonationContext';
+import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 
 interface AccountDropdownProps {
@@ -46,8 +47,35 @@ export default function AccountDropdown({
     isLoadingAccounts: isLoadingAdminAccounts,
     isImpersonating,
   } = useAdminImpersonationSafe();
+  const { features, isLoading: featuresLoading, getFeature } = useBillingEntitlementsSafe();
 
   const isAdmin = account?.role === 'admin';
+  
+  // Fetch current usage for key features
+  const [mapCount, setMapCount] = useState<number | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(false);
+  
+  useEffect(() => {
+    if (!isOpen || !activeAccountId) return;
+    
+    const fetchUsage = async () => {
+      setLoadingUsage(true);
+      try {
+        // Fetch map count
+        const mapsResponse = await fetch(`/api/maps?account_id=${activeAccountId}`);
+        if (mapsResponse.ok) {
+          const mapsData = await mapsResponse.json();
+          setMapCount(mapsData.maps?.length || 0);
+        }
+      } catch (err) {
+        console.error('Error fetching usage:', err);
+      } finally {
+        setLoadingUsage(false);
+      }
+    };
+    
+    fetchUsage();
+  }, [isOpen, activeAccountId]);
 
   // Fetch all user accounts when dropdown opens
   useEffect(() => {
@@ -371,6 +399,62 @@ export default function AccountDropdown({
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Plan & Limits Section */}
+              {account && (
+                <div className="border-t border-gray-200">
+                  <div className="px-[10px] py-1.5 text-[10px] font-medium text-gray-500 uppercase tracking-wide bg-gray-50">
+                    Plan & Limits
+                  </div>
+                  <div className="p-[10px] space-y-2">
+                    {/* Current Plan */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600">Plan</span>
+                      <span className="text-xs font-medium text-gray-900">
+                        {account.plan ? account.plan.charAt(0).toUpperCase() + account.plan.slice(1) : 'None'}
+                      </span>
+                    </div>
+                    
+                    {/* Map Limit */}
+                    {!featuresLoading && (() => {
+                      const mapFeature = getFeature('map') || getFeature('custom_maps');
+                      if (!mapFeature) return null;
+                      
+                      const displayCount = mapCount !== null ? mapCount : '...';
+                      const limitDisplay = mapFeature.is_unlimited 
+                        ? 'unlimited' 
+                        : mapFeature.limit_value !== null 
+                          ? `${mapFeature.limit_value}` 
+                          : 'unlimited';
+                      
+                      return (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <MapIcon className="w-3 h-3 text-gray-500" />
+                            <span className="text-xs text-gray-600">Maps</span>
+                          </div>
+                          <span className="text-xs font-medium text-gray-900">
+                            {mapFeature.is_unlimited 
+                              ? `${displayCount} (unlimited)`
+                              : `${displayCount} / ${limitDisplay}`}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    
+                    {/* View Plans Link */}
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push('/plans');
+                      }}
+                      className="w-full mt-2 px-2 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors text-center border border-indigo-200"
+                    >
+                      View Plans & Limits
+                    </button>
+                  </div>
                 </div>
               )}
 

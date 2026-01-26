@@ -1126,9 +1126,10 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               try {
                 const { supabase } = await import('@/lib/supabase');
                 const { data: mentionData } = await supabase
-                  .from('mentions')
+                  .from('map_pins')
                   .select('map_meta')
                   .eq('id', mentionId)
+                  .eq('is_active', true)
                   .single();
                 
                 if (mentionData && mentionData.map_meta) {

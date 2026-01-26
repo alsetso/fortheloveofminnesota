@@ -33,9 +33,9 @@ export async function GET(
             title,
             content,
             visibility,
-            group_id,
             mention_type_id,
             mention_ids,
+            map_id,
             images,
             map_data,
             created_at,
@@ -47,11 +47,11 @@ export async function GET(
               last_name,
               image_url
             ),
-            group:groups!posts_group_id_fkey(
+            map:map!posts_map_id_fkey(
               id,
               name,
               slug,
-              image_url
+              visibility
             ),
             mention_type:mention_types(
               id,
@@ -78,11 +78,11 @@ export async function GET(
           );
         }
 
-        // Fetch mentions if referenced
+        // Fetch mentions if referenced (now map_pins)
         const postData = post as any;
         if (postData.mention_ids && Array.isArray(postData.mention_ids) && postData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
-            .from('mentions')
+            .from('map_pins')
             .select(`
               id,
               lat,
@@ -99,7 +99,9 @@ export async function GET(
                 title
               )
             `)
-            .in('id', postData.mention_ids);
+            .in('id', postData.mention_ids)
+            .eq('is_active', true)
+            .eq('archived', false);
 
           postData.mentions = mentions || [];
         }
@@ -133,9 +135,9 @@ const updatePostSchema = z.object({
   title: z.string().max(200).optional().nullable(),
   content: z.string().min(1).max(10000).optional(),
   visibility: z.enum(['public', 'draft']).optional(),
-  group_id: z.string().uuid().optional().nullable(),
   mention_type_id: z.string().uuid().optional().nullable(),
   mention_ids: z.array(z.string().uuid()).optional().nullable(),
+  map_id: z.string().uuid().optional().nullable(),
   map_data: z.object({
     lat: z.number(),
     lng: z.number(),
@@ -168,7 +170,7 @@ export async function PATCH(
         // Get post and verify ownership
         const { data: post } = await supabase
           .from('posts')
-          .select('id, account_id, group_id')
+          .select('id, account_id')
           .eq('id', id)
           .single();
 
@@ -215,37 +217,19 @@ export async function PATCH(
             }
           }
         }
-        if (validation.data.group_id !== undefined) {
-          updateData.group_id = validation.data.group_id || null;
-          
-          // If changing group, verify user is a member of new group
-          if (validation.data.group_id) {
-            const { data: membership } = await supabase
-              .from('group_members')
-              .select('id')
-              .eq('group_id', validation.data.group_id)
-              .eq('account_id', accountId)
-              .maybeSingle();
-
-            if (!membership) {
-              return NextResponse.json(
-                { error: 'You must be a member of the group to post' },
-                { status: 403 }
-              );
-            }
-          }
-        }
         if (validation.data.mention_ids !== undefined) {
           updateData.mention_ids = validation.data.mention_ids && validation.data.mention_ids.length > 0 
             ? validation.data.mention_ids 
             : null;
 
-          // Validate mention IDs if provided
+          // Validate mention IDs if provided (now map_pins)
           if (validation.data.mention_ids && validation.data.mention_ids.length > 0) {
             const { data: mentions } = await supabase
-              .from('mentions')
+              .from('map_pins')
               .select('id')
-              .in('id', validation.data.mention_ids);
+              .in('id', validation.data.mention_ids)
+              .eq('is_active', true)
+              .eq('archived', false);
 
             if (!mentions || mentions.length !== validation.data.mention_ids.length) {
               return NextResponse.json(
@@ -257,6 +241,73 @@ export async function PATCH(
         }
         if (validation.data.map_data !== undefined) {
           updateData.map_data = validation.data.map_data;
+        }
+        if (validation.data.map_id !== undefined) {
+          // Validate map_id if provided
+          if (validation.data.map_id) {
+            // Check if map exists and is active
+            const { data: map, error: mapError } = await supabase
+              .from('map')
+              .select(`
+                id,
+                visibility,
+                is_active,
+                settings,
+                account_id
+              `)
+              .eq('id', validation.data.map_id)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            if (mapError || !map) {
+              return NextResponse.json(
+                { error: 'Map not found or inactive' },
+                { status: 400 }
+              );
+            }
+
+            // Check if user has access to the map
+            const mapAccountId = map && typeof map === 'object' && 'account_id' in map ? (map as { account_id: string }).account_id : null;
+            const isMapOwner = mapAccountId === accountId;
+            
+            // Check if user is map member (for private maps)
+            let isMapMember = false;
+            let userRole: string | null = null;
+            if (!isMapOwner) {
+              const { data: membership } = await supabase
+                .from('map_members')
+                .select('role')
+                .eq('map_id', validation.data.map_id)
+                .eq('account_id', accountId)
+                .maybeSingle();
+              
+              isMapMember = !!membership;
+              const membershipRole = membership && typeof membership === 'object' && 'role' in membership ? (membership as { role: string }).role : null;
+              userRole = membershipRole || null;
+            }
+
+            const mapVisibility = map && typeof map === 'object' && 'visibility' in map ? (map as { visibility: string }).visibility : null;
+            const isPublicMap = mapVisibility === 'public';
+            const mapSettings = map && typeof map === 'object' && 'settings' in map ? (map as { settings: any }).settings : {};
+            const collaboration = mapSettings?.collaboration || {};
+            const allowPosts = collaboration.allow_posts === true;
+
+            // Check access: owner/manager can always post, or public map with allow_posts, or member with allow_posts
+            const isManager = userRole === 'owner' || userRole === 'manager';
+            const canPost = isMapOwner || 
+              isManager ||
+              (isPublicMap && allowPosts) || 
+              (isMapMember && allowPosts);
+
+            if (!canPost) {
+              return NextResponse.json(
+                { error: 'You do not have permission to assign posts to this map' },
+                { status: 403 }
+              );
+            }
+          }
+          
+          updateData.map_id = validation.data.map_id || null;
         }
 
         // Update post
@@ -270,9 +321,9 @@ export async function PATCH(
             title,
             content,
             visibility,
-            group_id,
             mention_type_id,
             mention_ids,
+            map_id,
             images,
             map_data,
             created_at,
@@ -284,11 +335,11 @@ export async function PATCH(
               last_name,
               image_url
             ),
-            group:groups!posts_group_id_fkey(
+            map:map!posts_map_id_fkey(
               id,
               name,
               slug,
-              image_url
+              visibility
             ),
             mention_type:mention_types(
               id,
@@ -306,11 +357,11 @@ export async function PATCH(
           );
         }
 
-        // Fetch mentions if referenced
+        // Fetch mentions if referenced (now map_pins)
         const updatedPostData = updatedPost as any;
         if (updatedPostData && updatedPostData.mention_ids && Array.isArray(updatedPostData.mention_ids) && updatedPostData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
-            .from('mentions')
+            .from('map_pins')
             .select(`
               id,
               lat,
@@ -323,7 +374,9 @@ export async function PATCH(
                 name
               )
             `)
-            .in('id', updatedPostData.mention_ids);
+            .in('id', updatedPostData.mention_ids)
+            .eq('is_active', true)
+            .eq('archived', false);
 
           updatedPostData.mentions = mentions || [];
         }
@@ -372,10 +425,10 @@ export async function DELETE(
         const { id } = await params;
         const supabase = await createServerClientWithAuth(cookies());
 
-        // Get post and verify ownership
+        // Get post and verify ownership or map manager status
         const { data: post } = await supabase
           .from('posts')
-          .select('id, account_id')
+          .select('id, account_id, map_id')
           .eq('id', id)
           .single();
 
@@ -386,9 +439,25 @@ export async function DELETE(
           );
         }
 
-        if ((post as any).account_id !== accountId) {
+        const isOwner = (post as any).account_id === accountId;
+        let isMapManager = false;
+
+        // Check if user is map manager (if post has map_id)
+        if ((post as any).map_id && !isOwner) {
+          const { data: membership } = await supabase
+            .from('map_members')
+            .select('role')
+            .eq('map_id', (post as any).map_id)
+            .eq('account_id', accountId)
+            .maybeSingle();
+          
+          const membershipRole = membership && typeof membership === 'object' && 'role' in membership ? (membership as { role: string }).role : null;
+          isMapManager = membershipRole === 'owner' || membershipRole === 'manager';
+        }
+
+        if (!isOwner && !isMapManager) {
           return NextResponse.json(
-            { error: 'You can only delete your own posts' },
+            { error: 'You can only delete your own posts or posts on maps you manage' },
             { status: 403 }
           );
         }

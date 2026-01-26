@@ -13,6 +13,7 @@ export interface Post {
   group_id: string | null;
   mention_type_id: string | null;
   mention_ids: string[] | null;
+  map_id: string | null;
   images: Array<{
     url: string;
     alt?: string;
@@ -34,6 +35,12 @@ export interface Post {
     last_name: string | null;
     image_url: string | null;
     plan: string | null;
+  } | null;
+  map?: {
+    id: string;
+    name: string;
+    slug: string;
+    visibility: string;
   } | null;
   mention_type?: {
     id: string;
@@ -61,6 +68,7 @@ export interface CreatePostData {
   group_id?: string | null;
   mention_type_id?: string | null;
   mention_ids?: string[] | null;
+  map_id?: string | null;
   images?: Array<{
     url: string;
     alt?: string;
@@ -82,6 +90,7 @@ export interface UpdatePostData {
   group_id?: string | null;
   mention_type_id?: string | null;
   mention_ids?: string[] | null;
+  map_id?: string | null;
   images?: Array<{
     url: string;
     alt?: string;
@@ -99,6 +108,7 @@ export interface UpdatePostData {
 export interface PostFilters {
   account_id?: string;
   group_id?: string;
+  map_id?: string;
   visibility?: PostVisibility;
   limit?: number;
   offset?: number;

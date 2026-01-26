@@ -13,16 +13,11 @@ interface NavLink {
 
 const navLinks: NavLink[] = [
   { label: 'Home', href: '/' },
-  { label: 'Live Map', href: '/map/live' },
+  { label: 'Feed', href: '/feed', requiresAuth: true },
   { label: 'Maps', href: '/maps' },
+  { label: 'People', href: '/people' },
+  { label: 'Government', href: '/gov' },
   { label: 'Profile', href: '/profile', requiresAuth: true },
-  { label: 'Account', href: '/account', requiresAuth: true },
-  { label: 'Settings', href: '/account/settings', requiresAuth: true },
-  { label: 'Billing', href: '/billing', requiresAuth: true },
-  { label: 'Groups', href: '/groups' },
-  { label: 'Feed', href: '/feed' },
-  { label: 'Gov', href: '/gov' },
-  { label: 'Admin', href: '/admin', requiresAuth: true },
 ];
 
 interface HamburgerMenuProps {
@@ -90,6 +85,9 @@ export default function HamburgerMenu({ isOpen: controlledIsOpen, onOpenChange }
     }
     return link;
   }).filter(link => {
+    // Show Feed instead of Home if authenticated
+    if (link.href === '/' && user) return false;
+    if (link.href === '/feed' && !user) return false;
     if (link.requiresAuth && !user) return false;
     // Filter out Admin if not admin
     if (link.href === '/admin' && account?.role !== 'admin') return false;
@@ -111,7 +109,7 @@ export default function HamburgerMenu({ isOpen: controlledIsOpen, onOpenChange }
 
       {/* Full Screen Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: '#000000' }}>
           {/* Close Button */}
           <div className="absolute top-6 right-6 z-10">
             <button

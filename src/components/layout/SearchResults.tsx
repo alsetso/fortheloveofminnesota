@@ -7,13 +7,13 @@ import { EyeIcon, UserGroupIcon, DocumentTextIcon, RssIcon } from '@heroicons/re
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { supabase } from '@/lib/supabase';
+import { getMapPostUrl } from '@/lib/maps/urls';
 import type { Mention } from '@/types/mention';
 import type { Post } from '@/types/post';
-import type { Group } from '@/types/group';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import { Account } from '@/features/auth';
 
-type ContentType = 'posts' | 'mentions' | 'groups' | 'users' | 'news';
+type ContentType = 'posts' | 'mentions' | 'users' | 'news';
 
 interface NewsArticle {
   id: string;
@@ -34,7 +34,6 @@ interface NewsArticle {
 interface SearchResultsData {
   posts: Post[];
   mentions: Mention[];
-  groups: Group[];
   users: any[]; // TODO: Add User type
   news: NewsArticle[];
 }
@@ -45,7 +44,6 @@ export default function SearchResults() {
   const [results, setResults] = useState<SearchResultsData>({
     posts: [],
     mentions: [],
-    groups: [],
     users: [],
     news: [],
   });
@@ -61,14 +59,14 @@ export default function SearchResults() {
 
       if (contentTypesParam) {
         const types = contentTypesParam.split(',').map(s => s.trim()) as ContentType[];
-        selectedTypes = types.filter(t => ['posts', 'mentions', 'groups', 'users', 'news'].includes(t));
+        selectedTypes = types.filter(t => ['posts', 'mentions', 'users', 'news'].includes(t));
       } else if (contentTypeParam) {
-        if (['posts', 'mentions', 'groups', 'users', 'news'].includes(contentTypeParam)) {
+        if (['posts', 'mentions', 'users', 'news'].includes(contentTypeParam)) {
           selectedTypes = [contentTypeParam as ContentType];
         }
       } else {
         // Default to all types if none selected
-        selectedTypes = ['posts', 'mentions', 'groups', 'users', 'news'];
+        selectedTypes = ['posts', 'mentions', 'users', 'news'];
       }
 
       // Create cache key from selected types
@@ -101,7 +99,6 @@ export default function SearchResults() {
         const newResults: SearchResultsData = {
           posts: [],
           mentions: [],
-          groups: [],
           users: [],
           news: [],
         };
@@ -183,19 +180,6 @@ export default function SearchResults() {
           }
         }
 
-        // Fetch Groups
-        if (selectedTypes.includes('groups')) {
-          try {
-            const response = await fetch('/api/groups?limit=20', { credentials: 'include' });
-            if (response.ok) {
-              const data = await response.json();
-              newResults.groups = data.groups || [];
-            }
-          } catch (err) {
-            console.error('Error fetching groups:', err);
-          }
-        }
-
         // Fetch Users (accounts with usernames)
         if (selectedTypes.includes('users')) {
           try {
@@ -257,7 +241,7 @@ export default function SearchResults() {
     fetchResults();
   }, [searchParams]);
 
-  const totalResults = results.posts.length + results.mentions.length + results.groups.length + results.users.length + results.news.length;
+  const totalResults = results.posts.length + results.mentions.length + results.users.length + results.news.length;
 
   if (loading) {
     return (
@@ -311,7 +295,7 @@ export default function SearchResults() {
                 {results.posts.map((post) => (
                   <Link
                     key={post.id}
-                    href={`/post/${post.id}`}
+                    href={post.map ? getMapPostUrl(post.map, post.id) : '#'}
                     className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
                   >
                     <div className="space-y-2">
@@ -341,12 +325,6 @@ export default function SearchResults() {
                           })}
                         </span>
                       </div>
-                      {(post as any).group && (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600 pt-1">
-                          <UserGroupIcon className="w-3 h-3" />
-                          <span>{(post as any).group.name}</span>
-                        </div>
-                      )}
                     </div>
                   </Link>
                 ))}
@@ -464,69 +442,6 @@ export default function SearchResults() {
                           </span>
                         </div>
                       )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Groups Section */}
-          {results.groups.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <UserGroupIcon className="w-5 h-5 text-gray-600" />
-                <h3 className="text-md font-semibold text-gray-900">Groups ({results.groups.length})</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {results.groups.map((group) => (
-                  <Link
-                    key={group.id}
-                    href={`/group/${group.slug}`}
-                    className="block bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        {group.image_url ? (
-                          <img
-                            src={group.image_url}
-                            alt={group.name}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                            <UserGroupIcon className="w-6 h-6 text-gray-400" />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">
-                            {group.name}
-                          </h4>
-                          <p className="text-xs text-gray-500">
-                            {group.member_count || 0} members
-                          </p>
-                        </div>
-                      </div>
-                      {group.description && (
-                        <p className="text-sm text-gray-700 line-clamp-2">
-                          {group.description}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
-                        <span className={`px-2 py-1 rounded-full ${
-                          group.visibility === 'public' 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {group.visibility}
-                        </span>
-                        <span>
-                          {new Date(group.created_at).toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </span>
-                      </div>
                     </div>
                   </Link>
                 ))}

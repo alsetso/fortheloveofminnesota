@@ -5,8 +5,33 @@ import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollecti
 
 /**
  * Service for managing mentions
+ * Note: Mentions are now stored in map_pins table, linked to the "live" map
  */
 export class MentionService {
+  /**
+   * Get the live map ID (cached)
+   */
+  private static liveMapIdCache: string | null = null;
+  
+  private static async getLiveMapId(): Promise<string> {
+    if (this.liveMapIdCache) {
+      return this.liveMapIdCache;
+    }
+    
+    const { data, error } = await supabase
+      .from('map')
+      .select('id')
+      .eq('slug', 'live')
+      .eq('is_active', true)
+      .single();
+    
+    if (error || !data) {
+      throw new Error('Live map not found');
+    }
+    
+    this.liveMapIdCache = data.id;
+    return data.id;
+  }
   /**
    * Fetch all public mentions
    * Optionally filter by account_id, year, or bounding box
@@ -39,7 +64,7 @@ export class MentionService {
       view_count`;
     
     let query = supabase
-      .from('mentions')
+      .from('map_pins')
       .select(isAuthenticated 
         ? `${essentialColumns},
           accounts(
@@ -69,7 +94,8 @@ export class MentionService {
             name
           )`
       )
-      .eq('archived', false); // Exclude archived mentions
+      .eq('archived', false) // Exclude archived mentions
+      .eq('is_active', true); // Exclude inactive pins
     
     // For anonymous users, explicitly filter to public mentions only
     // (RLS should handle this, but explicit filter ensures it works)
@@ -93,17 +119,14 @@ export class MentionService {
       query = query.eq('city_id', filters.city_id);
     }
 
+    // All mentions are now linked to the live map
+    // If map_id filter is provided, use it; otherwise default to live map
     if (filters?.map_id) {
-      if (filters.include_null_map_id) {
-        // For live/primary maps: show mentions with this map_id OR NULL map_id
-        query = query.or(`map_id.eq.${filters.map_id},map_id.is.null`);
-      } else {
-        // For specific maps: show only mentions with this map_id
-        query = query.eq('map_id', filters.map_id);
-      }
-    } else if (filters?.include_null_map_id) {
-      // If no map_id but include_null_map_id is true, show only NULL map_id mentions
-      query = query.is('map_id', null);
+      query = query.eq('map_id', filters.map_id);
+    } else {
+      // Default to live map for mentions
+      const liveMapId = await this.getLiveMapId();
+      query = query.eq('map_id', liveMapId);
     }
 
     if (filters?.mention_type_ids && filters.mention_type_ids.length > 0) {
@@ -322,17 +345,23 @@ export class MentionService {
     // Use city_id if provided, otherwise leave as null
     const cityId = data.city_id || null;
 
+    // Get live map ID to link the mention
+    const liveMapId = await this.getLiveMapId();
+    
     const { data: mention, error } = await supabase
-      .from('mentions')
+      .from('map_pins')
       .insert({
+        map_id: liveMapId,
         lat: data.lat,
         lng: data.lng,
         description: data.description || null,
+        caption: null, // Mentions use description, not caption
         city_id: cityId,
         post_date: normalizedPostDate,
         account_id: account_id,
         visibility: data.visibility || 'public',
         archived: false, // New mentions are never archived
+        is_active: true, // New mentions are always active
         icon_url: null, // Not used - we use account.image_url instead
         image_url: data.image_url || null,
         video_url: data.video_url || null,
@@ -389,9 +418,10 @@ export class MentionService {
     }
 
     const { data: mention, error } = await supabase
-      .from('mentions')
+      .from('map_pins')
       .update(data)
       .eq('id', mentionId)
+      .eq('is_active', true)
       .select()
       .single();
 
@@ -413,11 +443,12 @@ export class MentionService {
       throw new Error('You must be signed in to delete mentions');
     }
 
-    // Get mention to verify ownership
+    // Get mention to verify ownership (now map_pins)
     const { data: mention } = await supabase
-      .from('mentions')
+      .from('map_pins')
       .select('account_id, accounts!inner(user_id)')
       .eq('id', mentionId)
+      .eq('is_active', true)
       .single();
 
     const mentionAccounts = mention?.accounts as { user_id: string } | { user_id: string }[] | null | undefined;
@@ -427,9 +458,10 @@ export class MentionService {
       throw new Error('You do not have permission to delete this mention');
     }
 
+    // Soft delete by setting is_active = false
     const { error } = await supabase
-      .from('mentions')
-      .delete()
+      .from('map_pins')
+      .update({ is_active: false, archived: true })
       .eq('id', mentionId);
 
     if (error) {

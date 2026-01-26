@@ -26,6 +26,12 @@ interface MapInfoCardProps {
   viewCount?: number | null;
   isOwner: boolean;
   hideCreator?: boolean;
+  visibility?: 'public' | 'private' | 'shared';
+  allowOthersToPostPins?: boolean;
+  allowOthersToAddAreas?: boolean;
+  // NEW: Plan-based permissions (for visual indicators)
+  pinPermissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+  areaPermissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
   onInfoClick: () => void;
   onPinClick: () => void;
   onDrawClick: () => void;
@@ -40,13 +46,34 @@ export default function MapInfoCard({
   viewCount,
   isOwner,
   hideCreator = false,
+  visibility = 'private',
+  allowOthersToPostPins = false,
+  allowOthersToAddAreas = false,
+  pinPermissions = null,
+  areaPermissions = null,
   onInfoClick,
   onPinClick,
   onDrawClick,
   pinMode,
   showAreaDrawModal,
 }: MapInfoCardProps) {
+  // Check if user can add pins/areas: owner OR (public map with collaboration enabled)
+  const canAddPins = isOwner || (visibility === 'public' && allowOthersToPostPins);
+  const canAddAreas = isOwner || (visibility === 'public' && allowOthersToAddAreas);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Visual indicators: Blue border = plan-based, Red border = owner-granted (TEMPORARY - remove before production)
+  const pinBorderClass = pinPermissions?.required_plan 
+    ? 'border-2 border-blue-500' // Plan-based permission
+    : allowOthersToPostPins && !isOwner
+    ? 'border-2 border-red-500' // Owner-granted permission
+    : '';
+
+  const areaBorderClass = areaPermissions?.required_plan
+    ? 'border-2 border-blue-500' // Plan-based permission
+    : allowOthersToAddAreas && !isOwner
+    ? 'border-2 border-red-500' // Owner-granted permission
+    : '';
 
   const displayName = account
     ? account.username ||
@@ -68,7 +95,18 @@ export default function MapInfoCard({
   return (
     <>
       {/* Floating Info Card - Top Center */}
-      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] max-w-md">
+      <div 
+        className="absolute top-3 left-1/2 -translate-x-1/2 z-[60] w-[calc(100%-2rem)] max-w-md pointer-events-auto"
+        onWheel={(e) => {
+          // Prevent scroll from propagating to page/map container
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        onTouchMove={(e) => {
+          // Prevent touch scroll propagation on mobile
+          e.stopPropagation();
+        }}
+      >
         <div className="bg-white/95 backdrop-blur-sm rounded-lg border border-gray-200 shadow-lg overflow-hidden transition-all">
           {/* Collapsed State */}
           {!isExpanded && (
@@ -197,31 +235,35 @@ export default function MapInfoCard({
                 </button>
 
 
-                {/* Owner Actions */}
-                {isOwner && (
+                {/* Actions - Show if owner OR if collaboration is enabled */}
+                {(canAddPins || canAddAreas) && (
                   <>
-                    <button
-                      onClick={onPinClick}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                        pinMode
-                          ? 'bg-gray-900 text-white hover:bg-gray-800'
-                          : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      <MapPinIcon className="w-4 h-4" />
-                      <span className="hidden sm:inline">Pin</span>
-                    </button>
-                    <button
-                      onClick={onDrawClick}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                        showAreaDrawModal
-                          ? 'bg-gray-900 text-white hover:bg-gray-800'
-                          : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      <PencilSquareIcon className="w-4 h-4" />
-                      <span className="hidden sm:inline">Draw</span>
-                    </button>
+                    {canAddPins && (
+                      <button
+                        onClick={onPinClick}
+                        className={`${pinBorderClass} flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                          pinMode
+                            ? 'bg-gray-900 text-white hover:bg-gray-800'
+                            : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                        }`}
+                      >
+                        <MapPinIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Pin</span>
+                      </button>
+                    )}
+                    {canAddAreas && (
+                      <button
+                        onClick={onDrawClick}
+                        className={`${areaBorderClass} flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                          showAreaDrawModal
+                            ? 'bg-gray-900 text-white hover:bg-gray-800'
+                            : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                        }`}
+                      >
+                        <PencilSquareIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Draw</span>
+                      </button>
+                    )}
                   </>
                 )}
               </div>

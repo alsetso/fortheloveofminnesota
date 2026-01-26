@@ -67,7 +67,7 @@ export function useMentionData(mentionId: string | null): UseMentionDataResult {
     const fetchMention = async (): Promise<Mention | null> => {
       try {
         const { data, error: fetchError } = await supabase
-          .from('mentions')
+          .from('map_pins')
           .select(`
             id,
             lat,
@@ -104,10 +104,11 @@ export function useMentionData(mentionId: string | null): UseMentionDataResult {
               emoji,
               name
             )
-          `)
-          .eq('id', mentionId)
-          .eq('archived', false)
-          .single();
+            `)
+            .eq('id', mentionId)
+            .eq('archived', false)
+            .eq('is_active', true)
+            .single();
 
         if (fetchError) {
           throw new Error(fetchError.message);

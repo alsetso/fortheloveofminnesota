@@ -58,12 +58,29 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const timeFilter = url.searchParams.get('timeFilter') || 'all';
 
-    // Build query for user's mentions
+    // Get live map ID first
+    const { data: liveMap } = await supabase
+      .from('map')
+      .select('id')
+      .eq('slug', 'live')
+      .eq('is_active', true)
+      .single();
+
+    if (!liveMap) {
+      return NextResponse.json(
+        { error: 'Live map not found' },
+        { status: 500 }
+      );
+    }
+
+    // Build query for user's mentions (now map_pins on live map)
     let query = supabase
-      .from('mentions')
+      .from('map_pins')
       .select('id, description, image_url, created_at, view_count')
+      .eq('map_id', liveMap.id)
       .eq('account_id', account.id)
       .eq('archived', false)
+      .eq('is_active', true)
       .order('created_at', { ascending: false });
 
     // Apply time filter

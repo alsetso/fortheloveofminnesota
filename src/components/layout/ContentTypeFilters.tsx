@@ -6,7 +6,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 /**
  * Content Type Filters Component
  * 
- * Displays filter buttons for content types (Posts, Mentions, Groups, Users)
+ * Displays filter buttons for content types (Posts, Mentions, Users, News)
  * in search mode. Manages URL state for content type filtering.
  */
 export default function ContentTypeFilters() {
@@ -19,7 +19,6 @@ export default function ContentTypeFilters() {
   const contentTypes = useMemo(() => [
     { id: 'posts', label: 'Posts' },
     { id: 'mentions', label: 'Mentions' },
-    { id: 'groups', label: 'Groups' },
     { id: 'users', label: 'Users' },
     { id: 'news', label: 'News' },
   ], []);

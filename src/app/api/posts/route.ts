@@ -8,7 +8,7 @@ import { cookies } from 'next/headers';
 
 /**
  * GET /api/posts
- * List posts (feed posts and group posts)
+ * List posts (feed posts only)
  * 
  * Security:
  * - Rate limited: 200 requests/minute
@@ -23,11 +23,12 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(req.url);
         
         const account_id = searchParams.get('account_id');
-        const group_id = searchParams.get('group_id');
         const mention_time = searchParams.get('mention_time') as '24h' | '7d' | 'all' | null;
         const mention_type_id = searchParams.get('mention_type_id');
         const limit = parseInt(searchParams.get('limit') || '20', 10);
         const offset = parseInt(searchParams.get('offset') || '0', 10);
+
+        const map_id = searchParams.get('map_id');
 
         let query = supabase
           .from('posts')
@@ -37,9 +38,9 @@ export async function GET(request: NextRequest) {
             title,
             content,
             visibility,
-            group_id,
             mention_type_id,
             mention_ids,
+            map_id,
             images,
             map_data,
             created_at,
@@ -52,38 +53,30 @@ export async function GET(request: NextRequest) {
               image_url,
               plan
             ),
+            map:map!posts_map_id_fkey(
+              id,
+              name,
+              slug,
+              visibility
+            ),
             mention_type:mention_types(
               id,
               emoji,
               name
-            ),
-            group:groups!posts_group_id_fkey(
-              id,
-              name,
-              slug,
-              image_url
             )
           `)
           .order('created_at', { ascending: false })
           .range(offset, offset + limit - 1);
 
-        // Filter by group_id or exclude group posts
-        if (group_id) {
-          query = query.eq('group_id', group_id);
-          // For group posts, visibility is handled by RLS policies (group members can see all group posts)
-          // No additional visibility filtering needed here
+        // Only show feed posts (group_id column will be removed by migration)
+        
+        // For feed posts, apply visibility filtering
+        // For anonymous users, only show public posts
+        if (!accountId) {
+          query = query.eq('visibility', 'public');
         } else {
-          // Default: only show feed posts (no group_id)
-          query = query.is('group_id', null);
-          
-          // For feed posts, apply visibility filtering
-          // For anonymous users, only show public posts
-          if (!accountId) {
-            query = query.eq('visibility', 'public');
-          } else {
-            // For authenticated users, show public posts and their own posts (including drafts)
-            query = query.or(`visibility.eq.public,account_id.eq.${accountId}`);
-          }
+          // For authenticated users, show public posts and their own posts (including drafts)
+          query = query.or(`visibility.eq.public,account_id.eq.${accountId}`);
         }
 
         // Filter by account
@@ -94,6 +87,11 @@ export async function GET(request: NextRequest) {
         // Filter by mention_type_id
         if (mention_type_id) {
           query = query.eq('mention_type_id', mention_type_id);
+        }
+
+        // Filter by map_id
+        if (map_id) {
+          query = query.eq('map_id', map_id);
         }
 
         const { data: posts, error } = await query;
@@ -128,11 +126,13 @@ export async function GET(request: NextRequest) {
           if (allMentionIds.length > 0) {
             const uniqueMentionIds = [...new Set(allMentionIds)];
             
-            // Fetch mentions that match the time filter
+            // Fetch mentions that match the time filter (now map_pins)
             const { data: filteredMentions } = await supabase
-              .from('mentions')
+              .from('map_pins')
               .select('id')
               .in('id', uniqueMentionIds)
+              .eq('is_active', true)
+              .eq('archived', false)
               .gte('created_at', cutoffDate.toISOString());
 
             const validMentionIds = new Set((filteredMentions || []).map((m: any) => m.id));
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
           if (allMentionIds.length > 0) {
             const uniqueMentionIds = [...new Set(allMentionIds)];
             const { data: mentions } = await supabase
-              .from('mentions')
+              .from('map_pins')
               .select(`
                 id,
                 lat,
@@ -175,7 +175,9 @@ export async function GET(request: NextRequest) {
                   name
                 )
               `)
-              .in('id', uniqueMentionIds);
+              .in('id', uniqueMentionIds)
+              .eq('is_active', true)
+              .eq('archived', false);
 
             const mentionsMap = new Map(
               (mentions || []).map((m: any) => [m.id, m])
@@ -219,9 +221,9 @@ const createPostSchema = z.object({
   title: z.string().max(200).optional().nullable(),
   content: z.string().min(1).max(10000),
   visibility: z.enum(['public', 'draft']).default('public'),
-  group_id: z.string().uuid().optional().nullable(),
   mention_type_id: z.string().uuid().optional().nullable(),
   mention_ids: z.array(z.string().uuid()).optional().nullable(),
+  map_id: z.string().uuid().optional().nullable(),
   images: z.array(z.object({
     url: z.string().url(),
     alt: z.string().optional(),
@@ -259,20 +261,67 @@ export async function POST(request: NextRequest) {
           return validation.error;
         }
 
-        const { title, content, visibility, group_id, mention_type_id, mention_ids, images, map_data } = validation.data;
+        const { title, content, visibility, mention_type_id, mention_ids, map_id, images, map_data } = validation.data;
 
-        // If posting to a group, verify user is a member
-        if (group_id) {
-          const { data: membership } = await supabase
-            .from('group_members')
-            .select('id')
-            .eq('group_id', group_id)
-            .eq('account_id', accountId)
+        // Validate map_id if provided
+        if (map_id) {
+          // Check if map exists and is active
+          const { data: map, error: mapError } = await supabase
+            .from('map')
+            .select(`
+              id,
+              visibility,
+              is_active,
+              settings,
+              account_id
+            `)
+            .eq('id', map_id)
+            .eq('is_active', true)
             .maybeSingle();
 
-          if (!membership) {
+          if (mapError || !map) {
             return NextResponse.json(
-              { error: 'You must be a member of the group to post' },
+              { error: 'Map not found or inactive' },
+              { status: 400 }
+            );
+          }
+
+          // Check if user is map owner
+          const mapAccountId = map && typeof map === 'object' && 'account_id' in map ? (map as { account_id: string }).account_id : null;
+          const isMapOwner = mapAccountId === accountId;
+
+          // Check if user is map member (for private maps)
+          let isMapMember = false;
+          let userRole: string | null = null;
+          if (!isMapOwner) {
+            const { data: membership } = await supabase
+              .from('map_members')
+              .select('role')
+              .eq('map_id', map_id)
+              .eq('account_id', accountId)
+              .maybeSingle();
+            
+            isMapMember = !!membership;
+            const membershipRole = membership && typeof membership === 'object' && 'role' in membership ? (membership as { role: string }).role : null;
+            userRole = membershipRole || null;
+          }
+
+          const mapVisibility = map && typeof map === 'object' && 'visibility' in map ? (map as { visibility: string }).visibility : null;
+          const isPublicMap = mapVisibility === 'public';
+          const mapSettings = map && typeof map === 'object' && 'settings' in map ? (map as { settings: any }).settings : {};
+          const collaboration = mapSettings?.collaboration || {};
+          const allowPosts = collaboration.allow_posts === true;
+
+          // Check access: owner/manager can always post, or public map with allow_posts, or member with allow_posts
+          const isManager = userRole === 'owner' || userRole === 'manager';
+          const canPost = isMapOwner || 
+            isManager ||
+            (isPublicMap && allowPosts) || 
+            (isMapMember && allowPosts);
+
+          if (!canPost) {
+            return NextResponse.json(
+              { error: 'You do not have permission to create posts on this map' },
               { status: 403 }
             );
           }
@@ -294,12 +343,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Validate mention IDs if provided
+        // Validate mention IDs if provided (now map_pins)
         if (mention_ids && mention_ids.length > 0) {
           const { data: mentions } = await supabase
-            .from('mentions')
+            .from('map_pins')
             .select('id')
-            .in('id', mention_ids);
+            .in('id', mention_ids)
+            .eq('is_active', true)
+            .eq('archived', false);
 
           if (!mentions || mentions.length !== mention_ids.length) {
             return NextResponse.json(
@@ -317,9 +368,9 @@ export async function POST(request: NextRequest) {
             title: title?.trim() || null,
             content: content.trim(),
             visibility,
-            group_id: group_id || null,
             mention_type_id: mention_type_id || null,
             mention_ids: mention_ids && mention_ids.length > 0 ? mention_ids : null,
+            map_id: map_id || null,
             images: images && images.length > 0 ? images : null,
             map_data: map_data || null,
           } as any)
@@ -329,8 +380,8 @@ export async function POST(request: NextRequest) {
             title,
             content,
             visibility,
-            group_id,
             mention_ids,
+            map_id,
             images,
             map_data,
             created_at,
@@ -343,11 +394,11 @@ export async function POST(request: NextRequest) {
               image_url,
               plan
             ),
-            group:groups!posts_group_id_fkey(
+            map:map!posts_map_id_fkey(
               id,
               name,
               slug,
-              image_url
+              visibility
             )
           `)
           .single();
@@ -360,11 +411,11 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Fetch mentions if referenced
+        // Fetch mentions if referenced (now map_pins)
         const postData = post as any;
         if (postData && postData.mention_ids && Array.isArray(postData.mention_ids) && postData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
-            .from('mentions')
+            .from('map_pins')
             .select(`
               id,
               lat,
@@ -377,6 +428,8 @@ export async function POST(request: NextRequest) {
                 name
               )
             `)
+            .eq('is_active', true)
+            .eq('archived', false)
             .in('id', postData.mention_ids);
 
           postData.mentions = mentions || [];

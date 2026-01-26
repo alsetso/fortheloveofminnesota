@@ -246,6 +246,19 @@ export default function MapAreaDrawModal({
               // Clear the drawing and close
               drawInstance.deleteAll();
               onClose();
+            } else {
+              // Handle permission errors
+              const errorData = await response.json().catch(() => ({}));
+              if (response.status === 403 && errorData.reason === 'plan_required') {
+                window.dispatchEvent(new CustomEvent('map-action-permission-denied', {
+                  detail: {
+                    action: 'areas',
+                    requiredPlan: errorData.requiredPlan,
+                    currentPlan: errorData.currentPlan,
+                  }
+                }));
+                onClose(); // Close modal on permission error
+              }
             }
           } catch (err) {
             console.error('Error auto-saving area:', err);
@@ -293,6 +306,16 @@ export default function MapAreaDrawModal({
 
       if (!response.ok) {
         const data = await response.json();
+        // Handle permission errors - show upgrade prompt via custom event
+        if (response.status === 403 && data.reason === 'plan_required') {
+          window.dispatchEvent(new CustomEvent('map-action-permission-denied', {
+            detail: {
+              action: 'areas',
+              requiredPlan: data.requiredPlan,
+              currentPlan: data.currentPlan,
+            }
+          }));
+        }
         throw new Error(data.error || 'Failed to create area');
       }
 

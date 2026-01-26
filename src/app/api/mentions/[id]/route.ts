@@ -21,9 +21,9 @@ export async function GET(
     // Check if user is authenticated
     const isAuthenticated = !!accountId;
 
-    // Build query with relations
+    // Build query with relations - query map_pins (unified table)
     let query = supabase
-      .from('mentions')
+      .from('map_pins')
       .select(`
         id,
         lat,
@@ -62,7 +62,8 @@ export async function GET(
         )
       `)
       .eq('id', id)
-      .eq('archived', false);
+      .eq('archived', false)
+      .eq('is_active', true);
 
     // For anonymous users, filter to public only
     if (!isAuthenticated) {

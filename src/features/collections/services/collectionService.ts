@@ -134,9 +134,10 @@ export class CollectionService {
     }
 
     const { error } = await supabase
-      .from('mentions')
+      .from('map_pins')
       .update({ collection_id: collectionId })
-      .eq('id', mentionId);
+      .eq('id', mentionId)
+      .eq('is_active', true);
 
     if (error) {
       console.error('[CollectionService] Error updating mention collection:', error);

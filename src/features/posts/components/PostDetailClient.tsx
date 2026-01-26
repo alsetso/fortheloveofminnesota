@@ -10,8 +10,11 @@ import { useAuthStateSafe } from '@/features/auth';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import MentionCard from '@/components/feed/MentionCard';
 import { Account } from '@/features/auth';
+import { getMapUrl, getMapPostEditUrl } from '@/lib/maps/urls';
 
 interface PostDetailClientProps {
+  mapId?: string;
+  mapSlug?: string;
   post: {
     id: string;
     account_id: string;
@@ -20,6 +23,7 @@ interface PostDetailClientProps {
     visibility: 'public' | 'draft';
     group_id: string | null;
     mention_ids: string[] | null;
+    map_id: string | null;
     images: Array<{
       url: string;
       alt?: string;
@@ -45,6 +49,12 @@ interface PostDetailClientProps {
       name: string;
     } | null;
     mention_type_id?: string | null;
+    map?: {
+      id: string;
+      name: string;
+      slug: string;
+      visibility: string;
+    } | null;
     account?: {
       id: string;
       username: string | null;
@@ -73,7 +83,7 @@ interface PostDetailClientProps {
   isOwner: boolean;
 }
 
-export default function PostDetailClient({ post, isOwner }: PostDetailClientProps) {
+export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: PostDetailClientProps) {
   const { account } = useAuthStateSafe();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -297,7 +307,7 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
                     <>
                       <div className="border-t border-gray-200 my-1" />
                       <Link
-                        href={`/post/${post.id}/edit`}
+                        href={post.map ? getMapPostEditUrl(post.map, post.id) : '#'}
                         onClick={() => setShowMenu(false)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                       >
@@ -339,6 +349,24 @@ export default function PostDetailClient({ post, isOwner }: PostDetailClientProp
                 >
                   @{username}
                 </Link>
+                {post.map && (
+                  <div className="mt-1">
+                    <Link
+                      href={getMapUrl(post.map)}
+                      className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      <span>{post.map.name}</span>
+                      {post.map.visibility === 'private' && (
+                        <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           )}

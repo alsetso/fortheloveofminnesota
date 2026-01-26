@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withRateLimit, RATE_LIMITS } from './rateLimit';
 import { optionalAuth } from './accessControl';
+import { getRequestAuth } from './authContext';
 
 /**
  * Request size limits (in bytes)
@@ -77,8 +78,8 @@ export async function withSecurity<T>(
     );
   }
   
-  // Get auth context
-  const auth = await optionalAuth();
+  // Get auth context (cached per request)
+  const auth = await getRequestAuth(request);
   
   // Apply rate limiting
   if (rateLimit !== 'none') {

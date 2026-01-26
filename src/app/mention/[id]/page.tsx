@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = await createServerClientWithAuth();
 
   const { data: mention } = await supabase
-    .from('mentions')
+    .from('map_pins')
     .select(`
       id,
       description,
@@ -25,6 +25,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     `)
     .eq('id', id)
     .eq('visibility', 'public')
+    .eq('is_active', true)
+    .eq('archived', false)
     .single();
 
   if (!mention) {
@@ -69,9 +71,9 @@ export default async function MentionPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createServerClientWithAuth();
 
-  // Fetch mention with all details
+  // Fetch mention with all details (now map_pins)
   const { data: mention, error } = await supabase
-    .from('mentions')
+    .from('map_pins')
     .select(`
       id,
       lat,
@@ -107,6 +109,7 @@ export default async function MentionPage({ params }: Props) {
     `)
     .eq('id', id)
     .eq('archived', false)
+    .eq('is_active', true)
     .single();
 
   if (error) {

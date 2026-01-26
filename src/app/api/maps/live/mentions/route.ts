@@ -17,23 +17,41 @@ const getCachedLiveMentions = cache(async () => {
   const supabase = createServerClient();
   
   // Get the live map ID first
-  const { data: liveMap, error: mapError } = await supabase
+  // Use slug (new system) or custom_slug (legacy fallback)
+  // Try slug first, then fallback to custom_slug
+  let liveMap: { id: string } | null = null;
+  
+  // Get live map by slug
+  const { data: slugMap, error: slugError } = await supabase
     .from('map')
     .select('id')
-    .eq('custom_slug', 'live')
-    .eq('is_primary', true)
-    .single();
+    .eq('slug', 'live')
+    .eq('is_active', true)
+    .maybeSingle();
   
-  if (mapError || !liveMap) {
+  if (slugMap && !slugError) {
+    liveMap = slugMap;
+  } else {
+    // Log detailed error for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Live Map Mentions API] Live map lookup failed:', {
+        slugError,
+        slugMap,
+      });
+    }
+    throw new Error('Live map not found');
+  }
+  
+  if (!liveMap) {
     throw new Error('Live map not found');
   }
   
   const liveMapId = (liveMap as { id: string }).id;
   
-  // Fetch the 100 most recent public mentions
-  // Include mentions with NULL map_id OR explicitly linked to live map
+  // Fetch the 100 most recent public map_pins from live map
+  // All mentions are now map_pins linked to the live map
   const { data: mentions, error } = await supabase
-    .from('mentions')
+    .from('map_pins')
     .select(`
       id,
       lat,
@@ -61,9 +79,10 @@ const getCachedLiveMentions = cache(async () => {
         name
       )
     `)
+    .eq('map_id', liveMapId)
     .eq('archived', false)
     .eq('visibility', 'public')
-    .or(`map_id.eq.${liveMapId},map_id.is.null`)
+    .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(100);
   

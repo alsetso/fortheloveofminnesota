@@ -113,13 +113,23 @@ export default async function ProfileMapPage({ params }: Props) {
 
   const collections: Collection[] = (collectionsData || []) as Collection[];
 
-  // Fetch mentions for this account
+  // Get live map ID first
+  const { data: liveMap } = await supabase
+    .from('map')
+    .select('id')
+    .eq('slug', 'live')
+    .eq('is_active', true)
+    .single();
+
+  // Fetch mentions for this account (now map_pins on live map)
   // For visitors, only show public mentions; for owners, show all non-archived mentions
   let mentionsQuery = supabase
-    .from('mentions')
+    .from('map_pins')
     .select('id, lat, lng, description, visibility, city_id, collection_id, image_url, video_url, media_type, created_at, updated_at')
+    .eq('map_id', liveMap?.id)
     .eq('account_id', accountData.id)
     .eq('archived', false)
+    .eq('is_active', true)
     .order('created_at', { ascending: false });
 
   // If not owner, only show public mentions

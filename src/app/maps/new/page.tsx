@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapIcon, GlobeAltIcon, BuildingOfficeIcon, MapPinIcon, SunIcon, MoonIcon, ChevronLeftIcon, ChevronRightIcon, LockClosedIcon, UserIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
@@ -18,7 +18,7 @@ import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export default function NewMapPage() {
   const router = useRouter();
-  const { account, user } = useAuthStateSafe();
+  const { account, user, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -28,6 +28,8 @@ export default function NewMapPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [mapLimit, setMapLimit] = useState<{current: number; max: number | null; type: string} | null>(null);
+  const [customMapsFeature, setCustomMapsFeature] = useState<{slug: string; name: string; limit_value: number | null; limit_type: string | null; is_unlimited: boolean} | null>(null);
+  const [plans, setPlans] = useState<Array<{slug: string; name: string; display_order: number; features?: Array<{slug: string; limit_value?: number | null; limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>}>>([]);
   const isAdmin = account?.role === 'admin';
   const totalSteps = isAdmin ? 7 : 6; // Add admin step if user is admin
   
@@ -50,51 +52,87 @@ export default function NewMapPage() {
     terrainEnabled: false,
   });
 
-  // Fetch map limit on mount
+  // Fetch plans and map limit on mount
   useEffect(() => {
-    if (!user || !account) return;
+    if (!user || !activeAccountId) return;
     
-    const fetchMapLimit = async () => {
+    const fetchData = async () => {
       try {
-        // Get user's map count
-        const mapsResponse = await fetch(`/api/maps?account_id=${account.id}`);
+        console.log('[NewMapPage] Fetching data for activeAccountId:', activeAccountId);
+        
+        // Fetch plans to get next plan's limit
+        const plansResponse = await fetch('/api/billing/plans');
+        if (plansResponse.ok) {
+          const plansData = await plansResponse.json();
+          setPlans(plansData.plans || []);
+          console.log('[NewMapPage] Plans fetched:', plansData.plans?.length || 0);
+        }
+
+        // Get user's map count using activeAccountId
+        const mapsResponse = await fetch(`/api/maps?account_id=${activeAccountId}`);
         if (mapsResponse.ok) {
           const mapsData = await mapsResponse.json();
           const currentCount = mapsData.maps?.length || 0;
+          console.log('[NewMapPage] Current map count:', currentCount);
           
           // Get account features to find map limit (account-scoped; includes limits)
+          // This uses the active account from the cookie
           const featuresResponse = await fetch('/api/billing/user-features');
           if (featuresResponse.ok) {
             const featuresData = await featuresResponse.json();
+            console.log('[NewMapPage] User features response:', featuresData);
+            
             const features: any[] = Array.isArray(featuresData.features) ? featuresData.features : [];
+            console.log('[NewMapPage] Features array:', features);
 
-            const limited = features.find((f) => f.slug === 'custom_maps');
+            // Look for 'map' feature first, then fallback to 'custom_maps'
+            const limited = features.find((f) => f.slug === 'map') || features.find((f) => f.slug === 'custom_maps');
+            console.log('[NewMapPage] map/custom_maps feature:', limited);
+
+            // Store the feature data for use in the modal
+            if (limited) {
+              setCustomMapsFeature({
+                slug: limited.slug,
+                name: limited.name || 'Maps',
+                limit_value: limited.limit_value ?? null,
+                limit_type: limited.limit_type || null,
+                is_unlimited: limited.is_unlimited || false,
+              });
+            }
 
             if (limited && (limited.is_unlimited || limited.limit_type === 'unlimited')) {
+              console.log('[NewMapPage] Map limit: unlimited');
               setMapLimit({ current: currentCount, max: null, type: 'unlimited' });
               return;
             }
 
             if (limited) {
-              setMapLimit({
+              const limitData = {
                 current: currentCount,
                 max: limited.limit_value ?? null,
                 type: limited.limit_type || 'count',
-              });
+              };
+              console.log('[NewMapPage] Map limit set:', limitData);
+              setMapLimit(limitData);
               return;
             }
 
             // No explicit entitlement row returned (treat as no access)
+            console.log('[NewMapPage] No map feature found, setting limit to 0');
             setMapLimit({ current: currentCount, max: 0, type: 'count' });
+          } else {
+            console.error('[NewMapPage] Failed to fetch user features:', featuresResponse.status, featuresResponse.statusText);
           }
+        } else {
+          console.error('[NewMapPage] Failed to fetch maps:', mapsResponse.status, mapsResponse.statusText);
         }
       } catch (err) {
-        console.error('Failed to fetch map limit:', err);
+        console.error('[NewMapPage] Failed to fetch map limit:', err);
       }
     };
     
-    fetchMapLimit();
-  }, [user, account]);
+    fetchData();
+  }, [user, activeAccountId]);
 
   // Mapbox state
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -325,11 +363,8 @@ export default function NewMapPage() {
       const data = await response.json();
       const createdMap = data.map || data;
 
-      // Success - navigate to the created map (use slug if available, otherwise id)
-      const mapUrl = createdMap.custom_slug 
-        ? `/map/${createdMap.custom_slug}`
-        : `/map/${createdMap.id}`;
-      router.push(mapUrl);
+      // Success - navigate to the created map
+      router.push(getMapUrl(createdMap));
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create map';
       console.error('[NewMapPage] Error creating map:', errorMessage, err);
@@ -650,9 +685,161 @@ export default function NewMapPage() {
     }
   };
 
+  // Calculate next plan's limit and upgrade message
+  const upgradeInfo = useMemo(() => {
+    console.log('[NewMapPage] upgradeInfo calculation:', { mapLimit, account: account?.id, activeAccountId, isAdmin });
+    
+    if (!mapLimit || !account || isAdmin) {
+      console.log('[NewMapPage] upgradeInfo: early return - no mapLimit, account, or isAdmin');
+      return null;
+    }
+    
+    if (mapLimit.max === null || mapLimit.current < mapLimit.max) {
+      console.log('[NewMapPage] upgradeInfo: not at limit', { current: mapLimit.current, max: mapLimit.max });
+      return null; // Not at limit
+    }
+    
+    console.log('[NewMapPage] upgradeInfo: limit reached, calculating next plan');
+    
+    const currentPlan = account.plan || 'hobby';
+    const currentPlanData = plans.find(p => p.slug === currentPlan);
+    const currentPlanOrder = currentPlanData?.display_order || 0;
+    
+    // Find next plan (higher display_order)
+    const nextPlan = plans
+      .filter(p => p.display_order > currentPlanOrder && p.is_active)
+      .sort((a, b) => a.display_order - b.display_order)[0];
+    
+    if (!nextPlan) {
+      console.log('[NewMapPage] upgradeInfo: no next plan found');
+      return null;
+    }
+    
+    console.log('[NewMapPage] upgradeInfo: next plan found:', nextPlan.name, nextPlan.features?.length || 0, 'features');
+    
+    // Get "map" feature from next plan (not "custom_maps")
+    const nextPlanMapFeature = nextPlan.features?.find(f => f.slug === 'map');
+    console.log('[NewMapPage] upgradeInfo: next plan map feature:', nextPlanMapFeature);
+    
+    const nextPlanLimit = nextPlanMapFeature?.limit_value ?? null;
+    const nextPlanLimitType = nextPlanMapFeature?.limit_type ?? null;
+    const nextPlanIsUnlimited = nextPlanLimitType === 'unlimited' || (nextPlanLimitType === 'count' && nextPlanLimit === null);
+    
+    console.log('[NewMapPage] upgradeInfo: next plan limit data:', {
+      limit_value: nextPlanLimit,
+      limit_type: nextPlanLimitType,
+      is_unlimited: nextPlanIsUnlimited,
+    });
+    
+    // Format plan name (capitalize first letter)
+    const planName = currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1);
+    
+    // Calculate how many more maps
+    let moreMapsText = 'unlimited';
+    if (nextPlanIsUnlimited) {
+      moreMapsText = 'unlimited';
+    } else if (nextPlanLimitType === 'count' && nextPlanLimit !== null && nextPlanLimit !== undefined) {
+      // If next plan has a count limit, calculate the difference
+      moreMapsText = `${nextPlanLimit - mapLimit.current}`;
+    }
+    
+    const result = {
+      currentPlanName: planName,
+      nextPlanName: nextPlan.name,
+      moreMaps: moreMapsText,
+      nextPlanLimit: nextPlanLimit,
+      nextPlanLimitType: nextPlanLimitType,
+      nextPlanIsUnlimited: nextPlanIsUnlimited,
+      nextPlanMapFeature: nextPlanMapFeature,
+    };
+    
+    console.log('[NewMapPage] upgradeInfo result:', result);
+    return result;
+  }, [mapLimit, account, plans, isAdmin]);
+
+  const isLimitReached = mapLimit && mapLimit.max !== null && mapLimit.current >= mapLimit.max && !isAdmin;
+  
+  console.log('[NewMapPage] Render check:', {
+    isLimitReached,
+    mapLimit,
+    upgradeInfo,
+    isAdmin,
+    accountId: account?.id,
+    activeAccountId,
+    accountPlan: account?.plan,
+  });
+
   return (
     <>
       <PageViewTracker />
+      {/* Limit Reached Overlay */}
+      {isLimitReached && upgradeInfo && account && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-md border border-gray-200 max-w-md w-full p-4">
+            <div className="space-y-3">
+              {/* Account Info */}
+              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+                {account.image_url ? (
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+                    <Image
+                      src={account.image_url}
+                      alt={AccountService.getDisplayName(account) || 'User'}
+                      width={32}
+                      height={32}
+                      className="w-full h-full object-cover"
+                      unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <UserIcon className="w-4 h-4 text-gray-500" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-gray-900 truncate">
+                    {account.username || AccountService.getDisplayName(account) || 'User'}
+                  </div>
+                  <div className="text-[10px] text-gray-500">
+                    {upgradeInfo.currentPlanName} Plan
+                  </div>
+                </div>
+              </div>
+              
+              {/* Message */}
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">
+                  Your {upgradeInfo.currentPlanName} plan ran out
+                </h2>
+                {mapLimit && customMapsFeature && (
+                  <p className="text-xs text-gray-600 mt-1.5">
+                    You have created {mapLimit.current} of {customMapsFeature.limit_value || 'unlimited'} maps. You need to upgrade to create more.
+                  </p>
+                )}
+                <p className="text-xs text-gray-600 mt-1">
+                  Get {upgradeInfo.moreMaps} more {upgradeInfo.moreMaps === 'unlimited' ? 'maps' : upgradeInfo.moreMaps === '1' ? 'map' : 'maps'} by upgrading to {upgradeInfo.nextPlanName}
+                </p>
+              </div>
+              
+              {/* Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/billing')}
+                  className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+                >
+                  Upgrade to {upgradeInfo.nextPlanName}
+                </button>
+                <button
+                  onClick={() => router.push('/maps')}
+                  className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Back to Maps
+                </button>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+      )}
       <PageWrapper
         headerContent={null}
         searchComponent={
@@ -676,33 +863,44 @@ export default function NewMapPage() {
             <div className="flex-1 lg:max-w-md w-full">
               <div className="space-y-3">
                 {/* Map Limit Indicator */}
-                {mapLimit && !isAdmin && mapLimit.type !== 'unlimited' && (
+                {mapLimit && customMapsFeature && !isAdmin && (
                   <div className="bg-white border border-gray-200 rounded-md p-[10px]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-medium text-gray-900">Maps Created</span>
-                      <span className="text-xs font-semibold text-gray-700">
+                      <span className={`text-xs font-semibold ${
+                        mapLimit.max !== null && mapLimit.current >= mapLimit.max
+                          ? 'text-red-600'
+                          : 'text-gray-700'
+                      }`}>
                         {mapLimit.current} / {mapLimit.max === null ? '∞' : mapLimit.max}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${
-                          mapLimit.max !== null && mapLimit.current >= mapLimit.max
-                            ? 'bg-red-500'
-                            : mapLimit.max !== null && mapLimit.current / mapLimit.max > 0.8
-                            ? 'bg-yellow-500'
-                            : 'bg-green-500'
-                        }`}
-                        style={{
-                          width: mapLimit.max !== null
-                            ? `${Math.min((mapLimit.current / mapLimit.max) * 100, 100)}%`
-                            : '0%'
-                        }}
-                      />
-                    </div>
+                    {mapLimit.max !== null && (
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            mapLimit.max !== null && mapLimit.current >= mapLimit.max
+                              ? 'bg-red-500'
+                              : mapLimit.max !== null && mapLimit.current / mapLimit.max > 0.8
+                              ? 'bg-yellow-500'
+                              : 'bg-green-500'
+                          }`}
+                          style={{
+                            width: mapLimit.max !== null
+                              ? `${Math.min((mapLimit.current / mapLimit.max) * 100, 100)}%`
+                              : '0%'
+                          }}
+                        />
+                      </div>
+                    )}
                     {mapLimit.max !== null && mapLimit.current >= mapLimit.max && (
                       <p className="text-[10px] text-red-600 mt-1.5">
                         Map limit reached. <a href="/billing" className="underline font-medium">Upgrade your plan</a> to create more maps.
+                      </p>
+                    )}
+                    {mapLimit.max === null && (
+                      <p className="text-[10px] text-gray-500 mt-1.5">
+                        Unlimited maps on your current plan.
                       </p>
                     )}
                   </div>

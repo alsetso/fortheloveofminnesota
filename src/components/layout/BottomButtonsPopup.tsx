@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
-export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'search';
+export type BottomButtonType = 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'search' | 'members';
 
 interface BottomButtonsPopupProps {
   isOpen: boolean;
@@ -13,6 +13,7 @@ interface BottomButtonsPopupProps {
   children: React.ReactNode;
   infoText?: string;
   darkMode?: boolean; // New prop for dark mode styling
+  containerRelative?: boolean; // If true, position relative to container instead of viewport
 }
 
 /**
@@ -27,7 +28,8 @@ export default function BottomButtonsPopup({
   height = 'half',
   children,
   infoText,
-  darkMode = false
+  darkMode = false,
+  containerRelative = false
 }: BottomButtonsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -142,6 +144,8 @@ export default function BottomButtonsPopup({
         return 'Collections';
       case 'account':
         return 'Account';
+      case 'members':
+        return 'Members';
       default:
         return '';
     }
@@ -163,20 +167,29 @@ export default function BottomButtonsPopup({
   // Use provided infoText or default based on type
   const displayInfoText = infoText !== undefined ? infoText : getDefaultInfoText();
 
-  const maxHeight = height === 'full' ? '100vh' : '50vh';
+  const positionClass = containerRelative ? 'absolute' : 'fixed';
+  const backdropClass = containerRelative ? 'absolute' : 'fixed';
+  const maxHeightValue = containerRelative 
+    ? (height === 'full' ? '100%' : '80vh')
+    : (height === 'full' ? '100vh' : '50vh');
+  const heightValue = containerRelative 
+    ? (height === 'full' ? '100%' : 'auto')
+    : (height === 'full' ? '100vh' : 'auto');
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[49] bg-black/20 transition-opacity duration-300"
-        onClick={handleClose}
-      />
+      {/* Backdrop - only show if not containerRelative (containerRelative uses external backdrop) */}
+      {!containerRelative && (
+        <div
+          className={`${backdropClass} inset-0 z-[59] bg-black/20 transition-opacity duration-300`}
+          onClick={handleClose}
+        />
+      )}
       
       {/* Popup */}
       <div
         ref={popupRef}
-        className={`fixed z-[50] shadow-2xl transition-all duration-300 ease-out flex flex-col
+        className={`${positionClass} z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
           bottom-0 left-1/2 -translate-x-1/2
           rounded-t-3xl ${
             darkMode 
@@ -185,11 +198,11 @@ export default function BottomButtonsPopup({
           }`}
         style={{
           transform: 'translate(-50%, 100%)',
-          maxHeight: '100vh',
-          height: height === 'full' ? '100vh' : 'auto',
-          maxWidth: '600px',
-          width: 'calc(100% - 2rem)',
-          paddingBottom: 'env(safe-area-inset-bottom)',
+          maxHeight: maxHeightValue,
+          height: heightValue,
+          maxWidth: containerRelative ? '100%' : '600px',
+          width: containerRelative ? '100%' : 'calc(100% - 2rem)',
+          paddingBottom: containerRelative ? '0' : 'env(safe-area-inset-bottom)',
         }}
       >
         {/* Handle bar */}
@@ -197,81 +210,9 @@ export default function BottomButtonsPopup({
           <div className={`w-12 h-1 rounded-full ${darkMode ? 'bg-white/40' : 'bg-gray-300'}`} />
         </div>
 
-        {/* Header */}
-        <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
-          darkMode 
-            ? 'border-white/20' 
-            : 'border-gray-200'
-        }`}>
-          <div className="flex items-center gap-1">
-            <h2 className={`text-sm font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {getTitle()}
-            </h2>
-            {displayInfoText && (
-              <div className="relative">
-                <button
-                  ref={infoButtonRef}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowInfo(!showInfo);
-                  }}
-                  className={`p-0.5 transition-colors flex items-center justify-center ${
-                    darkMode
-                      ? 'text-white/60 hover:text-white'
-                      : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                  title="Information"
-                >
-                  <InformationCircleIcon className="w-3.5 h-3.5" />
-                </button>
-                {showInfo && (
-                  <div
-                    ref={infoRef}
-                    className={`absolute top-full left-0 mt-1 z-50 rounded-md shadow-lg p-2 min-w-[200px] max-w-[280px] ${
-                      darkMode
-                        ? 'bg-white/10 border border-white/20 backdrop-blur-md'
-                        : 'bg-white border border-gray-200'
-                    }`}
-                  >
-                    <p className={`text-xs ${darkMode ? 'text-white' : 'text-gray-600'}`}>
-                      {displayInfoText}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleClose}
-            className={`p-1 -mr-1 transition-colors ${
-              darkMode
-                ? 'text-white/80 hover:text-white'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-            aria-label="Close"
-          >
-            <XMarkIcon className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Large Headline - Shows when at max height */}
-        {isAtMaxHeight && (
-          <div className={`px-4 py-3 border-b flex-shrink-0 transition-opacity duration-300 ${
-            darkMode
-              ? 'border-white/20'
-              : 'border-gray-200'
-          }`} style={{ opacity: isAtMaxHeight ? 1 : 0 }}>
-            <h1 className={`text-2xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {getTitle()}
-            </h1>
-          </div>
-        )}
-
         {/* Content - Scrollable */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto min-h-0 scrollbar-transparent">
-          <div className="p-4">
-            {children}
-          </div>
+        <div ref={contentRef} className="flex-1 overflow-y-auto min-h-0 scrollbar-hide">
+          {children}
         </div>
       </div>
     </>

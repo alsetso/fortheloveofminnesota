@@ -1,10 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { XMarkIcon, MapPinIcon, PencilSquareIcon, TrashIcon, PencilIcon, CheckIcon, CameraIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { XMarkIcon, MapPinIcon, PencilSquareIcon, TrashIcon, PencilIcon, CheckIcon, CameraIcon, Squares2X2Icon, ChevronLeftIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+import { useToastContext } from '@/features/ui/contexts/ToastContext';
+import { createToast } from '@/features/ui/services/toast';
 import EmojiPicker from './EmojiPicker';
+import { useMapboxMap } from '../hooks/useMapboxMap';
+import { MAP_CONFIG } from '@/features/map/config';
+import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
+import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface MapPin {
   id: string;
@@ -35,6 +42,7 @@ interface MapLayerPolygon {
   subtitle?: string | null;
   properties: Record<string, unknown>;
   geometryType?: string | null;
+  geometry?: GeoJSON.Geometry | GeoJSON.Polygon | GeoJSON.MultiPolygon | null;
 }
 
 type MapEntityType = 'pin' | 'area' | 'layer';
@@ -49,6 +57,7 @@ interface MapEntitySlideUpProps {
   mapId: string;
   onEntityDeleted?: () => void;
   onEntityUpdated?: (updatedEntity: MapPin | MapArea) => void;
+  visibility?: 'public' | 'private' | 'shared';
 }
 
 export default function MapEntitySlideUp({
@@ -60,9 +69,16 @@ export default function MapEntitySlideUp({
   mapId,
   onEntityDeleted,
   onEntityUpdated,
+  visibility = 'private',
 }: MapEntitySlideUpProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { addToast } = useToastContext();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const entityMapContainer = useRef<HTMLDivElement>(null);
+  const [entityMapLoaded, setEntityMapLoaded] = useState(false);
+  const entityMapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState<Partial<MapPin>>({});
@@ -117,9 +133,13 @@ export default function MapEntitySlideUp({
         onEntityDeleted();
       }
       onClose();
+      addToast(createToast('success', 'Entity deleted successfully', {
+        duration: 3000,
+      }));
     } catch (err) {
-      console.error('Error deleting entity:', err);
-      alert('Failed to delete. Please try again.');
+      addToast(createToast('error', 'Failed to delete. Please try again.', {
+        duration: 4000,
+      }));
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -172,9 +192,13 @@ export default function MapEntitySlideUp({
       setShowLatLngEdit(false);
       setShowEmojiPicker(false);
       setShowEmojiInput(false);
+      addToast(createToast('success', 'Pin updated successfully', {
+        duration: 3000,
+      }));
     } catch (err) {
-      console.error('Error saving pin:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save. Please try again.');
+      addToast(createToast('error', err instanceof Error ? err.message : 'Failed to save. Please try again.', {
+        duration: 4000,
+      }));
     } finally {
       setIsSaving(false);
     }
@@ -261,9 +285,13 @@ export default function MapEntitySlideUp({
           }
         }
       }
+      addToast(createToast('success', 'File uploaded successfully', {
+        duration: 3000,
+      }));
     } catch (err) {
-      console.error('Error uploading file:', err);
-      alert(err instanceof Error ? err.message : 'Failed to upload file. Please try again.');
+      addToast(createToast('error', err instanceof Error ? err.message : 'Failed to upload file. Please try again.', {
+        duration: 4000,
+      }));
     } finally {
       setIsUploading(false);
     }
@@ -280,84 +308,377 @@ export default function MapEntitySlideUp({
     }
   };
 
-  if (!isOpen || !entity || !entityType) return null;
-
+  // Compute entity variables before early return (needed for useEffect dependencies)
   const isPin = entityType === 'pin';
   const isLayer = entityType === 'layer';
-  const pin = isPin ? (entity as MapPin) : null;
-  const area = !isPin && !isLayer ? (entity as MapArea) : null;
-  const layer = isLayer ? (entity as MapLayerPolygon) : null;
+  const pin = isPin && entity ? (entity as MapPin) : null;
+  const area = !isPin && !isLayer && entity ? (entity as MapArea) : null;
+  const layer = isLayer && entity ? (entity as MapLayerPolygon) : null;
 
   const layerProperties = layer?.properties ? Object.entries(layer.properties) : [];
   const displayLayerProps = layerProperties
     .filter(([, v]) => v === null || ['string', 'number', 'boolean'].includes(typeof v))
     .slice(0, 16);
 
+  // Update URL when entity is selected
+  useEffect(() => {
+    if (isOpen && entity) {
+      const params = new URLSearchParams(searchParams.toString());
+      if (entityType === 'pin' && pin) {
+        params.set('entity', 'pin');
+        params.set('entityId', pin.id);
+      } else if (entityType === 'area' && area) {
+        params.set('entity', 'area');
+        params.set('entityId', area.id);
+      } else if (entityType === 'layer' && layer) {
+        params.set('entity', 'layer');
+        params.set('entityId', layer.layerId || '');
+      }
+      router.replace(`?${params.toString()}`, { scroll: false });
+    } else if (!isOpen) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('entity');
+      params.delete('entityId');
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [isOpen, entity, entityType, pin, area, layer, router, searchParams]);
+
+  // Initialize mapbox map for entity display
+  useEffect(() => {
+    if (!isOpen || !entity || !entityMapContainer.current) return;
+
+    let mounted = true;
+
+    const initEntityMap = async () => {
+      if (!MAP_CONFIG.MAPBOX_TOKEN || !entityMapContainer.current || !mounted) return;
+
+      try {
+        await import('mapbox-gl/dist/mapbox-gl.css');
+        const mapbox = await loadMapboxGL();
+        mapbox.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
+
+        if (!entityMapContainer.current || !mounted) return;
+
+        // Determine center and zoom based on entity type
+        let center: [number, number] = MAP_CONFIG.DEFAULT_CENTER;
+        let zoom: number = MAP_CONFIG.DEFAULT_ZOOM;
+
+        if (isPin && pin) {
+          center = [pin.lng, pin.lat];
+          zoom = 15;
+        } else if (area && area.geometry) {
+          // Calculate center from area geometry
+          const coords = area.geometry.type === 'Polygon' 
+            ? area.geometry.coordinates[0]
+            : area.geometry.coordinates[0][0];
+          const lngs = coords.map((c: number[]) => c[0]);
+          const lats = coords.map((c: number[]) => c[1]);
+          const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+          const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+          center = [centerLng, centerLat];
+          zoom = 12;
+        } else if (layer && layer.geometry) {
+          // Calculate center from layer geometry
+          if (layer.geometry.type === 'Point') {
+            const coords = (layer.geometry as GeoJSON.Point).coordinates;
+            center = [coords[0], coords[1]];
+            zoom = 15;
+          } else if (layer.geometry.type === 'Polygon') {
+            const coords = (layer.geometry as GeoJSON.Polygon).coordinates[0];
+            const lngs = coords.map((c: number[]) => c[0]);
+            const lats = coords.map((c: number[]) => c[1]);
+            const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+            const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+            center = [centerLng, centerLat];
+            zoom = 12;
+          } else if (layer.geometry.type === 'MultiPolygon') {
+            const coords = (layer.geometry as GeoJSON.MultiPolygon).coordinates[0][0];
+            const lngs = coords.map((c: number[]) => c[0]);
+            const lats = coords.map((c: number[]) => c[1]);
+            const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+            const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+            center = [centerLng, centerLat];
+            zoom = 12;
+          }
+        }
+
+        const mapInstance = new mapbox.Map({
+          container: entityMapContainer.current,
+          style: MAP_CONFIG.STRATEGIC_STYLES.streets,
+          center,
+          zoom,
+          pitch: 60,
+          maxZoom: MAP_CONFIG.MAX_ZOOM,
+          maxBounds: [
+            [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+            [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+          ],
+        });
+
+        entityMapInstanceRef.current = mapInstance as MapboxMapInstance;
+
+        mapInstance.on('load', () => {
+          if (!mounted) return;
+          setEntityMapLoaded(true);
+
+          const mapboxMap = mapInstance as any;
+
+          // Add entity to map
+          if (isPin && pin) {
+            // Add pin point
+            mapboxMap.addSource('entity-pin-source', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [pin.lng, pin.lat],
+                },
+                properties: { id: pin.id },
+              },
+            });
+
+            mapboxMap.addLayer({
+              id: 'entity-pin-layer',
+              type: 'circle',
+              source: 'entity-pin-source',
+              paint: {
+                'circle-radius': 8,
+                'circle-color': '#ef4444',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#ffffff',
+              },
+            });
+
+            mapboxMap.flyTo({ center: [pin.lng, pin.lat], zoom: 15, duration: 1000 });
+          } else if (area && area.geometry) {
+            // Add area polygon
+            mapboxMap.addSource('entity-area-source', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: area.geometry,
+                properties: { id: area.id },
+              },
+            });
+
+            mapboxMap.addLayer({
+              id: 'entity-area-fill',
+              type: 'fill',
+              source: 'entity-area-source',
+              paint: {
+                'fill-color': '#10b981',
+                'fill-opacity': 0.3,
+              },
+            });
+
+            mapboxMap.addLayer({
+              id: 'entity-area-outline',
+              type: 'line',
+              source: 'entity-area-source',
+              paint: {
+                'line-color': '#10b981',
+                'line-width': 2,
+              },
+            });
+
+            // Fit bounds to area
+            const coords = area.geometry.type === 'Polygon' 
+              ? area.geometry.coordinates[0]
+              : area.geometry.coordinates[0][0];
+            const lngs = coords.map((c: number[]) => c[0]);
+            const lats = coords.map((c: number[]) => c[1]);
+            const bounds: [[number, number], [number, number]] = [
+              [Math.min(...lngs), Math.min(...lats)],
+              [Math.max(...lngs), Math.max(...lats)],
+            ];
+            mapboxMap.fitBounds(bounds, { padding: 20, duration: 1000 });
+          } else if (layer && layer.geometry) {
+            // For layers, use geometry directly from layer entity
+            const geometry = layer.geometry;
+            mapboxMap.addSource('entity-layer-source', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry,
+                properties: layer.properties,
+              },
+            });
+
+            if (geometry.type === 'Point') {
+              mapboxMap.addLayer({
+                id: 'entity-layer-point',
+                type: 'circle',
+                source: 'entity-layer-source',
+                paint: {
+                  'circle-radius': 8,
+                  'circle-color': '#3b82f6',
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#ffffff',
+                },
+              });
+              const coords = (geometry as GeoJSON.Point).coordinates;
+              mapboxMap.flyTo({ center: [coords[0], coords[1]], zoom: 15, duration: 1000 });
+            } else if (geometry.type === 'Polygon') {
+              mapboxMap.addLayer({
+                id: 'entity-layer-fill',
+                type: 'fill',
+                source: 'entity-layer-source',
+                paint: {
+                  'fill-color': '#3b82f6',
+                  'fill-opacity': 0.3,
+                },
+              });
+              mapboxMap.addLayer({
+                id: 'entity-layer-outline',
+                type: 'line',
+                source: 'entity-layer-source',
+                paint: {
+                  'line-color': '#3b82f6',
+                  'line-width': 2,
+                },
+              });
+              const coords = (geometry as GeoJSON.Polygon).coordinates[0];
+              const lngs = coords.map((c: number[]) => c[0]);
+              const lats = coords.map((c: number[]) => c[1]);
+              const bounds: [[number, number], [number, number]] = [
+                [Math.min(...lngs), Math.min(...lats)],
+                [Math.max(...lngs), Math.max(...lats)],
+              ];
+              mapboxMap.fitBounds(bounds, { padding: 20, duration: 1000 });
+            } else if (geometry.type === 'MultiPolygon') {
+              mapboxMap.addLayer({
+                id: 'entity-layer-fill',
+                type: 'fill',
+                source: 'entity-layer-source',
+                paint: {
+                  'fill-color': '#3b82f6',
+                  'fill-opacity': 0.3,
+                },
+              });
+              mapboxMap.addLayer({
+                id: 'entity-layer-outline',
+                type: 'line',
+                source: 'entity-layer-source',
+                paint: {
+                  'line-color': '#3b82f6',
+                  'line-width': 2,
+                },
+              });
+              const coords = (geometry as GeoJSON.MultiPolygon).coordinates[0][0];
+              const lngs = coords.map((c: number[]) => c[0]);
+              const lats = coords.map((c: number[]) => c[1]);
+              const bounds: [[number, number], [number, number]] = [
+                [Math.min(...lngs), Math.min(...lats)],
+                [Math.max(...lngs), Math.max(...lats)],
+              ];
+              mapboxMap.fitBounds(bounds, { padding: 20, duration: 1000 });
+            }
+          }
+        });
+      } catch (err) {
+        console.error('Failed to initialize entity map:', err);
+      }
+    };
+
+    initEntityMap();
+
+    return () => {
+      mounted = false;
+      if (entityMapInstanceRef.current) {
+        try {
+          if (!(entityMapInstanceRef.current as any).removed) {
+            entityMapInstanceRef.current.remove();
+          }
+        } catch {
+          // Ignore cleanup errors
+        }
+        entityMapInstanceRef.current = null;
+      }
+      setEntityMapLoaded(false);
+    };
+  }, [isOpen, entity, entityType, pin, area, layer, isPin]);
+
+  // On public maps, cover full map area; otherwise use bottom sheet
+  const isPublicMap = visibility === 'public';
+  const containerClass = isPublicMap
+    ? `absolute inset-0 z-[100] transition-opacity duration-300 ease-out flex items-center justify-center ${
+        isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`
+    : `fixed bottom-0 left-1/2 -translate-x-1/2 z-[100] bg-white shadow-lg transition-transform duration-300 ease-out max-w-[800px] ${
+        isOpen ? 'translate-y-0' : 'translate-y-full'
+      }`;
+
+  const contentStyle = isPublicMap
+    ? undefined
+    : { maxHeight: '80vh', maxWidth: '800px', width: '100%', borderRadius: '8px 8px 0 0' };
+
+  if (!isOpen || !entity || !entityType) return null;
+
   return (
     <>
       {/* Slide-up Panel */}
-      <div
-        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-[100] bg-white rounded-t-xl shadow-lg transition-transform duration-300 ease-out ${
-          isOpen ? 'translate-y-0' : 'translate-y-full'
-        }`}
-        style={{ maxHeight: '80vh', maxWidth: '750px', width: '100%' }}
-      >
-        {/* Drag Handle */}
-        <div className="flex justify-center pt-2 pb-1">
-          <div className="w-12 h-1 bg-gray-300 rounded-full" />
-        </div>
+      <div className={containerClass} style={isPublicMap ? undefined : contentStyle}>
+        {isPublicMap ? (
+          <div className="w-full max-w-[800px] h-full bg-white flex flex-col shadow-lg rounded-t-lg" style={{ borderRadius: '8px 8px 0 0' }}>
+            {/* Header */}
+            <div className="flex items-center px-[10px] py-[10px] border-b border-gray-200 sticky top-0 bg-white z-10">
+          {/* Back Button */}
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+            aria-label="Back"
+          >
+            <ChevronLeftIcon className="w-4 h-4" />
+          </button>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            {isPin ? (
-              <MapPinIcon className="w-4 h-4 text-gray-600" />
-            ) : isLayer ? (
-              <Squares2X2Icon className="w-4 h-4 text-gray-600" />
-            ) : (
-              <PencilSquareIcon className="w-4 h-4 text-gray-600" />
-            )}
-            <h3 className="text-xs font-semibold text-gray-900">
-              {isPin ? 'Pin Details' : isLayer ? 'Layer Details' : 'Area Details'}
+          {/* Centered Title */}
+          <div className="flex-1 text-center">
+            <h3 className="text-xs font-semibold text-gray-900 truncate px-2">
+              {isPin && pin
+                ? pin.caption || 'Pin'
+                : isLayer && layer
+                ? layer.title || 'Layer'
+                : area
+                ? area.name || 'Area'
+                : 'Details'}
             </h3>
           </div>
-          <div className="flex items-center gap-1">
-            {isOwner && isPin && (
-              <>
-                {!isEditing ? (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-                    aria-label="Edit"
-                    title="Edit Pin"
-                  >
-                    <PencilIcon className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="p-1 text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
-                    aria-label="Save"
-                    title="Save Changes"
-                  >
-                    <CheckIcon className="w-4 h-4" />
-                  </button>
-                )}
-              </>
-            )}
-            <button
-              onClick={onClose}
-              className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
-              aria-label="Close"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          </div>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+            aria-label="Close"
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto px-[10px] py-3 space-y-3" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+        <div 
+          className={`overflow-y-auto px-[10px] py-3 space-y-3 ${isPublicMap ? 'flex flex-col' : ''} [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]`}
+          style={isPublicMap 
+            ? { height: 'calc(100% - 60px)' } 
+            : { maxHeight: 'calc(80vh - 80px)' }
+          }
+        >
+          {/* Mapbox Map - Show entity on map */}
+          <div className="w-full max-h-[400px] rounded-md overflow-hidden border border-gray-200 mb-3 flex-shrink-0 relative" style={{ height: '400px' }}>
+            <div 
+              ref={entityMapContainer}
+              className="w-full h-full"
+              style={{ minHeight: 0 }}
+            />
+            {!entityMapLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+                <div className="text-center">
+                  <div className="w-6 h-6 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                  <div className="text-gray-600 text-xs">Loading map...</div>
+                </div>
+              </div>
+            )}
+          </div>
           {/* Pin Content */}
           {isPin && pin && (
             <>
@@ -783,6 +1104,136 @@ export default function MapEntitySlideUp({
             </div>
           )}
         </div>
+          </div>
+        ) : (
+          <>
+            {/* Drag Handle */}
+            <div className="flex justify-center pt-2 pb-1">
+              <div className="w-12 h-1 bg-gray-300 rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center px-[10px] py-[10px] border-b border-gray-200">
+              {/* Back Button */}
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                aria-label="Back"
+              >
+                <ChevronLeftIcon className="w-4 h-4" />
+              </button>
+
+              {/* Centered Title */}
+              <div className="flex-1 text-center">
+                <h3 className="text-xs font-semibold text-gray-900 truncate px-2">
+                  {isPin && pin
+                    ? pin.caption || 'Pin'
+                    : isLayer && layer
+                    ? layer.title || 'Layer'
+                    : area
+                    ? area.name || 'Area'
+                    : 'Details'}
+                </h3>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div 
+              className="overflow-y-auto px-[10px] py-3 space-y-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+              style={{ maxHeight: 'calc(80vh - 80px)' }}
+            >
+              {/* Pin Content */}
+              {isPin && pin && (
+                <>
+                  {/* Emoji */}
+                  <div className="flex justify-center">
+                    <div className="text-2xl">{pin.emoji || '📍'}</div>
+                  </div>
+
+                  {/* Caption */}
+                  <div>
+                    <div className="text-xs text-gray-900 px-[10px]">{pin.caption || <span className="text-gray-400">No caption</span>}</div>
+                  </div>
+
+                  {/* Media */}
+                  <div>
+                    {pin.image_url ? (
+                      <div className="relative w-full h-48 rounded-md overflow-hidden border border-gray-200">
+                        <Image
+                          src={pin.image_url}
+                          alt={pin.caption || 'Pin image'}
+                          fill
+                          className="object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : pin.video_url ? (
+                      <div className="relative w-full rounded-md overflow-hidden border border-gray-200">
+                        <video
+                          src={pin.video_url}
+                          controls
+                          className="w-full"
+                        />
+                      </div>
+                    ) : (
+                      <div className="text-xs text-gray-400 px-[10px]">No media</div>
+                    )}
+                  </div>
+
+                  {/* Coordinates */}
+                  <div>
+                    <div className="text-[10px] font-medium text-gray-500 mb-0.5">Coordinates</div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="text-[10px] font-medium text-gray-500 mb-0.5">Latitude</div>
+                        <div className="text-gray-900">{pin.lat.toFixed(6)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-medium text-gray-500 mb-0.5">Longitude</div>
+                        <div className="text-gray-900">{pin.lng.toFixed(6)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Area Content */}
+              {!isPin && area && (
+                <>
+                  <div>
+                    <div className="text-[10px] font-medium text-gray-500 mb-0.5">Name</div>
+                    <div className="text-xs font-semibold text-gray-900">{area.name}</div>
+                  </div>
+                  {area.description && (
+                    <div>
+                      <div className="text-[10px] font-medium text-gray-500 mb-0.5">Description</div>
+                      <div className="text-xs text-gray-900">{area.description}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Layer Content */}
+              {isLayer && layer && (
+                <>
+                  <div>
+                    <div className="text-[10px] font-medium text-gray-500 mb-0.5">Layer</div>
+                    <div className="text-xs font-semibold text-gray-900">{layer.title}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </>
   );

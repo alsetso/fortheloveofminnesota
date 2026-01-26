@@ -18,18 +18,33 @@ export interface LocationMetadata {
 
 export interface MapPin {
   id: string;
+  map_id: string; // Map this pin belongs to (required)
   lat: number;
   lng: number;
-  description: string | null;
+  description: string | null; // Used by mentions
+  caption: string | null; // Used by custom map pins
+  emoji: string | null; // Used by custom map pins
   type: string | null;
   media_url: string | null;
+  image_url: string | null; // Used by mentions
+  video_url: string | null; // Used by mentions
+  media_type?: 'image' | 'video' | 'none'; // Used by mentions
   account_id: string | null;
   city_id: string | null;
   county_id: string | null;
   visibility: MapPinVisibility;
   archived?: boolean; // Soft delete flag - true means pin is archived
+  is_active?: boolean; // Active flag - false means pin is soft-deleted
   view_count?: number;
+  post_date?: string | null; // Used by mentions (for year filtering)
   location_metadata?: LocationMetadata | null;
+  map_meta?: Record<string, any> | null; // Used by mentions
+  atlas_meta?: Record<string, any> | null; // Used by mentions
+  full_address?: string | null; // Used by mentions
+  icon_url?: string | null; // Used by mentions
+  collection_id?: string | null; // Used by mentions
+  mention_type_id?: string | null; // Used by mentions
+  tagged_account_ids?: string[] | null; // Used by mentions (JSONB array)
   event_date?: string | null; // Date when the event/memory happened (can be in the past)
   hide_location?: boolean; // When true, uses city coordinates instead of exact coordinates
   created_at: string;

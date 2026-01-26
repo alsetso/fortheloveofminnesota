@@ -9,9 +9,10 @@ import { Account } from '@/features/auth';
 
 interface PostCreationFormProps {
   onPostCreated?: () => void;
+  mapId?: string | null;
 }
 
-export default function PostCreationForm({ onPostCreated }: PostCreationFormProps) {
+export default function PostCreationForm({ onPostCreated, mapId }: PostCreationFormProps) {
   const { account } = useAuthStateSafe();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [initialAction, setInitialAction] = useState<'upload_photo' | 'upload_video' | 'mention' | null>(null);
@@ -64,6 +65,7 @@ export default function PostCreationForm({ onPostCreated }: PostCreationFormProp
         onClose={handleModalClose}
         onPostCreated={onPostCreated}
         initialAction={initialAction}
+        initialMapId={mapId}
       />
     </>
   );

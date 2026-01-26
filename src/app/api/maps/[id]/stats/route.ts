@@ -86,11 +86,11 @@ export async function GET(
         if (isUUID(identifier)) {
           mapId = identifier;
         } else {
-          // Look up map by custom_slug
+          // Look up map by slug (new system) or custom_slug (legacy fallback)
           const { data: map, error: mapError } = await supabase
             .from('map')
             .select('id')
-            .eq('custom_slug', identifier)
+            .or(`slug.eq.${identifier},custom_slug.eq.${identifier}`)
             .single();
           
           if (mapError || !map) {
@@ -100,7 +100,9 @@ export async function GET(
         }
 
         // Get stats using get_url_stats function
-        // Maps are tracked as /map/{map_id} URLs
+        // IMPORTANT: Always use UUID (mapId) for stats queries, never slug
+        // Views are tracked as /map/{map_id} where map_id is always a UUID
+        // This ensures stats are consistent even if the map's slug changes
         const mapUrl = `/map/${mapId}`;
         const { data, error } = await supabase.rpc('get_url_stats', {
           p_url: mapUrl,

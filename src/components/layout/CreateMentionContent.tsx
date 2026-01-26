@@ -428,11 +428,21 @@ export default function CreateMentionContent({
       // Check if this is the user's first mention
       if (activeAccountId && createdMention.id) {
         try {
+          // Get live map ID first
+          const { data: liveMap } = await supabase
+            .from('map')
+            .select('id')
+            .eq('slug', 'live')
+            .eq('is_active', true)
+            .single();
+
           const { count } = await supabase
-            .from('mentions')
+            .from('map_pins')
             .select('*', { count: 'exact', head: true })
+            .eq('map_id', liveMap?.id)
             .eq('account_id', activeAccountId)
-            .eq('archived', false);
+            .eq('archived', false)
+            .eq('is_active', true);
 
           if (count === 1) {
             setShowFirstMentionModal(true);

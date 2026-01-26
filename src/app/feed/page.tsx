@@ -4,46 +4,43 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import MapSearchInput from '@/components/layout/MapSearchInput';
 import FeedContent from '@/components/feed/FeedContent';
 import SearchResults from '@/components/layout/SearchResults';
+import FeedPageLayout from './FeedPageLayout';
 import { useMemo } from 'react';
-import { Cog6ToothIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useSidebarState } from '@/hooks/useSidebarState';
-import SidebarToggleButton from '@/components/layout/SidebarToggleButton';
+import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
+import MentionTimeFilter from '@/components/feed/MentionTimeFilter';
+import MentionTypeFilter from '@/components/feed/MentionTypeFilter';
+import LiveMapAnalyticsCard from '@/components/feed/LiveMapAnalyticsCard';
 
 export default function FeedPage() {
   const { openWelcome } = useAppModalContextSafe();
+  const { activeSidebar, toggleSidebar, closeSidebar } = useUnifiedSidebar();
 
-  const {
-    isLeftSidebarVisible,
-    isRightSidebarVisible,
-    isLeftPanelOpen,
-    isRightPanelOpen,
-    toggleLeft,
-    toggleRight,
-    closeLeftPanel,
-    closeRightPanel,
-  } = useSidebarState();
 
-  const headerContent = useMemo(() => (
-    <div className="flex items-center gap-2">
-      <SidebarToggleButton
-        icon={FunnelIcon}
-        onClick={toggleLeft}
-        ariaLabel="Toggle left sidebar"
-        title="Feed filters"
-      />
-      <SidebarToggleButton
-        icon={Cog6ToothIcon}
-        onClick={toggleRight}
-        ariaLabel="Toggle right sidebar"
-        title="Feed sidebar"
-      />
-    </div>
-  ), [toggleLeft, toggleRight]);
+  const sidebarConfigs = useMemo(() => [
+    {
+      type: 'filter' as const,
+      title: 'Filters',
+      content: (
+        <div className="space-y-6">
+          <MentionTimeFilter />
+          <MentionTypeFilter />
+        </div>
+      ),
+      popupType: 'search' as const,
+    },
+    {
+      type: 'analytics' as const,
+      title: 'Analytics',
+      content: <LiveMapAnalyticsCard />,
+      popupType: 'analytics' as const,
+      infoText: 'View real-time visit statistics and page analytics',
+    },
+  ], []);
 
   return (
     <PageWrapper
-      headerContent={headerContent}
+      headerContent={null}
       searchComponent={
         <MapSearchInput
           onLocationSelect={() => {
@@ -59,14 +56,13 @@ export default function FeedPage() {
       }}
       searchResultsComponent={<SearchResults />}
     >
-      <FeedContent
-        leftSidebarVisible={isLeftSidebarVisible}
-        rightSidebarVisible={isRightSidebarVisible}
-        leftPanelOpen={isLeftPanelOpen}
-        rightPanelOpen={isRightPanelOpen}
-        onRequestCloseLeftPanel={closeLeftPanel}
-        onRequestCloseRightPanel={closeRightPanel}
-      />
+      <FeedPageLayout
+        activeSidebar={activeSidebar}
+        onSidebarClose={closeSidebar}
+        sidebarConfigs={sidebarConfigs}
+      >
+        <FeedContent />
+      </FeedPageLayout>
     </PageWrapper>
   );
 }

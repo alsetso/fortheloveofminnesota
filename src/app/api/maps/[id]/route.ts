@@ -59,35 +59,47 @@ export async function GET(
           .select(`
             id,
             account_id,
-            title,
+            name,
             description,
+            slug,
             visibility,
-            map_style,
-            map_layers,
-            type,
-            collection_type,
-            custom_slug,
-            is_primary,
-            hide_creator,
+            settings,
+            boundary,
+            boundary_data,
+            member_count,
+            is_active,
+            auto_approve_members,
+            membership_rules,
+            membership_questions,
             tags,
-            meta,
             created_at,
             updated_at,
-            account:accounts!inner(
+            account:accounts!map_account_id_fkey(
               id,
               username,
               first_name,
               last_name,
               image_url
             )
-          `);
+          `)
+          .eq('is_active', true);
 
         // Check if identifier is a UUID or a slug
         if (isUUID(identifier)) {
           query = query.eq('id', identifier);
         } else {
-          // Assume it's a custom_slug
-          query = query.eq('custom_slug', identifier);
+          // Assume it's a slug
+          query = query.eq('slug', identifier);
+        }
+
+        // If authenticated, also get user's member role
+        if (accountId) {
+          query = query.select(`
+            *,
+            current_user_member:map_members!left(
+              role
+            )
+          `);
         }
 
         const { data: map, error } = await query.single();
@@ -129,21 +141,56 @@ export async function GET(
  * - Ownership check required
  */
 const updateMapSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
+  name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional().nullable(),
-  visibility: z.enum(['public', 'private', 'shared']).optional(),
-  map_style: z.enum(['street', 'satellite', 'light', 'dark']).optional(),
-  type: z.enum(['user', 'community', 'gov', 'professional', 'atlas', 'user-generated']).optional().nullable(),
-  collection_type: z.enum(['community', 'professional', 'user', 'atlas', 'gov']).optional().nullable(),
-  custom_slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(100).optional().nullable(),
-  is_primary: z.boolean().optional(),
-  hide_creator: z.boolean().optional(),
+  visibility: z.enum(['public', 'private']).optional(),
+  slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(100).optional().nullable(),
+  boundary: z.enum(['statewide', 'county', 'city', 'town', 'district']).optional(),
+  boundary_data: z.record(z.string(), z.unknown()).nullable().optional(),
+  settings: z.object({
+    appearance: z.object({
+      map_style: z.enum(['street', 'satellite', 'light', 'dark']).optional(),
+      map_layers: z.record(z.string(), z.boolean()).optional(),
+      meta: z.record(z.string(), z.unknown()).optional(),
+    }).optional(),
+    collaboration: z.object({
+      allow_pins: z.boolean().optional(),
+      allow_areas: z.boolean().optional(),
+      allow_posts: z.boolean().optional(),
+      allow_clicks: z.boolean().optional(),
+      pin_permissions: z.object({
+        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+      }).optional(),
+      area_permissions: z.object({
+        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+      }).optional(),
+      post_permissions: z.object({
+        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+      }).optional(),
+      click_permissions: z.object({
+        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+      }).optional(),
+      role_overrides: z.object({
+        managers_can_edit: z.boolean().optional(),
+        editors_can_edit: z.boolean().optional(),
+      }).optional(),
+    }).optional(),
+    presentation: z.object({
+      hide_creator: z.boolean().optional(),
+      is_featured: z.boolean().optional(),
+      emoji: z.string().nullable().optional(),
+    }).optional(),
+  }).optional(),
+  auto_approve_members: z.boolean().optional(),
+  membership_rules: z.string().optional().nullable(),
+  membership_questions: z.array(z.object({
+    id: z.number(),
+    question: z.string(),
+  })).max(5).optional(),
   tags: z.array(z.object({
     emoji: z.string(),
     text: z.string(),
   })).max(20).optional(),
-  meta: z.record(z.string(), z.unknown()).optional(),
-  map_layers: z.record(z.string(), z.boolean()).optional(),
 });
 
 export async function PUT(
@@ -186,33 +233,46 @@ export async function PUT(
         let mapId: string;
         let mapQuery = supabase
           .from('map')
-          .select('id, account_id');
+          .select('id, account_id, settings');
         
         if (isUUID(identifier)) {
           mapQuery = mapQuery.eq('id', identifier);
         } else {
-          mapQuery = mapQuery.eq('custom_slug', identifier);
+          mapQuery = mapQuery.eq('slug', identifier);
         }
 
-        // Check if user owns the map
         const { data: map, error: mapError } = await mapQuery.single();
 
         if (mapError || !map) {
           return createErrorResponse('Map not found', 404);
         }
 
-        const mapData = map as { account_id: string; id: string };
+        const mapData = map as { account_id: string; id: string; settings: any };
         mapId = mapData.id;
-        
-        if (accountId !== mapData.account_id) {
-          return createErrorResponse('Forbidden - you do not own this map', 403);
+
+        // Check member role (owner/manager can update, editor cannot)
+        const { data: member } = await supabase
+          .from('map_members')
+          .select('role')
+          .eq('map_id', mapId)
+          .eq('account_id', accountId)
+          .maybeSingle();
+
+        const memberRole = (member as { role?: string } | null)?.role;
+        const isOwner = mapData.account_id === accountId;
+        const isManager = memberRole === 'manager' || memberRole === 'owner';
+        const canUpdate = isOwner || isManager;
+
+        if (!canUpdate) {
+          return createErrorResponse('Forbidden - you do not have permission to update this map', 403);
         }
 
         // Build update data
         const updateData: Partial<Database['public']['Tables']['map']['Update']> = {};
+        const currentSettings = (mapData.settings || {}) as any;
 
-        if (body.title !== undefined) {
-          updateData.title = body.title.trim();
+        if (body.name !== undefined) {
+          updateData.name = body.name.trim();
         }
 
         if (body.description !== undefined) {
@@ -223,52 +283,8 @@ export async function PUT(
           updateData.visibility = body.visibility;
         }
 
-        if (body.map_style !== undefined) {
-          updateData.map_style = body.map_style;
-        }
-
-        if (body.meta !== undefined) {
-          updateData.meta = body.meta;
-        }
-
-        if (body.map_layers !== undefined) {
-          updateData.map_layers = body.map_layers as any;
-        }
-
-        // Get admin status once if needed for type or collection_type validation
-        let isAdminForCollection = false;
-        if (body.type !== undefined || body.collection_type !== undefined) {
-          const { data: accountRow } = await supabase
-            .from('accounts')
-            .select('role')
-            .eq('id', accountId)
-            .single();
-          const role = (accountRow as { role?: string } | null)?.role;
-          isAdminForCollection = role === 'admin';
-        }
-
-        if (body.type !== undefined) {
-          const nextType = body.type || null;
-
-          // Non-admins may only keep/default to 'community'
-          if (!isAdminForCollection && nextType && nextType !== 'community') {
-            return createErrorResponse('Only admins can change collection type', 403);
-          }
-
-          updateData.type = nextType || 'community';
-        }
-
-        if (body.collection_type !== undefined) {
-          // Non-admins can only set collection_type to 'community' or null
-          if (!isAdminForCollection && body.collection_type && body.collection_type !== 'community') {
-            return createErrorResponse('Only admins can set collection_type to values other than "community"', 403);
-          }
-
-          updateData.collection_type = body.collection_type || null;
-        }
-
-        if (body.custom_slug !== undefined) {
-          // Check if user is admin (admins can set custom_slug without pro plan)
+        if (body.slug !== undefined) {
+          // Check if user is admin or has pro/plus plan
           const { data: account } = await supabase
             .from('accounts')
             .select('plan, role')
@@ -278,53 +294,75 @@ export async function PUT(
           const accountData = account as { plan: string; role: string } | null;
           const isAdmin = accountData?.role === 'admin';
           
-          // Non-admins need pro/plus plan for custom_slug
-          if (body.custom_slug && !isAdmin && accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
-            return createErrorResponse('Custom slugs are only available for pro accounts or admins', 403);
+          // Non-admins need pro/plus plan for custom slug
+          if (body.slug && !isAdmin && accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
+            return createErrorResponse('Custom slugs are only available for pro/plus accounts or admins', 403);
           }
 
-          if (body.custom_slug) {
+          if (body.slug) {
             // Check if slug is already taken (excluding current map)
             const { data: existingMap } = await supabase
               .from('map')
               .select('id')
-              .eq('custom_slug', body.custom_slug)
+              .eq('slug', body.slug)
               .neq('id', mapId)
               .maybeSingle();
 
             if (existingMap) {
-              return createErrorResponse('Custom slug is already taken', 409);
+              return createErrorResponse('Slug is already taken', 409);
             }
           }
-          updateData.custom_slug = body.custom_slug?.trim() || null;
+          updateData.slug = body.slug?.trim() || null;
         }
 
-        if (body.is_primary !== undefined || body.hide_creator !== undefined) {
-          // Get admin status for is_primary and hide_creator
-          const { data: accountRow } = await supabase
-            .from('accounts')
-            .select('role')
-            .eq('id', accountId)
-            .single();
+        // Update settings (merge with existing)
+        if (body.settings !== undefined) {
+          const newSettings = {
+            ...currentSettings,
+            ...(body.settings.appearance && {
+              appearance: {
+                ...currentSettings.appearance,
+                ...body.settings.appearance,
+              },
+            }),
+            ...(body.settings.collaboration && {
+              collaboration: {
+                ...currentSettings.collaboration,
+                ...body.settings.collaboration,
+              },
+            }),
+            ...(body.settings.presentation && {
+              presentation: {
+                ...currentSettings.presentation,
+                ...body.settings.presentation,
+              },
+            }),
+          };
+          updateData.settings = newSettings;
+        }
 
-          const role = (accountRow as { role?: string } | null)?.role;
-          const isAdmin = role === 'admin';
+        if (body.auto_approve_members !== undefined) {
+          updateData.auto_approve_members = body.auto_approve_members;
+        }
 
-          if (!isAdmin) {
-            return createErrorResponse('Admin role required to set is_primary or hide_creator', 403);
-          }
+        if (body.membership_rules !== undefined) {
+          updateData.membership_rules = body.membership_rules?.trim() || null;
+        }
 
-          if (body.is_primary !== undefined) {
-            updateData.is_primary = body.is_primary;
-          }
-
-          if (body.hide_creator !== undefined) {
-            updateData.hide_creator = body.hide_creator;
-          }
+        if (body.membership_questions !== undefined) {
+          updateData.membership_questions = body.membership_questions;
         }
 
         if (body.tags !== undefined) {
           updateData.tags = body.tags;
+        }
+
+        if (body.boundary !== undefined) {
+          updateData.boundary = body.boundary;
+        }
+
+        if (body.boundary_data !== undefined) {
+          updateData.boundary_data = body.boundary_data;
         }
 
         const { data: updatedMap, error: updateError } = await (supabase
@@ -334,18 +372,19 @@ export async function PUT(
           .select(`
             id,
             account_id,
-            title,
+            name,
             description,
+            slug,
             visibility,
-            map_style,
-            map_layers,
-            type,
-            collection_type,
-            custom_slug,
-            is_primary,
-            hide_creator,
+            settings,
+            boundary,
+            boundary_data,
+            member_count,
+            is_active,
+            auto_approve_members,
+            membership_rules,
+            membership_questions,
             tags,
-            meta,
             created_at,
             updated_at
           `)
@@ -417,10 +456,9 @@ export async function DELETE(
         if (isUUID(identifier)) {
           mapQuery = mapQuery.eq('id', identifier);
         } else {
-          mapQuery = mapQuery.eq('custom_slug', identifier);
+          mapQuery = mapQuery.eq('slug', identifier);
         }
 
-        // Check if user owns the map
         const { data: map, error: mapError } = await mapQuery.single();
 
         if (mapError || !map) {
@@ -430,15 +468,16 @@ export async function DELETE(
         const mapDataDelete = map as { account_id: string; id: string };
         mapId = mapDataDelete.id;
         
+        // Only owner can delete (not manager)
         if (accountId !== mapDataDelete.account_id) {
-          return createErrorResponse('Forbidden - you do not own this map', 403);
+          return createErrorResponse('Forbidden - only the map owner can delete this map', 403);
         }
 
-        // Delete map
-        const { error: deleteError } = await supabase
-          .from('map')
-          .delete()
-          .eq('id', mapId);
+        // Soft delete: set is_active = false
+        const { error: deleteError } = await ((supabase
+          .from('map') as any)
+          .update({ is_active: false })
+          .eq('id', mapId));
 
         if (deleteError) {
           if (process.env.NODE_ENV === 'development') {

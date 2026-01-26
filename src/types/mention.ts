@@ -6,6 +6,7 @@ export type MentionVisibility = 'public' | 'only_me';
 
 export interface Mention {
   id: string;
+  map_id: string; // Map ID (mentions are linked to the "live" map)
   lat: number;
   lng: number;
   description: string | null;
@@ -14,6 +15,7 @@ export interface Mention {
   collection_id: string | null; // Collection ID for categorizing mentions
   visibility: MentionVisibility;
   archived?: boolean;
+  is_active?: boolean; // Active flag (mentions are now map_pins)
   post_date?: string | null; // Date when the event/memory happened (for year filtering)
   icon_url?: string | null; // URL to the icon image for this mention pin
   image_url?: string | null; // URL to user-uploaded image associated with this mention
@@ -21,6 +23,7 @@ export interface Mention {
   media_type?: 'image' | 'video' | 'none'; // Type of media attached to this mention
   full_address?: string | null; // Full address string from reverse geocoding
   map_meta?: Record<string, any> | null; // JSON metadata containing all location details from the map
+  atlas_meta?: Record<string, any> | null; // JSON metadata containing atlas entity details
   view_count?: number; // Total number of views for this mention
   likes_count?: number; // Total number of likes for this mention
   is_liked?: boolean; // Whether the current user has liked this mention
@@ -47,7 +50,7 @@ export interface Mention {
 
 export interface MentionLike {
   id: string;
-  mention_id: string;
+  map_pin_id: string; // Updated: mentions are now map_pins, so likes use map_pin_id
   account_id: string;
   created_at: string;
 }
@@ -73,8 +76,8 @@ export interface CreateMentionData {
 export interface MentionFilters {
   account_id?: string;
   city_id?: string;
-  map_id?: string; // Filter by map ID
-  include_null_map_id?: boolean; // If true, include mentions with NULL map_id (used for live/primary maps)
+  map_id?: string; // Filter by map ID (mentions default to live map)
+  include_null_map_id?: boolean; // DEPRECATED: All mentions are now linked to live map
   collection_id?: string; // Filter by collection ID
   mention_type_id?: string; // Filter by mention type ID (single)
   mention_type_ids?: string[]; // Filter by mention type IDs (multiple)

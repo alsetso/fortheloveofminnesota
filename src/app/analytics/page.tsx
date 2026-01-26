@@ -47,13 +47,24 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const username = (account as any)?.username || null;
 
   // Get mention IDs for filtering
-  const { data: mentionsData, error: mentionsError } = await supabase
-    .from('mentions')
+  // Get live map ID first
+  const { data: liveMap } = await supabase
+    .from('map')
     .select('id')
-    .eq('account_id', accountId)
-    .returns<Array<{ id: string }>>();
+    .eq('slug', 'live')
+    .eq('is_active', true)
+    .single();
 
-  const mentionIds = mentionsData?.map(m => m.id) || [];
+  const liveMapId = liveMap && typeof liveMap === 'object' && 'id' in liveMap ? (liveMap as { id: string }).id : null;
+  const { data: mentionsData, error: mentionsError } = await supabase
+    .from('map_pins')
+    .select('id')
+    .eq('map_id', liveMapId || '')
+    .eq('account_id', accountId)
+    .eq('is_active', true)
+    .eq('archived', false);
+
+  const mentionIds = ((mentionsData || []) as Array<{ id: string }>).map(m => m.id);
 
   // Get post IDs for filtering
   const { data: postsData, error: postsError } = await supabase
@@ -306,12 +317,14 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           return mentionIds.includes(visit.mentionId);
         });
 
-      // Fetch mention content for all unique mention IDs
+      // Fetch mention content for all unique mention IDs (now map_pins)
       const uniqueMentionIds = [...new Set(mentionVisitsWithIds.map((v: any) => v.mentionId))];
       const { data: mentionsContent } = await supabase
-        .from('mentions')
+        .from('map_pins')
         .select('id, description')
-        .in('id', uniqueMentionIds);
+        .in('id', uniqueMentionIds)
+        .eq('is_active', true)
+        .eq('archived', false);
 
       const mentionsMap = new Map(
         (mentionsContent || []).map((m: any) => [m.id, m.description || ''])

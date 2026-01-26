@@ -20,10 +20,10 @@ import { commonSchemas } from '@/lib/security/validation';
  * - Query parameter validation
  */
 const mapsQuerySchema = z.object({
-  visibility: z.enum(['public', 'private', 'shared']).optional(),
+  visibility: z.enum(['public', 'private']).optional(),
   account_id: commonSchemas.uuid.optional(),
-  collection_type: z.enum(['community', 'professional', 'user', 'atlas', 'gov']).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(50),
+  category: z.enum(['community', 'professional', 'government', 'atlas', 'user']).optional(),
+  limit: z.coerce.number().int().positive().max(200).default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
 });
 
@@ -44,29 +44,25 @@ export async function GET(request: NextRequest) {
           return validation.error;
         }
         
-        const { visibility, account_id, collection_type, limit, offset } = validation.data;
+        const { visibility, account_id, category, limit, offset } = validation.data;
 
-    // Build query
+    // Build query - use new structure
     let query = supabase
       .from('map')
       .select(`
         id,
         account_id,
-        title,
+        name,
         description,
+        slug,
         visibility,
-        map_style,
-        map_layers,
-        type,
-        custom_slug,
+        settings,
+        member_count,
+        is_active,
         tags,
-        meta,
-        is_primary,
-        hide_creator,
-        collection_type,
         created_at,
         updated_at,
-        account:accounts!inner(
+        account:accounts!map_account_id_fkey(
           id,
           username,
           first_name,
@@ -74,6 +70,7 @@ export async function GET(request: NextRequest) {
           image_url
         )
       `)
+      .eq('is_active', true)
       .order('created_at', { ascending: false });
 
         // Apply filters
@@ -85,14 +82,12 @@ export async function GET(request: NextRequest) {
           query = query.eq('account_id', account_id);
         }
 
-        if (collection_type) {
-          // Backward-compat: some older maps used `type` for categorization.
-          // Treat collection_type filter as (collection_type = X OR type = X).
-          query = query.or(`collection_type.eq.${collection_type},type.eq.${collection_type}`);
-        }
+        // Filter by category - TODO: Implement proper join with map_categories table
+        // For now, we'll filter after fetching (or use a separate query)
+        // This requires a more complex query structure
 
     // For anonymous users, only show public maps
-    // For authenticated users, RLS will handle visibility (public + own private)
+    // For authenticated users, RLS will handle visibility (public + own private + member of)
     if (!auth) {
       query = query.eq('visibility', 'public');
     }
@@ -138,6 +133,8 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/maps
  * Create a new map (authenticated users only)
+ * Simplified creation: only name, description, visibility
+ * Other settings configured on map settings page
  * 
  * Security:
  * - Rate limited: 200 requests/minute (authenticated)
@@ -145,24 +142,14 @@ export async function GET(request: NextRequest) {
  * - Input validation with Zod
  * - Requires authentication
  * - Requires Contributor plan (pro/plus) or admin role
- * - Admin-only fields: is_primary, hide_creator, collection_type, custom_slug
+ * - Slug auto-generated (or custom if paying subscriber)
  * - RLS policies enforce ownership at database level
  */
 const createMapSchema = z.object({
-  title: z.string().min(1).max(200),
+  name: z.string().min(1).max(200),
   description: z.string().max(2000).optional().nullable(),
-  visibility: z.enum(['public', 'private', 'shared']).default('private'),
-  map_style: z.enum(['street', 'satellite', 'light', 'dark']).default('street'),
-  type: z.enum(['user', 'community', 'gov', 'professional', 'user-generated']).optional().nullable(),
-  custom_slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(100).optional().nullable(),
-  tags: z.array(z.object({
-    emoji: z.string(),
-    text: z.string(),
-  })).max(20).default([]),
-  meta: z.record(z.string(), z.unknown()).default({}),
-  is_primary: z.boolean().optional(),
-  hide_creator: z.boolean().optional(),
-  collection_type: z.enum(['community', 'professional', 'user', 'atlas', 'gov']).optional().nullable(),
+  visibility: z.enum(['public', 'private']).default('private'),
+  slug: z.string().regex(/^[a-z0-9-]+$/).min(3).max(100).optional().nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -189,17 +176,10 @@ export async function POST(request: NextRequest) {
           return validation.error;
         }
         const {
-          title,
+          name,
           description,
           visibility,
-          map_style,
-          type,
-          custom_slug,
-          tags,
-          meta,
-          is_primary,
-          hide_creator,
-          collection_type,
+          slug,
         } = validation.data;
 
         // Get account_id (already validated in security middleware)
@@ -280,49 +260,56 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Check if user is admin (required for is_primary, hide_creator, and custom_slug)
-        // Non-admins can set collection_type to 'community', but other values require admin
-        if ((is_primary !== undefined || hide_creator !== undefined || custom_slug !== undefined) && !isAdmin) {
-          return createErrorResponse('Admin role required to set is_primary, hide_creator, or custom_slug', 403);
-        }
-        
-        // Non-admins can only set collection_type to 'community' or null
-        if (collection_type !== undefined && !isAdmin && collection_type && collection_type !== 'community') {
-          return createErrorResponse('Only admins can set collection_type to values other than "community"', 403);
-        }
+        // Handle slug: custom if provided and user has pro/plus plan, otherwise auto-generate
+        let finalSlug: string | null = null;
+        if (slug) {
+          // Check if user can set custom slug (pro/plus or admin)
+          const canSetCustomSlug = isAdmin || accountData?.plan === 'pro' || accountData?.plan === 'plus';
+          if (!canSetCustomSlug) {
+            return createErrorResponse('Custom slugs are only available for pro/plus accounts or admins', 403);
+          }
 
-        // Validate custom_slug if provided (already validated in schema, but check uniqueness)
-        if (custom_slug) {
           // Check if slug is already taken
           const { data: existingMap } = await supabase
             .from('map')
             .select('id')
-            .eq('custom_slug', custom_slug)
+            .eq('slug', slug)
             .maybeSingle();
 
           if (existingMap) {
             return createErrorResponse('Custom slug is already taken', 409);
           }
+
+          finalSlug = slug.trim();
         }
+
+        // Initialize default settings
+        const defaultSettings = {
+          appearance: {
+            map_style: 'street' as const,
+            map_layers: {},
+            meta: {},
+          },
+          collaboration: {
+            allow_pins: false,
+            allow_areas: false,
+            allow_posts: false,
+          },
+          presentation: {
+            hide_creator: false,
+            is_featured: false,
+          },
+        };
 
         const insertData: Database['public']['Tables']['map']['Insert'] = {
           account_id: finalAccountId,
-          title: title.trim(),
+          name: name.trim(),
           description: description?.trim() || null,
           visibility,
-          map_style: map_style as 'street' | 'satellite',
-          type: type || null,
-          custom_slug: custom_slug?.trim() || null,
-          tags: tags || [],
-          meta: meta || {},
-          // Allow non-admins to set collection_type to 'community'
-          collection_type: collection_type || null,
-          ...(isAdmin && {
-            is_primary: is_primary ?? false,
-            hide_creator: hide_creator ?? false,
-            custom_slug: custom_slug?.trim() || null,
-          }),
-        };
+          settings: defaultSettings,
+          // Slug will be auto-generated by trigger if null
+          slug: finalSlug,
+        } as any;
 
         const { data: map, error } = await supabase
           .from('map')
@@ -330,15 +317,13 @@ export async function POST(request: NextRequest) {
           .select(`
             id,
             account_id,
-            title,
+            name,
             description,
+            slug,
             visibility,
-            map_style,
-            map_layers,
-            type,
-            custom_slug,
-            tags,
-            meta,
+            settings,
+            member_count,
+            is_active,
             created_at,
             updated_at
           `)

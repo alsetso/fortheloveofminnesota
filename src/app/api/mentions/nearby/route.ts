@@ -59,8 +59,25 @@ export async function GET(request: NextRequest) {
       updated_at,
       view_count`;
 
+    // Get live map ID first
+    const { data: liveMap, error: liveMapError } = await supabase
+      .from('map')
+      .select('id')
+      .eq('slug', 'live')
+      .eq('is_active', true)
+      .single();
+
+    if (liveMapError || !liveMap) {
+      return NextResponse.json(
+        { error: 'Live map not found' },
+        { status: 500 }
+      );
+    }
+
+    const liveMapId = (liveMap as { id: string }).id;
+
     let query = supabase
-      .from('mentions')
+      .from('map_pins')
       .select(isAuthenticated
         ? `${essentialColumns},
           accounts(
@@ -90,7 +107,9 @@ export async function GET(request: NextRequest) {
             name
           )`
       )
+      .eq('map_id', liveMapId)
       .eq('archived', false)
+      .eq('is_active', true)
       .gte('lat', bbox.minLat)
       .lte('lat', bbox.maxLat)
       .gte('lng', bbox.minLng)
@@ -112,7 +131,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter by distance and sort (client-side for now - can be optimized with PostGIS)
-    const mentionsWithDistance = (mentions || []).map((mention: any) => {
+    const mentionsWithDistance = ((mentions || []) as any[]).map((mention: any) => {
       const distance = Math.sqrt(
         Math.pow(mention.lat - lat, 2) + Math.pow(mention.lng - lng, 2)
       );

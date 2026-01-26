@@ -104,7 +104,7 @@ export default function MentionTypeFilter() {
 
   if (loading) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4 hidden lg:block">
+      <div className="bg-white border border-gray-200 rounded-lg p-4">
         <h2 className="text-sm font-semibold text-gray-900 mb-3">Filter by Type</h2>
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, index) => (
@@ -116,7 +116,7 @@ export default function MentionTypeFilter() {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hidden lg:block">
+    <div className="bg-white border border-gray-200 rounded-lg p-4">
       <h2 className="text-sm font-semibold text-gray-900 mb-3">Filter by Type</h2>
       <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-hide">
         {mentionTypes.map((type) => {

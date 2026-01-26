@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export interface ApiErrorResponse {
   error: string;
-  details?: string;
+  details?: string | Record<string, unknown>;
 }
 
 /**
@@ -11,7 +11,7 @@ export interface ApiErrorResponse {
 export function createErrorResponse(
   error: string,
   status: number,
-  details?: string
+  details?: string | Record<string, unknown>
 ): NextResponse<ApiErrorResponse> {
   const response: ApiErrorResponse = { error };
   if (details) {

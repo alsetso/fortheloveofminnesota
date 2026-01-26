@@ -71,18 +71,10 @@ export function AdminImpersonationProvider({ children }: { children: ReactNode }
 
     setIsLoadingAccounts(true);
     try {
-      // For admins, fetch all accounts (not just their own)
-      // First try admin endpoint, fallback to regular endpoint
-      let response = await fetch('/api/admin/accounts?limit=1000', {
+      // Fetch accounts (max limit is 100 per endpoint)
+      const response = await fetch('/api/accounts?limit=100', {
         credentials: 'include',
       });
-      
-      // If admin endpoint doesn't exist or fails, use regular endpoint (will only return user's accounts)
-      if (!response.ok) {
-        response = await fetch('/api/accounts?limit=1000', {
-          credentials: 'include',
-        });
-      }
       
       if (response.ok) {
         const contentType = response.headers.get('content-type');

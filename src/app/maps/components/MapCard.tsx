@@ -16,9 +16,22 @@ interface MapCardProps {
   isSmall?: boolean;
   showVisibility?: boolean;
   fullWidth?: boolean;
+  isPrimary?: boolean;
+  variant?: 'default' | 'primary' | 'compact';
+  onClick?: () => void;
 }
 
-export default function MapCard({ map, account: userAccount, isFeatured = false, isSmall = false, showVisibility = false, fullWidth = false }: MapCardProps) {
+export default function MapCard({ 
+  map, 
+  account: userAccount, 
+  isFeatured = false, 
+  isSmall = false, 
+  showVisibility = false, 
+  fullWidth = false,
+  isPrimary = false,
+  variant = 'default',
+  onClick
+}: MapCardProps) {
   const router = useRouter();
   const { openComingSoon } = useAppModalContextSafe();
   
@@ -46,7 +59,7 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
     
     if (!MAP_CONFIG?.MAPBOX_TOKEN) return null;
     
-    const mapStyle = map.map_style || 'street';
+    const mapStyle = map.settings?.appearance?.map_style || 'street';
     let styleId = 'streets-v12';
     if (mapStyle === 'satellite') {
       styleId = 'satellite-v9';
@@ -56,15 +69,15 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
       styleId = 'dark-v11';
     }
     
-    // Use map-specific center/zoom from meta if available, otherwise use defaults
-    const center = map.meta?.center || MAP_CONFIG.DEFAULT_CENTER;
-    const zoom = map.meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM;
+    // Use map-specific center/zoom from settings if available, otherwise use defaults
+    const center = map.settings?.appearance?.meta?.center || MAP_CONFIG.DEFAULT_CENTER;
+    const zoom = map.settings?.appearance?.meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM;
     const [lng, lat] = center;
     const width = 300;
     const height = 200;
     
     return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/${lng},${lat},${zoom}/${width}x${height}@2x?access_token=${MAP_CONFIG.MAPBOX_TOKEN}`;
-  }, [map?.map_type, map?.thumbnail, map?.map_style, map?.meta?.center, map?.meta?.zoom]);
+  }, [map?.map_type, map?.thumbnail, map?.settings?.appearance?.map_style, map?.settings?.appearance?.meta?.center, map?.settings?.appearance?.meta?.zoom]);
 
   // Truncate description to 120 characters
   const truncatedDescription = useMemo(() => {
@@ -77,7 +90,7 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
     // For coming soon atlas maps, show coming soon modal
     if (isComingSoon) {
       e.preventDefault();
-      openComingSoon(map.title);
+      openComingSoon(map.name || map.title || 'Map');
       return;
     }
 
@@ -106,25 +119,47 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
     if (map.href && canAccess) {
       return; // Let Link handle navigation
     }
-  }, [isComingSoon, map.title, map.requiresPro, map.map_type, map.href, map.id, canAccess, openComingSoon, router]);
+  }, [isComingSoon, map.name, map.title, map.requiresPro, map.map_type, map.href, map.id, canAccess, openComingSoon, router]);
+
+  // Determine variant based on props
+  const cardVariant = variant === 'primary' || isPrimary ? 'primary' : variant === 'compact' ? 'compact' : 'default';
+  const isPrimaryCard = cardVariant === 'primary';
+  const isCompactCard = cardVariant === 'compact';
+
+  // Removed - using aspect ratio instead for better responsive behavior
 
   const content = (
     <div 
-      className={`bg-white border border-gray-200 rounded-md overflow-hidden transition-colors cursor-pointer flex flex-col w-full ${
-        canAccess && !isComingSoon ? 'hover:bg-gray-50' : 'opacity-75'
+      className={`bg-white border rounded-lg overflow-hidden transition-all cursor-pointer flex flex-col w-full h-full min-h-0 ${
+        isPrimaryCard 
+          ? 'border-2 border-indigo-200 shadow-md hover:shadow-lg hover:border-indigo-300' 
+          : 'border border-gray-200 hover:border-gray-300'
+      } ${
+        canAccess && !isComingSoon 
+          ? isPrimaryCard 
+            ? 'hover:bg-indigo-50/30' 
+            : 'hover:bg-gray-50' 
+          : 'opacity-75'
       }`}
-      onClick={handleClick}
+      onClick={(e) => {
+        if (onClick) {
+          e.preventDefault();
+          onClick();
+        } else {
+          handleClick(e);
+        }
+      }}
     >
-      {/* Map Preview - Rectangle with compact padding */}
+      {/* Map Preview - Fixed aspect ratio for consistent sizing */}
       {previewUrl && (
         <div className="w-full bg-white flex-shrink-0 p-1">
-          <div className={`w-full ${isFeatured ? 'h-48' : isSmall ? 'h-16' : 'h-24'} bg-gray-100 relative overflow-hidden rounded-md border border-gray-200`}>
+          <div className="w-full aspect-[4/3] bg-gray-100 relative overflow-hidden rounded-md border border-gray-200">
             {map.map_type === 'atlas' && map.thumbnail ? (
               // For atlas maps with thumbnail, use the icon directly
               <div className="w-full h-full flex items-center justify-center bg-gray-50">
                 <Image
                   src={previewUrl}
-                  alt={map.title}
+                  alt={map.name || map.title || 'Map preview'}
                   width={48}
                   height={48}
                   className="object-contain"
@@ -133,8 +168,8 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
               </div>
             ) : (
               <Image
-                src={previewUrl}
-                alt={map.title}
+                src={previewUrl || ''}
+                alt={map.name || map.title || 'Map preview'}
                 fill
                 className="object-cover rounded-md"
                 unoptimized
@@ -158,9 +193,15 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
                 </div>
               </div>
             )}
-            {/* Owner Badge - Floating label in top left */}
-            {map.account && !map.hide_creator && (
-              <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-black/70 backdrop-blur-sm rounded flex items-center gap-1">
+            {/* Featured Badge - Top left for featured maps */}
+            {(isPrimaryCard || map.settings?.presentation?.is_featured) && (
+              <div className="absolute top-2 left-2 px-2 py-1 bg-indigo-600 text-white rounded-md flex items-center gap-1 z-10">
+                <span className="text-[10px] font-bold">FEATURED</span>
+              </div>
+            )}
+            {/* Owner Badge - Floating label in top left (or top right if primary) */}
+            {map.account && !map.settings?.presentation?.hide_creator && (
+              <div className={`absolute ${isPrimaryCard ? 'top-2 right-2' : 'top-1 left-1'} px-1.5 py-0.5 bg-black/70 backdrop-blur-sm rounded flex items-center gap-1 ${isPrimaryCard ? 'z-10' : ''}`}>
                 {map.account.image_url ? (
                   <div className="w-3 h-3 rounded-full overflow-hidden flex-shrink-0 border border-white/20">
                     <Image
@@ -216,25 +257,64 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
         </div>
       )}
       
-      {/* Content with compact padding */}
-      <div className="p-2 flex-1 flex flex-col min-h-0">
-        {/* Title */}
-        <h3 className="text-xs font-semibold text-gray-900 mb-0.5 line-clamp-1">{map.title}</h3>
+      {/* Content with responsive padding - flex to fill */}
+      <div className="p-2 flex-1 flex flex-col min-h-0 justify-between">
+        {/* Top Section */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          {/* Title */}
+          <h3 className="text-xs font-semibold text-gray-900 mb-0.5 line-clamp-1">
+            {map.name || map.title}
+          </h3>
+          
+          {/* Description - Truncated to 120 characters */}
+          {truncatedDescription && (
+            <p className="text-xs text-gray-600 mb-1 line-clamp-2 flex-shrink-0">
+              {truncatedDescription}
+            </p>
+          )}
+        </div>
         
-        {/* Description - Truncated to 120 characters */}
-        {truncatedDescription && (
-          <p className="text-xs text-gray-600 mb-1 line-clamp-2">{truncatedDescription}</p>
-        )}
-        
-        {/* Spacer */}
-        <div className="flex-1" />
-        
-        {/* Bottom Section - Views */}
-        <div className="pt-1 border-t border-gray-200">
-          {map.view_count !== undefined && (
-            <div className="flex items-center gap-1 text-[10px] text-gray-500">
-              <EyeIcon className="w-3 h-3" />
-              <span>{map.view_count.toLocaleString()}</span>
+        {/* Bottom Section - Collection Type, Subscription, Views */}
+        <div className="pt-1 border-t border-gray-200 space-y-1 flex-shrink-0">
+          {/* Collection Type and Subscription Level */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Collection Type Badge */}
+            {map.collection_type && map.collection_type !== 'community' && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                {map.collection_type === 'professional' ? 'Professional' : 
+                 map.collection_type === 'gov' ? 'Government' : 
+                 map.collection_type === 'atlas' ? 'Atlas' : 
+                 map.collection_type === 'user' ? 'User' : map.collection_type}
+              </span>
+            )}
+            {/* Subscription Level Badge */}
+            {map.requiresPro && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                Contributor
+              </span>
+            )}
+          </div>
+          {/* Stats Row */}
+          <div className="flex items-center gap-3 text-[10px] text-gray-500">
+            {map.member_count !== undefined && (
+              <div className="flex items-center gap-1">
+                <span className="font-medium text-gray-900">{map.member_count}</span>
+                <span>members</span>
+              </div>
+            )}
+            {map.view_count !== undefined && (
+              <div className="flex items-center gap-1">
+                <EyeIcon className="w-3 h-3" />
+                <span>{map.view_count.toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+          {/* Role Badge (for My Maps) */}
+          {map.current_user_role && (
+            <div className="mt-1">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 capitalize">
+                {map.current_user_role}
+              </span>
             </div>
           )}
         </div>
@@ -244,13 +324,12 @@ export default function MapCard({ map, account: userAccount, isFeatured = false,
 
   // Wrap in Link only if it has href and can access (for community/professional maps)
   // Atlas maps handle navigation in onClick handler
+  // All cards same size regardless of variant - use fullWidth for grid layouts
   const containerClass = fullWidth
-    ? 'w-full'
-    : isFeatured 
-    ? 'w-full lg:max-w-[320px] lg:flex-shrink-0' 
+    ? 'w-full h-full' // Full width in grid, stretch to fill row
     : isSmall
     ? 'w-full lg:max-w-[120px] lg:flex-shrink-0'
-    : 'w-full lg:max-w-[150px] lg:flex-shrink-0';
+    : 'w-full sm:max-w-[180px] md:max-w-[200px] lg:max-w-[220px] lg:flex-shrink-0'; // Fixed width for non-grid layouts
 
   if (map.href && canAccess && map.map_type !== 'atlas') {
     return (

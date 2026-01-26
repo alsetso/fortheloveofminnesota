@@ -62,20 +62,38 @@ function normalizeEntitlements(payload: unknown): AccountFeatureEntitlement[] {
 }
 
 export function BillingEntitlementsProvider({ children }: { children: React.ReactNode }) {
-  const { user, account } = useAuthStateSafe();
+  const { user, account, activeAccountId } = useAuthStateSafe();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [features, setFeatures] = useState<AccountFeatureEntitlement[]>([]);
+  
+  // Cache features per account
+  const featuresCache = useRef<Map<string, { features: AccountFeatureEntitlement[]; timestamp: number }>>(new Map());
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   const requestSeq = useRef(0);
 
   const refresh = useCallback(async () => {
     const nextSeq = ++requestSeq.current;
 
-    if (!user || !account) {
+    // Use activeAccountId if available, fallback to account.id
+    const targetAccountId = activeAccountId || account?.id;
+    
+    if (!user || !targetAccountId) {
       setAccountId(null);
       setFeatures([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // Check cache first
+    const cached = featuresCache.current.get(targetAccountId);
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < CACHE_TTL) {
+      setAccountId(targetAccountId);
+      setFeatures(cached.features);
       setError(null);
       setIsLoading(false);
       return;
@@ -91,30 +109,45 @@ export function BillingEntitlementsProvider({ children }: { children: React.Reac
       if (nextSeq !== requestSeq.current) return;
 
       if (!res.ok) {
-        setAccountId(account.id);
+        setAccountId(targetAccountId);
         setFeatures([]);
         setError(typeof (data as any)?.error === 'string' ? (data as any).error : 'Failed to load billing entitlements');
         return;
       }
 
       const normalized = normalizeEntitlements(data);
-      setAccountId(typeof (data as any)?.accountId === 'string' ? (data as any).accountId : account.id);
+      const returnedAccountId = typeof (data as any)?.accountId === 'string' ? (data as any).accountId : targetAccountId;
+      
+      // Update cache
+      featuresCache.current.set(returnedAccountId, {
+        features: normalized,
+        timestamp: now,
+      });
+      
+      setAccountId(returnedAccountId);
       setFeatures(normalized);
     } catch (e) {
       if (nextSeq !== requestSeq.current) return;
-      setAccountId(account.id);
+      setAccountId(targetAccountId);
       setFeatures([]);
       setError(e instanceof Error ? e.message : 'Failed to load billing entitlements');
     } finally {
       if (nextSeq !== requestSeq.current) return;
       setIsLoading(false);
     }
-  }, [user, account]);
+  }, [user, account, activeAccountId]);
 
-  // Refresh when the active account changes.
+  // Refresh when the active account changes
   useEffect(() => {
     void refresh();
-  }, [refresh, account?.id, user?.id]);
+  }, [refresh, activeAccountId, account?.id, user?.id]);
+  
+  // Clear cache when account changes
+  useEffect(() => {
+    if (activeAccountId) {
+      // Keep cache for current account, could clear others if needed
+    }
+  }, [activeAccountId]);
 
   // Defensive: also refresh on the global account switch event.
   useEffect(() => {

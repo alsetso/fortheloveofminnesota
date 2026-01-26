@@ -1,21 +1,20 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Group } from '@/types/group';
 import { useAuthStateSafe, Account } from '@/features/auth';
 import Link from 'next/link';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import { Mention } from '@/types/mention';
 import PostMapDrawer from './PostMapDrawer';
 import PostImageDrawer from './PostImageDrawer';
+import { getAccessibleMaps, type AccessibleMap } from '@/lib/maps/getAccessibleMaps';
 
 interface CreatePostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPostCreated?: () => void;
   initialAction?: 'upload_photo' | 'upload_video' | 'mention' | null;
-  initialGroupId?: string | null;
-  lockGroupId?: boolean;
+  initialMapId?: string | null;
 }
 
 export default function CreatePostModal({ 
@@ -23,16 +22,12 @@ export default function CreatePostModal({
   onClose, 
   onPostCreated,
   initialAction,
-  initialGroupId,
-  lockGroupId = false
+  initialMapId
 }: CreatePostModalProps) {
   const { account } = useAuthStateSafe();
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
   const [showTitle, setShowTitle] = useState(false);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId || null);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrivacyMenu, setShowPrivacyMenu] = useState(false);
@@ -56,6 +51,10 @@ export default function CreatePostModal({
   const [mentionTypes, setMentionTypes] = useState<Array<{ id: string; emoji: string; name: string }>>([]);
   const [isLoadingMentionTypes, setIsLoadingMentionTypes] = useState(false);
   const [mentionTypeSearchQuery, setMentionTypeSearchQuery] = useState('');
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
+  const [accessibleMaps, setAccessibleMaps] = useState<AccessibleMap[]>([]);
+  const [isLoadingMaps, setIsLoadingMaps] = useState(false);
+  const [showMapSelector, setShowMapSelector] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -91,6 +90,38 @@ export default function CreatePostModal({
                          (account?.plan as string) === 'business' || 
                          account?.plan === 'gov';
 
+  // Fetch accessible maps when modal opens
+  useEffect(() => {
+    if (!isOpen || !account?.id) {
+      setAccessibleMaps([]);
+      return;
+    }
+
+    const fetchMaps = async () => {
+      setIsLoadingMaps(true);
+      try {
+        const maps = await getAccessibleMaps(account.id);
+        setAccessibleMaps(maps);
+      } catch (err) {
+        console.error('Error fetching accessible maps:', err);
+      } finally {
+        setIsLoadingMaps(false);
+      }
+    };
+
+    fetchMaps();
+  }, [isOpen, account?.id]);
+
+  // Set initial map ID when modal opens
+  useEffect(() => {
+    if (isOpen && initialMapId) {
+      setSelectedMapId(initialMapId);
+    } else if (!isOpen) {
+      // Reset when modal closes
+      setSelectedMapId(null);
+    }
+  }, [isOpen, initialMapId]);
+
   // Fetch mention types (only active ones for public selection)
   useEffect(() => {
     if (!isOpen) return;
@@ -116,33 +147,6 @@ export default function CreatePostModal({
 
     fetchMentionTypes();
   }, [isOpen]);
-
-  // Fetch user's groups
-  useEffect(() => {
-    if (!account?.id || !isOpen) return;
-
-    const fetchGroups = async () => {
-      setIsLoadingGroups(true);
-      try {
-        const response = await fetch('/api/groups?limit=100', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          const memberGroups = (data.groups || []).filter(
-            (g: Group) => g.is_member === true
-          );
-          setGroups(memberGroups);
-        }
-      } catch (err) {
-        console.error('Error fetching groups:', err);
-      } finally {
-        setIsLoadingGroups(false);
-      }
-    };
-
-    fetchGroups();
-  }, [account?.id, isOpen]);
 
   // Handle initial actions
   useEffect(() => {
@@ -185,8 +189,16 @@ export default function CreatePostModal({
       setIsLoadingMentions(true);
       try {
         const { supabase } = await import('@/lib/supabase');
+        // Get live map ID first
+        const { data: liveMap } = await supabase
+          .from('map')
+          .select('id')
+          .eq('slug', 'live')
+          .eq('is_active', true)
+          .single();
+
         const { data, error } = await supabase
-          .from('mentions')
+          .from('map_pins')
           .select(`
             id,
             lat,
@@ -212,8 +224,10 @@ export default function CreatePostModal({
               name
             )
           `)
+          .eq('map_id', liveMap?.id)
           .eq('account_id', account.id)
           .eq('archived', false)
+          .eq('is_active', true)
           .order('created_at', { ascending: false })
           .limit(100);
 
@@ -236,11 +250,6 @@ export default function CreatePostModal({
       setContent('');
       setTitle('');
       setShowTitle(false);
-      if (!lockGroupId) {
-        setSelectedGroupId(null);
-      } else {
-        setSelectedGroupId(initialGroupId || null);
-      }
       setError(null);
       setImages([]);
       setSelectedMentionIds([]);
@@ -256,14 +265,7 @@ export default function CreatePostModal({
       setShowMentionTypesModal(false);
       setMentionTypeSearchQuery('');
     }
-  }, [isOpen, lockGroupId, initialGroupId]);
-
-  // Set initial group ID when provided
-  useEffect(() => {
-    if (initialGroupId && isOpen) {
-      setSelectedGroupId(initialGroupId);
-    }
-  }, [initialGroupId, isOpen]);
+  }, [isOpen]);
 
   // Focus title input when it's shown
   useEffect(() => {
@@ -412,13 +414,13 @@ export default function CreatePostModal({
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({
+          body: JSON.stringify({
           title: title.trim() || null,
           content: content.trim(),
           visibility: visibility,
-          group_id: selectedGroupId || null,
           mention_type_id: selectedMentionTypeId || null,
           mention_ids: selectedMentionIds.length > 0 ? selectedMentionIds : null,
+          map_id: selectedMapId || null,
           images: images.length > 0 ? images : null,
           map_data: mapData ? {
             lat: mapData.center?.lat || 0,
@@ -439,15 +441,12 @@ export default function CreatePostModal({
       setContent('');
       setTitle('');
       setShowTitle(false);
-      if (!lockGroupId) {
-        setSelectedGroupId(null);
-      } else {
-        setSelectedGroupId(initialGroupId || null);
-      }
       setImages([]);
       setSelectedMentionIds([]);
       setShowMentionsList(false);
       setSelectedMentionTypeId(null);
+      setSelectedMapId(null);
+      setMapData(null);
       onPostCreated?.();
       onClose();
     } catch (err) {
@@ -653,25 +652,6 @@ export default function CreatePostModal({
             <form onSubmit={handleSubmit} className={`p-4 transition-transform duration-300 ${
               showMentionsList || showMapView || showImageView ? '-translate-x-full' : 'translate-x-0'
             }`}>
-            {/* Group Selector - Optional */}
-            {groups.length > 0 && (
-              <div className="mb-3">
-                <select
-                  value={selectedGroupId || ''}
-                  onChange={(e) => setSelectedGroupId(e.target.value || null)}
-                  disabled={lockGroupId}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-600"
-                >
-                  <option value="">Feed (no group)</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {/* Mention Type Tag Selector */}
             <div className="mb-3">
               {selectedMentionTypeId && mentionTypes.length > 0 ? (
@@ -709,6 +689,112 @@ export default function CreatePostModal({
                     Add tag
                   </span>
                 </button>
+              )}
+            </div>
+
+            {/* Map Selector */}
+            <div className="mb-3">
+              {selectedMapId ? (
+                // Show selected map
+                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-gray-50">
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-900">
+                    {accessibleMaps.find(m => m.id === selectedMapId)?.name || 'Map'}
+                  </span>
+                  {accessibleMaps.find(m => m.id === selectedMapId)?.visibility === 'private' && (
+                    <svg className="w-3 h-3 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                  {/* Only show remove button if map was not pre-selected via initialMapId */}
+                  {initialMapId !== selectedMapId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMapId(null)}
+                      className="w-5 h-5 rounded-full hover:bg-gray-200 flex items-center justify-center transition-colors text-gray-400 hover:text-gray-600"
+                      title="Remove map"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                // Show Add Map button (only if no initialMapId is set)
+                !initialMapId && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowMapSelector(!showMapSelector)}
+                      className="relative inline-flex items-center gap-2 px-3 py-2 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
+                      title="Add to map"
+                      disabled={isLoadingMaps}
+                    >
+                      <svg className="w-4 h-4 text-gray-500 group-hover:text-gray-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-500 group-hover:text-gray-700 transition-colors">
+                        {isLoadingMaps ? 'Loading maps...' : 'Add to map'}
+                      </span>
+                    </button>
+                  
+                  {/* Map Dropdown */}
+                  {showMapSelector && !isLoadingMaps && (
+                    <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-64 overflow-y-auto">
+                      <div className="p-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMapId(null);
+                            setShowMapSelector(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            !selectedMapId
+                              ? 'bg-gray-100 text-gray-900 font-medium'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          No map (general post)
+                        </button>
+                        {accessibleMaps.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-gray-500">
+                            No accessible maps
+                          </div>
+                        ) : (
+                          accessibleMaps.map((map) => (
+                            <button
+                              key={map.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedMapId(map.id);
+                                setShowMapSelector(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
+                                selectedMapId === map.id
+                                  ? 'bg-gray-100 text-gray-900 font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                              </svg>
+                              <span className="flex-1 truncate">{map.name}</span>
+                              {map.visibility === 'private' && (
+                                <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  </div>
+                )
               )}
             </div>
 

@@ -96,7 +96,7 @@ export default function PlansPageClient() {
       return `${feature.limit_value} ${feature.name}`;
     }
     
-    if (feature.limit_type === 'storage_mb' && feature.limit_value !== null) {
+    if (feature.limit_type === 'storage_mb' && feature.limit_value !== null && feature.limit_value !== undefined) {
       const gb = feature.limit_value >= 1000 ? (feature.limit_value / 1000).toFixed(1) : null;
       return gb ? `${gb}GB ${feature.name}` : `${feature.limit_value}MB ${feature.name}`;
     }

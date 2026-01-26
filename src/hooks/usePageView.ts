@@ -1,31 +1,30 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useAdminImpersonationSafe } from '@/contexts/AdminImpersonationContext';
+import { useAuthStateSafe } from '@/features/auth';
 
 interface UsePageViewOptions {
   page_url?: string; // Optional - defaults to window.location.pathname
   enabled?: boolean;
-  /** Override account ID for tracking (admin impersonation) */
+  /** Override account ID for tracking */
   accountId?: string | null;
 }
 
 /**
  * Hook to track page views using the simplified page_url system
  * Automatically uses current page path if page_url not provided
- * For admins: Uses selected account ID from AdminImpersonationContext if available
+ * Skips tracking if current account is an admin (to avoid polluting analytics)
  */
 export function usePageView({ page_url, enabled = true, accountId }: UsePageViewOptions = {}) {
   const hasTracked = useRef(false);
-  const { selectedAccountId, isImpersonating } = useAdminImpersonationSafe();
+  const { account } = useAuthStateSafe();
   
-  // Use provided accountId, or admin-selected account, or null (will be determined server-side)
-  const trackingAccountId = accountId !== undefined 
-    ? accountId 
-    : (isImpersonating ? selectedAccountId : undefined);
+  // Skip tracking if current account is an admin
+  const isAdmin = account?.role === 'admin';
+  const shouldSkipTracking = isAdmin;
 
   useEffect(() => {
-    if (!enabled || hasTracked.current) return;
+    if (!enabled || hasTracked.current || shouldSkipTracking) return;
 
     // Get page URL - use provided or current pathname
     const url = page_url || (typeof window !== 'undefined' ? window.location.pathname : '');
@@ -58,7 +57,7 @@ export function usePageView({ page_url, enabled = true, accountId }: UsePageView
       referrer_url: referrer || null,
       user_agent: userAgent || null,
       session_id: deviceId, // Using session_id column to store device_id
-      ...(trackingAccountId !== undefined && { account_id: trackingAccountId }),
+      ...(accountId !== undefined && { account_id: accountId }),
     };
     
     // Use requestIdleCallback if available, otherwise setTimeout
@@ -88,7 +87,7 @@ export function usePageView({ page_url, enabled = true, accountId }: UsePageView
       // Fallback: delay by 1 second
       setTimeout(trackView, 1000);
     }
-  }, [page_url, enabled, trackingAccountId]);
+  }, [page_url, enabled, accountId, shouldSkipTracking]);
 }
 
 

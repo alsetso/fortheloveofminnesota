@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const planSlug = body.plan || 'contributor'; // Default to contributor for backward compatibility
     const billingPeriod = body.period || 'monthly'; // 'monthly' or 'yearly'
+    const returnUrl = body.returnUrl || `/billing?plan=${planSlug}`;
     
     // Fetch plan from database to get price ID
     const supabaseWithAuth = await createServerClientWithAuth(cookies());
@@ -176,8 +177,10 @@ export async function POST(request: NextRequest) {
 
     // Get base URL for success/cancel redirects
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const successUrl = `${baseUrl}/?upgrade=success`;
-    const cancelUrl = `${baseUrl}/?upgrade=canceled`;
+    
+    // Build success and cancel URLs with checkout status
+    const successUrl = `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}checkout=success`;
+    const cancelUrl = `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}checkout=canceled`;
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({

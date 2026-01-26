@@ -15,6 +15,7 @@ import { useUnifiedSidebar, type UnifiedSidebarType } from '@/hooks/useUnifiedSi
 import { useMapMembership } from './hooks/useMapMembership';
 import { generateUUID } from '@/lib/utils/uuid';
 import { shouldNormalizeUrl, getMapUrl } from '@/lib/maps/urls';
+import { isMapSetupComplete } from '@/lib/maps/mapSetupCheck';
 import MapFilterContent from '@/components/layout/MapFilterContent';
 import MapSettingsSidebar from './components/MapSettingsSidebar';
 import MemberManager from './components/MemberManager';
@@ -685,6 +686,8 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     }
 
     // Show join sidebar if user is not a member and not an owner
+    // Note: We allow joining regardless of collaboration settings - the map owner
+    // can configure membership rules/questions to control access
     if (!isMember && !isOwner && currentAccountId) {
       configs.push({
         type: 'join' as const,
@@ -966,6 +969,8 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                     auto_approve_members={mapData.auto_approve_members || false}
                     membership_questions={mapData.membership_questions || []}
                     membership_rules={mapData.membership_rules || null}
+                    isMember={isMember}
+                    onJoinClick={handleJoinClick}
                     onMapLoad={handleMapLoad}
                     onMapUpdate={(updatedData) => {
                       setMapData(prev => prev ? { ...prev, ...updatedData } : null);

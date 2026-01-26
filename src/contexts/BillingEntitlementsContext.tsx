@@ -17,6 +17,7 @@ export type AccountFeatureEntitlement = {
   limit_value: number | null;
   limit_type: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null;
   is_unlimited: boolean;
+  category?: string | null;
 };
 
 type BillingEntitlementsContextValue = {
@@ -56,6 +57,7 @@ function normalizeEntitlements(payload: unknown): AccountFeatureEntitlement[] {
         limit_value: typeof row.limit_value === 'number' ? row.limit_value : null,
         limit_type: normalizeLimitType(row.limit_type),
         is_unlimited: Boolean(row.is_unlimited),
+        category: typeof row.category === 'string' ? row.category : null,
       };
     })
     .filter(Boolean) as AccountFeatureEntitlement[];

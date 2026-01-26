@@ -12,6 +12,9 @@ import { createToast } from '@/features/ui/services/toast';
 import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from '../types';
 import JoinMapRequestModal from '@/app/map/[id]/components/JoinMapRequestModal';
+import MapMembersList from './MapMembersList';
+import MapMemberManagerInline from './MapMemberManagerInline';
+import { isMapSetupComplete } from '@/lib/maps/mapSetupCheck';
 
 interface MapDetailsContentProps {
   map: MapItem | null;
@@ -391,6 +394,111 @@ export default function MapDetailsContent({ map, account, onClose }: MapDetailsC
           </div>
         )}
         
+        {/* Members Section - Show if user is a member (read-only) */}
+        {isMember && !isOwner && currentAccountId && (
+          <MapMembersList 
+            mapId={map.id || map.slug || ''} 
+            currentAccountId={currentAccountId}
+          />
+        )}
+        
+        {/* Member Manager Section - Show if user is owner */}
+        {isOwner && currentAccountId && membershipData && (
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-medium text-gray-500">Member Manager</div>
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+              <MapMemberManagerInline
+                mapId={map.id || map.slug || ''}
+                mapAccountId={map.account?.id || ''}
+                autoApproveMembers={membershipData.autoApproveMembers}
+                membershipQuestions={membershipData.membershipQuestions}
+                membershipRules={membershipData.membershipRules}
+                onMemberAdded={() => {
+                  // Refresh membership data if needed
+                  if (membershipData) {
+                    const mapId = map.id || map.slug;
+                    if (mapId) {
+                      fetch(`/api/maps/${mapId}/members`)
+                        .then(res => res.ok ? res.json() : null)
+                        .then(data => {
+                          if (data?.members) {
+                            // Update member count if available
+                            // The component will re-render with updated data
+                          }
+                        })
+                        .catch(console.error);
+                    }
+                  }
+                }}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Join Map Section - Show if user is not a member AND map setup is complete */}
+        {!isMember && !isOwner && currentAccountId && membershipData && map && (() => {
+          const setupCheck = isMapSetupComplete(
+            map.visibility || 'private',
+            map.settings?.collaboration
+          );
+          return setupCheck.isSetupComplete;
+        })() && (
+          <div className="space-y-1.5">
+            <div className="text-[10px] font-medium text-gray-500">Join Map</div>
+            <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px] space-y-2">
+              {/* Show membership rules if set */}
+              {membershipData.membershipRules && (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-medium text-gray-600">Terms & Conditions</div>
+                  <div className="text-xs text-gray-700 whitespace-pre-wrap bg-white border border-gray-200 rounded-md p-2 max-h-32 overflow-y-auto">
+                    {membershipData.membershipRules}
+                  </div>
+                </div>
+              )}
+              
+              {/* Show questions preview if set */}
+              {membershipData.membershipQuestions.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[10px] font-medium text-gray-600">Questions</div>
+                  <div className="space-y-1">
+                    {membershipData.membershipQuestions.map((q, idx) => (
+                      <div key={q.id || idx} className="text-xs text-gray-600 bg-white border border-gray-200 rounded-md p-2">
+                        {idx + 1}. {q.question}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Join Button */}
+              {membershipData.hasPendingRequest ? (
+                <div className="w-full px-3 py-1.5 text-xs text-center text-gray-600 bg-gray-100 rounded-md">
+                  Membership request pending
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    // If no questions and auto-approve, direct join
+                    if (membershipData.membershipQuestions.length === 0 && 
+                        membershipData.autoApproveMembers && 
+                        map.visibility === 'public') {
+                      handleJoinMap([]);
+                    } else {
+                      // Show join request modal with terms/questions
+                      setShowJoinModal(true);
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+                >
+                  {membershipData.autoApproveMembers && (map.visibility as string) === 'public'
+                    ? 'Join Map'
+                    : 'Request to Join'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* Footer Actions */}
         <div className="pt-2 space-y-2">
           {!currentAccountId ? (
@@ -419,42 +527,7 @@ export default function MapDetailsContent({ map, account, onClose }: MapDetailsC
             >
               View Map
             </button>
-          ) : membershipData?.hasPendingRequest ? (
-            <div className="w-full px-3 py-1.5 text-xs text-center text-gray-600 bg-gray-50 rounded-md">
-              Membership request pending
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                // If we have membership data and conditions are met, direct join
-                if (membershipData && 
-                    membershipData.membershipQuestions.length === 0 && 
-                    membershipData.autoApproveMembers && 
-                    map.visibility === 'public') {
-                  // Direct join if no questions and auto-approve
-                  handleJoinMap([]);
-                } else if (membershipData) {
-                  // Show join request modal
-                  setShowJoinModal(true);
-                } else {
-                  // Fallback: if membershipData is null, try to show modal or direct join
-                  // For public maps, attempt direct join
-                  if (map.visibility === 'public') {
-                    handleJoinMap([]);
-                  } else {
-                    setShowJoinModal(true);
-                  }
-                }
-              }}
-              className="w-full px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
-            >
-              {membershipData 
-                ? (membershipData.autoApproveMembers && (map.visibility as string) === 'public'
-                    ? 'Join Map'
-                    : 'Request to Join')
-                : ((map.visibility as string) === 'public' ? 'Join Map' : 'Request to Join')}
-            </button>
-          )}
+          ) : null}
         </div>
       </div>
 

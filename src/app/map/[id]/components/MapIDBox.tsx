@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import { useMapboxMap } from '../hooks/useMapboxMap';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import MapPinForm from './MapPinForm';
@@ -15,6 +15,7 @@ import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToastContext } from '@/features/ui/contexts/ToastContext';
 import { createToast } from '@/features/ui/services/toast';
+import { isMapSetupComplete } from '@/lib/maps/mapSetupCheck';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
 import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
@@ -67,6 +68,8 @@ interface MapIDBoxProps {
   auto_approve_members?: boolean;
   membership_questions?: Array<{ id: number; question: string }>;
   membership_rules?: string | null;
+  isMember?: boolean;
+  onJoinClick?: () => void;
 }
 
 interface MapPin {
@@ -145,6 +148,8 @@ export default function MapIDBox({
   auto_approve_members = false,
   membership_questions = [],
   membership_rules = null,
+  isMember = false,
+  onJoinClick,
 }: MapIDBoxProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1318,6 +1323,17 @@ export default function MapIDBox({
           bottom: 0,
         }}
       />
+      {/* Floating Join Map Button - Show if user is not a member and not owner */}
+      {!isMember && !isOwner && current_account_id && onJoinClick && mapLoaded && (
+        <button
+          onClick={onJoinClick}
+          className="absolute bottom-3 right-3 z-20 flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-indigo-600/90 hover:bg-indigo-700 rounded-md shadow-md backdrop-blur-sm transition-colors"
+          aria-label="Join Map"
+        >
+          <UserPlusIcon className="w-3 h-3" />
+          <span>Join Map</span>
+        </button>
+      )}
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
           <div className="text-center">

@@ -338,11 +338,28 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
             previousAccountIdRef.current = accountId;
             window.dispatchEvent(new CustomEvent('account-changed', { detail: { accountId, account: accountData } }));
             
-            // Redirect to profile after login if account has username
-            // Only redirect if we're on the homepage (/) to avoid interrupting other flows
-            // Only redirect on first account load (when previousAccountIdRef was null)
-            if (accountData.username && window.location.pathname === '/' && isFirstLoad) {
-              router.push(`/profile/${accountData.username}`);
+            // Handle redirect parameter after login
+            if (isFirstLoad && typeof window !== 'undefined') {
+              const urlParams = new URLSearchParams(window.location.search);
+              const redirectParam = urlParams.get('redirect');
+              
+              if (redirectParam) {
+                // Clean redirect parameter and navigate
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.delete('redirect');
+                newUrl.searchParams.delete('message');
+                router.replace(newUrl.pathname + newUrl.search);
+                
+                // Navigate to the redirect URL
+                router.push(redirectParam);
+                return; // Exit early to avoid profile redirect
+              }
+              
+              // Default: Redirect to profile after login if account has username
+              // Only redirect if we're on the homepage (/) to avoid interrupting other flows
+              if (accountData.username && window.location.pathname === '/') {
+                router.push(`/profile/${accountData.username}`);
+              }
             }
           }
         } else {

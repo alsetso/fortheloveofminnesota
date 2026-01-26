@@ -192,11 +192,25 @@ export default function MapCard({
               </div>
             )}
             {/* Featured Badge - Top left for featured maps */}
-            {(isPrimaryCard || map.settings?.presentation?.is_featured) && (
-              <div className="absolute top-2 left-2 px-2 py-1 bg-indigo-600 text-white rounded-md flex items-center gap-1 z-10">
-                <span className="text-[10px] font-bold">FEATURED</span>
-              </div>
-            )}
+            {(isPrimaryCard || map.settings?.presentation?.is_featured) && (() => {
+              const isLiveMap = map.name?.toLowerCase() === 'live';
+              
+              if (isLiveMap) {
+                return (
+                  <div className="absolute top-2 left-2 px-2 py-1 bg-white text-black rounded-md flex items-center gap-1.5 z-10 border border-gray-200 shadow-sm">
+                    {/* Red flashing indicator */}
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-[10px] font-bold">LIVE</span>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="absolute top-2 left-2 px-2 py-1 bg-indigo-600 text-white rounded-md flex items-center gap-1 z-10">
+                  <span className="text-[10px] font-bold">FEATURED</span>
+                </div>
+              );
+            })()}
             {/* Owner Badge - Floating label in top left (or top right if primary) */}
             {map.account && !map.settings?.presentation?.hide_creator && (
               <div className={`absolute ${isPrimaryCard ? 'top-2 right-2' : 'top-1 left-1'} px-1.5 py-0.5 bg-black/70 backdrop-blur-sm rounded flex items-center gap-1 ${isPrimaryCard ? 'z-10' : ''}`}>

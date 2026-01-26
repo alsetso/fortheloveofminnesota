@@ -13,6 +13,7 @@ const ROUTE_PROTECTION: Record<string, {
   '/account/settings': { auth: true },
   '/map-test': { auth: true },
   '/admin': { auth: true, roles: ['admin'] },
+  '/billing': { auth: true },
 };
 
 /**
@@ -282,8 +283,10 @@ export async function middleware(req: NextRequest) {
       }
     }
     
+    // Preserve full URL including query parameters (e.g., ?plan=slug)
+    const fullPath = pathname + (req.nextUrl.search || '');
     const redirectUrl = new URL('/', req.url);
-    redirectUrl.searchParams.set('redirect', pathname);
+    redirectUrl.searchParams.set('redirect', fullPath);
     redirectUrl.searchParams.set('message', 'Please sign in to access this page');
     return NextResponse.redirect(redirectUrl);
   }

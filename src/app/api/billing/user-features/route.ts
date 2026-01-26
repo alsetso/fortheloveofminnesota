@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
               limit_value: row.limit_value ?? null,
               limit_type: row.limit_type ?? null,
               is_unlimited: Boolean(row.is_unlimited),
+              category: row.category ?? null,
             }))
           : [];
         

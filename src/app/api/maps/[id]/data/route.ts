@@ -102,6 +102,25 @@ export async function GET(
         }
 
         mapId = (map as any).id;
+        const mapAccountId = (map as any).account_id;
+
+        // Check if user can view members (owner or member)
+        let canViewMembers = false;
+        if (accountId) {
+          const isOwner = accountId === mapAccountId;
+          if (isOwner) {
+            canViewMembers = true;
+          } else {
+            // Check if user is a member
+            const { data: member } = await supabase
+              .from('map_members')
+              .select('role')
+              .eq('map_id', mapId)
+              .eq('account_id', accountId)
+              .maybeSingle();
+            canViewMembers = !!member;
+          }
+        }
 
         // Parallel queries for all data
         const [statsResult, pinsResult, areasResult, membersResult] = await Promise.all([
@@ -130,8 +149,8 @@ export async function GET(
             .eq('is_active', true)
             .order('created_at', { ascending: false }),
           
-          // Members (only if authenticated)
-          auth?.userId && accountId
+          // Members (only if user can view members)
+          canViewMembers && accountId
             ? supabase
                 .from('map_members')
                 .select(`

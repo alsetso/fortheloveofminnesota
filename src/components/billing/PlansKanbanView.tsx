@@ -17,17 +17,22 @@ interface PlanWithFeatures extends BillingPlan {
 interface PlansKanbanViewProps {
   onViewDetails?: (planSlug: string) => void;
   currentPlanSlug?: string;
+  showCarousel?: boolean;
+  initialPlans?: PlanWithFeatures[];
 }
 
-export default function PlansKanbanView({ onViewDetails, currentPlanSlug }: PlansKanbanViewProps) {
-  const [plans, setPlans] = useState<PlanWithFeatures[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function PlansKanbanView({ onViewDetails, currentPlanSlug, showCarousel = true, initialPlans }: PlansKanbanViewProps) {
+  const [plans, setPlans] = useState<PlanWithFeatures[]>(initialPlans || []);
+  const [loading, setLoading] = useState(!initialPlans);
   const [activePlanIndex, setActivePlanIndex] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchPlans();
-  }, []);
+    // Only fetch if we don't have initial plans
+    if (!initialPlans || initialPlans.length === 0) {
+      fetchPlans();
+    }
+  }, [initialPlans]);
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -106,6 +111,7 @@ export default function PlansKanbanView({ onViewDetails, currentPlanSlug }: Plan
   return (
     <div className="w-full">
       {/* Kanban Columns */}
+      {showCarousel && (
       <div 
         ref={scrollContainerRef}
         className="flex gap-4 overflow-x-auto pb-4 scroll-smooth [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
@@ -130,7 +136,9 @@ export default function PlansKanbanView({ onViewDetails, currentPlanSlug }: Plan
           return (
             <div
               key={plan.id}
-              className={`flex flex-col flex-shrink-0 w-80 bg-white rounded-lg overflow-hidden transition-all duration-300 ${borderClass}`}
+              className={`flex flex-col flex-shrink-0 w-80 bg-white rounded-lg overflow-hidden transition-all duration-300 ${borderClass} ${
+                !isUserActivePlan ? 'hover:border-2 hover:border-gray-900 hover:shadow-lg' : ''
+              }`}
             >
               {/* Plan Header */}
               <div className={`p-4 border-b ${isUserActivePlan ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
@@ -224,9 +232,10 @@ export default function PlansKanbanView({ onViewDetails, currentPlanSlug }: Plan
           );
         })}
       </div>
+      )}
 
       {/* Billing Footer with Navigation */}
-      {plans.length > 1 && (
+      {showCarousel && plans.length > 1 && (
         <div className="flex items-center justify-center gap-8 mt-8 py-4 border-t border-gray-100">
           {/* Left Arrow */}
           <button
@@ -271,6 +280,152 @@ export default function PlansKanbanView({ onViewDetails, currentPlanSlug }: Plan
           >
             <ChevronRightIcon className={`w-5 h-5 ${activePlanIndex === plans.length - 1 ? 'text-gray-400' : 'text-gray-700'}`} />
           </button>
+        </div>
+      )}
+
+      {/* Plans and Features Comparison Table */}
+      {plans.length > 0 && (
+        <div className="mt-12 pt-8 border-t border-gray-200">
+          <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left p-[10px] text-xs font-semibold text-gray-900 sticky left-0 bg-white z-10">
+                    Feature
+                  </th>
+                  {plans.map((plan) => {
+                    const priceDisplay = plan.price_monthly_cents === 0 
+                      ? 'Free' 
+                      : `$${(plan.price_monthly_cents / 100).toFixed(0)}/mo`;
+                    const isUserActivePlan = currentPlanSlug && plan.slug.toLowerCase() === currentPlanSlug.toLowerCase();
+                    
+                    return (
+                      <th
+                        key={plan.id}
+                        className={`text-center p-[10px] text-xs font-semibold text-gray-900 min-w-[120px] ${
+                          isUserActivePlan ? 'bg-green-50' : 'bg-gray-50'
+                        }`}
+                      >
+                        <div className="font-bold text-gray-900">{plan.name}</div>
+                        <div className="text-[10px] text-gray-600 mt-0.5">{priceDisplay}</div>
+                        {isUserActivePlan && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-500 text-white">
+                              Active
+                            </span>
+                          </div>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  // Get all unique features across all plans
+                  const allFeaturesMap = new Map();
+                  plans.forEach((plan) => {
+                    plan.features.forEach((feature) => {
+                      if (!allFeaturesMap.has(feature.id)) {
+                        allFeaturesMap.set(feature.id, {
+                          ...feature,
+                          plans: new Set(),
+                        });
+                      }
+                      allFeaturesMap.get(feature.id).plans.add(plan.id);
+                    });
+                  });
+                  
+                  const allFeatures = Array.from(allFeaturesMap.values()).sort((a, b) => {
+                    // Sort by category, then name
+                    if (a.category !== b.category) {
+                      return (a.category || '').localeCompare(b.category || '');
+                    }
+                    return a.name.localeCompare(b.name);
+                  });
+
+                  return allFeatures.map((feature) => (
+                    <tr key={feature.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="p-[10px] text-xs text-gray-700 sticky left-0 bg-white z-10">
+                        <div className="flex items-center gap-1.5">
+                          {feature.emoji && <span className="text-sm">{feature.emoji}</span>}
+                          <span className="font-medium">{feature.name}</span>
+                          {feature.category && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 capitalize">
+                              {feature.category}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {plans.map((plan) => {
+                        const planFeature = plan.features.find(f => f.id === feature.id);
+                        const hasFeature = !!planFeature;
+                        const isUserActivePlan = currentPlanSlug && plan.slug.toLowerCase() === currentPlanSlug.toLowerCase();
+                        
+                        return (
+                          <td
+                            key={plan.id}
+                            className={`text-center p-[10px] text-xs ${
+                              isUserActivePlan ? 'bg-green-50' : ''
+                            }`}
+                          >
+                            {hasFeature ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                {planFeature.limit_type === 'boolean' || !planFeature.limit_type ? (
+                                  <span className="text-green-500 font-semibold">✓</span>
+                                ) : planFeature.limit_type === 'unlimited' ? (
+                                  <span className="text-gray-900 font-semibold">∞</span>
+                                ) : planFeature.limit_type === 'count' && planFeature.limit_value !== null ? (
+                                  <span className="text-gray-900 font-semibold">{planFeature.limit_value}</span>
+                                ) : planFeature.limit_type === 'storage_mb' && planFeature.limit_value != null ? (
+                                  <span className="text-gray-900 font-semibold text-[10px]">
+                                    {planFeature.limit_value >= 1000 
+                                      ? `${(planFeature.limit_value / 1000).toFixed(1)}GB`
+                                      : `${planFeature.limit_value}MB`}
+                                  </span>
+                                ) : (
+                                  <span className="text-green-500 font-semibold">✓</span>
+                                )}
+                                {!planFeature.is_active && (
+                                  <span className="text-[10px] text-gray-400 italic">Soon</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ));
+                })()}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-gray-200">
+                  <td className="p-[10px] sticky left-0 bg-white z-10"></td>
+                  {plans.map((plan) => {
+                    const isUserActivePlan = currentPlanSlug && plan.slug.toLowerCase() === currentPlanSlug.toLowerCase();
+                    
+                    return (
+                      <td
+                        key={plan.id}
+                        className={`text-center p-[10px] ${
+                          isUserActivePlan ? 'bg-green-50' : 'bg-gray-50'
+                        }`}
+                      >
+                        <button
+                          onClick={() => onViewDetails?.(plan.slug)}
+                          className="w-full px-3 py-1.5 text-xs font-semibold rounded-md bg-white border border-gray-300 text-gray-900 hover:bg-gray-50 transition-colors"
+                        >
+                          View
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
     </div>

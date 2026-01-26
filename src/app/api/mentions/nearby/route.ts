@@ -59,22 +59,46 @@ export async function GET(request: NextRequest) {
       updated_at,
       view_count`;
 
-    // Get live map ID first
-    const { data: liveMap, error: liveMapError } = await supabase
+    // Get live map ID first - try slug first, then fallback to custom_slug
+    let liveMapId: string | null = null;
+    
+    // Try slug first
+    const { data: slugMap, error: slugError } = await supabase
       .from('map')
       .select('id')
       .eq('slug', 'live')
-      .eq('is_active', true)
-      .single();
+      .maybeSingle();
+    
+    if (slugMap && !slugError) {
+      const typedSlugMap = slugMap as { id: string };
+      if (typedSlugMap.id) {
+        liveMapId = typedSlugMap.id;
+      }
+    }
+    
+    if (!liveMapId) {
+      // Fallback to custom_slug (legacy)
+      const { data: customSlugMap, error: customSlugError } = await supabase
+        .from('map')
+        .select('id')
+        .eq('custom_slug', 'live')
+        .maybeSingle();
+      
+      if (customSlugMap && !customSlugError) {
+        const typedCustomSlugMap = customSlugMap as { id: string };
+        if (typedCustomSlugMap.id) {
+          liveMapId = typedCustomSlugMap.id;
+        }
+      }
+    }
 
-    if (liveMapError || !liveMap) {
+    if (!liveMapId) {
+      console.error('[API] Live map not found:', { slugError });
       return NextResponse.json(
-        { error: 'Live map not found' },
+        { error: 'Live map not found', details: 'No map with slug or custom_slug="live" found' },
         { status: 500 }
       );
     }
-
-    const liveMapId = (liveMap as { id: string }).id;
 
     let query = supabase
       .from('map_pins')

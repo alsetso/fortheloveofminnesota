@@ -62,6 +62,7 @@ export interface CreateMentionData {
   city_id?: string | null; // Optional city ID - can be set during creation or auto-detected
   collection_id?: string | null; // Optional collection ID for categorizing mentions
   mention_type_id?: string | null; // Optional mention type ID for categorizing mentions
+  map_id?: string | null; // Optional map ID - if not provided, defaults to live map
   visibility?: MentionVisibility;
   post_date?: string | null; // ISO date string - can be up to 100 years in the past
   icon_url?: string | null; // URL to the icon image for this mention pin

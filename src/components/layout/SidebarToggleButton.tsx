@@ -38,11 +38,11 @@ export default function SidebarToggleButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center w-8 h-8 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+      className="flex items-center justify-center w-7 h-7 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors"
       aria-label={ariaLabel}
       title={title}
     >
-      <Icon className="w-5 h-5" />
+      <Icon className="w-4 h-4" />
     </button>
   );
 }

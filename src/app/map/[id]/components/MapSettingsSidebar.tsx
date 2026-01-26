@@ -556,7 +556,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       />
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-hide bg-gray-50">
         {!isMember ? (
           // Not a member - show join prompt
           <div className="space-y-3">
@@ -605,7 +605,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
             </div>
             
             {/* Map Info (Read-only) */}
-            <div className="border border-gray-200 rounded-md">
+            <div className="border border-gray-200 rounded-md bg-white">
               <div className="px-3 py-2 border-b border-gray-200">
                 <div className="text-xs font-semibold text-gray-900">Map Information</div>
               </div>
@@ -638,7 +638,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
             
 
           {/* BASIC INFO SECTION */}
-          <div className="border border-gray-200 rounded-md">
+          <div className="border border-gray-200 rounded-md bg-white">
             <button
               type="button"
               onClick={() => toggleSection('basic')}
@@ -915,7 +915,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
           </div>
 
           {/* APPEARANCE SECTION */}
-          <div className="border border-gray-200 rounded-md">
+          <div className="border border-gray-200 rounded-md bg-white">
             <button
               type="button"
               onClick={() => toggleSection('appearance')}
@@ -1090,7 +1090,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
           </div>
 
           {/* COLLABORATION SECTION */}
-          <div className="border border-gray-200 rounded-md">
+          <div className="border border-gray-200 rounded-md bg-white">
             <button
               type="button"
               onClick={() => toggleSection('collaboration')}
@@ -1410,7 +1410,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
           </div>
 
           {/* PRESENTATION SECTION */}
-          <div className="border border-gray-200 rounded-md">
+          <div className="border border-gray-200 rounded-md bg-white">
             <button
               type="button"
               onClick={() => toggleSection('presentation')}
@@ -1486,7 +1486,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
 
           {/* MEMBERSHIP REQUESTS SECTION */}
           {!formData.auto_approve_members && (
-            <div className="border border-gray-200 rounded-md">
+            <div className="border border-gray-200 rounded-md bg-white">
               <button
                 type="button"
                 onClick={() => toggleSection('requests')}
@@ -1551,7 +1551,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
           )}
 
           {/* CATEGORIES SECTION */}
-          <div className="border border-gray-200 rounded-md">
+          <div className="border border-gray-200 rounded-md bg-white">
             <button
               type="button"
               onClick={() => toggleSection('categories')}

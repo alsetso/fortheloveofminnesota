@@ -118,19 +118,37 @@ export default function SidebarHeader({
     setShowDropdown(false);
   };
 
+  const handleCloseTab = () => {
+    try {
+      window.close();
+      // If window.close() doesn't work (e.g., tab wasn't opened by script),
+      // show a message to the user
+      setTimeout(() => {
+        addToast(createToast('info', 'Please close the tab manually', {
+          duration: 3000,
+        }));
+      }, 100);
+    } catch (err) {
+      addToast(createToast('info', 'Please close the tab manually', {
+        duration: 3000,
+      }));
+    }
+    setShowDropdown(false);
+  };
+
   return (
-    <div className="flex items-center justify-between p-3 border-b border-gray-200 flex-shrink-0">
-      <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
+    <div className="flex items-center justify-between px-2 py-1.5 border-b border-gray-200 flex-shrink-0">
+      <h2 className="text-xs font-semibold text-gray-900">{title}</h2>
       <div className="flex items-center gap-1">
         {showMenu && (
           <div className="relative">
             <button
               ref={menuButtonRef}
               onClick={() => setShowDropdown(!showDropdown)}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors flex items-center justify-center"
               aria-label="Menu"
             >
-              <EllipsisVerticalIcon className="w-4 h-4" />
+              <EllipsisVerticalIcon className="w-3.5 h-3.5" />
             </button>
             {showDropdown && (
               <div
@@ -219,6 +237,13 @@ export default function SidebarHeader({
                       Share
                     </button>
                   )}
+                  <button
+                    onClick={handleCloseTab}
+                    className="w-full px-3 py-1.5 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5" />
+                    Close Tab
+                  </button>
                 </div>
               </div>
             )}

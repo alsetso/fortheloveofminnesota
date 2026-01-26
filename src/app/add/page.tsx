@@ -69,6 +69,11 @@ export default function AddMentionPage() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [showCollectionModal, setShowCollectionModal] = useState(false);
   const [loadingCollections, setLoadingCollections] = useState(false);
+  
+  // Maps state
+  const [maps, setMaps] = useState<Array<{ id: string; name: string; emoji?: string }>>([]);
+  const [selectedMapId, setSelectedMapId] = useState<string | null>(null);
+  const [loadingMaps, setLoadingMaps] = useState(false);
   const [showMentionTypesModal, setShowMentionTypesModal] = useState(false);
   const [showMediaModal, setShowMediaModal] = useState(false);
   const [showMediaPreviewModal, setShowMediaPreviewModal] = useState(false);
@@ -603,6 +608,81 @@ export default function AddMentionPage() {
     loadCollections();
   }, [activeAccountId]);
 
+  // Fetch maps where account is a member
+  useEffect(() => {
+    if (!activeAccountId) {
+      setMaps([]);
+      setSelectedMapId(null);
+      return;
+    }
+
+    const loadMaps = async () => {
+      setLoadingMaps(true);
+      try {
+        // Fetch maps where user is owner or member
+        // The API endpoint with account_id returns maps owned by the account
+        // We also need to fetch maps where the account is a member
+        const [ownedResponse, memberResponse] = await Promise.all([
+          fetch(`/api/maps?account_id=${activeAccountId}`),
+          // Fetch maps where account is a member by checking map_members
+          supabase
+            .from('map_members')
+            .select(`
+              map_id,
+              map:map!map_members_map_id_fkey(
+                id,
+                name,
+                settings,
+                is_active
+              )
+            `)
+            .eq('account_id', activeAccountId)
+            .eq('map.is_active', true),
+        ]);
+
+        const mapsSet = new Map<string, { id: string; name: string; emoji?: string }>();
+
+        // Add owned maps
+        if (ownedResponse.ok) {
+          const ownedData = await ownedResponse.json();
+          (ownedData.maps || []).forEach((map: any) => {
+            if (map.is_active) {
+              mapsSet.set(map.id, {
+                id: map.id,
+                name: map.name || map.title || 'Unnamed Map',
+                emoji: (map.settings as any)?.appearance?.emoji || '🗺️',
+              });
+            }
+          });
+        }
+
+        // Add member maps
+        if (memberResponse.data) {
+          memberResponse.data.forEach((member: any) => {
+            const map = member.map;
+            if (map && map.is_active && !mapsSet.has(map.id)) {
+              mapsSet.set(map.id, {
+                id: map.id,
+                name: map.name || 'Unnamed Map',
+                emoji: (map.settings as any)?.appearance?.emoji || '🗺️',
+              });
+            }
+          });
+        }
+
+        setMaps(Array.from(mapsSet.values()).sort((a, b) => a.name.localeCompare(b.name)));
+      } catch (err) {
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[AddMentionPage] Error loading maps:', err);
+        }
+      } finally {
+        setLoadingMaps(false);
+      }
+    };
+
+    loadMaps();
+  }, [activeAccountId]);
+
   // Close account dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -778,6 +858,7 @@ export default function AddMentionPage() {
         media_type: finalMediaType !== 'none' ? finalMediaType : undefined,
         tagged_account_ids: taggedAccounts.length > 0 ? taggedAccounts.map(acc => acc.id) : undefined,
         collection_id: selectedCollectionId || undefined,
+        map_id: selectedMapId || undefined,
         full_address: fullAddress || undefined,
         map_meta: mapMeta || undefined,
       }, activeAccountId);
@@ -853,6 +934,7 @@ export default function AddMentionPage() {
     setMediaType(null);
     setTaggedAccounts([]);
     setSelectedCollectionId(null);
+    setSelectedMapId(null);
     setCreatedMention(null);
     setSuccess(false);
   };
@@ -1438,8 +1520,29 @@ export default function AddMentionPage() {
                   );
                 })()}
 
+                {/* Map Selector */}
+                {maps.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                      Map (optional)
+                    </label>
+                    <select
+                      value={selectedMapId || ''}
+                      onChange={(e) => setSelectedMapId(e.target.value || null)}
+                      className="w-full px-3 py-2 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white"
+                    >
+                      <option value="">Default (Live Map)</option>
+                      {maps.map((map) => (
+                        <option key={map.id} value={map.id}>
+                          {map.emoji} {map.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* Status Indicators */}
-                {(selectedTypeId || selectedCollectionId || taggedAccounts.length > 0 || mediaPreview) && (
+                {(selectedTypeId || selectedCollectionId || selectedMapId || taggedAccounts.length > 0 || mediaPreview) && (
                   <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100">
                     {selectedTypeId && (
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
@@ -1452,6 +1555,13 @@ export default function AddMentionPage() {
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
                         <span className="text-[10px] text-green-700 font-medium">
                           {collections.find(c => c.id === selectedCollectionId)?.emoji} {collections.find(c => c.id === selectedCollectionId)?.title}
+                        </span>
+                      </div>
+                    )}
+                    {selectedMapId && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
+                        <span className="text-[10px] text-green-700 font-medium">
+                          {maps.find(m => m.id === selectedMapId)?.emoji} {maps.find(m => m.id === selectedMapId)?.name}
                         </span>
                       </div>
                     )}

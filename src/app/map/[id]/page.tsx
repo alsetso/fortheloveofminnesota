@@ -33,6 +33,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   const { account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const mapInstanceRef = useRef<any>(null);
+  const clickMarkerRef = useRef<any>(null);
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -323,6 +324,42 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     setMapLoaded(true);
   }, []);
 
+  // Fly to location when location select popup opens
+  useEffect(() => {
+    if (!locationSelectPopup.isOpen || !mapLoaded || !mapInstanceRef.current) return;
+    
+    const mapboxMap = mapInstanceRef.current as any;
+    if (mapboxMap.removed) return;
+    
+    const { lat, lng } = locationSelectPopup;
+    if (lat === 0 && lng === 0) return; // Skip if coordinates are not set
+    
+    // Fly to the clicked location
+    if (typeof mapboxMap.flyTo === 'function') {
+      const currentZoom = typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 10;
+      const targetZoom = Math.max(currentZoom, 15); // Ensure we zoom in at least to level 15
+      
+      mapboxMap.flyTo({
+        center: [lng, lat],
+        zoom: targetZoom,
+        duration: 1000,
+        essential: true,
+      });
+    }
+  }, [locationSelectPopup.isOpen, locationSelectPopup.lat, locationSelectPopup.lng, mapLoaded]);
+
+  // Remove click marker when popup closes
+  useEffect(() => {
+    if (!locationSelectPopup.isOpen && clickMarkerRef.current) {
+      try {
+        clickMarkerRef.current.remove();
+      } catch (err) {
+        // Ignore cleanup errors
+      }
+      clickMarkerRef.current = null;
+    }
+  }, [locationSelectPopup.isOpen]);
+
   // Add click handler for location select popup when map loads
   useEffect(() => {
     if (!mapLoaded) return;
@@ -373,6 +410,79 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       if (!MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
         console.warn('[MapPage] Click outside Minnesota bounds:', { lat, lng });
         return;
+      }
+
+      // Remove existing click marker
+      if (clickMarkerRef.current) {
+        try {
+          clickMarkerRef.current.remove();
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+        clickMarkerRef.current = null;
+      }
+
+      // Create white circle with black dot marker
+      try {
+        const mapboxgl = (window as any).mapboxgl;
+        if (mapboxgl && mapboxgl.Marker) {
+          // Create marker element
+          const el = document.createElement('div');
+          el.style.cssText = `
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #ffffff;
+            border: 2px solid rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            pointer-events: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          `;
+
+          // Add black dot
+          const dot = document.createElement('div');
+          dot.style.cssText = `
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #000000;
+            position: absolute;
+          `;
+          el.appendChild(dot);
+
+          // Create and add marker
+          clickMarkerRef.current = new mapboxgl.Marker({
+            element: el,
+            anchor: 'center',
+          })
+            .setLngLat([lng, lat])
+            .addTo(mapboxMap);
+        }
+      } catch (err) {
+        console.error('[MapPage] Error creating click marker:', err);
+      }
+
+      // Always fly to the clicked location
+      if (typeof mapboxMap.flyTo === 'function') {
+        const currentZoom = typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 10;
+        const targetZoom = Math.max(currentZoom + 2, 15); // Zoom in a bit (add 2 levels) or at least to level 15
+        
+        mapboxMap.flyTo({
+          center: [lng, lat],
+          zoom: targetZoom,
+          duration: 1000,
+          essential: true,
+        });
+      }
+
+      // Only show location popup if map settings allow clicks
+      const allowClicks = mapData?.settings?.collaboration?.allow_clicks ?? false;
+      if (!allowClicks) {
+        return; // Don't show popup if clicks are disabled
       }
 
       // Check clickability permission
@@ -448,6 +558,15 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       const map = mapInstanceRef.current as any;
       if (map && !map.removed) {
         map.off('click', handleMapClick);
+      }
+      // Clean up click marker
+      if (clickMarkerRef.current) {
+        try {
+          clickMarkerRef.current.remove();
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+        clickMarkerRef.current = null;
       }
     };
   }, [mapLoaded, mapData, account, isOwner, userRole]);

@@ -1303,7 +1303,7 @@ export default function MapIDBox({
 
       <div 
         ref={mapContainer} 
-        className="absolute inset-0 w-full h-full rounded-t-3xl overflow-hidden"
+        className="absolute inset-0 w-full h-full overflow-hidden"
         style={{ 
           margin: 0, 
           padding: 0, 

@@ -22,14 +22,18 @@ import {
   MapIcon, 
   UsersIcon,
   SparklesIcon,
-  Bars3Icon
+  Bars3Icon,
+  PlusIcon,
+  CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
   MapIcon as MapIconSolid, 
   UsersIcon as UsersIconSolid,
   SparklesIcon as SparklesIconSolid,
-  Bars3Icon as Bars3IconSolid
+  Bars3Icon as Bars3IconSolid,
+  PlusIcon as PlusIconSolid,
+  CreditCardIcon as CreditCardIconSolid
 } from '@heroicons/react/24/solid';
 
 interface AccountDropdownProps {
@@ -280,6 +284,8 @@ export default function PageWrapper({
     { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
+    { label: 'Add', href: '/add', icon: PlusIcon, iconSolid: PlusIconSolid },
+    { label: 'Plans', href: '/plans', icon: CreditCardIcon, iconSolid: CreditCardIconSolid },
     { label: 'More', href: null, icon: Bars3Icon, iconSolid: Bars3IconSolid, isButton: true },
   ], []);
 

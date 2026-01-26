@@ -32,6 +32,7 @@ export default function MapPageHeaderButtons({
       <SidebarHeaderButtons
         onFilterClick={onFilterClick}
         onSettingsClick={onSettingsClick}
+        showFilter={false}
         showSettings={showSettings}
         filterLabel="Filter map"
         settingsLabel="Map settings"

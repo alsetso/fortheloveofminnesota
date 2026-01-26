@@ -7,6 +7,8 @@ import SidebarToggleButton from './SidebarToggleButton';
 interface SidebarHeaderButtonsProps {
   onFilterClick: () => void;
   onSettingsClick: () => void;
+  /** Show the filter button. Default: true */
+  showFilter?: boolean;
   /** Show the settings button. Default: true */
   showSettings?: boolean;
   /** Custom filter icon. Default: FunnelIcon */
@@ -37,6 +39,7 @@ interface SidebarHeaderButtonsProps {
 export default function SidebarHeaderButtons({
   onFilterClick,
   onSettingsClick,
+  showFilter = true,
   showSettings = true,
   filterIcon: FilterIcon = FunnelIcon,
   settingsIcon: SettingsIcon = Cog6ToothIcon,
@@ -45,12 +48,14 @@ export default function SidebarHeaderButtons({
 }: SidebarHeaderButtonsProps) {
   return (
     <div className="flex items-center gap-2">
-      <SidebarToggleButton
-        icon={FilterIcon}
-        onClick={onFilterClick}
-        ariaLabel={filterLabel}
-        title={filterLabel}
-      />
+      {showFilter && (
+        <SidebarToggleButton
+          icon={FilterIcon}
+          onClick={onFilterClick}
+          ariaLabel={filterLabel}
+          title={filterLabel}
+        />
+      )}
       {showSettings && (
         <SidebarToggleButton
           icon={SettingsIcon}

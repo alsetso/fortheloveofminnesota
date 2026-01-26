@@ -170,21 +170,22 @@ export default function BottomButtonsPopup({
   const positionClass = containerRelative ? 'absolute' : 'fixed';
   const backdropClass = containerRelative ? 'absolute' : 'fixed';
   const maxHeightValue = containerRelative 
-    ? (height === 'full' ? '100%' : '80vh')
-    : (height === 'full' ? '100vh' : '50vh');
+    ? (height === 'full' ? '90%' : '80vh')
+    : (height === 'full' ? '90vh' : '50vh');
   const heightValue = containerRelative 
-    ? (height === 'full' ? '100%' : 'auto')
-    : (height === 'full' ? '100vh' : 'auto');
+    ? (height === 'full' ? '90%' : 'auto')
+    : (height === 'full' ? '90vh' : 'auto');
+  // On mobile, always use 90% width regardless of containerRelative
+  const widthValue = containerRelative ? '90%' : '90%';
+  const maxWidthValue = containerRelative ? '90%' : '600px';
 
   return (
     <>
-      {/* Backdrop - only show if not containerRelative (containerRelative uses external backdrop) */}
-      {!containerRelative && (
-        <div
-          className={`${backdropClass} inset-0 z-[59] bg-black/20 transition-opacity duration-300`}
-          onClick={handleClose}
-        />
-      )}
+      {/* Backdrop - transparent overlay that closes popup on click */}
+      <div
+        className={`${backdropClass} inset-0 z-[59] bg-black/20 transition-opacity duration-300`}
+        onClick={handleClose}
+      />
       
       {/* Popup */}
       <div
@@ -200,16 +201,11 @@ export default function BottomButtonsPopup({
           transform: 'translate(-50%, 100%)',
           maxHeight: maxHeightValue,
           height: heightValue,
-          maxWidth: containerRelative ? '100%' : '600px',
-          width: containerRelative ? '100%' : 'calc(100% - 2rem)',
+          maxWidth: maxWidthValue,
+          width: widthValue,
           paddingBottom: containerRelative ? '0' : 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Handle bar */}
-        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0">
-          <div className={`w-12 h-1 rounded-full ${darkMode ? 'bg-white/40' : 'bg-gray-300'}`} />
-        </div>
-
         {/* Content - Scrollable */}
         <div ref={contentRef} className="flex-1 overflow-y-auto min-h-0 scrollbar-hide">
           {children}

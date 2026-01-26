@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { XMarkIcon, MapPinIcon, InformationCircleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, MapPinIcon, CheckCircleIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { supabase } from '@/lib/supabase';
 
@@ -64,9 +64,9 @@ export default function LocationSelectPopup({
 
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
-  const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
-  const mapMetaInfoRef = useRef<HTMLDivElement>(null);
   const [addressCopied, setAddressCopied] = useState(false);
+  const [nearbyPlaces, setNearbyPlaces] = useState<Array<{ id: string; description: string | null; mention_type: { emoji: string; name: string } | null; distance: number }>>([]);
+  const [loadingNearby, setLoadingNearby] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,21 +89,67 @@ export default function LocationSelectPopup({
     };
   }, [isOpen]);
 
-  // Close map meta info popup when clicking outside
+  // Fetch nearby places when popup opens
   useEffect(() => {
-    if (!showMapMetaInfo) return;
+    if (!isOpen || !lat || !lng) {
+      setNearbyPlaces([]);
+      return;
+    }
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (mapMetaInfoRef.current && !mapMetaInfoRef.current.contains(event.target as Node)) {
-        setShowMapMetaInfo(false);
+    const fetchNearbyPlaces = async () => {
+      setLoadingNearby(true);
+      try {
+        // Fetch places within 25 miles (40 km)
+        const radiusKm = 40; // 25 miles ≈ 40 km
+        const response = await fetch(
+          `/api/mentions/nearby?lat=${lat}&lng=${lng}&radius=${radiusKm}`
+        );
+
+        if (!response.ok) {
+          // Silently fail - don't show error, just don't display nearby places
+          setNearbyPlaces([]);
+          return;
+        }
+
+        const data = await response.json();
+        const mentions = data.mentions || [];
+
+        if (!mentions || mentions.length === 0) {
+          setNearbyPlaces([]);
+          return;
+        }
+
+        // Convert distance from degrees to miles
+        // The API returns distance in degrees (Euclidean distance)
+        // For Minnesota (~45°N): 1 degree lat ≈ 69 miles
+        const mentionsWithMiles = mentions.map((mention: any) => {
+          const distanceDegrees = mention.distance || 0;
+          const distanceMiles = distanceDegrees * 69; // Convert degrees to miles
+          return {
+            id: mention.id,
+            description: mention.description,
+            mention_type: mention.mention_type || null,
+            distance: distanceMiles,
+          };
+        });
+
+        // Show only the 3 closest places
+        setNearbyPlaces(mentionsWithMiles.slice(0, 3));
+      } catch (err) {
+        // Silently fail - don't show error
+        console.error('Error fetching nearby places:', err);
+        setNearbyPlaces([]);
+      } finally {
+        setLoadingNearby(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showMapMetaInfo]);
+    const timeoutId = setTimeout(() => {
+      fetchNearbyPlaces();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [isOpen, lat, lng]);
 
   // Fetch selected mention type from URL parameters or props (props take priority)
   useEffect(() => {
@@ -239,11 +285,6 @@ export default function LocationSelectPopup({
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        {/* Handle bar - hidden on desktop */}
-        <div className="flex items-center justify-center pt-2 pb-1 flex-shrink-0 xl:hidden">
-          <div className={`w-12 h-1 rounded-full ${useBlurStyle ? 'bg-white/50' : 'bg-gray-300'}`} />
-        </div>
-
         {/* Header */}
         <div className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
           useTransparentUI
@@ -323,51 +364,24 @@ export default function LocationSelectPopup({
               : displayName;
 
             return (
-              <div className="relative">
-                <div className={`flex items-center gap-2 p-2 border rounded-md ${
-                  useTransparentUI
-                    ? 'bg-white/10 border-white/20'
-                    : 'bg-gray-50 border-gray-200'
-                }`}>
+              <div className={`p-2 border rounded-md space-y-1 ${
+                useTransparentUI
+                  ? 'bg-white/10 border-white/20'
+                  : 'bg-gray-50 border-gray-200'
+              }`}>
+                {/* Name/Type on top */}
+                <div className="flex items-center gap-1.5">
                   {feature.icon && feature.icon !== '📍' && (
-                    <span className="text-xs flex-shrink-0">{feature.icon}</span>
+                    <span className="text-[10px] flex-shrink-0">{feature.icon}</span>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-semibold truncate ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-                      {singleLineLabel}
-                    </div>
+                  <div className={`text-[10px] font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                    {displayName}
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowMapMetaInfo(!showMapMetaInfo);
-                    }}
-                    className={`flex-shrink-0 p-0.5 transition-colors ${
-                      useTransparentUI
-                        ? 'text-white/60 hover:text-white'
-                        : 'text-gray-400 hover:text-gray-600'
-                    }`}
-                    aria-label="Map metadata information"
-                  >
-                    <InformationCircleIcon className="w-3.5 h-3.5" />
-                  </button>
                 </div>
-                
-                {/* Info Popup */}
-                {showMapMetaInfo && (
-                  <div
-                    ref={mapMetaInfoRef}
-                    className={`absolute top-full left-0 right-0 mt-1 z-50 border rounded-md shadow-lg p-2 ${
-                      useTransparentUI
-                        ? 'bg-white/90 backdrop-blur-md border-white/20'
-                        : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    <p className={`text-xs ${useTransparentUI ? 'text-white/90' : 'text-gray-600'}`}>
-                      This is map data from the location you clicked. It will be included in your mention to help others understand the context.
-                    </p>
-                  </div>
-                )}
+                {/* Shortened info text below */}
+                <div className={`text-[10px] ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                  Map data included in mention for context.
+                </div>
               </div>
             );
           })()}
@@ -380,7 +394,7 @@ export default function LocationSelectPopup({
                 className={`w-full flex items-center gap-2 px-3 py-2 text-left border rounded-md transition-all ${
                   useTransparentUI
                     ? 'bg-white/10 border-white/20 hover:bg-white/20'
-                    : 'bg-white border-gray-300 hover:border-gray-400'
+                    : 'bg-gray-100 border-gray-300 hover:border-gray-400'
                 } ${addressCopied ? 'border-green-500' : ''}`}
               >
                 <MapPinIcon className={`w-4 h-4 flex-shrink-0 ${
@@ -398,8 +412,12 @@ export default function LocationSelectPopup({
                     handleCopyAddress();
                   }}
                 />
-                {addressCopied && (
+                {addressCopied ? (
                   <CheckCircleIcon className="w-4 h-4 text-green-500 flex-shrink-0" />
+                ) : (
+                  <DocumentDuplicateIcon className={`w-4 h-4 flex-shrink-0 ${
+                    useWhiteText ? 'text-white/60' : 'text-gray-400'
+                  }`} />
                 )}
               </button>
             </div>
@@ -430,6 +448,48 @@ export default function LocationSelectPopup({
               'Add to Map'
             )}
           </button>
+
+          {/* Nearby Places - Show 3 closest */}
+          {nearbyPlaces.length > 0 && (
+            <div className="space-y-2">
+              <h3 className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                Nearby Places
+              </h3>
+              <div className="space-y-1.5">
+                {loadingNearby ? (
+                  <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                    Loading...
+                  </div>
+                ) : (
+                  nearbyPlaces.map((place) => (
+                    <div
+                      key={place.id}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md border ${
+                        useTransparentUI
+                          ? 'bg-white/10 border-white/20'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      {place.mention_type && (
+                        <span className="text-xs flex-shrink-0">{place.mention_type.emoji}</span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-[10px] font-medium truncate ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
+                          {place.description || place.mention_type?.name || 'Place'}
+                        </div>
+                      </div>
+                      <div className={`text-[10px] flex-shrink-0 ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
+                        {place.distance < 0.1 
+                          ? `${(place.distance * 5280).toFixed(0)} ft`
+                          : `${place.distance.toFixed(1)} mi`
+                        }
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

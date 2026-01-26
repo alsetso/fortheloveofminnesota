@@ -345,13 +345,13 @@ export class MentionService {
     // Use city_id if provided, otherwise leave as null
     const cityId = data.city_id || null;
 
-    // Get live map ID to link the mention
-    const liveMapId = await this.getLiveMapId();
+    // Get map ID - use provided map_id or default to live map
+    const mapId = data.map_id || await this.getLiveMapId();
     
     const { data: mention, error } = await supabase
       .from('map_pins')
       .insert({
-        map_id: liveMapId,
+        map_id: mapId,
         lat: data.lat,
         lng: data.lng,
         description: data.description || null,

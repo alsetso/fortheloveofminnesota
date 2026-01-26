@@ -78,9 +78,11 @@ export default async function MapPostPage({ params }: Props) {
     .eq('is_active', true)
     .single();
 
-  if (!mapData) {
+  if (!mapData || typeof mapData !== 'object' || !('id' in mapData)) {
     notFound();
   }
+
+  const typedMapData = mapData as { id: string; slug: string };
 
   // Fetch post with all details
   const { data: post, error } = await supabase
@@ -137,7 +139,7 @@ export default async function MapPostPage({ params }: Props) {
   const postData = post as any;
 
   // Verify post belongs to this map
-  if (postData.map_id !== mapData.id) {
+  if (postData.map_id !== typedMapData.id) {
     // Redirect to correct map route if post belongs to a different map
     if (postData.map?.slug) {
       redirect(`/map/${postData.map.slug}/post/${postId}`);
@@ -201,5 +203,5 @@ export default async function MapPostPage({ params }: Props) {
     postData.mentions = [];
   }
 
-  return <PostDetailClient post={postData as any} isOwner={isOwner} mapId={mapData.id} mapSlug={mapData.slug} />;
+  return <PostDetailClient post={postData as any} isOwner={isOwner} mapId={typedMapData.id} mapSlug={typedMapData.slug} />;
 }

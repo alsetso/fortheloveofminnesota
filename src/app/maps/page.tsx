@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { MagnifyingGlassIcon, PlusIcon, MapIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
@@ -11,7 +11,9 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import MapCard from './components/MapCard';
 import MapListItem from './components/MapListItem';
-import MapDetailsPopup from './components/MapDetailsPopup';
+import MapDetailsContent from './components/MapDetailsContent';
+import MapsPageLayout from './MapsPageLayout';
+import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
 import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from './types';
 
@@ -50,9 +52,9 @@ export default function MapsPage() {
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [loadingMyMaps, setLoadingMyMaps] = useState(false);
   
-  // Selected map for modal
+  // Selected map for sidebar
   const [selectedMap, setSelectedMap] = useState<MapItem | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { activeSidebar, toggleSidebar, closeSidebar } = useUnifiedSidebar();
 
   // Update view type when URL changes
   useEffect(() => {
@@ -334,13 +336,34 @@ export default function MapsPage() {
 
   const handleMapClick = (map: MapItem) => {
     setSelectedMap(map);
-    setIsModalOpen(true);
+    toggleSidebar('map-details');
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
+  const handleCloseSidebar = useCallback(() => {
+    closeSidebar();
     setSelectedMap(null);
-  };
+  }, [closeSidebar]);
+
+  // Sidebar configurations
+  const sidebarConfigs = useMemo(() => {
+    if (!selectedMap) return [];
+
+    return [
+      {
+        type: 'map-details' as const,
+        title: 'Map Details',
+        content: (
+          <MapDetailsContent
+            map={selectedMap}
+            account={account}
+            onClose={handleCloseSidebar}
+          />
+        ),
+        popupType: 'account' as const,
+        infoText: 'View map details, statistics, and join options',
+      },
+    ];
+  }, [selectedMap, account, handleCloseSidebar]);
 
   return (
     <>
@@ -354,7 +377,12 @@ export default function MapsPage() {
         }}
         searchResultsComponent={<SearchResults />}
       >
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3">
+        <MapsPageLayout
+          activeSidebar={activeSidebar}
+          onSidebarClose={handleCloseSidebar}
+          sidebarConfigs={sidebarConfigs}
+        >
+          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
@@ -582,14 +610,7 @@ export default function MapsPage() {
             </div>
           </div>
         </div>
-        
-        {/* Map Details Modal */}
-        <MapDetailsPopup
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          map={selectedMap}
-          account={account}
-        />
+        </MapsPageLayout>
       </PageWrapper>
     </>
   );

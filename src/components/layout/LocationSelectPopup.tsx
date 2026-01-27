@@ -21,7 +21,7 @@ interface LocationSelectPopupProps {
 /**
  * Simple popup that appears when user clicks on map
  * Shows address, coordinates, and "Add to map" button
- * Navigates to /add page with lat/lng parameters
+ * Opens contribute overlay on map page with lat/lng parameters
  */
 export default function LocationSelectPopup({
   isOpen,
@@ -65,8 +65,6 @@ export default function LocationSelectPopup({
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
   const [addressCopied, setAddressCopied] = useState(false);
-  const [nearbyPlaces, setNearbyPlaces] = useState<Array<{ id: string; description: string | null; mention_type: { emoji: string; name: string } | null; distance: number }>>([]);
-  const [loadingNearby, setLoadingNearby] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,67 +87,6 @@ export default function LocationSelectPopup({
     };
   }, [isOpen]);
 
-  // Fetch nearby places when popup opens
-  useEffect(() => {
-    if (!isOpen || !lat || !lng) {
-      setNearbyPlaces([]);
-      return;
-    }
-
-    const fetchNearbyPlaces = async () => {
-      setLoadingNearby(true);
-      try {
-        // Fetch places within 25 miles (40 km)
-        const radiusKm = 40; // 25 miles ≈ 40 km
-        const response = await fetch(
-          `/api/mentions/nearby?lat=${lat}&lng=${lng}&radius=${radiusKm}`
-        );
-
-        if (!response.ok) {
-          // Silently fail - don't show error, just don't display nearby places
-          setNearbyPlaces([]);
-          return;
-        }
-
-        const data = await response.json();
-        const mentions = data.mentions || [];
-
-        if (!mentions || mentions.length === 0) {
-          setNearbyPlaces([]);
-          return;
-        }
-
-        // Convert distance from degrees to miles
-        // The API returns distance in degrees (Euclidean distance)
-        // For Minnesota (~45°N): 1 degree lat ≈ 69 miles
-        const mentionsWithMiles = mentions.map((mention: any) => {
-          const distanceDegrees = mention.distance || 0;
-          const distanceMiles = distanceDegrees * 69; // Convert degrees to miles
-          return {
-            id: mention.id,
-            description: mention.description,
-            mention_type: mention.mention_type || null,
-            distance: distanceMiles,
-          };
-        });
-
-        // Show only the 3 closest places
-        setNearbyPlaces(mentionsWithMiles.slice(0, 3));
-      } catch (err) {
-        // Silently fail - don't show error
-        console.error('Error fetching nearby places:', err);
-        setNearbyPlaces([]);
-      } finally {
-        setLoadingNearby(false);
-      }
-    };
-
-    const timeoutId = setTimeout(() => {
-      fetchNearbyPlaces();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [isOpen, lat, lng]);
 
   // Fetch selected mention type from URL parameters or props (props take priority)
   useEffect(() => {
@@ -229,14 +166,21 @@ export default function LocationSelectPopup({
   };
 
   const handleAddToMap = () => {
-    // Always navigate to /add page
+    if (onAddToMap) {
+      // Use provided callback
+      onAddToMap({ lat, lng }, mapMeta || null, selectedMentionTypeId || propMentionTypeId || null);
+      handleClose();
+      return;
+    }
+    
+    // Default: navigate to live map with contribute overlay
     const params = new URLSearchParams();
     params.set('lat', lat.toString());
     params.set('lng', lng.toString());
-    if (selectedMentionTypeId) {
-      params.set('mention_type_id', selectedMentionTypeId);
+    if (selectedMentionTypeId || propMentionTypeId) {
+      params.set('mention_type_id', (selectedMentionTypeId || propMentionTypeId)!);
     }
-    router.push(`/add?${params.toString()}`);
+    router.push(`/map/live?${params.toString()}#contribute`);
     handleClose();
   };
 
@@ -258,12 +202,6 @@ export default function LocationSelectPopup({
 
   return (
     <>
-      {/* Backdrop - hidden on desktop */}
-      <div
-        className="fixed inset-0 z-[60] bg-black/20 transition-opacity duration-300 xl:hidden"
-        onClick={handleClose}
-      />
-      
       {/* Popup - iOS-style bottom sheet */}
       <div
         ref={popupRef}
@@ -423,11 +361,6 @@ export default function LocationSelectPopup({
             </div>
           )}
 
-          {/* Coordinates */}
-          <div className={`text-xs font-mono ${useWhiteText ? 'text-white/70' : 'text-gray-600'}`}>
-            {lat.toFixed(6)}, {lng.toFixed(6)}
-          </div>
-
           {/* Add to Map Button */}
           <button
             onClick={handleAddToMap}
@@ -448,48 +381,6 @@ export default function LocationSelectPopup({
               'Add to Map'
             )}
           </button>
-
-          {/* Nearby Places - Show 3 closest */}
-          {nearbyPlaces.length > 0 && (
-            <div className="space-y-2">
-              <h3 className={`text-xs font-semibold ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-                Nearby Places
-              </h3>
-              <div className="space-y-1.5">
-                {loadingNearby ? (
-                  <div className={`text-xs ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                    Loading...
-                  </div>
-                ) : (
-                  nearbyPlaces.map((place) => (
-                    <div
-                      key={place.id}
-                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md border ${
-                        useTransparentUI
-                          ? 'bg-white/10 border-white/20'
-                          : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      {place.mention_type && (
-                        <span className="text-xs flex-shrink-0">{place.mention_type.emoji}</span>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-[10px] font-medium truncate ${useWhiteText ? 'text-white' : 'text-gray-900'}`}>
-                          {place.description || place.mention_type?.name || 'Place'}
-                        </div>
-                      </div>
-                      <div className={`text-[10px] flex-shrink-0 ${useWhiteText ? 'text-white/70' : 'text-gray-500'}`}>
-                        {place.distance < 0.1 
-                          ? `${(place.distance * 5280).toFixed(0)} ft`
-                          : `${place.distance.toFixed(1)} mi`
-                        }
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </>

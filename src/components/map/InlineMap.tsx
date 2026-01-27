@@ -12,6 +12,8 @@ interface InlineMapProps {
   onLocationSelect: (lat: number, lng: number) => void;
   onOpenFullscreen?: () => void;
   fullscreen?: boolean;
+  initialZoom?: number;
+  hideMarker?: boolean;
 }
 
 export default function InlineMap({ 
@@ -19,7 +21,9 @@ export default function InlineMap({
   lng, 
   onLocationSelect,
   onOpenFullscreen,
-  fullscreen = false
+  fullscreen = false,
+  initialZoom,
+  hideMarker = false
 }: InlineMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<MapboxMapInstance | null>(null);
@@ -49,30 +53,35 @@ export default function InlineMap({
       markerRef.current = null;
     }
 
-    // Create marker
-    const el = document.createElement('div');
-    el.style.cssText = 'width: 32px; height: 32px; cursor: pointer; pointer-events: none;';
-    el.innerHTML = `
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
-        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EF4444"/>
-        <circle cx="12" cy="9" r="3" fill="white"/>
-      </svg>
-    `;
+    // Only create marker if not hidden
+    if (!hideMarker) {
+      // Create marker
+      const el = document.createElement('div');
+      el.style.cssText = 'width: 32px; height: 32px; cursor: pointer; pointer-events: none;';
+      el.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#EF4444"/>
+          <circle cx="12" cy="9" r="3" fill="white"/>
+        </svg>
+      `;
 
-    try {
-      markerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([lng, lat])
-        .addTo(mapInstance.current);
-
-      mapInstance.current.flyTo({
-        center: [lng, lat],
-        zoom: MAP_CONFIG.ADDRESS_ZOOM,
-        duration: 500,
-      });
-    } catch (err) {
-      console.error('[InlineMap] Error creating marker:', err);
+      try {
+        markerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([lng, lat])
+          .addTo(mapInstance.current);
+      } catch (err) {
+        console.error('[InlineMap] Error creating marker:', err);
+      }
     }
-  }, [mapLoaded]);
+
+    // Always zoom to location
+    const zoomLevel = initialZoom !== undefined ? initialZoom : MAP_CONFIG.ADDRESS_ZOOM;
+    mapInstance.current.flyTo({
+      center: [lng, lat],
+      zoom: zoomLevel,
+      duration: 500,
+    });
+  }, [mapLoaded, hideMarker, initialZoom]);
 
   // Search addresses
   const searchAddresses = useCallback(async (query: string) => {
@@ -205,11 +214,15 @@ export default function InlineMap({
 
         if (!mounted || !mapContainer.current) return;
 
+        const zoomLevel = lat && lng 
+          ? (initialZoom !== undefined ? initialZoom : MAP_CONFIG.ADDRESS_ZOOM)
+          : MAP_CONFIG.DEFAULT_ZOOM;
+        
         const map = new mapboxgl.Map({
           container: mapContainer.current,
           style: MAP_CONFIG.STRATEGIC_STYLES.streets,
           center: lat && lng ? [parseFloat(lng), parseFloat(lat)] : MAP_CONFIG.DEFAULT_CENTER,
-          zoom: lat && lng ? MAP_CONFIG.ADDRESS_ZOOM : MAP_CONFIG.DEFAULT_ZOOM,
+          zoom: zoomLevel,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
@@ -315,7 +328,7 @@ export default function InlineMap({
         setMapLoaded(false);
       }
     };
-  }, [fullscreen]);
+  }, [fullscreen, initialZoom]);
 
   // Update marker when coordinates change externally
   useEffect(() => {

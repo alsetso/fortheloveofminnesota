@@ -30,6 +30,12 @@ export interface MapMeta {
   zoom?: number;
 }
 
+export interface MapFilters {
+  angle?: number; // 0-60 degrees (map pitch/3D angle)
+  map_styles?: boolean; // Enable/disable map style selection
+  global_layers?: boolean; // Enable/disable global layer toggles
+}
+
 /**
  * Map Settings Structure (stored in settings JSONB column)
  */
@@ -38,6 +44,7 @@ export interface MapSettings {
     map_style?: 'street' | 'satellite' | 'light' | 'dark';
     map_layers?: MapLayers;
     meta?: MapMeta;
+    map_filters?: MapFilters;
   };
   collaboration?: {
     allow_pins?: boolean;
@@ -56,6 +63,10 @@ export interface MapSettings {
   presentation?: {
     hide_creator?: boolean;
     is_featured?: boolean;
+    show_map_filters_icon?: boolean; // Owner-controlled: show/hide map filters icon
+  };
+  membership?: {
+    max_members?: number; // Owner-set limit (null/undefined = no limit, but still subject to plan limit)
   };
 }
 

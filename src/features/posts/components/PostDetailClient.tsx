@@ -174,7 +174,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
         throw new Error('Failed to delete post');
       }
 
-      router.push('/feed');
+      router.push('/');
     } catch (error) {
       if (process.env.NODE_ENV === 'development') {
         console.error('[PostDetailClient] Error deleting post:', error);
@@ -230,14 +230,14 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
         <header className="border-b border-gray-200 bg-white sticky top-0 z-10">
           <div className="max-w-[600px] mx-auto px-4 py-3 flex items-center justify-between">
             <Link
-              href="/feed"
+              href="/"
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeftIcon className="w-5 h-5" />
               <span className="text-sm font-medium">Back</span>
             </Link>
             <Link
-              href="/feed"
+              href="/"
               className="absolute left-1/2 transform -translate-x-1/2"
             >
               <Image

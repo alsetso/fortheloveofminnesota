@@ -8,12 +8,17 @@ import {
   ChevronUpIcon,
   UserPlusIcon,
   XMarkIcon,
-  TagIcon
+  TagIcon,
+  InformationCircleIcon,
+  PaintBrushIcon,
+  UserGroupIcon,
+  PresentationChartLineIcon,
+  InboxIcon,
+  Squares2X2Icon
 } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useMapMembership } from '../hooks/useMapMembership';
-import { useToastContext } from '@/features/ui/contexts/ToastContext';
-import { createToast } from '@/features/ui/services/toast';
+import toast from 'react-hot-toast';
 import SidebarHeader from '@/components/layout/SidebarHeader';
 import EmojiPicker from './EmojiPicker';
 import { MapPinIcon, Square3Stack3DIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
@@ -47,11 +52,10 @@ interface MapSettingsSidebarProps {
   userRole?: 'owner' | 'manager' | 'editor' | null;
 }
 
-type CollapsibleSection = 'basic' | 'appearance' | 'collaboration' | 'presentation' | 'requests' | 'categories';
+type CollapsibleSection = 'basic' | 'appearance' | 'collaboration' | 'presentation' | 'new-members' | 'requests' | 'categories';
 
 export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isOwner: propIsOwner, userRole: propUserRole }: MapSettingsSidebarProps) {
   const { account } = useAuthStateSafe();
-  const { addToast } = useToastContext();
   const isOwner = propIsOwner ?? (account?.id === initialMap.account_id);
   
   // Use useMapMembership hook to get role (already fetched on page level)
@@ -64,9 +68,9 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
   // Check if user is a member (has any role)
   const isMember = isOwner || hookIsManager || effectiveUserRole === 'editor';
 
-  // Collapsible sections state
+  // Collapsible sections state - all start closed
   const [openSections, setOpenSections] = useState<Set<CollapsibleSection>>(
-    new Set(['basic', 'appearance', 'collaboration'])
+    new Set()
   );
 
   const toggleSection = (section: CollapsibleSection) => {
@@ -100,6 +104,11 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
         map_style: initialMap.settings?.appearance?.map_style || 'street',
         map_layers: initialMap.settings?.appearance?.map_layers || {},
         meta: initialMap.settings?.appearance?.meta || {},
+        map_filters: initialMap.settings?.appearance?.map_filters || {
+          angle: 0,
+          map_styles: false,
+          global_layers: false,
+        },
       },
       collaboration: {
         allow_pins: initialMap.settings?.collaboration?.allow_pins || false,
@@ -115,6 +124,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
         hide_creator: initialMap.settings?.presentation?.hide_creator || false,
         is_featured: initialMap.settings?.presentation?.is_featured || false,
         emoji: initialEmoji,
+        show_map_filters_icon: initialMap.settings?.presentation?.show_map_filters_icon ?? true,
+      },
+      membership: {
+        max_members: initialMap.settings?.membership?.max_members ?? null,
       },
     },
     auto_approve_members: initialMap.auto_approve_members,
@@ -140,7 +153,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
   const [error, setError] = useState<string | null>(null);
   
   // Debug info: Billing features and plan comparison
-  const { features: userFeatures, isLoading: featuresLoading, hasFeature } = useBillingEntitlementsSafe();
+  const { features: userFeatures, isLoading: featuresLoading, hasFeature, getFeature } = useBillingEntitlementsSafe();
   const [allPlans, setAllPlans] = useState<Array<BillingPlan & { features?: any[] }>>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
@@ -322,6 +335,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
           map_style: initialMap.settings?.appearance?.map_style || 'street',
           map_layers: initialMap.settings?.appearance?.map_layers || {},
           meta: initialMap.settings?.appearance?.meta || {},
+          map_filters: initialMap.settings?.appearance?.map_filters || {},
         },
         collaboration: {
           allow_pins: initialMap.settings?.collaboration?.allow_pins || false,
@@ -337,6 +351,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
           hide_creator: initialMap.settings?.presentation?.hide_creator || false,
           is_featured: initialMap.settings?.presentation?.is_featured || false,
           emoji: initialEmoji,
+          show_map_filters_icon: initialMap.settings?.presentation?.show_map_filters_icon ?? false,
+        },
+        membership: {
+          max_members: initialMap.settings?.membership?.max_members ?? null,
         },
       },
       auto_approve_members: initialMap.auto_approve_members,
@@ -395,9 +413,9 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
 
       setIsEditing(false);
       setIsSaving(false);
-      addToast(createToast('success', 'Map settings saved', {
+      toast.success('Map settings saved', {
         duration: 3000,
-      }));
+      });
       if (onUpdated) {
         onUpdated(updatedMap);
       }
@@ -405,9 +423,9 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       const errorMessage = err instanceof Error ? err.message : 'Failed to update map';
       setError(errorMessage);
       setIsSaving(false);
-      addToast(createToast('error', errorMessage, {
+      toast.error(errorMessage, {
         duration: 4000,
-      }));
+      });
     }
   };
 
@@ -448,18 +466,18 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       });
       if (response.ok) {
         setMembershipRequests(prev => prev.filter(r => r.id !== requestId));
-        addToast(createToast('success', 'Membership request approved', {
+        toast.success('Membership request approved', {
           duration: 3000,
-        }));
+        });
         // Members are managed by MemberManager component
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to approve request');
       }
     } catch (err: any) {
-      addToast(createToast('error', err.message || 'Failed to approve request', {
-        duration: 4000,
-      }));
+        toast.error(err.message || 'Failed to approve request', {
+          duration: 4000,
+        });
     }
   };
 
@@ -470,17 +488,17 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       });
       if (response.ok) {
         setMembershipRequests(prev => prev.filter(r => r.id !== requestId));
-        addToast(createToast('success', 'Membership request rejected', {
+        toast.success('Membership request rejected', {
           duration: 3000,
-        }));
+        });
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to reject request');
       }
     } catch (err: any) {
-      addToast(createToast('error', err.message || 'Failed to reject request', {
-        duration: 4000,
-      }));
+        toast.error(err.message || 'Failed to reject request', {
+          duration: 4000,
+        });
     }
   };
 
@@ -494,17 +512,17 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       if (response.ok) {
         const data = await response.json();
         setCategories(prev => [...prev, category]);
-        addToast(createToast('success', 'Category added', {
+        toast.success('Category added', {
           duration: 3000,
-        }));
+        });
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to add category');
       }
     } catch (err: any) {
-      addToast(createToast('error', err.message || 'Failed to add category', {
-        duration: 4000,
-      }));
+        toast.error(err.message || 'Failed to add category', {
+          duration: 4000,
+        });
     }
   };
 
@@ -515,17 +533,17 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       });
       if (response.ok) {
         setCategories(prev => prev.filter(c => c !== category));
-        addToast(createToast('success', 'Category removed', {
+        toast.success('Category removed', {
           duration: 3000,
-        }));
+        });
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to remove category');
       }
     } catch (err: any) {
-      addToast(createToast('error', err.message || 'Failed to remove category', {
-        duration: 4000,
-      }));
+        toast.error(err.message || 'Failed to remove category', {
+          duration: 4000,
+        });
     }
   };
 
@@ -539,7 +557,14 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
     <div className="h-full flex flex-col">
       <SidebarHeader
         title="Map Settings"
-        onClose={onClose || (() => {})}
+        onClose={() => {
+          if (isEditing) {
+            handleCancel();
+          }
+          if (onClose) {
+            onClose();
+          }
+        }}
         isOwner={isOwner}
         mapId={initialMap.id}
         mapName={initialMap.name}
@@ -552,7 +577,6 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
             form.requestSubmit();
           }
         } : undefined}
-        onCancel={isEditing ? handleCancel : undefined}
       />
 
       {/* Content */}
@@ -644,7 +668,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               onClick={() => toggleSection('basic')}
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
             >
-              <span>Basic Info</span>
+              <div className="flex items-center gap-2">
+                <InformationCircleIcon className="w-4 h-4 text-gray-500" />
+                <span>Basic Info</span>
+              </div>
               {openSections.has('basic') ? (
                 <ChevronUpIcon className="w-3 h-3" />
               ) : (
@@ -921,7 +948,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               onClick={() => toggleSection('appearance')}
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
             >
-              <span>Appearance</span>
+              <div className="flex items-center gap-2">
+                <PaintBrushIcon className="w-4 h-4 text-gray-500" />
+                <span>Appearance</span>
+              </div>
               {openSections.has('appearance') ? (
                 <ChevronUpIcon className="w-3 h-3" />
               ) : (
@@ -1085,6 +1115,102 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     disabled={!isEditing || isSaving}
                   />
                 </div>
+
+                {/* Map Filters */}
+                <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
+                  <label className="block text-xs font-medium text-gray-900 mb-1">
+                    Map Filters
+                  </label>
+                  
+                  {/* Angle */}
+                  <div>
+                    <label htmlFor="filter_angle" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Angle (0–60°)
+                    </label>
+                    <input
+                      id="filter_angle"
+                      type="number"
+                      min={0}
+                      max={60}
+                      value={formData.settings.appearance.map_filters?.angle ?? 0}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            appearance: {
+                              ...formData.settings.appearance,
+                              map_filters: {
+                                ...formData.settings.appearance.map_filters,
+                                angle: Number(e.target.value),
+                              },
+                            },
+                          },
+                        })
+                      }
+                      className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      disabled={!isEditing || isSaving}
+                    />
+                  </div>
+
+                  {/* Map Styles */}
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="filter_map_styles" className="text-xs text-gray-600">
+                      Map styles
+                    </label>
+                    <input
+                      id="filter_map_styles"
+                      type="checkbox"
+                      checked={formData.settings.appearance.map_filters?.map_styles || false}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            appearance: {
+                              ...formData.settings.appearance,
+                              map_filters: {
+                                ...formData.settings.appearance.map_filters,
+                                map_styles: e.target.checked,
+                              },
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      disabled={!isEditing || isSaving}
+                    />
+                  </div>
+
+                  {/* Global Layers */}
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="filter_global_layers" className="text-xs text-gray-600">
+                      Global layers
+                    </label>
+                    <input
+                      id="filter_global_layers"
+                      type="checkbox"
+                      checked={formData.settings.appearance.map_filters?.global_layers || false}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            appearance: {
+                              ...formData.settings.appearance,
+                              map_filters: {
+                                ...formData.settings.appearance.map_filters,
+                                global_layers: e.target.checked,
+                              },
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      disabled={!isEditing || isSaving}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1096,7 +1222,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               onClick={() => toggleSection('collaboration')}
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
             >
-              <span>Collaboration</span>
+              <div className="flex items-center gap-2">
+                <UserGroupIcon className="w-4 h-4 text-gray-500" />
+                <span>Collaboration</span>
+              </div>
               {openSections.has('collaboration') ? (
                 <ChevronUpIcon className="w-3 h-3" />
               ) : (
@@ -1105,28 +1234,112 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
             </button>
             {openSections.has('collaboration') && (
               <div className="px-3 pb-3 space-y-2 border-t border-gray-200 pt-2">
-                {/* Auto Approve Members */}
-                <div className="flex items-center justify-between">
-                  <label htmlFor="auto_approve_members" className="text-xs text-gray-600">
-                    Auto-approve membership requests
-                  </label>
-                  <input
-                    id="auto_approve_members"
-                    type="checkbox"
-                    checked={formData.auto_approve_members}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        auto_approve_members: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
-                  />
+                {/* Max Members */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="max_members" className="block text-xs font-medium text-gray-500">
+                      Maximum members
+                    </label>
+                    <span className="text-xs font-semibold text-gray-900">
+                      {formData.settings.membership?.max_members ?? 'No limit'}
+                    </span>
+                  </div>
+                  {(() => {
+                    const planLimit = hasFeature('map_members') ? getFeature('map_members') : null;
+                    const maxLimit = planLimit?.is_unlimited 
+                      ? 1000 // Cap at 1000 for unlimited plans
+                      : planLimit?.limit_value ?? 100; // Default to 100 if no plan limit
+                    const minLimit = 1;
+                    const defaultLimit = 50; // Default to 50 (lowest maximum for all plans)
+                    const hasLimit = formData.settings.membership?.max_members !== null && formData.settings.membership?.max_members !== undefined;
+                    const currentValue = hasLimit ? formData.settings.membership!.max_members! : defaultLimit;
+                    
+                    return (
+                      <>
+                        {hasLimit ? (
+                          <>
+                            <input
+                              id="max_members"
+                              type="range"
+                              min={minLimit}
+                              max={maxLimit}
+                              step={1}
+                              value={currentValue}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value, 10);
+                                setFormData({
+                                  ...formData,
+                                  settings: {
+                                    ...formData.settings,
+                                    membership: {
+                                      ...formData.settings.membership,
+                                      max_members: value > 0 ? value : null,
+                                    },
+                                  },
+                                });
+                              }}
+                              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gray-900 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-gray-900 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
+                              style={{
+                                background: `linear-gradient(to right, #111827 0%, #111827 ${((currentValue - minLimit) / (maxLimit - minLimit)) * 100}%, #e5e7eb ${((currentValue - minLimit) / (maxLimit - minLimit)) * 100}%, #e5e7eb 100%)`
+                              }}
+                              disabled={!isEditing || isSaving}
+                            />
+                            <div className="flex items-center justify-between mt-0.5">
+                              <span className="text-[10px] text-gray-400">{minLimit}</span>
+                              <p className="text-[11px] text-gray-500 text-center">
+                                {planLimit?.is_unlimited 
+                                  ? 'Unlimited (slider capped at 1000)'
+                                  : planLimit?.limit_value 
+                                  ? `Plan limit: ${planLimit.limit_value}`
+                                  : 'No plan limit'}
+                              </p>
+                              <span className="text-[10px] text-gray-400">{maxLimit}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  settings: {
+                                    ...formData.settings,
+                                    membership: {
+                                      ...formData.settings.membership,
+                                      max_members: null,
+                                    },
+                                  },
+                                });
+                              }}
+                              className="mt-1 text-[11px] text-gray-500 hover:text-gray-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={!isEditing || isSaving}
+                            >
+                              Remove limit
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                settings: {
+                                  ...formData.settings,
+                                  membership: {
+                                    ...formData.settings.membership,
+                                    max_members: Math.min(defaultLimit, maxLimit), // Default to 50, but cap at plan limit
+                                  },
+                                },
+                              });
+                            }}
+                            className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!isEditing || isSaving}
+                          >
+                            Set member limit (defaults to {Math.min(defaultLimit, maxLimit)})
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
-                <p className="text-[11px] text-gray-500">
-                  When enabled, membership requests are automatically approved
-                </p>
 
                 {/* Membership Rules */}
                 <div>
@@ -1144,191 +1357,140 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                   />
                 </div>
 
-                {/* Membership Questions */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-0.5">
-                    Membership questions (max 5)
-                  </label>
-                  <div className="space-y-1.5">
-                    {formData.membership_questions.map((q, idx) => (
-                      <div key={idx} className="flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          value={q.question}
-                          onChange={(e) => {
-                            const updated = [...formData.membership_questions];
-                            updated[idx] = { ...q, question: e.target.value };
-                            setFormData({ ...formData, membership_questions: updated });
-                          }}
-                          className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 disabled:bg-gray-50"
-                          placeholder="Question text"
-                          disabled={!isEditing || isSaving}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData({
-                              ...formData,
-                              membership_questions: formData.membership_questions.filter((_, i) => i !== idx),
-                            });
-                          }}
-                          className="p-1 text-gray-400 hover:text-gray-600"
-                          disabled={!isEditing || isSaving}
-                        >
-                          <XMarkIcon className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    {formData.membership_questions.length < 5 && (
-                      <button
-                        type="button"
-                        onClick={() => {
+                {/* Collaboration Settings - Always visible, but disabled for private maps */}
+                <div className="pt-2 border-t border-gray-200 space-y-2">
+                  <h4 className="text-xs font-semibold text-gray-900">
+                    {formData.visibility === 'public' ? 'Public collaboration' : 'Collaboration'}
+                  </h4>
+                  {formData.visibility === 'private' && (
+                    <p className="text-[11px] text-gray-500 mb-2">
+                      Collaboration settings are only available for public maps
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="allow_pins" className="text-xs text-gray-600">
+                      Allow others to add pins
+                    </label>
+                    <input
+                      id="allow_pins"
+                      type="checkbox"
+                      checked={formData.settings.collaboration.allow_pins}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            collaboration: {
+                              ...formData.settings.collaboration,
+                              allow_pins: e.target.checked,
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="allow_areas" className="text-xs text-gray-600">
+                      Allow others to add areas
+                    </label>
+                    <input
+                      id="allow_areas"
+                      type="checkbox"
+                      checked={formData.settings.collaboration.allow_areas}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            collaboration: {
+                              ...formData.settings.collaboration,
+                              allow_areas: e.target.checked,
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="allow_posts" className="text-xs text-gray-600">
+                      Allow others to create posts
+                    </label>
+                    <input
+                      id="allow_posts"
+                      type="checkbox"
+                      checked={formData.settings.collaboration.allow_posts}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            collaboration: {
+                              ...formData.settings.collaboration,
+                              allow_posts: e.target.checked,
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="allow_clicks" className="text-xs text-gray-600">
+                      Allow others to click on map
+                    </label>
+                    <input
+                      id="allow_clicks"
+                      type="checkbox"
+                      checked={formData.settings.collaboration.allow_clicks}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          settings: {
+                            ...formData.settings,
+                            collaboration: {
+                              ...formData.settings.collaboration,
+                              allow_clicks: e.target.checked,
+                            },
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                    />
+                  </div>
+                      
+                  {/* Plan-Based Permissions (NEW) */}
+                  {formData.settings.collaboration.allow_pins && (
+                    <div className="pt-2 border-t border-gray-200 space-y-1.5">
+                      <label className="text-[10px] font-medium text-gray-500">
+                        Minimum plan to add pins
+                      </label>
+                      <select
+                        value={formData.settings.collaboration.pin_permissions?.required_plan || 'any'}
+                        onChange={(e) => {
+                          const value = e.target.value === 'any' ? null : e.target.value;
                           setFormData({
                             ...formData,
-                            membership_questions: [
-                              ...formData.membership_questions,
-                              { id: formData.membership_questions.length, question: '' },
-                            ],
+                            settings: {
+                              ...formData.settings,
+                              collaboration: {
+                                ...formData.settings.collaboration,
+                                pin_permissions: { required_plan: value as any },
+                              },
+                            },
                           });
                         }}
-                        className="text-xs text-indigo-600 hover:text-indigo-700"
-                        disabled={!isEditing || isSaving}
-                      >
-                        + Add question
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Collaboration Settings - Only for public maps */}
-                {formData.visibility === 'public' && (
-                  <>
-                    <div className="pt-2 border-t border-gray-200 space-y-2">
-                      <h4 className="text-xs font-semibold text-gray-900">Public collaboration</h4>
-                      
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="allow_pins" className="text-xs text-gray-600">
-                          Allow others to add pins
-                        </label>
-                        <input
-                          id="allow_pins"
-                          type="checkbox"
-                          checked={formData.settings.collaboration.allow_pins}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              settings: {
-                                ...formData.settings,
-                                collaboration: {
-                                  ...formData.settings.collaboration,
-                                  allow_pins: e.target.checked,
-                                },
-                              },
-                            })
-                          }
-                          className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                          disabled={!isEditing || isSaving}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="allow_areas" className="text-xs text-gray-600">
-                          Allow others to add areas
-                        </label>
-                        <input
-                          id="allow_areas"
-                          type="checkbox"
-                          checked={formData.settings.collaboration.allow_areas}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              settings: {
-                                ...formData.settings,
-                                collaboration: {
-                                  ...formData.settings.collaboration,
-                                  allow_areas: e.target.checked,
-                                },
-                              },
-                            })
-                          }
-                          className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                          disabled={!isEditing || isSaving}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="allow_posts" className="text-xs text-gray-600">
-                          Allow others to create posts
-                        </label>
-                        <input
-                          id="allow_posts"
-                          type="checkbox"
-                          checked={formData.settings.collaboration.allow_posts}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              settings: {
-                                ...formData.settings,
-                                collaboration: {
-                                  ...formData.settings.collaboration,
-                                  allow_posts: e.target.checked,
-                                },
-                              },
-                            })
-                          }
-                          className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                          disabled={!isEditing || isSaving}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <label htmlFor="allow_clicks" className="text-xs text-gray-600">
-                          Allow others to click on map
-                        </label>
-                        <input
-                          id="allow_clicks"
-                          type="checkbox"
-                          checked={formData.settings.collaboration.allow_clicks}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              settings: {
-                                ...formData.settings,
-                                collaboration: {
-                                  ...formData.settings.collaboration,
-                                  allow_clicks: e.target.checked,
-                                },
-                              },
-                            })
-                          }
-                          className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                          disabled={!isEditing || isSaving}
-                        />
-                      </div>
-                      
-                      {/* Plan-Based Permissions (NEW) */}
-                      {formData.settings.collaboration.allow_pins && (
-                        <div className="pt-2 border-t border-gray-200 space-y-1.5">
-                          <label className="text-[10px] font-medium text-gray-500">
-                            Minimum plan to add pins
-                          </label>
-                          <select
-                            value={formData.settings.collaboration.pin_permissions?.required_plan || 'any'}
-                            onChange={(e) => {
-                              const value = e.target.value === 'any' ? null : e.target.value;
-                              setFormData({
-                                ...formData,
-                                settings: {
-                                  ...formData.settings,
-                                  collaboration: {
-                                    ...formData.settings.collaboration,
-                                    pin_permissions: { required_plan: value as any },
-                                  },
-                                },
-                              });
-                            }}
-                            className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                            disabled={!isEditing || isSaving}
+                        className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                        disabled={!isEditing || isSaving || formData.visibility === 'private'}
                           >
                             <option value="any">Any authenticated user</option>
                             <option value="hobby">Hobby plan or higher</option>
@@ -1360,7 +1522,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               });
                             }}
                             className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                            disabled={!isEditing || isSaving}
+                            disabled={!isEditing || isSaving || formData.visibility === 'private'}
                           >
                             <option value="any">Any authenticated user</option>
                             <option value="hobby">Hobby plan or higher</option>
@@ -1392,7 +1554,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               });
                             }}
                             className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                            disabled={!isEditing || isSaving}
+                            disabled={!isEditing || isSaving || formData.visibility === 'private'}
                           >
                             <option value="any">Any authenticated user</option>
                             <option value="hobby">Hobby plan or higher</option>
@@ -1403,8 +1565,6 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                         </div>
                       )}
                     </div>
-                  </>
-                )}
               </div>
             )}
           </div>
@@ -1416,7 +1576,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               onClick={() => toggleSection('presentation')}
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
             >
-              <span>Presentation</span>
+              <div className="flex items-center gap-2">
+                <PresentationChartLineIcon className="w-4 h-4 text-gray-500" />
+                <span>Presentation</span>
+              </div>
               {openSections.has('presentation') ? (
                 <ChevronUpIcon className="w-3 h-3" />
               ) : (
@@ -1480,6 +1643,135 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                 <p className="text-[11px] text-gray-500">
                   Hide the creator badge on map cards
                 </p>
+
+                <div className="flex items-center justify-between">
+                  <label htmlFor="show_map_filters_icon" className="text-xs text-gray-600">
+                    Show map filters icon
+                  </label>
+                  <input
+                    id="show_map_filters_icon"
+                    type="checkbox"
+                    checked={formData.settings.presentation.show_map_filters_icon}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        settings: {
+                          ...formData.settings,
+                          presentation: {
+                            ...formData.settings.presentation,
+                            show_map_filters_icon: e.target.checked,
+                          },
+                        },
+                      })
+                    }
+                    className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                    disabled={!isEditing || isSaving}
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Show the map filters icon when any filter is enabled (angle, map styles, or global layers)
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* NEW MEMBERS SECTION */}
+          <div className="border border-gray-200 rounded-md bg-white">
+            <button
+              type="button"
+              onClick={() => toggleSection('new-members')}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <UserPlusIcon className="w-4 h-4 text-gray-500" />
+                <span>New Members</span>
+              </div>
+              {openSections.has('new-members') ? (
+                <ChevronUpIcon className="w-3 h-3" />
+              ) : (
+                <ChevronDownIcon className="w-3 h-3" />
+              )}
+            </button>
+            {openSections.has('new-members') && (
+              <div className="px-3 pb-3 space-y-2 border-t border-gray-200 pt-2">
+                {/* Auto Approve Members */}
+                <div className="flex items-center justify-between">
+                  <label htmlFor="auto_approve_members" className="text-xs text-gray-600">
+                    Auto-approve membership requests
+                  </label>
+                  <input
+                    id="auto_approve_members"
+                    type="checkbox"
+                    checked={formData.auto_approve_members}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        auto_approve_members: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                    disabled={!isEditing || isSaving}
+                  />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  When enabled, membership requests are automatically approved
+                </p>
+
+                {/* Membership Questions */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-0.5">
+                    Membership questions (max 5)
+                  </label>
+                  <div className="space-y-1.5">
+                    {formData.membership_questions.map((q, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={q.question}
+                          onChange={(e) => {
+                            const updated = [...formData.membership_questions];
+                            updated[idx] = { ...q, question: e.target.value };
+                            setFormData({ ...formData, membership_questions: updated });
+                          }}
+                          className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 disabled:bg-gray-50"
+                          placeholder="Question text"
+                          disabled={!isEditing || isSaving}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              membership_questions: formData.membership_questions.filter((_, i) => i !== idx),
+                            });
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-600"
+                          disabled={!isEditing || isSaving}
+                        >
+                          <XMarkIcon className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {formData.membership_questions.length < 5 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            membership_questions: [
+                              ...formData.membership_questions,
+                              { id: formData.membership_questions.length, question: '' },
+                            ],
+                          });
+                        }}
+                        className="text-xs text-indigo-600 hover:text-indigo-700"
+                        disabled={!isEditing || isSaving}
+                      >
+                        + Add question
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1492,7 +1784,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                 onClick={() => toggleSection('requests')}
                 className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
               >
-                <span>Membership Requests ({membershipRequests.length})</span>
+                <div className="flex items-center gap-2">
+                  <InboxIcon className="w-4 h-4 text-gray-500" />
+                  <span>Membership Requests ({membershipRequests.length})</span>
+                </div>
                 {openSections.has('requests') ? (
                   <ChevronUpIcon className="w-3 h-3" />
                 ) : (
@@ -1557,7 +1852,10 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               onClick={() => toggleSection('categories')}
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
             >
-              <span>Categories ({categories.length})</span>
+              <div className="flex items-center gap-2">
+                <Squares2X2Icon className="w-4 h-4 text-gray-500" />
+                <span>Categories ({categories.length})</span>
+              </div>
               {openSections.has('categories') ? (
                 <ChevronUpIcon className="w-3 h-3" />
               ) : (

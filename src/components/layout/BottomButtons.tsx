@@ -144,7 +144,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
           // Single mention type selected - show "Add [Type]" button
           <button
             onClick={() => {
-              router.push('/add');
+              router.push('/map/live#contribute');
             }}
             className={`px-4 h-14 rounded-full transition-all flex items-center gap-2 ${
               useTransparentUI
@@ -163,7 +163,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
           <button
             onClick={() => {
               if (isLivePage) {
-                router.push('/add');
+                router.push('/map/live#contribute');
               } else {
                 onButtonClick('create');
               }

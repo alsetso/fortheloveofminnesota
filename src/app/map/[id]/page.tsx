@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -11,217 +11,111 @@ import SearchResults from '@/components/layout/SearchResults';
 import MapIDBox from './components/MapIDBox';
 import MapPageLayout from './MapPageLayout';
 import MapPageHeaderButtons from './MapPageHeaderButtons';
-import { useUnifiedSidebar, type UnifiedSidebarType } from '@/hooks/useUnifiedSidebar';
+import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
 import { useMapMembership } from './hooks/useMapMembership';
-import { generateUUID } from '@/lib/utils/uuid';
+import { useMapPermissions } from './hooks/useMapPermissions';
+import { useMapSidebarConfigs } from './hooks/useMapSidebarConfigs';
+import { useUnifiedMapClickHandler } from './hooks/useUnifiedMapClickHandler';
+import { useMapPageData } from './hooks/useMapPageData';
+import { useBoundaryLayers } from './hooks/useBoundaryLayers';
+import { useMapAccess } from './hooks/useMapAccess';
+import { useContributeOverlay } from './hooks/useContributeOverlay';
+import { useMapSidebarHandlers } from './hooks/useMapSidebarHandlers';
+import { useEntitySidebar } from './hooks/useEntitySidebar';
 import { shouldNormalizeUrl, getMapUrl } from '@/lib/maps/urls';
-import { isMapSetupComplete } from '@/lib/maps/mapSetupCheck';
-import MapFilterContent from '@/components/layout/MapFilterContent';
-import MapSettingsSidebar from './components/MapSettingsSidebar';
-import MemberManager from './components/MemberManager';
-import JoinMapSidebar from './components/JoinMapSidebar';
-import MapPosts from './components/MapPosts';
+import type { PlanLevel } from '@/lib/maps/permissions';
 import MapActionUpgradePrompt from '@/components/maps/MapActionUpgradePrompt';
-import { canUserPerformMapAction, type PlanLevel } from '@/lib/maps/permissions';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
-import { useReverseGeocode } from '@/hooks/useReverseGeocode';
-import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
-import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import type { MapData } from '@/types/map';
+
+// Lazy load ContributeOverlay - only needed when #contribute hash is present
+const ContributeOverlay = lazy(() => import('./components/ContributeOverlay'));
 
 export default function MapPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const { account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const mapInstanceRef = useRef<any>(null);
-  const clickMarkerRef = useRef<any>(null);
-  const [mapData, setMapData] = useState<MapData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [viewCount, setViewCount] = useState<number>(0);
-  const [mapId, setMapId] = useState<string | null>(null);
-  const [hasRecordedView, setHasRecordedView] = useState(false);
-  const { activeSidebar, toggleSidebar, closeSidebar } = useUnifiedSidebar();
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('7d');
-  const [showDistricts, setShowDistricts] = useState(false);
-  const [showCTU, setShowCTU] = useState(false);
-  const [showStateBoundary, setShowStateBoundary] = useState(false);
-  const [showCountyBoundaries, setShowCountyBoundaries] = useState(false);
-  const [initialPins, setInitialPins] = useState<any[]>([]);
-  const [initialAreas, setInitialAreas] = useState<any[]>([]);
-  const [initialMembers, setInitialMembers] = useState<any[] | null>(null);
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
-  const [checkingMembership, setCheckingMembership] = useState(true);
+  const { activeSidebar, toggleSidebar, closeSidebar, openSidebar } = useUnifiedSidebar();
   const membershipToastShownRef = useRef(false);
   
-  // Location select popup state (for map clicks)
-  const [locationSelectPopup, setLocationSelectPopup] = useState<{
-    isOpen: boolean;
-    lat: number;
-    lng: number;
-    address: string | null;
-    mapMeta: Record<string, any> | null;
-  }>({
-    isOpen: false,
-    lat: 0,
-    lng: 0,
-    address: null,
-    mapMeta: null,
-  });
-
-  // State for clicked coordinates (triggers reverse geocode hook)
-  const [clickedCoordinates, setClickedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  const { address: reverseGeocodeAddress } = useReverseGeocode(
-    clickedCoordinates?.lat || null,
-    clickedCoordinates?.lng || null
-  );
-
-  // Update location popup address when reverse geocode completes
-  useEffect(() => {
-    if (locationSelectPopup.isOpen && reverseGeocodeAddress !== null) {
-      setLocationSelectPopup((prev) => ({
-        ...prev,
-        address: reverseGeocodeAddress,
-      }));
-    }
-  }, [reverseGeocodeAddress, locationSelectPopup.isOpen]);
-  
-  // Upgrade prompt state
-  const [upgradePrompt, setUpgradePrompt] = useState<{
-    isOpen: boolean;
-    action: 'pins' | 'areas' | 'posts' | 'clicks';
-    requiredPlan: PlanLevel;
-    currentPlan?: PlanLevel;
-  }>({
-    isOpen: false,
-    action: 'pins',
-    requiredPlan: 'contributor',
-  });
-  
-  // Listen for permission denied events from API errors
-  useEffect(() => {
-    const handlePermissionDenied = (e: CustomEvent) => {
-      const { action, requiredPlan, currentPlan } = e.detail;
-      setUpgradePrompt({
-        isOpen: true,
-        action,
-        requiredPlan,
-        currentPlan,
-      });
-    };
-    
-    window.addEventListener('map-action-permission-denied', handlePermissionDenied as EventListener);
-    return () => {
-      window.removeEventListener('map-action-permission-denied', handlePermissionDenied as EventListener);
-    };
-  }, []);
-
-  // Keep boundary toggles in sync with persisted map_layers
-  useEffect(() => {
-    const layers = mapData?.settings?.appearance?.map_layers || {};
-    setShowDistricts(Boolean(layers.congressional_districts));
-    setShowCTU(Boolean(layers.ctu_boundaries));
-    setShowStateBoundary(Boolean(layers.state_boundary));
-    setShowCountyBoundaries(Boolean(layers.county_boundaries));
-  }, [mapData?.settings?.appearance?.map_layers]);
-
   // Get map ID from params
+  const [mapId, setMapId] = useState<string | null>(null);
   useEffect(() => {
     params.then(({ id }) => {
       setMapId(id);
     });
   }, [params]);
 
-  // Membership check (consolidated)
+  // Consolidated map page data (mapData, loading, error, viewCount, initialPins/Areas/Members)
+  const {
+    mapData,
+    loading,
+    error,
+    viewCount,
+    initialPins,
+    initialAreas,
+    initialMembers,
+    updateMapData,
+  } = useMapPageData({ mapId });
+
+  // Boundary layers state (consolidated)
+  const { showDistricts, showCTU, showStateBoundary, showCountyBoundaries } = useBoundaryLayers(mapData);
+
+  // Other state
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  
+  // Membership check (consolidated) - must come before useMapPermissions
   const { isOwner, showMembers, isMember, isManager, loading: membershipLoading, userRole } = useMapMembership(mapId, mapData?.account_id || null, initialMembers);
-  
-  // Use active account ID from dropdown
-  const currentAccountId = activeAccountId || account?.id || null;
-  
-  // Permission check handlers
-  const handlePinAction = useCallback(() => {
-    if (!mapData || !account) return;
-    
-    const permissionCheck = canUserPerformMapAction(
-      'pins',
-      mapData,
-      {
-        accountId: account.id,
-        plan: (account.plan || 'hobby') as PlanLevel,
-        subscription_status: account.subscription_status,
-        role: userRole || null,
-      },
-      isOwner
-    );
-    
-    if (!permissionCheck.allowed && permissionCheck.reason === 'plan_required') {
-      setUpgradePrompt({
-        isOpen: true,
-        action: 'pins',
-        requiredPlan: permissionCheck.requiredPlan!,
-        currentPlan: permissionCheck.currentPlan,
-      });
+
+  // Unified access hook - consolidates all access checks and computed flags
+  const { currentAccountId, computedUserRole, access } = useMapAccess({
+    isOwner,
+    isMember,
+    isManager,
+    userRole: userRole || null,
+    showMembers,
+  });
+
+  // Unified permissions hook (replaces 3 duplicate handlers + upgrade prompt state)
+  const { checkPermission, upgradePrompt, closeUpgradePrompt } = useMapPermissions({
+    mapData,
+    account,
+    isOwner,
+    userRole: userRole || null,
+  });
+
+  // Determine if filter icon should be shown
+  const shouldShowFilterIcon = useMemo(() => {
+    // Must be member or owner to see filter icon
+    if (!access.canViewSettings) {
       return false;
     }
-    
-    return permissionCheck.allowed;
-  }, [mapData, account, isOwner, userRole]);
-  
-  const handleAreaAction = useCallback(() => {
-    if (!mapData || !account) return;
-    
-    const permissionCheck = canUserPerformMapAction(
-      'areas',
-      mapData,
-      {
-        accountId: account.id,
-        plan: (account.plan || 'hobby') as PlanLevel,
-        subscription_status: account.subscription_status,
-        role: userRole || null,
-      },
-      isOwner
-    );
-    
-    if (!permissionCheck.allowed && permissionCheck.reason === 'plan_required') {
-      setUpgradePrompt({
-        isOpen: true,
-        action: 'areas',
-        requiredPlan: permissionCheck.requiredPlan!,
-        currentPlan: permissionCheck.currentPlan,
-      });
+
+    // Check if show_map_filters_icon is enabled (default true)
+    const showIconSetting = mapData?.settings?.presentation?.show_map_filters_icon ?? true;
+    if (!showIconSetting) {
       return false;
     }
-    
-    return permissionCheck.allowed;
-  }, [mapData, account, isOwner, userRole]);
-  
-  const handlePostAction = useCallback(() => {
-    if (!mapData || !account) return;
-    
-    const permissionCheck = canUserPerformMapAction(
-      'posts',
-      mapData,
-      {
-        accountId: account.id,
-        plan: (account.plan || 'hobby') as PlanLevel,
-        subscription_status: account.subscription_status,
-        role: userRole || null,
-      },
-      isOwner
-    );
-    
-    if (!permissionCheck.allowed && permissionCheck.reason === 'plan_required') {
-      setUpgradePrompt({
-        isOpen: true,
-        action: 'posts',
-        requiredPlan: permissionCheck.requiredPlan!,
-        currentPlan: permissionCheck.currentPlan,
-      });
+
+    // Check if any filter is enabled
+    const mapFilters = mapData?.settings?.appearance?.map_filters;
+    if (!mapFilters) {
       return false;
     }
-    
-    return permissionCheck.allowed;
-  }, [mapData, account, isOwner, userRole]);
+
+    const hasAngle = (mapFilters.angle ?? 0) > 0;
+    const hasMapStyles = mapFilters.map_styles === true;
+    const hasGlobalLayers = mapFilters.global_layers === true;
+
+    // Show icon if any filter is enabled
+    return hasAngle || hasMapStyles || hasGlobalLayers;
+  }, [mapData?.settings?.appearance?.map_filters, mapData?.settings?.presentation?.show_map_filters_icon, access.canViewSettings]);
+  
+  // Permission check handlers (using unified hook)
+  const handlePinAction = useCallback(() => checkPermission('pins'), [checkPermission]);
+  const handleAreaAction = useCallback(() => checkPermission('areas'), [checkPermission]);
+  const handlePostAction = useCallback(() => checkPermission('posts'), [checkPermission]);
 
   // Show membership status toast after map loads and auth is checked
   useEffect(() => {
@@ -235,16 +129,19 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     }
 
     // Skip toast for public maps where user has no role (they're just viewing)
-    if (mapData.visibility === 'public' && !isOwner && !isMember) {
+    if (mapData.visibility === 'public' && !access.hasAccess) {
       membershipToastShownRef.current = true;
       return;
     }
 
     // Determine message based on role
+    // Check ownership directly from map data as fallback (in case membership hook hasn't updated yet)
+    const isActuallyOwner = mapData.account_id === account?.id;
+    
     let title = '';
     let message = '';
 
-    if (isOwner) {
+    if (isOwner || isActuallyOwner) {
       title = 'Map Owner';
       message = 'You own this map and have full control';
     } else if (isManager) {
@@ -253,7 +150,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     } else if (isMember && userRole === 'editor') {
       title = 'Map Editor';
       message = 'You can add pins, areas, and posts to this map';
-    } else if (mapData.visibility === 'private') {
+    } else if (mapData.visibility === 'private' && !isActuallyOwner) {
       title = 'Not a Member';
       message = 'This is a private map. Request access to collaborate';
     }
@@ -270,7 +167,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       });
       membershipToastShownRef.current = true;
     }
-  }, [mapData, membershipLoading, account, mapId, isOwner, isManager, isMember, userRole]);
+  }, [mapData, membershipLoading, account, mapId, isOwner, isManager, isMember, userRole, access.hasAccess]);
 
   // Reset toast flag when mapId changes
   useEffect(() => {
@@ -282,17 +179,14 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     return mapData?.slug === 'live' || mapId === 'live';
   }, [mapData?.slug, mapId]);
 
-  // Check membership and pending requests when map data loads
+  // Check for pending membership requests
   useEffect(() => {
     if (!mapData || !mapId || !currentAccountId || isLiveMap) {
-      setCheckingMembership(false);
+      setHasPendingRequest(false);
       return;
     }
 
-    const checkMembershipStatus = async () => {
-      setCheckingMembership(true);
-      
-      // Check for pending request
+    const checkPendingRequest = async () => {
       try {
         const requestsResponse = await fetch(`/api/maps/${mapId}/membership-requests`);
         if (requestsResponse.ok) {
@@ -308,11 +202,9 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       } catch (err) {
         setHasPendingRequest(false);
       }
-
-      setCheckingMembership(false);
     };
 
-    checkMembershipStatus();
+    checkPendingRequest();
   }, [mapData, mapId, currentAccountId, isLiveMap]);
 
 
@@ -325,521 +217,96 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     setMapLoaded(true);
   }, []);
 
-  // Fly to location when location select popup opens
-  useEffect(() => {
-    if (!locationSelectPopup.isOpen || !mapLoaded || !mapInstanceRef.current) return;
-    
-    const mapboxMap = mapInstanceRef.current as any;
-    if (mapboxMap.removed) return;
-    
-    const { lat, lng } = locationSelectPopup;
-    if (lat === 0 && lng === 0) return; // Skip if coordinates are not set
-    
-    // Fly to the clicked location
-    if (typeof mapboxMap.flyTo === 'function') {
-      const currentZoom = typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 10;
-      const targetZoom = Math.max(currentZoom, 15); // Ensure we zoom in at least to level 15
-      
-      mapboxMap.flyTo({
-        center: [lng, lat],
-        zoom: targetZoom,
-        duration: 1000,
-        essential: true,
-      });
-    }
-  }, [locationSelectPopup.isOpen, locationSelectPopup.lat, locationSelectPopup.lng, mapLoaded]);
-
-  // Remove click marker when popup closes
-  useEffect(() => {
-    if (!locationSelectPopup.isOpen && clickMarkerRef.current) {
-      try {
-        clickMarkerRef.current.remove();
-      } catch (err) {
-        // Ignore cleanup errors
-      }
-      clickMarkerRef.current = null;
-    }
-  }, [locationSelectPopup.isOpen]);
-
-  // Add click handler for location select popup when map loads
-  useEffect(() => {
-    if (!mapLoaded) return;
-    
-    const mapboxMap = mapInstanceRef.current as any;
-    if (!mapboxMap || mapboxMap.removed) return;
-
-    const handleMapClick = async (e: any) => {
-      const map = mapInstanceRef.current as any;
-      if (!map || map.removed) return;
-      
-      // Check if click hit a pin or area layer - those have their own handlers
-      const pinOrAreaLayers = ['map-pins-points', 'map-pins-point-label', 'map-areas-fill', 'map-areas-outline'];
-      const hitRadius = 20;
-      const box: [[number, number], [number, number]] = [
-        [e.point.x - hitRadius, e.point.y - hitRadius],
-        [e.point.x + hitRadius, e.point.y + hitRadius]
-      ];
-      
-      let pinOrAreaFeatures: any[] = [];
-      try {
-        const existingLayers = pinOrAreaLayers.filter(layerId => {
-          try {
-            return map.getLayer(layerId) !== undefined;
-          } catch {
-            return false;
-          }
-        });
-        
-        if (existingLayers.length > 0) {
-          pinOrAreaFeatures = map.queryRenderedFeatures(box, {
-            layers: existingLayers,
-          });
-        }
-      } catch (queryError) {
-        // Silently continue if query fails
-      }
-      
-      // If clicked on a pin or area, don't show location popup
-      if (pinOrAreaFeatures.length > 0) {
-        return;
-      }
-      
-      const lng = e.lngLat.lng;
-      const lat = e.lngLat.lat;
-      
-      // Check if click is within Minnesota bounds
-      if (!MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
-        console.warn('[MapPage] Click outside Minnesota bounds:', { lat, lng });
-        return;
-      }
-
-      // Remove existing click marker
-      if (clickMarkerRef.current) {
-        try {
-          clickMarkerRef.current.remove();
-        } catch (err) {
-          // Ignore cleanup errors
-        }
-        clickMarkerRef.current = null;
-      }
-
-      // Create white circle with black dot marker
-      try {
-        const mapboxgl = (window as any).mapboxgl;
-        if (mapboxgl && mapboxgl.Marker) {
-          // Create marker element
-          const el = document.createElement('div');
-          el.style.cssText = `
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background-color: #ffffff;
-            border: 2px solid rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            pointer-events: none;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          `;
-
-          // Add black dot
-          const dot = document.createElement('div');
-          dot.style.cssText = `
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #000000;
-            position: absolute;
-          `;
-          el.appendChild(dot);
-
-          // Create and add marker
-          clickMarkerRef.current = new mapboxgl.Marker({
-            element: el,
-            anchor: 'center',
-          })
-            .setLngLat([lng, lat])
-            .addTo(mapboxMap);
-        }
-      } catch (err) {
-        console.error('[MapPage] Error creating click marker:', err);
-      }
-
-      // Always fly to the clicked location
-      if (typeof mapboxMap.flyTo === 'function') {
-        const currentZoom = typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 10;
-        const targetZoom = Math.max(currentZoom + 2, 15); // Zoom in a bit (add 2 levels) or at least to level 15
-        
-        mapboxMap.flyTo({
-          center: [lng, lat],
-          zoom: targetZoom,
-          duration: 1000,
-          essential: true,
-        });
-      }
-
-      // Only show location popup if map settings allow clicks
-      const allowClicks = mapData?.settings?.collaboration?.allow_clicks ?? false;
-      if (!allowClicks) {
-        return; // Don't show popup if clicks are disabled
-      }
-
-      // Check clickability permission
-      if (mapData && account) {
-        const permissionCheck = canUserPerformMapAction(
-          'clicks',
-          mapData,
-          {
-            accountId: account.id,
-            plan: (account.plan || 'hobby') as PlanLevel,
-            subscription_status: account.subscription_status,
-            role: userRole || null,
-          },
-          isOwner
-        );
-
-        if (!permissionCheck.allowed) {
-          if (permissionCheck.reason === 'plan_required') {
-            setUpgradePrompt({
-              isOpen: true,
-              action: 'clicks',
-              requiredPlan: permissionCheck.requiredPlan!,
-              currentPlan: permissionCheck.currentPlan,
-            });
-          }
-          return;
-        }
-      }
-      
-      // Trigger reverse geocode hook
-      setClickedCoordinates({ lat, lng });
-      
-      // Capture mapbox feature at click point for map_meta
-      let mapMeta: Record<string, any> | null = null;
-      try {
-        const point = map.project([lng, lat]);
-        const result = queryFeatureAtPoint(map, point, 'labels-first', false);
-        if (result) {
-          const extractedFeature = 'feature' in result ? result.feature : result;
-          if (extractedFeature && 'layerId' in extractedFeature) {
-            mapMeta = {
-              location: null,
-              feature: {
-                layerId: extractedFeature.layerId,
-                sourceLayer: extractedFeature.sourceLayer,
-                category: extractedFeature.category,
-                name: extractedFeature.name,
-                label: extractedFeature.label,
-                icon: extractedFeature.icon,
-                properties: extractedFeature.properties,
-                showIntelligence: extractedFeature.showIntelligence,
-              },
-            };
-          }
-        }
-      } catch (err) {
-        console.debug('[MapPage] Error capturing map feature:', err);
-      }
-      
-      // Show location select popup (address will be set via reverse geocode hook)
-      setLocationSelectPopup({
-        isOpen: true,
-        lat,
-        lng,
-        address: null, // Will be updated when reverse geocode completes
-        mapMeta: mapMeta,
-      });
-    };
-
-    mapboxMap.on('click', handleMapClick);
-    
-    return () => {
-      const map = mapInstanceRef.current as any;
-      if (map && !map.removed) {
-        map.off('click', handleMapClick);
-      }
-      // Clean up click marker
-      if (clickMarkerRef.current) {
-        try {
-          clickMarkerRef.current.remove();
-        } catch (err) {
-          // Ignore cleanup errors
-        }
-        clickMarkerRef.current = null;
-      }
-    };
-  }, [mapLoaded, mapData, account, isOwner, userRole]);
-
-  const handleSettingsClick = () => toggleSidebar('settings');
-  const handleFilterClick = () => toggleSidebar('filter');
-  const handlePostsClick = () => toggleSidebar('posts');
-  const handleMembersClick = () => toggleSidebar('members');
-  const handleJoinClick = () => toggleSidebar('join');
-
-  // Debounced map resize when sidebars animate
-  useEffect(() => {
-    const map = mapInstanceRef.current;
-    if (!map || typeof map.resize !== 'function') return;
-
-    const timeoutId = setTimeout(() => {
-      try {
-        map.resize();
-      } catch {
-        // ignore
-      }
-    }, 350); // Debounce to 350ms (after 300ms transition)
-
-    return () => clearTimeout(timeoutId);
-  }, [activeSidebar]);
-
-  // Sidebar configurations
-  const sidebarConfigs = useMemo(() => {
-    if (!mapData) return [];
-
-    const configs: Array<{
-      type: UnifiedSidebarType;
-      title: string;
-      content: React.ReactNode;
-      popupType?: 'create' | 'home' | 'settings' | 'analytics' | 'location' | 'collections' | 'account' | 'search' | 'members';
-      darkMode?: boolean;
-      infoText?: string;
-    }> = [
-      {
-        type: 'filter',
-        title: 'Filter Map',
-        content: <MapFilterContent onClose={closeSidebar} />,
-        popupType: 'search',
-      },
-    ];
-
-    // Settings visible to all members (owners see editable, members see permissions)
-    if (isMember || isOwner || currentAccountId) {
-      configs.push({
-        type: 'settings' as const,
-        title: 'Map Settings',
-        content: (
-          <MapSettingsSidebar
-            initialMap={{
-              id: mapData.id,
-              account_id: mapData.account_id,
-              name: mapData.name,
-              description: mapData.description,
-              slug: mapData.slug,
-              visibility: mapData.visibility,
-              boundary: mapData.boundary || 'statewide',
-              boundary_data: mapData.boundary_data || null,
-              settings: mapData.settings || {
-                appearance: {
-                  map_style: 'street',
-                  map_layers: {},
-                  meta: {},
-                },
-                collaboration: {
-                  allow_pins: false,
-                  allow_areas: false,
-                  allow_posts: false,
-                },
-                presentation: {
-                  hide_creator: false,
-                  is_featured: false,
-                },
-              },
-              auto_approve_members: mapData.auto_approve_members || false,
-              membership_rules: mapData.membership_rules || null,
-              membership_questions: mapData.membership_questions || [],
-              tags: mapData.tags,
-              created_at: mapData.created_at,
-              updated_at: mapData.updated_at,
-            }}
-            onUpdated={(updated) => {
-              setMapData(prev => prev ? { ...prev, ...updated } : null);
-            }}
-            onClose={closeSidebar}
-            isOwner={isOwner}
-            userRole={isOwner ? 'owner' : (isManager ? 'manager' : (isMember ? 'editor' : null))}
-          />
-        ),
-        popupType: 'settings',
-      });
-    }
-
-    if (showMembers) {
-      configs.push({
-        type: 'members' as const,
-        title: 'Members',
-        content: (
-          <MemberManager
-            mapId={mapData.id}
-            mapAccountId={mapData.account_id}
-            autoApproveMembers={mapData.auto_approve_members || false}
-            membershipQuestions={mapData.membership_questions || []}
-            membershipRules={mapData.membership_rules || null}
-            onClose={closeSidebar}
-            mapName={mapData.name}
-          />
-        ),
-        popupType: 'members' as 'members',
-        infoText: 'Manage map members, roles, and membership requests',
-      });
-    }
-
-    // Show join sidebar if user is not a member and not an owner
-    // Note: We allow joining regardless of collaboration settings - the map owner
-    // can configure membership rules/questions to control access
-    if (!isMember && !isOwner && currentAccountId) {
-      configs.push({
-        type: 'join' as const,
-        title: 'Join Map',
-        content: (
-          <JoinMapSidebar
-            mapId={mapData.id}
-            mapName={mapData.name}
-            autoApproveMembers={mapData.auto_approve_members || false}
-            membershipQuestions={(mapData.membership_questions || []).map((q: any, index: number) => ({
-              id: q.id !== undefined ? q.id : index,
-              question: q.question || q,
-            }))}
-            membershipRules={mapData.membership_rules || null}
-            allowPins={mapData.settings?.collaboration?.allow_pins || false}
-            allowAreas={mapData.settings?.collaboration?.allow_areas || false}
-            allowPosts={mapData.settings?.collaboration?.allow_posts || false}
-            pinPermissions={mapData.settings?.collaboration?.pin_permissions || null}
-            areaPermissions={mapData.settings?.collaboration?.area_permissions || null}
-            postPermissions={mapData.settings?.collaboration?.post_permissions || null}
-            mapLayers={mapData.settings?.appearance?.map_layers || {}}
-            memberCount={mapData.member_count || 0}
-            onJoinSuccess={() => {
-              // Refresh membership status
-              setCheckingMembership(true);
-            }}
-            onClose={closeSidebar}
-          />
-        ),
-        popupType: 'account',
-      });
-    }
-
-    // Add posts section
-    configs.push({
-      type: 'posts' as const,
-      title: 'Posts',
-      content: (
-        <MapPosts mapId={mapData.id} onClose={closeSidebar} />
-      ),
-      popupType: 'account',
-      infoText: 'Posts associated with this map',
+  // Location select popup state (managed by MapIDBox's unified handler)
+  const [locationSelectPopup, setLocationSelectPopup] = useState({
+    isOpen: false,
+    lat: 0,
+    lng: 0,
+    address: null as string | null,
+    mapMeta: null as Record<string, any> | null,
+  });
+  
+  const closePopup = useCallback(() => {
+    setLocationSelectPopup({
+      isOpen: false,
+      lat: 0,
+      lng: 0,
+      address: null,
+      mapMeta: null,
     });
+  }, []);
+  
+  const popupAddress = locationSelectPopup.address;
 
-    return configs;
-  }, [mapData, isOwner, showMembers, isMember, currentAccountId, closeSidebar]);
+  // Consolidated sidebar handlers
+  const sidebarHandlers = useMapSidebarHandlers({ toggleSidebar });
 
-  const handleTimeFilterChange = (filter: '24h' | '7d' | 'all') => {
-    setTimeFilter(filter);
-    window.dispatchEvent(new CustomEvent('mention-time-filter-change', {
-      detail: { timeFilter: filter }
-    }));
-  };
+  // Entity sidebar state (mentions, pins, areas)
+  const entitySidebar = useEntitySidebar();
 
-  // Sync boundary state with map via events
+  // Auto-open sidebar when entity is selected
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('map-boundaries-change', {
-      detail: {
-        showDistricts,
-        showCTU,
-        showStateBoundary,
-        showCountyBoundaries,
+    if (entitySidebar.selectedMentionId || entitySidebar.selectedEntityId) {
+      const sidebarType = entitySidebar.selectedMentionId ? 'mention' : 'entity';
+      if (activeSidebar !== sidebarType) {
+        // Use openSidebar to switch to the new type (don't toggle if already open)
+        openSidebar(sidebarType);
       }
-    }));
-  }, [showDistricts, showCTU, showStateBoundary, showCountyBoundaries]);
+    } else if (activeSidebar === 'mention' || activeSidebar === 'entity') {
+      // Close sidebar if entity is deselected
+      closeSidebar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entitySidebar.selectedMentionId, entitySidebar.selectedEntityId, activeSidebar]);
 
-  // Fetch all map data in one call - runs once per mapId
-  useEffect(() => {
-    if (!mapId) return;
-
-    let cancelled = false;
-
-    const fetchAll = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        // Single aggregate endpoint: map + stats + pins + areas + members
-        const response = await fetch(`/api/maps/${mapId}/data`);
-        const data = await response.json();
-
-        if (cancelled) return;
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError('Map not found');
-          } else if (response.status === 403) {
-            setError('You do not have access to this map');
-          } else {
-            setError(data.error || 'Failed to load map');
-          }
-          setLoading(false);
-          return;
-        }
-
-        // Validate response structure
-        if (!data || typeof data !== 'object' || !data.map) {
-          throw new Error('Invalid map data received');
-        }
-        
-        const map: MapData = data.map;
-        setMapData(map);
-        setViewCount(data.stats?.stats?.total_views || 0);
-        setInitialPins(data.pins || []);
-        setInitialAreas(data.areas || []);
-        setInitialMembers(data.members || null);
-
-        // Record view (fire and forget)
-        if (!hasRecordedView && map.id) {
-          setHasRecordedView(true);
-          let sessionId: string | null = null;
-          if (typeof window !== 'undefined') {
-            sessionId = localStorage.getItem('analytics_device_id') || generateUUID();
-            if (!localStorage.getItem('analytics_device_id')) {
-              localStorage.setItem('analytics_device_id', sessionId);
-            }
-          }
-          fetch('/api/analytics/map-view', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              map_id: map.id,
-              referrer_url: typeof window !== 'undefined' ? document.referrer || null : null,
-              session_id: sessionId,
-              user_agent: typeof window !== 'undefined' ? navigator.userAgent : null,
-            }),
-          }).catch(() => {});
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.error('Error fetching map:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load map');
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+  // Sidebar configurations (extracted to hook)
+  const sidebarConfigs = useMapSidebarConfigs({
+    mapData,
+    isOwner,
+    isMember,
+    isManager,
+    showMembers,
+    currentAccountId,
+    permissionsLoading: membershipLoading,
+    closeSidebar: () => {
+      entitySidebar.closeSidebar();
+      closeSidebar();
+    },
+    onMapDataUpdate: updateMapData,
+    onJoinSuccess: () => {
+      // Membership will refresh automatically via useMapMembership hook
+    },
+    selectedMentionId: entitySidebar.selectedMentionId,
+    selectedMention: entitySidebar.selectedMention,
+    selectedEntityId: entitySidebar.selectedEntityId,
+    selectedEntityType: entitySidebar.selectedEntityType,
+    selectedEntity: entitySidebar.selectedEntity,
+    onEntityDeleted: () => {
+      // Refresh pins/areas if needed
+      if (mapId) {
+        // Trigger a refresh by updating a ref or state
+        window.dispatchEvent(new CustomEvent('entity-deleted'));
       }
-    };
+    },
+    onEntityUpdated: (updated) => {
+      // Handle entity update if needed
+      window.dispatchEvent(new CustomEvent('entity-updated', { detail: updated }));
+    },
+  });
 
-    fetchAll();
+  // Contribute overlay management
+  const { showOverlay: showContributeOverlay, openOverlay, closeOverlay: handleCloseContribute } = useContributeOverlay();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [mapId, hasRecordedView]);
 
-  // URL normalization: redirect ID URLs to slug URLs when available
+  // URL normalization: automatically redirect ID URLs to slug URLs when available
+  // This ensures canonical URLs (slug preferred) while ID remains source of truth internally
   useEffect(() => {
     if (!mapData || !mapId || loading) return;
     
+    // Check if URL contains UUID but map has a slug/custom_slug
     if (shouldNormalizeUrl(mapId, mapData)) {
       const canonicalUrl = getMapUrl(mapData);
+      // Replace URL with canonical slug (no history entry, no scroll)
       router.replace(canonicalUrl, { scroll: false });
     }
   }, [mapData, mapId, loading, router]);
@@ -871,15 +338,14 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       <PageWrapper
         headerContent={
           <MapPageHeaderButtons
-            onSettingsClick={handleSettingsClick}
-            onFilterClick={handleFilterClick}
-            onMembersClick={handleMembersClick}
-            onJoinClick={handleJoinClick}
-            onPostsClick={handlePostsClick}
-            showSettings={isMember || isOwner || currentAccountId !== null}
-            showMembers={showMembers}
-            showJoin={!isMember && !isOwner && currentAccountId !== null}
-            showPosts={true}
+            onSettingsClick={sidebarHandlers.handleSettingsClick}
+            onFilterClick={sidebarHandlers.handleFilterClick}
+            onMembersClick={sidebarHandlers.handleMembersClick}
+            onPostsClick={sidebarHandlers.handlePostsClick}
+            showSettings={access.canViewSettings}
+            showMembers={access.canViewMembers}
+            showPosts={access.canViewPosts}
+            showFilter={shouldShowFilterIcon}
           />
         }
         searchComponent={
@@ -931,7 +397,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
 
           {mapData && !loading && (
             <>
-              <div className={`${isLiveMap ? 'h-screen' : 'h-full'} overflow-hidden`}>
+              <div className={`relative ${isLiveMap ? 'h-screen' : 'h-full'} overflow-hidden`}>
                 <MapPageLayout
                   activeSidebar={activeSidebar}
                   onSidebarClose={closeSidebar}
@@ -961,7 +427,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                     viewCount={viewCount}
                     hideCreator={mapData.settings?.presentation?.hide_creator || false}
                     map_account_id={mapData.account_id}
-                    current_account_id={activeAccountId || account?.id || null}
+                    current_account_id={currentAccountId}
                     created_at={mapData.created_at}
                     updated_at={mapData.updated_at}
                     initialPins={initialPins}
@@ -970,13 +436,29 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                     membership_questions={mapData.membership_questions || []}
                     membership_rules={mapData.membership_rules || null}
                     isMember={isMember}
-                    onJoinClick={handleJoinClick}
+                    onJoinClick={sidebarHandlers.handleJoinClick}
+                    activeSidebar={activeSidebar}
+                    mapSettings={mapData.settings || null}
+                    userRole={computedUserRole}
+                    checkPermission={checkPermission}
+                    mapData={mapData}
+                    onLocationPopupChange={setLocationSelectPopup}
                     onMapLoad={handleMapLoad}
-                    onMapUpdate={(updatedData) => {
-                      setMapData(prev => prev ? { ...prev, ...updatedData } : null);
-                    }}
+                    onMapUpdate={updateMapData}
                   />
                 </MapPageLayout>
+                
+                {/* Contribute Overlay - positioned over map area only */}
+                {mapData && showContributeOverlay && (
+                  <Suspense fallback={null}>
+                    <ContributeOverlay
+                      isOpen={showContributeOverlay}
+                      onClose={handleCloseContribute}
+                      mapId={mapData.id}
+                      mapSlug={mapData.slug}
+                    />
+                  </Suspense>
+                )}
               </div>
 
             </>
@@ -987,7 +469,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       {/* Upgrade Prompt */}
       <MapActionUpgradePrompt
         isOpen={upgradePrompt.isOpen}
-        onClose={() => setUpgradePrompt({ ...upgradePrompt, isOpen: false })}
+        onClose={closeUpgradePrompt}
         action={upgradePrompt.action}
         requiredPlan={upgradePrompt.requiredPlan}
         currentPlan={upgradePrompt.currentPlan}
@@ -996,29 +478,14 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       {/* Location Select Popup */}
       <LocationSelectPopup
         isOpen={locationSelectPopup.isOpen}
-        onClose={() => {
-          setLocationSelectPopup({ 
-            isOpen: false, 
-            lat: 0, 
-            lng: 0, 
-            address: null, 
-            mapMeta: null,
-          });
-          setClickedCoordinates(null);
-        }}
+        onClose={closePopup}
         lat={locationSelectPopup.lat}
         lng={locationSelectPopup.lng}
-        address={locationSelectPopup.address || reverseGeocodeAddress}
+        address={popupAddress}
         mapMeta={locationSelectPopup.mapMeta}
         onAddToMap={(coordinates, mapMeta, mentionTypeId) => {
-          // Navigate to /add page with location and mention type
-          const params = new URLSearchParams();
-          params.set('lat', coordinates.lat.toString());
-          params.set('lng', coordinates.lng.toString());
-          if (mentionTypeId) {
-            params.set('mention_type_id', mentionTypeId);
-          }
-          router.push(`/add?${params.toString()}`);
+          // Open contribute overlay with location, mention type, and mapMeta
+          openOverlay(coordinates, mentionTypeId || undefined, mapMeta || null, popupAddress || null);
         }}
       />
     </>

@@ -26,7 +26,7 @@ export default function MapPageLayout({
   return (
     <div className="relative w-full h-full flex">
       {/* Mobile: Map container + Sidebar container handles popups */}
-      <div className="lg:hidden w-full h-full relative overflow-hidden">
+      <div className="lg:hidden w-full h-full relative overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
         <div className="absolute inset-0 w-full h-full">
           {children}
         </div>

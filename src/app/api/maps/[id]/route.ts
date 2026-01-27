@@ -152,6 +152,11 @@ const updateMapSchema = z.object({
       map_style: z.enum(['street', 'satellite', 'light', 'dark']).optional(),
       map_layers: z.record(z.string(), z.boolean()).optional(),
       meta: z.record(z.string(), z.unknown()).optional(),
+      map_filters: z.object({
+        angle: z.number().min(0).max(60).optional(),
+        map_styles: z.boolean().optional(),
+        global_layers: z.boolean().optional(),
+      }).optional(),
     }).optional(),
     collaboration: z.object({
       allow_pins: z.boolean().optional(),
@@ -179,6 +184,10 @@ const updateMapSchema = z.object({
       hide_creator: z.boolean().optional(),
       is_featured: z.boolean().optional(),
       emoji: z.string().nullable().optional(),
+      show_map_filters_icon: z.boolean().optional(),
+    }).optional(),
+    membership: z.object({
+      max_members: z.number().int().positive().optional().nullable(),
     }).optional(),
   }).optional(),
   auto_approve_members: z.boolean().optional(),
@@ -323,6 +332,25 @@ export async function PUT(
               appearance: {
                 ...currentSettings.appearance,
                 ...body.settings.appearance,
+                // Deep merge nested objects
+                ...(body.settings.appearance.map_filters && {
+                  map_filters: {
+                    ...(currentSettings.appearance?.map_filters || {}),
+                    ...body.settings.appearance.map_filters,
+                  },
+                }),
+                ...(body.settings.appearance.meta && {
+                  meta: {
+                    ...(currentSettings.appearance?.meta || {}),
+                    ...body.settings.appearance.meta,
+                  },
+                }),
+                ...(body.settings.appearance.map_layers && {
+                  map_layers: {
+                    ...(currentSettings.appearance?.map_layers || {}),
+                    ...body.settings.appearance.map_layers,
+                  },
+                }),
               },
             }),
             ...(body.settings.collaboration && {

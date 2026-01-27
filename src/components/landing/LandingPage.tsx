@@ -269,7 +269,7 @@ export default function LandingPage() {
               )}
               {user && account && (
                 <Link
-                  href="/add"
+                  href="/map/live#contribute"
                   className="w-full bg-white hover:bg-gray-50 text-gray-900 font-medium py-3.5 px-6 rounded-xl border border-gray-200 transition-all active:scale-[0.98] hover:shadow-sm flex items-center justify-center"
                 >
                   Add To Map

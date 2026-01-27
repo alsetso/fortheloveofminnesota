@@ -38,7 +38,7 @@ export default function SidebarToggleButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center w-7 h-7 text-white/70 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+      className="flex items-center justify-center w-8 h-8 text-white/90 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200 backdrop-blur-sm"
       aria-label={ariaLabel}
       title={title}
     >

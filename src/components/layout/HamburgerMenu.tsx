@@ -13,7 +13,6 @@ interface NavLink {
 
 const navLinks: NavLink[] = [
   { label: 'Home', href: '/' },
-  { label: 'Feed', href: '/feed', requiresAuth: true },
   { label: 'Maps', href: '/maps' },
   { label: 'People', href: '/people' },
   { label: 'Government', href: '/gov' },
@@ -85,9 +84,6 @@ export default function HamburgerMenu({ isOpen: controlledIsOpen, onOpenChange }
     }
     return link;
   }).filter(link => {
-    // Show Feed instead of Home if authenticated
-    if (link.href === '/' && user) return false;
-    if (link.href === '/feed' && !user) return false;
     if (link.requiresAuth && !user) return false;
     // Filter out Admin if not admin
     if (link.href === '/admin' && account?.role !== 'admin') return false;

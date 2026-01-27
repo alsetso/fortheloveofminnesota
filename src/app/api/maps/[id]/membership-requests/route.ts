@@ -5,6 +5,8 @@ import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiErro
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validatePathParams, validateRequestBody } from '@/lib/security/validation';
 import { z } from 'zod';
+import { getEffectiveMemberLimit } from '@/lib/maps/memberLimits';
+import type { MapSettings } from '@/types/map';
 
 /**
  * GET /api/maps/[id]/membership-requests
@@ -181,7 +183,7 @@ export async function POST(
         let mapId: string;
         let mapQuery = supabase
           .from('map')
-          .select('id, account_id, visibility, auto_approve_members');
+          .select('id, account_id, visibility, auto_approve_members, settings, member_count');
         
         if (isUUID(identifier)) {
           mapQuery = mapQuery.eq('id', identifier);
@@ -194,7 +196,14 @@ export async function POST(
           return createErrorResponse('Map not found', 404);
         }
 
-        const mapData = map as { account_id: string; id: string; visibility: string; auto_approve_members: boolean };
+        const mapData = map as { 
+          account_id: string; 
+          id: string; 
+          visibility: string; 
+          auto_approve_members: boolean;
+          settings: MapSettings;
+          member_count: number;
+        };
         mapId = mapData.id;
 
         // Check if already a member
@@ -222,27 +231,43 @@ export async function POST(
           return createErrorResponse('You already have a pending request for this map', 409);
         }
 
-        // If auto_approve is enabled, add as member directly
+        // Check member limit before proceeding
+        const limitCheck = await getEffectiveMemberLimit(
+          mapData.account_id,
+          mapData.settings,
+          mapData.member_count
+        );
+
+        if (!limitCheck.canAddMember) {
+          return createErrorResponse(
+            limitCheck.reason || 'Map has reached the maximum member limit',
+            403
+          );
+        }
+
+        // If auto_approve is enabled, add as member directly using RPC function
+        // This bypasses RLS while still validating all security conditions
         if (mapData.auto_approve_members && mapData.visibility === 'public') {
           const { data: newMember, error: memberError } = await supabase
-            .from('map_members')
-            .insert({
-              map_id: mapId,
-              account_id: accountId,
-              role: 'editor',
+            .rpc('join_map_auto_approve', {
+              p_map_id: mapId,
+              p_account_id: accountId,
             } as any)
-            .select(`
-              id,
-              map_id,
-              account_id,
-              role,
-              joined_at
-            `)
             .single();
 
           if (memberError) {
             if (process.env.NODE_ENV === 'development') {
               console.error('[Maps API] Error auto-adding member:', memberError);
+            }
+            // Check for specific error types
+            if (memberError.message?.includes('Already a member')) {
+              return createErrorResponse('You are already a member of this map', 409);
+            }
+            if (memberError.message?.includes('Not authenticated')) {
+              return createErrorResponse('Authentication required', 401);
+            }
+            if (memberError.message?.includes('Account does not belong to user')) {
+              return createErrorResponse('Invalid account', 403);
             }
             return createErrorResponse('Failed to join map', 500);
           }

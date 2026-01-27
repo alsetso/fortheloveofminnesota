@@ -45,17 +45,24 @@ export default function MapMembershipRequests({
     setProcessingId(requestId);
     try {
       const response = await fetch(
-        `/api/maps/${mapId}/membership-requests/${requestId}/approve`,
+        `/api/maps/${mapId}/membership-requests/${requestId}`,
         { method: 'PUT' }
       );
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to approve request');
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to approve request');
+        } else {
+          const text = await response.text();
+          throw new Error(`Failed to approve request: ${response.status} ${response.statusText}`);
+        }
       }
 
-      // Remove from list
-      setRequests(prev => prev.filter(r => r.id !== requestId));
+      // Refetch requests to get updated list (status changed to 'approved', so it won't appear)
+      await fetchRequests();
       onMemberAdded?.();
       addToast(createToast('success', 'Membership request approved', {
         duration: 3000,
@@ -78,12 +85,19 @@ export default function MapMembershipRequests({
       );
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to reject request');
+        // Check if response is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to reject request');
+        } else {
+          const text = await response.text();
+          throw new Error(`Failed to reject request: ${response.status} ${response.statusText}`);
+        }
       }
 
-      // Remove from list
-      setRequests(prev => prev.filter(r => r.id !== requestId));
+      // Refetch requests to get updated list (status changed to 'rejected', so it won't appear)
+      await fetchRequests();
       addToast(createToast('success', 'Membership request rejected', {
         duration: 3000,
       }));

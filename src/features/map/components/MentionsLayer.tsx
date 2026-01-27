@@ -25,13 +25,15 @@ interface MentionsLayerProps {
   selectedMentionId?: string | null;
   /** Optional map ID to filter mentions by map */
   mapId?: string | null;
+  /** If true, skip registering click handlers (unified handler will handle clicks) */
+  skipClickHandlers?: boolean;
 }
 
 /**
  * MentionsLayer component manages Mapbox mention visualization
  * Handles fetching, formatting, and real-time updates
  */
-export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId, mapId }: MentionsLayerProps) {
+export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId, mapId, skipClickHandlers = false }: MentionsLayerProps) {
   const sourceId = 'map-mentions';
   const pointLayerId = 'map-mentions-point';
   const pointLabelLayerId = 'map-mentions-point-label';
@@ -1062,7 +1064,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         }
 
         // Add click handlers for mention interactions (only once, but reset on filter changes)
-        if (!clickHandlersAddedRef.current) {
+        // Skip if unified handler is managing clicks
+        if (!clickHandlersAddedRef.current && !skipClickHandlers) {
           const handleMentionClick = async (e: any) => {
             if (!mounted) return;
             if (!mapboxMap || !e || !e.point || typeof e.point.x !== 'number' || typeof e.point.y !== 'number' || typeof mapboxMap.queryRenderedFeatures !== 'function') return;
@@ -1087,96 +1090,127 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             let mention = mentionsRef.current.find(m => m.id === mentionId);
             if (!mention) return;
             
-            // Fetch full account profile data if account_id exists
+            // Fetch complete mention data in parallel for fast switching
+            const fetchPromises: Promise<any>[] = [];
+            
+            // Fetch account data if missing
             if (mention.account_id && (!mention.account || !mention.account.username)) {
-              try {
-                const { supabase } = await import('@/lib/supabase');
-                const { data: accountData } = await supabase
-                  .from('accounts')
-                  .select('id, username, first_name, image_url, plan')
-                  .eq('id', mention.account_id)
-                  .single();
-                
-                if (accountData) {
-                  // Update mention with full account data
-                  mention = {
-                    ...mention,
-                    account: {
-                      id: accountData.id,
-                      username: accountData.username,
-                      image_url: accountData.image_url,
-                      plan: accountData.plan,
-                    }
-                  };
-                  // Update in refs
-                  const index = mentionsRef.current.findIndex(m => m.id === mentionId);
-                  if (index !== -1) {
-                    mentionsRef.current[index] = mention;
+              fetchPromises.push(
+                (async () => {
+                  try {
+                    const { supabase } = await import('@/lib/supabase');
+                    const { data: accountData } = await supabase
+                      .from('accounts')
+                      .select('id, username, first_name, image_url, plan')
+                      .eq('id', mention.account_id)
+                      .single();
+                    return accountData ? { account: accountData } : null;
+                  } catch (error) {
+                    console.error('[MentionsLayer] Error fetching account:', error);
+                    return null;
                   }
-                }
-              } catch (error) {
-                console.error('[MentionsLayer] Error fetching account profile:', error);
-                // Continue with existing mention data
-              }
+                })()
+              );
             }
 
-            // Fetch map_meta for the mention (not included in initial fetch for performance)
-            let mapMeta: Record<string, any> | null = null;
-            if (!mention.map_meta) {
-              try {
-                const { supabase } = await import('@/lib/supabase');
-                const { data: mentionData } = await supabase
-                  .from('map_pins')
-                  .select('map_meta')
-                  .eq('id', mentionId)
-                  .eq('is_active', true)
-                  .single();
-                
-                if (mentionData && mentionData.map_meta) {
-                  mapMeta = mentionData.map_meta;
-                  // Update mention with map_meta
-                  mention = {
-                    ...mention,
-                    map_meta: mapMeta,
-                  };
-                }
-              } catch (error) {
-                console.error('[MentionsLayer] Error fetching map_meta:', error);
-                // Continue without map_meta
-              }
-            } else {
-              mapMeta = mention.map_meta;
+            // Fetch missing mention fields (full_address, map_meta, etc.)
+            if (!mention.full_address || !mention.map_meta) {
+              fetchPromises.push(
+                (async () => {
+                  try {
+                    const { supabase } = await import('@/lib/supabase');
+                    const { data: mentionData } = await supabase
+                      .from('map_pins')
+                      .select('full_address, map_meta, description')
+                      .eq('id', mentionId)
+                      .eq('is_active', true)
+                      .single();
+                    return mentionData || null;
+                  } catch (error) {
+                    console.error('[MentionsLayer] Error fetching mention details:', error);
+                    return null;
+                  }
+                })()
+              );
             }
 
-            // Fly to mention location
-            const currentZoom = mapboxMap.getZoom();
-            const targetZoom = Math.max(currentZoom, 14); // Ensure we zoom in at least to level 14
-            
-            mapboxMap.flyTo({
-              center: [mention.lng, mention.lat],
-              zoom: targetZoom,
-              duration: 800,
-              essential: true, // Animation is essential for accessibility
-            });
-            
-            // Optimistically increment view_count for immediate UI feedback
+            // Dispatch immediately with current data for fast UI response
             const updatedMention = {
               ...mention,
               view_count: (mention.view_count || 0) + 1
             };
             
-            // Update mention in refs
+            window.dispatchEvent(new CustomEvent('mention-click', {
+              detail: { 
+                mention: updatedMention,
+                address: mention.full_address || null
+              }
+            }));
+
+            // Fetch missing data async and update if needed
+            if (fetchPromises.length > 0) {
+              Promise.all(fetchPromises).then((results) => {
+                const accountData = results.find(r => r?.account);
+                const mentionData = results.find(r => r && !r.account);
+                
+                if (accountData || mentionData) {
+                  const enhancedMention = {
+                    ...updatedMention,
+                    ...(accountData?.account && {
+                      account: {
+                        id: accountData.account.id,
+                        username: accountData.account.username,
+                        image_url: accountData.account.image_url,
+                        plan: accountData.account.plan,
+                      }
+                    }),
+                    ...(mentionData && {
+                      full_address: mention.full_address || mentionData.full_address || null,
+                      map_meta: mention.map_meta || mentionData.map_meta || null,
+                      description: mention.description || mentionData.description || null,
+                    })
+                  };
+                  
+                  // Update via event for fast sidebar update
+                  window.dispatchEvent(new CustomEvent('mention-click', {
+                    detail: { 
+                      mention: enhancedMention,
+                      address: enhancedMention.full_address || null
+                    }
+                  }));
+                }
+              }).catch(() => {
+                // Silently fail - UI already showed with available data
+              });
+            }
+
+            // Check if user is authenticated before showing mention details
+            if (!accountRef.current) {
+              showErrorToastRef.current('Must be logged in', 'Please sign in to view mention details');
+              return;
+            }
+
+            // Fly to mention location
+            const currentZoom = mapboxMap.getZoom();
+            const targetZoom = Math.max(currentZoom, 14);
+            
+            mapboxMap.flyTo({
+              center: [mention.lng, mention.lat],
+              zoom: targetZoom,
+              duration: 800,
+              essential: true,
+            });
+            
+            // Update mention in refs (reuse updatedMention from above)
             const mentionIndex = mentionsRef.current.findIndex(m => m.id === mentionId);
             if (mentionIndex !== -1) {
               mentionsRef.current[mentionIndex] = updatedMention;
             }
             
-            // Track mention view (async, non-blocking)
+            // Track view (async, non-blocking)
             const trackMentionView = () => {
               const referrer = typeof document !== 'undefined' ? document.referrer : null;
               const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
-              
-              // Generate or get device ID from localStorage
               let deviceId: string | null = null;
               if (typeof window !== 'undefined') {
                 deviceId = localStorage.getItem('analytics_device_id');
@@ -1196,36 +1230,16 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                   session_id: deviceId,
                 }),
                 keepalive: true,
-              }).catch((error) => {
-                // Silently fail - don't break the page
-                if (process.env.NODE_ENV === 'development') {
-                  console.error('[MentionsLayer] Failed to track mention view:', error);
-                }
+              }).catch(() => {
+                // Silently fail
               });
             };
-
-            // Check if user is authenticated before showing mention details
-            // For public map pages, show toast if not logged in
-            if (!accountRef.current) {
-              showErrorToastRef.current('Must be logged in', 'Please sign in to view mention details');
-              return;
-            }
             
-            // Track view asynchronously (non-blocking)
             if ('requestIdleCallback' in window) {
               requestIdleCallback(trackMentionView, { timeout: 2000 });
             } else {
               setTimeout(trackMentionView, 1000);
             }
-            
-            // Dispatch mention-click event for iOS-style popup (handled by LiveMap)
-            // Use the updated mention with incremented view_count
-            window.dispatchEvent(new CustomEvent('mention-click', {
-              detail: { 
-                mention: updatedMention,
-                address: mention.full_address || mention.map_meta?.place_name || null
-              }
-            }));
             
             // Don't create Mapbox popup - use iOS-style popup instead
             return;

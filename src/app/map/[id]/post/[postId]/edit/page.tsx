@@ -331,7 +331,7 @@ export default function EditMapPostPage() {
             <span className="text-sm font-medium">Back</span>
           </Link>
           <Link
-            href="/feed"
+            href="/"
             className="absolute left-1/2 transform -translate-x-1/2"
           >
             <Image

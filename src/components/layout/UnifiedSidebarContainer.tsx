@@ -40,7 +40,7 @@ export default function UnifiedSidebarContainer({
   return (
     <>
       {/* Mobile: Bottom slide-up popups */}
-      <div className="lg:hidden">
+      <div className="lg:hidden absolute inset-0 pointer-events-none z-[9997]" style={{ height: '100%', maxHeight: '100%' }}>
         {activeSidebarConfig && (
           <BottomButtonsPopup
             isOpen={true}
@@ -56,11 +56,13 @@ export default function UnifiedSidebarContainer({
         )}
       </div>
 
-      {/* Desktop: Fixed left sidebar */}
+      {/* Desktop: Fixed left sidebar - uses transform to avoid map resize */}
       <aside
-        className={`hidden lg:block ${
-          activeSidebar ? 'w-80' : 'w-0'
-        } transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-r border-gray-200 overflow-hidden ${sidebarClassName}`}
+        className={`hidden lg:block transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-r border-gray-200 overflow-hidden ${
+          activeSidebar 
+            ? 'w-80 translate-x-0' 
+            : 'w-0 -translate-x-full'
+        } ${sidebarClassName}`}
       >
         {activeSidebarConfig && (
           <div className="h-full flex flex-col">

@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { ChevronDownIcon, MapIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, MapIcon, EyeIcon, UserGroupIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon, MapPinIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import Image from 'next/image';
 import { useAuthStateSafe } from '@/features/auth';
+import BottomButtonsPopup from '@/components/layout/BottomButtonsPopup';
 import type { MapItem } from '@/app/maps/types';
 
 interface MapsSelectorDropdownProps {
@@ -11,7 +13,7 @@ interface MapsSelectorDropdownProps {
   onMapClick?: () => void; // Callback when map card is clicked (for opening modal)
 }
 
-type TabType = 'community' | 'my-maps';
+type TabType = 'community' | 'my-maps' | 'about';
 
 export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDropdownProps) {
   const router = useRouter();
@@ -28,14 +30,32 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
   const [loadingUserMaps, setLoadingUserMaps] = useState(false);
   const [selectedMapViewCount, setSelectedMapViewCount] = useState<number | null>(null);
   const [selectedMapName, setSelectedMapName] = useState<string | null>(null);
+  const [currentMapData, setCurrentMapData] = useState<any>(null);
+  const [loadingMapData, setLoadingMapData] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Reset to community tab when dropdown opens
+  // Check if we're on a map page (any /map/[slug] except /map/new and /maps)
+  const isMapPage = pathname?.startsWith('/map/') && pathname !== '/map/new' && pathname !== '/maps';
+  const isMapsPage = pathname === '/maps';
+
+  // Detect mobile screen size (lg breakpoint is 1024px)
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Reset to community tab when dropdown opens (unless on map page, then default to about)
   useEffect(() => {
     if (isOpen) {
-      setActiveTab('community');
+      setActiveTab(isMapPage ? 'about' : 'community');
     }
-  }, [isOpen]);
+  }, [isOpen, isMapPage]);
 
   // Fetch maps on mount
   useEffect(() => {
@@ -122,6 +142,61 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
 
     fetchCommunityMaps();
   }, [activeTab, isOpen]);
+
+  // Fetch current map data when About tab is selected
+  useEffect(() => {
+    if (activeTab !== 'about' || !isOpen || !selectedMapId) {
+      return;
+    }
+
+    const fetchMapData = async () => {
+      setLoadingMapData(true);
+      try {
+        const mapResponse = await fetch(`/api/maps/${selectedMapId}`);
+        if (mapResponse.ok) {
+          const data = await mapResponse.json();
+          const map = data.map || data;
+          
+          // Fetch stats
+          const statsResponse = await fetch(`/api/maps/${map.id}/stats`);
+          if (statsResponse.ok) {
+            const statsData = await statsResponse.json();
+            map.view_count = statsData.stats?.total_views || 0;
+          }
+          
+          // Fetch member count
+          const membersResponse = await fetch(`/api/maps/${map.id}/members`);
+          if (membersResponse.ok) {
+            const membersData = await membersResponse.json();
+            map.member_count = membersData.members?.length || 0;
+          }
+          
+          // Fetch pins count
+          const pinsResponse = await fetch(`/api/maps/${map.id}/pins`);
+          if (pinsResponse.ok) {
+            const pinsData = await pinsResponse.json();
+            map.pins_count = pinsData.pins?.length || 0;
+          }
+          
+          // Fetch areas count
+          const areasResponse = await fetch(`/api/maps/${map.id}/areas`);
+          if (areasResponse.ok) {
+            const areasData = await areasResponse.json();
+            map.areas_count = areasData.areas?.length || 0;
+          }
+          
+          setCurrentMapData(map);
+        }
+      } catch (err) {
+        console.error('Error fetching map data:', err);
+        setCurrentMapData(null);
+      } finally {
+        setLoadingMapData(false);
+      }
+    };
+
+    fetchMapData();
+  }, [activeTab, isOpen, selectedMapId]);
 
   // Fetch user maps when tab is selected
   useEffect(() => {
@@ -357,9 +432,261 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
     setIsOpen(false);
   };
 
-  // Check if we're on a map page (any /map/[slug] except /map/new and /maps)
-  const isMapPage = pathname?.startsWith('/map/') && pathname !== '/map/new' && pathname !== '/maps';
-  const isMapsPage = pathname === '/maps';
+  // Render dropdown content (used for both desktop and mobile)
+  const renderDropdownContent = () => (
+    <>
+      {/* Tabs */}
+      <div className="flex items-center border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('community')}
+          className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+            activeTab === 'community'
+              ? 'border-gray-900 text-gray-900'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Community
+        </button>
+        {account && (
+          <button
+            onClick={() => setActiveTab('my-maps')}
+            className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+              activeTab === 'my-maps'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            My Maps
+          </button>
+        )}
+        {isMapPage && (
+          <button
+            onClick={() => setActiveTab('about')}
+            className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
+              activeTab === 'about'
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            About
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="overflow-y-auto flex-1">
+        {activeTab === 'about' ? (
+          loadingMapData ? (
+            <div className="p-3 text-xs text-gray-500 text-center">Loading map info...</div>
+          ) : currentMapData ? (
+            <div className="p-3 space-y-3">
+              {/* Title */}
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-medium text-gray-500">Title</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+                  <div className="text-xs text-gray-900">{currentMapData.name || currentMapData.title}</div>
+                </div>
+              </div>
+              
+              {/* Description */}
+              {currentMapData.description && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-medium text-gray-500">Description</div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+                    <div className="text-xs text-gray-600 whitespace-pre-wrap break-words">{currentMapData.description}</div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Owner */}
+              {currentMapData.account && !currentMapData.settings?.presentation?.hide_creator && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-medium text-gray-500">Owner</div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+                    <div className="flex items-center gap-2">
+                      {currentMapData.account.image_url ? (
+                        <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
+                          <Image
+                            src={currentMapData.account.image_url}
+                            alt={currentMapData.account.username || 'User'}
+                            width={24}
+                            height={24}
+                            className="w-full h-full object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] text-gray-500">
+                            {(currentMapData.account.first_name?.[0] || currentMapData.account.username?.[0] || 'U').toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-xs font-medium text-gray-900 truncate flex-1">
+                        {currentMapData.account.first_name && currentMapData.account.last_name
+                          ? `${currentMapData.account.first_name} ${currentMapData.account.last_name}`
+                          : currentMapData.account.username
+                          ? `@${currentMapData.account.username}`
+                          : 'User'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Stats */}
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-medium text-gray-500">Statistics</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px] space-y-1.5">
+                  {currentMapData.member_count !== undefined && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <UserGroupIcon className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">Members</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-900">{currentMapData.member_count}</span>
+                    </div>
+                  )}
+                  {currentMapData.pins_count !== undefined && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <MapPinIcon className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">Pins</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-900">{currentMapData.pins_count}</span>
+                    </div>
+                  )}
+                  {currentMapData.areas_count !== undefined && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <PencilSquareIcon className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">Areas</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-900">{currentMapData.areas_count}</span>
+                    </div>
+                  )}
+                  {currentMapData.view_count !== undefined && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <EyeIcon className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs text-gray-600">Views</span>
+                      </div>
+                      <span className="text-xs font-medium text-gray-900">
+                        {currentMapData.view_count.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Visibility */}
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-medium text-gray-500">Visibility</div>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    {currentMapData.visibility === 'public' ? (
+                      <>
+                        <GlobeAltIcon className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-900 capitalize">Public</span>
+                      </>
+                    ) : (
+                      <>
+                        <LockClosedIcon className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs font-medium text-gray-900 capitalize">Private</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Categories */}
+              {currentMapData.categories && currentMapData.categories.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-medium text-gray-500">Categories</div>
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-[10px]">
+                    <div className="flex flex-wrap gap-1">
+                      {currentMapData.categories.map((cat: string) => (
+                        <span
+                          key={cat}
+                          className="px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 rounded border border-gray-200 capitalize"
+                        >
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-3 text-xs text-gray-500 text-center">Map info not available</div>
+          )
+        ) : activeTab === 'community' ? (
+          loadingCommunityMaps ? (
+            <div className="p-3 text-xs text-gray-500 text-center">Loading maps...</div>
+          ) : communityMaps.length === 0 ? (
+            <div className="p-3 text-xs text-gray-500 text-center">No maps found</div>
+          ) : (
+            <div className="py-1">
+              {communityMaps.map((map) => {
+                const isSelected = selectedMapId === map.id || selectedMapId === map.custom_slug;
+                return (
+                  <button
+                    key={map.id}
+                    onClick={() => handleMapSelect(map)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
+                      isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{map.name || map.title}</span>
+                      {map.view_count !== undefined && (
+                        <div className="flex items-center gap-0.5 text-gray-500 flex-shrink-0">
+                          <EyeIcon className="w-3 h-3" />
+                          <span className="text-[10px]">{map.view_count.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          loadingUserMaps ? (
+            <div className="p-3 text-xs text-gray-500 text-center">Loading maps...</div>
+          ) : userMaps.length === 0 ? (
+            <div className="p-3 text-xs text-gray-500 text-center">No maps found</div>
+          ) : (
+            <div className="py-1">
+              {userMaps.map((map) => {
+                const isSelected = selectedMapId === map.id || selectedMapId === map.custom_slug;
+                return (
+                  <button
+                    key={map.id}
+                    onClick={() => handleMapSelect(map)}
+                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
+                      isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium">{map.name || map.title}</span>
+                      {map.view_count !== undefined && (
+                        <div className="flex items-center gap-0.5 text-gray-500 flex-shrink-0">
+                          <EyeIcon className="w-3 h-3" />
+                          <span className="text-[10px]">{map.view_count.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )
+        )}
+      </div>
+    </>
+  );
   
   const displayText = selectedMap 
     ? `${selectedMap.tags?.[0]?.emoji || '🗺️'} ${selectedMap.name || selectedMap.title}`
@@ -392,102 +719,40 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
           <ChevronDownIcon className={`w-3 h-3 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-all ${isOpen ? 'rotate-180 opacity-100' : ''}`} />
         </button>
 
-        {/* Dropdown Menu */}
-        {isOpen && (
+        {/* Desktop Dropdown */}
+        {!isMobile && isOpen && (
           <div className="absolute top-full left-0 mt-1 w-64 sm:w-80 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-[400px] overflow-hidden flex flex-col">
-            {/* Tabs */}
-            <div className="flex items-center border-b border-gray-200">
-              <button
-                onClick={() => setActiveTab('community')}
-                className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-                  activeTab === 'community'
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Community
-              </button>
-              {account && (
-                <button
-                  onClick={() => setActiveTab('my-maps')}
-                  className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-                    activeTab === 'my-maps'
-                      ? 'border-gray-900 text-gray-900'
-                      : 'border-transparent text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  My Maps
-                </button>
-              )}
-            </div>
-
-            {/* Maps List */}
-            <div className="overflow-y-auto flex-1">
-              {activeTab === 'community' ? (
-                loadingCommunityMaps ? (
-                  <div className="p-3 text-xs text-gray-500 text-center">Loading maps...</div>
-                ) : communityMaps.length === 0 ? (
-                  <div className="p-3 text-xs text-gray-500 text-center">No maps found</div>
-                ) : (
-                  <div className="py-1">
-                    {communityMaps.map((map) => {
-                      const isSelected = selectedMapId === map.id || selectedMapId === map.custom_slug;
-                      return (
-                        <button
-                          key={map.id}
-                          onClick={() => handleMapSelect(map)}
-                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
-                            isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-900'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-medium">{map.name || map.title}</span>
-                            {map.view_count !== undefined && (
-                              <div className="flex items-center gap-0.5 text-gray-500 flex-shrink-0">
-                                <EyeIcon className="w-3 h-3" />
-                                <span className="text-[10px]">{map.view_count.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )
-              ) : (
-                loadingUserMaps ? (
-                  <div className="p-3 text-xs text-gray-500 text-center">Loading maps...</div>
-                ) : userMaps.length === 0 ? (
-                  <div className="p-3 text-xs text-gray-500 text-center">No maps found</div>
-                ) : (
-                  <div className="py-1">
-                    {userMaps.map((map) => {
-                      const isSelected = selectedMapId === map.id || selectedMapId === map.custom_slug;
-                      return (
-                        <button
-                          key={map.id}
-                          onClick={() => handleMapSelect(map)}
-                          className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
-                            isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-900'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate font-medium">{map.name || map.title}</span>
-                            {map.view_count !== undefined && (
-                              <div className="flex items-center gap-0.5 text-gray-500 flex-shrink-0">
-                                <EyeIcon className="w-3 h-3" />
-                                <span className="text-[10px]">{map.view_count.toLocaleString()}</span>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )
-              )}
-            </div>
+            {renderDropdownContent()}
           </div>
+        )}
+
+        {/* Mobile Popup */}
+        {isMobile && (
+          <BottomButtonsPopup
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+            type="account"
+            height="full"
+            darkMode={false}
+            containerRelative={false}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-3xl">
+              <h2 className="text-sm font-semibold text-gray-900">Maps</h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-md transition-colors"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="flex flex-col h-full">
+              {renderDropdownContent()}
+            </div>
+          </BottomButtonsPopup>
         )}
       </div>
     );
@@ -505,101 +770,40 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
         <ChevronDownIcon className={`w-3 h-3 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {isOpen && (
+      {/* Desktop Dropdown */}
+      {!isMobile && isOpen && (
         <div className="absolute top-full left-0 mt-1 w-64 sm:w-80 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-[400px] overflow-hidden flex flex-col">
-          {/* Tabs */}
-          <div className="flex items-center border-b border-gray-200">
-            <button
-              onClick={() => setActiveTab('community')}
-              className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-                activeTab === 'community'
-                  ? 'border-gray-900 text-gray-900'
-                  : 'border-transparent text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Community
-            </button>
-            {account && (
-              <button
-                onClick={() => setActiveTab('my-maps')}
-                className={`flex-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
-                  activeTab === 'my-maps'
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                My Maps
-              </button>
-            )}
-          </div>
-
-          {/* Maps List */}
-          <div className="overflow-y-auto flex-1">
-            {activeTab === 'community' ? (
-              loadingCommunityMaps ? (
-                <div className="p-3 text-xs text-gray-500 text-center">Loading maps...</div>
-              ) : communityMaps.length === 0 ? (
-                <div className="p-3 text-xs text-gray-500 text-center">No maps found</div>
-              ) : (
-                <div className="py-1">
-                  {communityMaps.map((map) => {
-                    const isSelected = selectedMapId === map.id || selectedMapId === map.custom_slug;
-                    return (
-                      <button
-                        key={map.id}
-                        onClick={() => handleMapSelect(map)}
-                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
-                          isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-900'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate font-medium">{map.name || map.title}</span>
-                          {map.view_count !== undefined && (
-                            <div className="flex items-center gap-0.5 text-gray-500 flex-shrink-0">
-                              <EyeIcon className="w-3 h-3" />
-                              <span className="text-[10px]">{map.view_count.toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )
-            ) : (
-              loadingUserMaps ? (
-                <div className="p-3 text-xs text-gray-500 text-center">Loading maps...</div>
-              ) : userMaps.length === 0 ? (
-                <div className="p-3 text-xs text-gray-500 text-center">No maps found</div>
-              ) : (
-                <div className="py-1">
-                  {userMaps.map((map) => {
-                    const isSelected = selectedMapId === map.id || selectedMapId === map.custom_slug;
-                    return (
-                      <button
-                        key={map.id}
-                        onClick={() => handleMapSelect(map)}
-                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 transition-colors ${
-                          isSelected ? 'bg-indigo-50 text-indigo-900' : 'text-gray-900'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate font-medium">{map.name || map.title}</span>
-                          {map.view_count !== undefined && (
-                            <div className="flex items-center gap-0.5 text-gray-500 flex-shrink-0">
-                              <EyeIcon className="w-3 h-3" />
-                              <span className="text-[10px]">{map.view_count.toLocaleString()}</span>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )
-            )}
-          </div>
+          {renderDropdownContent()}
         </div>
+      )}
+
+      {/* Mobile Popup */}
+      {isMobile && (
+        <BottomButtonsPopup
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          type="account"
+          height="full"
+          darkMode={false}
+          containerRelative={false}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-3xl">
+            <h2 className="text-sm font-semibold text-gray-900">Maps</h2>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-md transition-colors"
+              aria-label="Close"
+            >
+              <XMarkIcon className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="flex flex-col h-full">
+            {renderDropdownContent()}
+          </div>
+        </BottomButtonsPopup>
       )}
     </div>
   );

@@ -47,7 +47,10 @@ export default function BottomButtonsPopup({
       // Trigger animation on next frame
       requestAnimationFrame(() => {
         if (popupRef.current) {
-          popupRef.current.style.transform = 'translate(-50%, 0)';
+          const isFullScreenMobile = containerRelative && height === 'full';
+          popupRef.current.style.transform = isFullScreenMobile 
+            ? 'translateY(0)' 
+            : 'translate(-50%, 0)';
         }
       });
     } else {
@@ -59,7 +62,7 @@ export default function BottomButtonsPopup({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, containerRelative, height]);
 
   // Check if content reaches max height
   useEffect(() => {
@@ -118,7 +121,10 @@ export default function BottomButtonsPopup({
 
   const handleClose = () => {
     if (popupRef.current) {
-      popupRef.current.style.transform = 'translate(-50%, 100%)';
+      const isFullScreenMobile = containerRelative && height === 'full';
+      popupRef.current.style.transform = isFullScreenMobile
+        ? 'translateY(100%)'
+        : 'translate(-50%, 100%)';
     }
     // Wait for animation to complete
     setTimeout(() => {
@@ -170,36 +176,43 @@ export default function BottomButtonsPopup({
   const positionClass = containerRelative ? 'absolute' : 'fixed';
   const backdropClass = containerRelative ? 'absolute' : 'fixed';
   const maxHeightValue = containerRelative 
-    ? (height === 'full' ? '90%' : '80vh')
+    ? (height === 'full' ? '100%' : '80vh')
     : (height === 'full' ? '90vh' : '50vh');
   const heightValue = containerRelative 
-    ? (height === 'full' ? '90%' : 'auto')
+    ? (height === 'full' ? '100%' : 'auto')
     : (height === 'full' ? '90vh' : 'auto');
-  // On mobile, always use 90% width regardless of containerRelative
-  const widthValue = containerRelative ? '90%' : '90%';
-  const maxWidthValue = containerRelative ? '90%' : '600px';
+  
+  // When containerRelative and full height, use 100% height and width
+  const isFullScreenMobile = containerRelative && height === 'full';
+  const constrainedMaxHeight = isFullScreenMobile
+    ? '100%' // Full height
+    : maxHeightValue;
+  // On mobile with full height, use 100% width; otherwise 90%
+  // Always use 100% width when height is 'full' for consistent mobile experience
+  const widthValue = height === 'full' ? '100%' : (isFullScreenMobile ? '100%' : (containerRelative ? '90%' : '90%'));
+  const maxWidthValue = height === 'full' ? '100%' : (isFullScreenMobile ? '100%' : (containerRelative ? '90%' : '600px'));
 
   return (
     <>
       {/* Backdrop - transparent overlay that closes popup on click */}
       <div
-        className={`${backdropClass} inset-0 z-[59] bg-black/20 transition-opacity duration-300`}
+        className={`${backdropClass} inset-0 z-[9998] bg-black/20 transition-opacity duration-300 pointer-events-auto`}
         onClick={handleClose}
       />
       
       {/* Popup */}
       <div
         ref={popupRef}
-        className={`${positionClass} z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
-          bottom-0 left-1/2 -translate-x-1/2
-          rounded-t-3xl ${
+        className={`${positionClass} z-[9999] shadow-2xl transition-all duration-300 ease-out flex flex-col pointer-events-auto
+          ${isFullScreenMobile ? 'inset-0' : 'bottom-0 left-1/2 -translate-x-1/2'}
+          ${isFullScreenMobile ? 'rounded-none' : 'rounded-t-3xl'} ${
             darkMode 
               ? 'bg-black' 
               : 'bg-white'
           }`}
         style={{
-          transform: 'translate(-50%, 100%)',
-          maxHeight: maxHeightValue,
+          transform: isFullScreenMobile ? 'translateY(100%)' : 'translate(-50%, 100%)',
+          maxHeight: constrainedMaxHeight,
           height: heightValue,
           maxWidth: maxWidthValue,
           width: widthValue,

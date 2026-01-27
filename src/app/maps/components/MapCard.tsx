@@ -4,39 +4,30 @@ import { useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { EyeIcon, LockClosedIcon, ClockIcon, GlobeAltIcon, LinkIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, UsersIcon, GlobeAltIcon, LockClosedIcon, StarIcon, ShieldCheckIcon, PencilIcon } from '@heroicons/react/24/outline';
 import { MAP_CONFIG } from '@/features/map/config';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from '../types';
 
 interface MapCardProps {
   map: MapItem;
   account: { plan?: string | null; id?: string } | null;
-  isFeatured?: boolean;
-  isSmall?: boolean;
-  showVisibility?: boolean;
-  fullWidth?: boolean;
-  isPrimary?: boolean;
-  variant?: 'default' | 'primary' | 'compact';
   onClick?: () => void;
+  showRoleIcon?: boolean;
 }
 
 export default function MapCard({ 
   map, 
   account: userAccount, 
-  isFeatured = false, 
-  isSmall = false, 
-  showVisibility = false, 
-  fullWidth = false,
-  isPrimary = false,
-  variant = 'default',
-  onClick
+  onClick,
+  showRoleIcon = false
 }: MapCardProps) {
   const router = useRouter();
   const { openComingSoon } = useAppModalContextSafe();
-  
+
   if (!map) return null;
-  
+
   // Memoize canAccess to prevent recalculation
   const canAccess = useMemo(
     () => !map.requiresPro || userAccount?.plan === 'contributor' || userAccount?.plan === 'plus',
@@ -45,15 +36,14 @@ export default function MapCard({
 
   // Check if atlas map is coming soon
   const isComingSoon = useMemo(
-    () => map.map_type === 'atlas' && map.status === 'coming_soon',
-    [map.map_type, map.status]
+    () => (map as any).map_type === 'atlas' && map.status === 'coming_soon',
+    [(map as any).map_type, map.status]
   );
-  
-  // Generate map preview URL using Mapbox Static Images API
-  // Format: https://api.mapbox.com/styles/v1/mapbox/{style_id}/static/{lon},{lat},{zoom}/{width}x{height}@2x?access_token={token}
+
+  // Generate map preview URL using Mapbox Static Images API - larger size for card
   const previewUrl = useMemo(() => {
     // For atlas maps, use thumbnail if available
-    if (map.map_type === 'atlas' && map.thumbnail) {
+    if ((map as any).map_type === 'atlas' && map.thumbnail) {
       return map.thumbnail;
     }
     
@@ -73,24 +63,23 @@ export default function MapCard({
     const center = map.settings?.appearance?.meta?.center || MAP_CONFIG.DEFAULT_CENTER;
     const zoom = map.settings?.appearance?.meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM;
     const [lng, lat] = center;
-    const width = 300;
-    const height = 200;
+    const width = 400;
+    const height = 240;
     
     return `https://api.mapbox.com/styles/v1/mapbox/${styleId}/static/${lng},${lat},${zoom}/${width}x${height}@2x?access_token=${MAP_CONFIG.MAPBOX_TOKEN}`;
-  }, [map?.map_type, map?.thumbnail, map?.settings?.appearance?.map_style, map?.settings?.appearance?.meta?.center, map?.settings?.appearance?.meta?.zoom]);
-
-  // Truncate description to 120 characters
-  const truncatedDescription = useMemo(() => {
-    if (!map.description) return null;
-    if (map.description.length <= 120) return map.description;
-    return map.description.substring(0, 120).trim() + '...';
-  }, [map.description]);
+  }, [(map as any)?.map_type, map?.thumbnail, map?.settings?.appearance?.map_style, map?.settings?.appearance?.meta?.center, map?.settings?.appearance?.meta?.zoom]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
+    if (onClick) {
+      e.preventDefault();
+      onClick();
+      return;
+    }
+
     // For coming soon atlas maps, show coming soon modal
     if (isComingSoon) {
       e.preventDefault();
-      openComingSoon(map.name || map.title || 'Map');
+      openComingSoon(map.name);
       return;
     }
 
@@ -102,14 +91,14 @@ export default function MapCard({
     }
 
     // For user-generated maps, navigate to map page
-    if (map.map_type === 'user' && !map.href) {
+    if ((map as any).map_type === 'user' && !map.href) {
       e.preventDefault();
-      router.push(`/map/${map.id}`);
+      router.push(getMapUrl(map));
       return;
     }
 
     // For atlas maps, navigate to atlas map page
-    if (map.map_type === 'atlas' && map.href) {
+    if ((map as any).map_type === 'atlas' && map.href) {
       e.preventDefault();
       router.push(map.href);
       return;
@@ -119,199 +108,103 @@ export default function MapCard({
     if (map.href && canAccess) {
       return; // Let Link handle navigation
     }
-  }, [isComingSoon, map.name, map.title, map.requiresPro, map.map_type, map.href, map.id, canAccess, openComingSoon, router]);
-
-  // Determine variant based on props
-  const cardVariant = variant === 'primary' || isPrimary ? 'primary' : variant === 'compact' ? 'compact' : 'default';
-  const isPrimaryCard = cardVariant === 'primary';
-  const isCompactCard = cardVariant === 'compact';
-
-  // Removed - using aspect ratio instead for better responsive behavior
+  }, [isComingSoon, map.name, map.requiresPro, (map as any).map_type, map.href, map.id, canAccess, openComingSoon, router, onClick]);
 
   const content = (
     <div 
-      className={`bg-white border rounded-lg overflow-hidden transition-all cursor-pointer flex flex-col w-full h-full min-h-0 ${
-        isPrimaryCard 
-          ? 'border border-gray-200 shadow-md hover:shadow-lg hover:border-gray-300' 
-          : 'border border-gray-200 hover:border-gray-300'
-      } ${
-        canAccess && !isComingSoon 
-          ? 'hover:bg-gray-50' 
-          : 'opacity-75'
-      }`}
-      onClick={(e) => {
-        if (onClick) {
-          e.preventDefault();
-          onClick();
-        } else {
-          handleClick(e);
-        }
-      }}
+      className="bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors cursor-pointer group overflow-hidden relative"
+      onClick={handleClick}
     >
-      {/* Map Preview - Fixed aspect ratio for consistent sizing */}
-      {previewUrl && (
-        <div className="w-full bg-white flex-shrink-0 p-1">
-          <div className="w-full aspect-[4/3] bg-gray-100 relative overflow-hidden rounded-md border border-gray-200">
-            {map.map_type === 'atlas' && map.thumbnail ? (
-              // For atlas maps with thumbnail, use the icon directly
-              <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                <Image
-                  src={previewUrl}
-                  alt={map.name || map.title || 'Map preview'}
-                  width={48}
-                  height={48}
-                  className="object-contain"
-                  unoptimized
-                />
-              </div>
-            ) : (
+      {/* Large Map Preview Area - Full Card Height */}
+      <div className="w-full h-48 bg-gray-100 relative overflow-hidden">
+        {previewUrl ? (
+          (map as any).map_type === 'atlas' && map.thumbnail ? (
+            <div className="w-full h-full flex items-center justify-center bg-gray-50">
               <Image
-                src={previewUrl || ''}
-                alt={map.name || map.title || 'Map preview'}
-                fill
-                className="object-cover rounded-md"
+                src={previewUrl}
+                alt={map.name}
+                width={400}
+                height={240}
+                className="object-contain"
                 unoptimized
               />
-            )}
-            {/* Contributor Locked Overlay - Only for professional maps without access */}
-            {map.requiresPro && !canAccess && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-md">
-                <div className="flex flex-col items-center gap-1">
-                  <LockClosedIcon className="w-5 h-5 text-white" />
-                  <span className="text-[9px] font-medium text-white">Contributor</span>
-                </div>
-              </div>
-            )}
-            {/* Coming Soon Overlay - For atlas maps with coming_soon status */}
-            {isComingSoon && (
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-md">
-                <div className="flex flex-col items-center gap-1">
-                  <ClockIcon className="w-5 h-5 text-white" />
-                  <span className="text-[9px] font-medium text-white">Coming Soon</span>
-                </div>
-              </div>
-            )}
-            {/* Featured Badge - Top left for featured maps */}
-            {(isPrimaryCard || map.settings?.presentation?.is_featured) && (() => {
-              const isLiveMap = map.name?.toLowerCase() === 'live';
-              
-              if (isLiveMap) {
-                return (
-                  <div className="absolute top-2 left-2 px-2 py-1 bg-white text-black rounded-md flex items-center gap-1.5 z-10 border border-gray-200 shadow-sm">
-                    {/* Red flashing indicator */}
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-[10px] font-bold">LIVE</span>
-                  </div>
-                );
-              }
-              
-              return (
-                <div className="absolute top-2 left-2 px-2 py-1 bg-indigo-600 text-white rounded-md flex items-center gap-1 z-10">
-                  <span className="text-[10px] font-bold">FEATURED</span>
-                </div>
-              );
-            })()}
-            {/* Owner Badge - Floating label in top left (or top right if primary) */}
-            {map.account && !map.settings?.presentation?.hide_creator && (
-              <div className={`absolute ${isPrimaryCard ? 'top-2 right-2' : 'top-1 left-1'} px-1.5 py-0.5 bg-black/70 backdrop-blur-sm rounded flex items-center gap-1 ${isPrimaryCard ? 'z-10' : ''}`}>
-                {map.account.image_url ? (
-                  <div className="w-3 h-3 rounded-full overflow-hidden flex-shrink-0 border border-white/20">
-                    <Image
-                      src={map.account.image_url}
-                      alt={map.account.username || 'User'}
-                      width={12}
-                      height={12}
-                      className="w-full h-full object-cover"
-                      unoptimized
-                    />
-                  </div>
-                ) : (
-                  <div className="w-3 h-3 rounded-full bg-gray-400 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[6px] text-white font-medium">
-                      {(map.account.first_name?.[0] || map.account.username?.[0] || 'U').toUpperCase()}
-                    </span>
-                  </div>
-                )}
-                <span className="text-[9px] font-medium text-white">
-                  {map.account.username || 
-                   (map.account.first_name && map.account.last_name 
-                     ? `${map.account.first_name} ${map.account.last_name}`.trim()
-                     : map.account.first_name || 'User')}
-                </span>
-              </div>
-            )}
-            {/* Visibility Badge - Floating label in bottom right */}
-            {map.visibility && (
-              <div className={`absolute bottom-1 right-1 px-1.5 py-0.5 backdrop-blur-sm rounded flex items-center gap-1 ${
-                map.visibility === 'public' 
-                  ? 'bg-lime-500/90' 
-                  : 'bg-black/70'
-              }`}>
-                {map.visibility === 'public' ? (
-                  <>
-                    <GlobeAltIcon className="w-2.5 h-2.5 text-white" />
-                    <span className="text-[9px] font-medium text-white">Public</span>
-                  </>
-                ) : map.visibility === 'private' ? (
-                  <>
-                    <LockClosedIcon className="w-2.5 h-2.5 text-white" />
-                    <span className="text-[9px] font-medium text-white">Private</span>
-                  </>
-                ) : (
-                  <>
-                    <LinkIcon className="w-2.5 h-2.5 text-white" />
-                    <span className="text-[9px] font-medium text-white">Shared</span>
-                  </>
-                )}
-              </div>
-            )}
+            </div>
+          ) : (
+            <Image
+              src={previewUrl}
+              alt={map.name}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          )
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-2xl text-gray-400">🗺️</span>
           </div>
-        </div>
-      )}
-      
-      {/* Content with responsive padding - flex to fill */}
-      <div className="p-2 flex-1 flex flex-col min-h-0 justify-between">
-        {/* Top Section */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          {/* Title */}
-          <h3 className="text-xs font-semibold text-gray-900 mb-0.5 line-clamp-1">
-            {map.name || map.title}
-          </h3>
+        )}
+        
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />
+        
+        {/* Overlay badges - Left side */}
+        <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
+          {/* Visibility Icon */}
+          {map.visibility && (
+            <div className="bg-white/90 backdrop-blur-sm rounded-md p-1" title={map.visibility === 'public' ? 'Public map' : 'Private map'}>
+              {map.visibility === 'public' ? (
+                <GlobeAltIcon className="w-3 h-3 text-gray-600" />
+              ) : (
+                <LockClosedIcon className="w-3 h-3 text-gray-600" />
+              )}
+            </div>
+          )}
           
-          {/* Description - Truncated to 120 characters */}
-          {truncatedDescription && (
-            <p className="text-xs text-gray-600 mb-1 line-clamp-2 flex-shrink-0">
-              {truncatedDescription}
-            </p>
+          {/* Role Icon (for My Maps view) */}
+          {showRoleIcon && map.current_user_role && (
+            <div className="bg-white/90 backdrop-blur-sm rounded-md p-1" title={`You are ${map.current_user_role}`}>
+              {map.current_user_role === 'owner' ? (
+                <StarIcon className="w-3 h-3 text-amber-500" />
+              ) : map.current_user_role === 'manager' ? (
+                <ShieldCheckIcon className="w-3 h-3 text-blue-500" />
+              ) : (
+                <PencilIcon className="w-3 h-3 text-gray-500" />
+              )}
+            </div>
           )}
         </div>
-        
-        {/* Bottom Section - Collection Type, Subscription, Views */}
-        <div className="pt-1 border-t border-gray-200 space-y-1 flex-shrink-0">
-          {/* Collection Type and Subscription Level */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Collection Type Badge */}
-            {map.collection_type && map.collection_type !== 'community' && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-gray-100 text-gray-700 border border-gray-200">
-                {map.collection_type === 'professional' ? 'Professional' : 
-                 map.collection_type === 'gov' ? 'Government' : 
-                 map.collection_type === 'atlas' ? 'Atlas' : 
-                 map.collection_type === 'user' ? 'User' : map.collection_type}
+
+        {/* Role Label - Top Right */}
+        {map.current_user_role && (
+          <div className="absolute top-2 right-2 z-10">
+            <div className="bg-white/90 backdrop-blur-sm rounded-md px-1.5 py-0.5 flex items-center justify-center">
+              <span className="text-[10px] font-medium text-gray-700 capitalize text-center">
+                {map.current_user_role}
               </span>
-            )}
-            {/* Subscription Level Badge */}
-            {map.requiresPro && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
-                Contributor
-              </span>
-            )}
+            </div>
           </div>
+        )}
+
+        {/* Info Section - Overlaid at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-[10px] space-y-1.5 z-10">
+          {/* Map Name */}
+          <h3 className="text-xs font-semibold text-white line-clamp-1 drop-shadow-sm">
+            {map.name}
+          </h3>
+
+          {/* Map Description */}
+          {map.description && (
+            <p className="text-xs text-white/90 line-clamp-1 drop-shadow-sm">
+              {map.description}
+            </p>
+          )}
+
           {/* Stats Row */}
-          <div className="flex items-center gap-3 text-[10px] text-gray-500">
+          <div className="flex items-center gap-3 text-[10px] text-white/80">
             {map.member_count !== undefined && (
               <div className="flex items-center gap-1">
-                <span className="font-medium text-gray-900">{map.member_count}</span>
-                <span>members</span>
+                <UsersIcon className="w-3 h-3" />
+                <span>{map.member_count}</span>
               </div>
             )}
             {map.view_count !== undefined && (
@@ -321,38 +214,19 @@ export default function MapCard({
               </div>
             )}
           </div>
-          {/* Role Badge (for My Maps) */}
-          {map.current_user_role && (
-            <div className="mt-1">
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200 capitalize">
-                {map.current_user_role}
-              </span>
-            </div>
-          )}
         </div>
       </div>
     </div>
   );
 
   // Wrap in Link only if it has href and can access (for community/professional maps)
-  // Atlas maps handle navigation in onClick handler
-  // All cards same size regardless of variant - use fullWidth for grid layouts
-  const containerClass = fullWidth
-    ? 'w-full h-full' // Full width in grid, stretch to fill row
-    : isSmall
-    ? 'w-full lg:max-w-[120px] lg:flex-shrink-0'
-    : 'w-full sm:max-w-[180px] md:max-w-[200px] lg:max-w-[220px] lg:flex-shrink-0'; // Fixed width for non-grid layouts
-
-  if (map.href && canAccess && map.map_type !== 'atlas') {
+  if (map.href && canAccess && (map as any).map_type !== 'atlas' && !onClick) {
     return (
-      <Link href={map.href} className={`block ${containerClass}`}>
+      <Link href={map.href} className="block">
         {content}
       </Link>
     );
   }
 
-  return (
-    <div className={containerClass}>{content}</div>
-  );
+  return content;
 }
-

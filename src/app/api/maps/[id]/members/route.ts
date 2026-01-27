@@ -6,6 +6,8 @@ import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validatePathParams, validateRequestBody } from '@/lib/security/validation';
 import { z } from 'zod';
 import { commonSchemas } from '@/lib/security/validation';
+import { getEffectiveMemberLimit } from '@/lib/maps/memberLimits';
+import type { MapSettings } from '@/types/map';
 
 /**
  * GET /api/maps/[id]/members
@@ -186,7 +188,7 @@ export async function POST(
         let mapId: string;
         let mapQuery = supabase
           .from('map')
-          .select('id, account_id');
+          .select('id, account_id, settings, member_count');
         
         if (isUUID(identifier)) {
           mapQuery = mapQuery.eq('id', identifier);
@@ -199,7 +201,12 @@ export async function POST(
           return createErrorResponse('Map not found', 404);
         }
 
-        const mapData = map as { account_id: string; id: string };
+        const mapData = map as { 
+          account_id: string; 
+          id: string;
+          settings: MapSettings;
+          member_count: number;
+        };
         mapId = mapData.id;
 
         // Check if user is owner or manager
@@ -240,6 +247,20 @@ export async function POST(
 
         if (existingMember) {
           return createErrorResponse('User is already a member of this map', 409);
+        }
+
+        // Check member limit before adding
+        const limitCheck = await getEffectiveMemberLimit(
+          mapData.account_id,
+          mapData.settings,
+          mapData.member_count
+        );
+
+        if (!limitCheck.canAddMember) {
+          return createErrorResponse(
+            limitCheck.reason || 'Map has reached the maximum member limit',
+            403
+          );
         }
 
         // Add member

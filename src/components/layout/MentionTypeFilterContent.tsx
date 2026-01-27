@@ -74,13 +74,13 @@ export default function MentionTypeFilterContent({ onClose, showHeader = false }
     }
   }, [mentionTypes, searchParams]);
 
-  // Handle type selection - navigate to /add page with mention_type
+  // Handle type selection - navigate to live map with contribute overlay
   const handleTypeSelect = (typeId: string) => {
     const selectedType = mentionTypes.find(t => t.id === typeId);
     if (selectedType) {
       const params = new URLSearchParams();
       params.set('mention_type_id', typeId);
-      router.push(`/add?${params.toString()}`);
+      router.push(`/map/live?${params.toString()}#contribute`);
       if (onClose) {
         onClose();
       }

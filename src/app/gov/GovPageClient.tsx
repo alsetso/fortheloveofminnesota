@@ -244,7 +244,6 @@ export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
                           key={map.id} 
                           map={map} 
                           account={account}
-                          fullWidth={true}
                         />
                       ))}
                     </div>

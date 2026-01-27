@@ -90,7 +90,7 @@ export default function PageWrapper({
   const isMapsPage = pathname === '/maps' || pathname === '/map';
   
   // Extract map ID/slug from pathname
-  const mapIdOrSlug = isMapPage ? pathname.replace('/map/', '') : null;
+  const mapIdOrSlug = isMapPage ? pathname.replace('/map/', '').split('/')[0] : null;
   
   // Fetch map info when on a custom map page
   const [mapInfo, setMapInfo] = useState<{ 
@@ -280,14 +280,46 @@ export default function PageWrapper({
   }, [pathname]);
 
   // Memoize navItems to prevent recreation on every render
-  const navItems = useMemo(() => [
-    { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
-    { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
-    { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
-    { label: 'Add', href: '/add', icon: PlusIcon, iconSolid: PlusIconSolid },
-    { label: 'Plans', href: '/plans', icon: CreditCardIcon, iconSolid: CreditCardIconSolid },
-    { label: 'More', href: null, icon: Bars3Icon, iconSolid: Bars3IconSolid, isButton: true },
-  ], []);
+  // Only show "Add" button on map pages
+  const navItems = useMemo(() => {
+    const items: Array<{
+      label: string;
+      href: string | null;
+      icon: typeof HomeIcon;
+      iconSolid: typeof HomeIconSolid;
+      onClick?: (e: React.MouseEvent) => void;
+      isButton?: boolean;
+    }> = [
+      { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
+      { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
+      { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
+    ];
+    
+    // Only add the "Add" button when on a map page
+    // Use hash parameter to show contribute overlay (no page refresh)
+    if (isMapPage && mapIdOrSlug) {
+      items.push({ 
+        label: 'Add', 
+        href: `#contribute`, 
+        icon: PlusIcon, 
+        iconSolid: PlusIconSolid,
+        onClick: (e: React.MouseEvent) => {
+          e.preventDefault();
+          if (typeof window !== 'undefined') {
+            window.location.hash = 'contribute';
+            window.dispatchEvent(new HashChangeEvent('hashchange'));
+          }
+        }
+      });
+    }
+    
+    items.push(
+      { label: 'Plans', href: '/plans', icon: CreditCardIcon, iconSolid: CreditCardIconSolid },
+      { label: 'More', href: null, icon: Bars3Icon, iconSolid: Bars3IconSolid, isButton: true }
+    );
+    
+    return items;
+  }, [isMapPage, mapIdOrSlug]);
 
   // Set mounted flag on client side only
   useEffect(() => {
@@ -438,69 +470,79 @@ export default function PageWrapper({
             </div>
             
             {/* 2nd Column: Nav Icons or Mention Type Filters (Aligns with center feed, max-width 800px) */}
-            {isMapPage ? (
-              <div className="hidden lg:flex lg:col-span-6 justify-center items-center px-4">
-                <div className="flex flex-wrap items-center gap-2 justify-center">
-                  {/* Mention Type Filters - Only show when type parameters exist */}
-                  {selectedMentionTypes.length > 0 && (
-                    <>
-                      {selectedMentionTypes.map((type) => (
-                        <div
-                          key={type.id}
-                          className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white/10 border-white/30 text-white"
-                        >
-                          <span className="text-base flex-shrink-0">{type.emoji}</span>
-                          <span className="font-medium leading-none">{type.name}</span>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleRemoveType(type.slug);
-                            }}
-                            className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-white"
-                            aria-label={`Remove ${type.name} filter`}
-                          >
-                            <XCircleIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="hidden lg:flex lg:col-span-6 justify-center px-4">
-                <div className="flex items-center justify-around w-full max-w-[800px]">
-                  {navItems.map((item) => {
-                    // Home is active on both '/' and '/feed' routes
-                    const isActive = item.href === '/' 
-                      ? (pathname === '/' || pathname === '/feed')
-                      : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
-                    const Icon = isActive ? item.iconSolid : item.icon;
-                    
-                    // Handle button type (e.g., "More" hamburger menu)
-                    if (item.isButton) {
-                      return (
-                        <button
-                          key={item.label}
-                          onClick={() => setIsMenuOpen(true)}
-                          className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
-                        >
-                          <Icon className="w-5 h-5 text-white/50" />
-                        </button>
-                      );
-                    }
-                    
+            <div className="hidden lg:flex lg:col-span-6 justify-center px-4">
+              <div className="flex items-center justify-around w-full max-w-[800px]">
+                {/* Show nav icons on all pages, including map pages */}
+                {navItems.map((item) => {
+                  // Hash-based items (like #contribute) are active when hash matches
+                  const isActive = item.href?.startsWith('#')
+                    ? (typeof window !== 'undefined' && window.location.hash === item.href)
+                    : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
+                  const Icon = isActive ? item.iconSolid : item.icon;
+                  
+                  // Handle button type (e.g., "More" hamburger menu)
+                  if (item.isButton || !item.href) {
                     return (
-                      <Link
+                      <button
                         key={item.label}
-                        href={item.href!}
+                        onClick={() => setIsMenuOpen(true)}
+                        className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
+                      >
+                        <Icon className="w-5 h-5 text-white/50" />
+                      </button>
+                    );
+                  }
+                  
+                  // Handle items with onClick (e.g., hash-based navigation)
+                  if ((item as any).onClick) {
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={(item as any).onClick}
                         className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
                       >
                         <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/50'}`} />
-                      </Link>
+                      </button>
                     );
-                  })}
+                  }
+                  
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href!}
+                      className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
+                    >
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/50'}`} />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {/* Mention Type Filters - Show below nav icons on map pages when types are selected */}
+            {isMapPage && selectedMentionTypes.length > 0 && (
+              <div className="hidden lg:flex lg:col-span-12 justify-center items-center px-4 pt-2">
+                <div className="flex flex-wrap items-center gap-2 justify-center">
+                  {selectedMentionTypes.map((type) => (
+                    <div
+                      key={type.id}
+                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white/10 border-white/30 text-white"
+                    >
+                      <span className="text-base flex-shrink-0">{type.emoji}</span>
+                      <span className="font-medium leading-none">{type.name}</span>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRemoveType(type.slug);
+                        }}
+                        className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-white"
+                        aria-label={`Remove ${type.name} filter`}
+                      >
+                        <XCircleIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -673,10 +715,7 @@ export default function PageWrapper({
             ) : (
               <div className="flex items-center justify-around">
                 {navItems.map((item) => {
-                  // Home is active on both '/' and '/feed' routes
-                  const isActive = item.href === '/' 
-                    ? (pathname === '/' || pathname === '/feed')
-                    : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
+                  const isActive = item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href)));
                   const Icon = isActive ? item.iconSolid : item.icon;
                   
                   // Handle button type (e.g., "More" hamburger menu)
@@ -688,6 +727,19 @@ export default function PageWrapper({
                         className="flex items-center justify-center flex-1 h-9 transition-colors hover:bg-white/10 rounded-xl"
                       >
                         <Icon className="w-5 h-5 text-white/60" />
+                      </button>
+                    );
+                  }
+                  
+                  // Handle items with onClick (e.g., hash-based navigation)
+                  if ((item as any).onClick) {
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={(item as any).onClick}
+                        className="flex items-center justify-center flex-1 h-9 transition-colors hover:bg-white/10 rounded-xl"
+                      >
+                        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/60'}`} />
                       </button>
                     );
                   }

@@ -241,7 +241,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                   </Link>
                   {mention.accounts?.username && mention.accounts?.account_taggable && (
                     <Link
-                      href={`/add?username=${encodeURIComponent(mention.accounts.username)}`}
+                      href={`/map/live?username=${encodeURIComponent(mention.accounts.username)}#contribute`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuthStateSafe, Account } from '@/features/auth';
 import Link from 'next/link';
 import ProfilePhoto from '../shared/ProfilePhoto';
@@ -462,7 +463,8 @@ export default function CreatePostModal({
 
   if (!isOpen || !account) return null;
 
-  return (
+  // Portal modal to document body to ensure it overlays entire map container
+  const modalContent = (
     <>
       {/* Backdrop */}
       <div
@@ -1358,4 +1360,11 @@ export default function CreatePostModal({
       </div>
     </>
   );
+
+  // Use portal to render at document body level
+  if (typeof window !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }

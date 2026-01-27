@@ -70,10 +70,30 @@ export async function GET(
           mapId = (map as any).id;
         }
 
-        // Fetch pin (RLS will filter based on permissions)
+        // Fetch pin with related data (RLS will filter based on permissions)
         const { data: pin, error } = await supabase
           .from('map_pins')
-          .select('*')
+          .select(`
+            *,
+            account:accounts!map_pins_account_id_fkey(
+              id,
+              username,
+              first_name,
+              last_name,
+              image_url,
+              plan
+            ),
+            collection:collections(
+              id,
+              emoji,
+              title
+            ),
+            mention_type:mention_types(
+              id,
+              emoji,
+              name
+            )
+          `)
           .eq('id', validatedPinId)
           .eq('map_id', mapId)
           .single();

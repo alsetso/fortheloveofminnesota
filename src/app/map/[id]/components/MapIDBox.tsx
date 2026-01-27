@@ -1,27 +1,24 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, EyeIcon, Cog6ToothIcon, MapPinIcon, PencilSquareIcon, InformationCircleIcon, XMarkIcon, ChevronDownIcon, ChevronUpIcon, UserPlusIcon, GlobeAltIcon, LockClosedIcon, Square3Stack3DIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { useMapboxMap } from '../hooks/useMapboxMap';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import MapPinForm from './MapPinForm';
 import MapAreaDrawModal from './MapAreaDrawModal';
 import MapIDDetails from './MapIDDetails';
-import MapEntitySlideUp from './MapEntitySlideUp';
+import CollaborationToolsNav from './CollaborationToolsNav';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToastContext } from '@/features/ui/contexts/ToastContext';
 import { createToast } from '@/features/ui/services/toast';
 import { isMapSetupComplete } from '@/lib/maps/mapSetupCheck';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import CongressionalDistrictsLayer from '@/features/map/components/CongressionalDistrictsLayer';
-import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
-import StateBoundaryLayer from '@/features/map/components/StateBoundaryLayer';
-import CountyBoundariesLayer from '@/features/map/components/CountyBoundariesLayer';
+import BoundaryLayersManager from './BoundaryLayersManager';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
+import { useUnifiedMapClickHandler } from '../hooks/useUnifiedMapClickHandler';
 
 interface MapIDBoxProps {
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
@@ -70,6 +67,37 @@ interface MapIDBoxProps {
   membership_rules?: string | null;
   isMember?: boolean;
   onJoinClick?: () => void;
+  activeSidebar?: string | null;
+  mapSettings?: {
+    collaboration?: {
+      allow_pins?: boolean;
+      allow_areas?: boolean;
+      allow_posts?: boolean;
+      allow_clicks?: boolean;
+      pin_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+      area_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+      post_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+      click_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+      role_overrides?: {
+        managers_can_edit?: boolean;
+        editors_can_edit?: boolean;
+      };
+    };
+  } | null;
+  userRole?: 'owner' | 'manager' | 'editor' | null;
+  checkPermission?: (action: 'pins' | 'areas' | 'posts' | 'clicks') => boolean | undefined;
+  mapData?: {
+    id: string;
+    account_id: string;
+    settings?: {
+      collaboration?: {
+        allow_clicks?: boolean;
+        allow_pins?: boolean;
+        allow_areas?: boolean;
+      };
+    };
+  } | null;
+  onLocationPopupChange?: (popup: { isOpen: boolean; lat: number; lng: number; address: string | null; mapMeta: Record<string, any> | null }) => void;
 }
 
 interface MapPin {
@@ -150,15 +178,20 @@ export default function MapIDBox({
   membership_rules = null,
   isMember = false,
   onJoinClick,
+  activeSidebar = null,
+  mapSettings = null,
+  userRole = null,
+  checkPermission,
+  mapData,
+  onLocationPopupChange,
 }: MapIDBoxProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const mapContainer = useRef<HTMLDivElement>(null);
   const { account: currentAccount, activeAccountId } = useAuthStateSafe();
   const { openAccount, openWelcome } = useAppModalContextSafe();
   const { addToast } = useToastContext();
   const [pinMode, setPinMode] = useState(false);
   const [showAreaDrawModal, setShowAreaDrawModal] = useState(false);
+  const [activeTool, setActiveTool] = useState<'click' | 'pin' | 'draw' | null>(null);
   
   // Permission check handlers for pin/area actions
   const handlePinModeToggle = useCallback(() => {
@@ -180,12 +213,39 @@ export default function MapIDBox({
     }
     setShowAreaDrawModal(true);
   }, [onAreaActionCheck]);
+
+  // Handle collaboration tool selection
+  const handleToolSelect = useCallback((tool: 'click' | 'pin' | 'draw') => {
+    setActiveTool(tool);
+    
+    if (tool === 'pin') {
+      handlePinModeToggle();
+    } else if (tool === 'draw') {
+      handleAreaDrawToggle();
+    } else if (tool === 'click') {
+      // Default click mode - disable pin mode and close draw modal
+      setPinMode(false);
+      setShowAreaDrawModal(false);
+    }
+  }, [handlePinModeToggle, handleAreaDrawToggle]);
+
+  // Update active tool based on current state
+  useEffect(() => {
+    if (showAreaDrawModal) {
+      setActiveTool('draw');
+    } else if (pinMode) {
+      setActiveTool('pin');
+    } else {
+      setActiveTool('click');
+    }
+  }, [pinMode, showAreaDrawModal]);
   
   // Expose handlers for MapInfoCard (if used elsewhere)
   // These will be called when pin/draw buttons are clicked
   const handlePinClick = handlePinModeToggle;
   const handleDrawClick = handleAreaDrawToggle;
   const [showInfoModal, setShowInfoModal] = useState(false);
+  // Keep selectedEntity for layer clicks (not migrated to sidebar yet)
   const [selectedEntity, setSelectedEntity] = useState<MapPin | MapArea | MapLayerPolygonEntity | null>(null);
   const [selectedEntityType, setSelectedEntityType] = useState<'pin' | 'area' | 'layer' | null>(null);
   const [loadingEntity, setLoadingEntity] = useState(false);
@@ -200,6 +260,176 @@ export default function MapIDBox({
   const [showPinForm, setShowPinForm] = useState(false);
   const [pinFormCoords, setPinFormCoords] = useState<{ lat: number; lng: number } | null>(null);
   const clickHandlerAddedRef = useRef(false);
+
+  // Create checkPermission wrapper if not provided
+  const checkPermissionWrapper = useCallback((action: 'pins' | 'areas' | 'posts' | 'clicks') => {
+    if (checkPermission) {
+      return checkPermission(action);
+    }
+    // Fallback: check based on onPinActionCheck/onAreaActionCheck
+    if (action === 'pins' && onPinActionCheck) {
+      return onPinActionCheck();
+    }
+    if (action === 'areas' && onAreaActionCheck) {
+      return onAreaActionCheck();
+    }
+    return undefined;
+  }, [checkPermission, onPinActionCheck, onAreaActionCheck]);
+
+  // Use unified click handler - expose location popup state
+  // Only pass mapData if it's a full MapData object (has all required fields)
+  const fullMapData = mapData && 'name' in mapData && 'slug' in mapData ? mapData as any : null;
+  const { locationSelectPopup: unifiedLocationPopup, closePopup: closeUnifiedPopup, popupAddress } = useUnifiedMapClickHandler({
+    map: mapInstance,
+    mapLoaded,
+    mapData: fullMapData,
+    account: (currentAccount ? {
+      id: currentAccount.id,
+      plan: currentAccount.plan || null,
+      subscription_status: currentAccount.subscription_status || null,
+    } : null) || (account ? {
+      id: account.id,
+      plan: null,
+      subscription_status: null,
+    } : null),
+    isOwner,
+    userRole: userRole || null,
+    checkPermission: checkPermissionWrapper,
+    pinMode,
+    showAreaDrawModal,
+    onPinClick: async (pinId) => {
+      // Fetch pin data and dispatch event
+      setLoadingEntity(true);
+      try {
+        const response = await fetch(`/api/maps/${mapId}/pins/${pinId}`);
+        if (response.ok) {
+          const pinData = await response.json();
+          window.dispatchEvent(new CustomEvent('entity-click', {
+            detail: { entity: pinData, type: 'pin' }
+          }));
+        } else {
+          console.error('Failed to fetch pin:', response.statusText);
+        }
+      } catch (err) {
+        console.error('Error fetching pin:', err);
+      } finally {
+        setLoadingEntity(false);
+      }
+    },
+    onAreaClick: async (areaId) => {
+      // Fetch area data and dispatch event
+      setLoadingEntity(true);
+      try {
+        const response = await fetch(`/api/maps/${mapId}/areas/${areaId}`);
+        if (response.ok) {
+          const areaData = await response.json();
+          window.dispatchEvent(new CustomEvent('entity-click', {
+            detail: { entity: areaData, type: 'area' }
+          }));
+        } else {
+          console.error('Failed to fetch area:', response.statusText);
+        }
+      } catch (err) {
+        console.error('Error fetching area:', err);
+      } finally {
+        setLoadingEntity(false);
+      }
+    },
+    onMentionClick: async (mentionId) => {
+      // Fetch mention data and dispatch event (MentionsLayer normally does this, but unified handler takes priority)
+      setLoadingEntity(true);
+      try {
+        // Try to get from MentionsLayer's cache first, then fetch if needed
+        const response = await fetch(`/api/maps/${mapId}/pins/${mentionId}`);
+        if (response.ok) {
+          const mentionData = await response.json();
+          window.dispatchEvent(new CustomEvent('mention-click', {
+            detail: { 
+              mention: mentionData,
+              address: mentionData.full_address || null
+            }
+          }));
+        } else {
+          console.error('Failed to fetch mention:', response.statusText);
+        }
+      } catch (err) {
+        console.error('Error fetching mention:', err);
+      } finally {
+        setLoadingEntity(false);
+      }
+    },
+    onMapClick: async (coordinates, mapMeta) => {
+      // Handle pin creation when in pin mode
+      if (!pinMode || showAreaDrawModal) return;
+      
+      const canAddPins = isOwner || (visibility === 'public' && allowOthersToPostPins);
+      if (!canAddPins) return;
+      
+      // Additional permission check
+      if (onPinActionCheck) {
+        const allowed = onPinActionCheck();
+        if (allowed === false) {
+          setPinMode(false);
+          return;
+        }
+      }
+
+      const { lat, lng } = coordinates;
+      
+      // Auto-create pin for owners (no form)
+      try {
+        const response = await fetch(`/api/maps/${mapId}/pins`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            emoji: null,
+            caption: null,
+            image_url: null,
+            video_url: null,
+            lat,
+            lng,
+          }),
+        });
+
+        if (response.ok) {
+          // Refresh pins list
+          const refreshResponse = await fetch(`/api/maps/${mapId}/pins`);
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            setPins(refreshData.pins || []);
+          }
+          setPinMode(false); // Exit pin mode after creating
+        } else {
+          // Handle permission errors
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 403 && errorData.reason === 'plan_required') {
+            window.dispatchEvent(new CustomEvent('map-action-permission-denied', {
+              detail: {
+                action: 'pins',
+                requiredPlan: errorData.requiredPlan,
+                currentPlan: errorData.currentPlan,
+              }
+            }));
+            setPinMode(false);
+          }
+        }
+      } catch (err) {
+        console.error('Error creating pin:', err);
+      }
+    },
+  });
+
+  // Expose location popup state to parent
+  useEffect(() => {
+    if (onLocationPopupChange) {
+      onLocationPopupChange({
+        ...unifiedLocationPopup,
+        address: popupAddress || unifiedLocationPopup.address,
+      });
+    }
+  }, [unifiedLocationPopup, popupAddress, onLocationPopupChange]);
   const hiddenLayersRef = useRef<Map<string, 'visible' | 'none' | undefined>>(new Map());
 
   // Use active account ID from dropdown
@@ -633,46 +863,6 @@ export default function MapIDBox({
     fetchData();
   }, [mapLoaded, mapId, initialPins.length, initialAreas.length]);
 
-  // Load entity from URL parameters
-  useEffect(() => {
-    if (!mapLoaded || !mapId || pins.length === 0 && areas.length === 0) return;
-
-    const entityType = searchParams.get('entity');
-    const entityId = searchParams.get('entityId');
-
-    if (!entityType || !entityId) return;
-
-    const loadEntity = async () => {
-      setLoadingEntity(true);
-      try {
-        if (entityType === 'pin') {
-          const response = await fetch(`/api/maps/${mapId}/pins/${entityId}`);
-          if (response.ok) {
-            const pinData = await response.json();
-            setSelectedEntity(pinData);
-            setSelectedEntityType('pin');
-          }
-        } else if (entityType === 'area') {
-          const response = await fetch(`/api/maps/${mapId}/areas/${entityId}`);
-          if (response.ok) {
-            const areaData = await response.json();
-            setSelectedEntity(areaData);
-            setSelectedEntityType('area');
-          }
-        } else if (entityType === 'layer') {
-          // For layers, we need to find it from the map click handler
-          // This would need to be handled differently as layers come from mapbox features
-        }
-      } catch (err) {
-        console.error('Error loading entity from URL:', err);
-      } finally {
-        setLoadingEntity(false);
-      }
-    };
-
-    loadEntity();
-  }, [mapLoaded, mapId, searchParams, pins.length, areas.length]);
-
   // Add pins to map
   useEffect(() => {
     if (!mapLoaded || !mapInstance) return;
@@ -767,42 +957,12 @@ export default function MapIDBox({
     }
   }, [mapLoaded, mapInstance, pins]);
 
-  // Handle pin clicks
+  // Handle pin hover (cursor changes) - click handling moved to unified handler
   useEffect(() => {
     if (!mapLoaded || !mapInstance || pinMode || showAreaDrawModal) return;
 
     const mapboxMap = mapInstance as any;
     if (mapboxMap.removed) return;
-
-    const handlePinClick = async (e: any) => {
-      const features = mapboxMap.queryRenderedFeatures(e.point, {
-        layers: [PINS_LAYER_ID],
-      });
-
-      if (features.length === 0) return;
-
-      const feature = features[0];
-      const pinId = feature.properties?.id;
-
-      if (!pinId) return;
-
-      // Fetch pin data
-      setLoadingEntity(true);
-      try {
-        const response = await fetch(`/api/maps/${mapId}/pins/${pinId}`);
-        if (response.ok) {
-          const pinData = await response.json();
-          setSelectedEntity(pinData);
-          setSelectedEntityType('pin');
-        } else {
-          console.error('Failed to fetch pin:', response.statusText);
-        }
-      } catch (err) {
-        console.error('Error fetching pin:', err);
-      } finally {
-        setLoadingEntity(false);
-      }
-    };
 
     // Add hover cursor
     const handleMouseEnter = () => {
@@ -820,18 +980,16 @@ export default function MapIDBox({
       }
     };
 
-    mapboxMap.on('click', PINS_LAYER_ID, handlePinClick);
     mapboxMap.on('mouseenter', PINS_LAYER_ID, handleMouseEnter);
     mapboxMap.on('mouseleave', PINS_LAYER_ID, handleMouseLeave);
 
     return () => {
       if (mapboxMap && !mapboxMap.removed) {
-        mapboxMap.off('click', PINS_LAYER_ID, handlePinClick);
         mapboxMap.off('mouseenter', PINS_LAYER_ID, handleMouseEnter);
         mapboxMap.off('mouseleave', PINS_LAYER_ID, handleMouseLeave);
       }
     };
-  }, [mapLoaded, mapInstance, mapId, pinMode, showAreaDrawModal]);
+  }, [mapLoaded, mapInstance, pinMode, showAreaDrawModal]);
 
   // Add areas to map
   useEffect(() => {
@@ -944,37 +1102,7 @@ export default function MapIDBox({
     const mapboxMap = mapInstance as any;
     if (mapboxMap.removed) return;
 
-    const handleAreaClick = async (e: any) => {
-      const features = mapboxMap.queryRenderedFeatures(e.point, {
-        layers: [AREAS_LAYER_ID, AREAS_OUTLINE_LAYER_ID],
-      });
-
-      if (features.length === 0) return;
-
-      const feature = features[0];
-      const areaId = feature.properties?.id;
-
-      if (!areaId) return;
-
-      // Fetch area data
-      setLoadingEntity(true);
-      try {
-        const response = await fetch(`/api/maps/${mapId}/areas/${areaId}`);
-        if (response.ok) {
-          const areaData = await response.json();
-          setSelectedEntity(areaData);
-          setSelectedEntityType('area');
-        } else {
-          console.error('Failed to fetch area:', response.statusText);
-        }
-      } catch (err) {
-        console.error('Error fetching area:', err);
-      } finally {
-        setLoadingEntity(false);
-      }
-    };
-
-    // Add hover cursor
+    // Add hover cursor - click handling moved to unified handler
     const handleMouseEnter = () => {
       const canvas = mapboxMap.getCanvas();
       if (canvas) {
@@ -990,8 +1118,6 @@ export default function MapIDBox({
       }
     };
 
-    mapboxMap.on('click', AREAS_LAYER_ID, handleAreaClick);
-    mapboxMap.on('click', AREAS_OUTLINE_LAYER_ID, handleAreaClick);
     mapboxMap.on('mouseenter', AREAS_LAYER_ID, handleMouseEnter);
     mapboxMap.on('mouseleave', AREAS_LAYER_ID, handleMouseLeave);
     mapboxMap.on('mouseenter', AREAS_OUTLINE_LAYER_ID, handleMouseEnter);
@@ -999,8 +1125,6 @@ export default function MapIDBox({
 
     return () => {
       if (mapboxMap && !mapboxMap.removed) {
-        mapboxMap.off('click', AREAS_LAYER_ID, handleAreaClick);
-        mapboxMap.off('click', AREAS_OUTLINE_LAYER_ID, handleAreaClick);
         mapboxMap.off('mouseenter', AREAS_LAYER_ID, handleMouseEnter);
         mapboxMap.off('mouseleave', AREAS_LAYER_ID, handleMouseLeave);
         mapboxMap.off('mouseenter', AREAS_OUTLINE_LAYER_ID, handleMouseEnter);
@@ -1063,114 +1187,22 @@ export default function MapIDBox({
     buildLayerPolygonEntity,
   ]);
 
-  // Handle map clicks for pin creation (owner only, when pin mode is active)
+  // Update cursor when pin mode changes - click handling moved to unified handler
   useEffect(() => {
-    // Check if user can add pins: owner OR (public map with collaboration enabled)
-    const canAddPins = isOwner || (visibility === 'public' && allowOthersToPostPins);
+    if (!mapLoaded || !mapInstance) return;
     
-    // Additional permission check via callback (checks plan requirements)
-    if (pinMode && onPinActionCheck) {
-      const allowed = onPinActionCheck();
-      if (allowed === false) {
-        // Permission check failed, exit pin mode
-        setPinMode(false);
-        return;
-      }
-    }
-    
-    // Only activate if pin mode is on and area draw modal is closed
-    if (!mapLoaded || !mapInstance || !canAddPins || !pinMode || showAreaDrawModal || clickHandlerAddedRef.current) {
-      // Cleanup if pin mode is off or area draw is active
-      if (mapInstance && clickHandlerAddedRef.current) {
-        const mapboxMap = mapInstance as any;
-        if (!mapboxMap.removed) {
-          const canvas = mapboxMap.getCanvas();
-          if (canvas) {
-            canvas.style.cursor = '';
-          }
-        }
-        clickHandlerAddedRef.current = false;
-      }
-      return;
-    }
-
     const mapboxMap = mapInstance as any;
     if (mapboxMap.removed) return;
-
-    const handleMapClick = async (e: any) => {
-      // Don't create pin if clicking on existing pin or area
-      const features = mapboxMap.queryRenderedFeatures(e.point, {
-        layers: [PINS_LAYER_ID, AREAS_LAYER_ID, AREAS_OUTLINE_LAYER_ID],
-      });
-      if (features.length > 0) return;
-
-      const { lng, lat } = e.lngLat;
-      
-      // Auto-create pin for owners (no form)
-      try {
-        const response = await fetch(`/api/maps/${mapId}/pins`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            emoji: null,
-            caption: null,
-            image_url: null,
-            video_url: null,
-            lat,
-            lng,
-          }),
-        });
-
-        if (response.ok) {
-          // Refresh pins list
-          const refreshResponse = await fetch(`/api/maps/${mapId}/pins`);
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            setPins(refreshData.pins || []);
-          }
-          setPinMode(false); // Exit pin mode after creating
-        } else {
-          // Handle permission errors - show upgrade prompt via custom event
-          const errorData = await response.json().catch(() => ({}));
-          if (response.status === 403 && errorData.reason === 'plan_required') {
-            window.dispatchEvent(new CustomEvent('map-action-permission-denied', {
-              detail: {
-                action: 'pins',
-                requiredPlan: errorData.requiredPlan,
-                currentPlan: errorData.currentPlan,
-              }
-            }));
-            setPinMode(false); // Exit pin mode
-          }
-        }
-      } catch (err) {
-        console.error('Error creating pin:', err);
-      }
-    };
-
-    mapboxMap.on('click', handleMapClick);
     
-    // Change cursor to crosshair when in pin mode
     const canvas = mapboxMap.getCanvas();
-    if (canvas) {
-      canvas.style.cursor = 'crosshair';
-    }
+    if (!canvas) return;
     
-    clickHandlerAddedRef.current = true;
-
-    return () => {
-      if (mapboxMap && !mapboxMap.removed) {
-        mapboxMap.off('click', handleMapClick);
-        const canvas = mapboxMap.getCanvas();
-        if (canvas) {
-          canvas.style.cursor = '';
-        }
-      }
-      clickHandlerAddedRef.current = false;
-    };
-  }, [mapLoaded, isOwner, visibility, allowOthersToPostPins, mapInstance, mapId, pinMode, showAreaDrawModal, onPinActionCheck]);
+    if (pinMode && !showAreaDrawModal) {
+      canvas.style.cursor = 'crosshair';
+    } else {
+      canvas.style.cursor = '';
+    }
+  }, [mapLoaded, mapInstance, pinMode, showAreaDrawModal]);
 
   // Cleanup pins layer and source on unmount
   useEffect(() => {
@@ -1281,18 +1313,16 @@ export default function MapIDBox({
         <>
 
           {/* Saved boundary layers (exclusive, persisted via map.map_layers) */}
-          <CongressionalDistrictsLayer
-            map={mapInstance}
-            mapLoaded={mapLoaded}
-            visible={showDistricts}
-          />
-          <CTUBoundariesLayer map={mapInstance} mapLoaded={mapLoaded} visible={showCTU} />
-          <CountyBoundariesLayer
-            map={mapInstance}
-            mapLoaded={mapLoaded}
-            visible={showCountyBoundaries}
-          />
-          <StateBoundaryLayer map={mapInstance} mapLoaded={mapLoaded} visible={showStateBoundary} />
+          {mapInstance && (
+            <BoundaryLayersManager
+              map={mapInstance}
+              mapLoaded={mapLoaded}
+              showDistricts={showDistricts}
+              showCTU={showCTU}
+              showStateBoundary={showStateBoundary}
+              showCountyBoundaries={showCountyBoundaries}
+            />
+          )}
           
           {/* Mentions Layer - Render mentions as pins on map */}
           {/* Always render for public maps, conditionally for private/shared maps */}
@@ -1301,6 +1331,7 @@ export default function MapIDBox({
               map={mapInstance} 
               mapLoaded={mapLoaded}
               mapId={mapId}
+              skipClickHandlers={true}
             />
           )}
         </>
@@ -1323,16 +1354,75 @@ export default function MapIDBox({
           bottom: 0,
         }}
       />
-      {/* Floating Join Map Button - Show if user is not a member and not owner */}
-      {!isMember && !isOwner && current_account_id && onJoinClick && mapLoaded && (
-        <button
-          onClick={onJoinClick}
-          className="absolute bottom-3 right-3 z-20 flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-indigo-600/90 hover:bg-indigo-700 rounded-md shadow-md backdrop-blur-sm transition-colors"
-          aria-label="Join Map"
-        >
-          <UserPlusIcon className="w-3 h-3" />
-          <span>Join Map</span>
-        </button>
+      {/* Floating Join Map Card - Show when sidebar/pop-up is not open */}
+      {/* Show for: unauthenticated users OR authenticated users who are not members/owners */}
+      {!isMember && !isOwner && mapLoaded && activeSidebar === null && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
+          <div className="bg-white border border-gray-200 rounded-md p-[10px] shadow-lg max-w-xs w-full">
+            <div className="flex flex-col gap-3">
+              {/* Heading */}
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-semibold text-gray-900 text-center">{title || 'Join Map'}</h3>
+                
+                {/* Description */}
+                {description && (
+                  <p className="text-xs text-gray-600 text-center line-clamp-2">{description}</p>
+                )}
+                
+                {/* Visibility Badge */}
+                <div className="flex items-center justify-center gap-1.5">
+                  {visibility === 'public' ? (
+                    <>
+                      <GlobeAltIcon className="w-3 h-3 text-gray-500" />
+                      <span className="text-xs font-medium text-gray-700 capitalize">Public Map</span>
+                    </>
+                  ) : (
+                    <>
+                      <LockClosedIcon className="w-3 h-3 text-gray-500" />
+                      <span className="text-xs font-medium text-gray-700 capitalize">Private Map</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Collaboration Tools Icons */}
+              {(allowOthersToPostPins || allowOthersToAddAreas) && (
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {allowOthersToPostPins && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
+                      <MapPinIcon className="w-3.5 h-3.5 text-gray-600" />
+                      <span className="text-xs font-medium text-gray-700">Pins</span>
+                    </div>
+                  )}
+                  {allowOthersToAddAreas && (
+                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
+                      <Square3Stack3DIcon className="w-3.5 h-3.5 text-gray-600" />
+                      <span className="text-xs font-medium text-gray-700">Areas</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Join Button */}
+              <button
+                onClick={() => {
+                  // If not authenticated, open sign in modal
+                  if (!current_account_id) {
+                    openWelcome();
+                  } else if (onJoinClick) {
+                    // If authenticated but not a member, open join sidebar
+                    onJoinClick();
+                  }
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
+                aria-label={current_account_id ? "Join Map" : "Sign in to join map"}
+              >
+                <UserPlusIcon className="w-3 h-3" />
+                <span>{current_account_id ? 'Join Map' : 'Sign In to Join'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
@@ -1398,54 +1488,77 @@ export default function MapIDBox({
       )}
 
 
-      {/* Entity Slide-Up Modal */}
-      <MapEntitySlideUp
-        isOpen={selectedEntity !== null && selectedEntityType !== null}
-        onClose={() => {
-          setSelectedEntity(null);
-          setSelectedEntityType(null);
-        }}
-        entity={selectedEntity}
-        entityType={selectedEntityType}
-        isOwner={isOwner}
-        mapId={mapId}
-        visibility={visibility}
-        onEntityDeleted={async () => {
-          // Refresh pins or areas list
-          try {
-            if (selectedEntityType === 'pin') {
-              const response = await fetch(`/api/maps/${mapId}/pins`);
-              if (response.ok) {
-                const data = await response.json();
-                setPins(data.pins || []);
-              }
-            } else if (selectedEntityType === 'area') {
-              const response = await fetch(`/api/maps/${mapId}/areas`);
-              if (response.ok) {
-                const data = await response.json();
-                setAreas(data.areas || []);
-              }
-            }
-          } catch (err) {
-            console.error('Error refreshing entities:', err);
-          }
-        }}
-        onEntityUpdated={async (updatedEntity) => {
-          // Update the selected entity and refresh the list
-          setSelectedEntity(updatedEntity);
-          try {
-            if (selectedEntityType === 'pin') {
-              const response = await fetch(`/api/maps/${mapId}/pins`);
-              if (response.ok) {
-                const data = await response.json();
-                setPins(data.pins || []);
-              }
-            }
-          } catch (err) {
-            console.error('Error refreshing entities:', err);
-          }
-        }}
-      />
+      {/* Entity sidebar is now handled by page-level useEntitySidebar hook */}
+      {/* Layer clicks still use local state (not migrated yet) */}
+
+      {/* Collaboration Tools Nav - Only show for authenticated members or owners */}
+      {mapLoaded && current_account_id && (isMember || isOwner) && (
+        <CollaborationToolsNav
+          onToolSelect={handleToolSelect}
+          activeTool={activeTool}
+          map={mapSettings ? {
+            id: mapId,
+            account_id: map_account_id || '',
+            name: title || '',
+            description: description || null,
+            slug: '',
+            visibility: (visibility || 'public') as 'public' | 'private',
+            settings: {
+              collaboration: mapSettings.collaboration || {},
+            } as any,
+            boundary: 'statewide' as any,
+            boundary_data: null,
+            member_count: 0,
+            is_active: true,
+            auto_approve_members: auto_approve_members,
+            membership_rules: membership_rules,
+            membership_questions: membership_questions,
+            cover_image_url: null,
+            image_url: null,
+            tags: null,
+            created_at: created_at || new Date().toISOString(),
+            updated_at: updated_at || new Date().toISOString(),
+            account: account || null,
+          } as any : {
+            id: mapId,
+            account_id: map_account_id || '',
+            name: title || '',
+            description: description || null,
+            slug: '',
+            visibility: (visibility || 'public') as 'public' | 'private',
+            settings: {
+              collaboration: {
+                allow_pins: allowOthersToPostPins || false,
+                allow_areas: allowOthersToAddAreas || false,
+                allow_clicks: false,
+                allow_posts: false,
+                pin_permissions: pinPermissions,
+                area_permissions: areaPermissions,
+              },
+            } as any,
+            boundary: 'statewide' as any,
+            boundary_data: null,
+            member_count: 0,
+            is_active: true,
+            auto_approve_members: auto_approve_members,
+            membership_rules: membership_rules,
+            membership_questions: membership_questions,
+            cover_image_url: null,
+            image_url: null,
+            tags: null,
+            created_at: created_at || new Date().toISOString(),
+            updated_at: updated_at || new Date().toISOString(),
+            account: account || null,
+          } as any}
+          isOwner={isOwner}
+          userContext={currentAccountId && currentAccount ? {
+            accountId: currentAccountId,
+            plan: (userPlan || 'hobby') as any,
+            subscription_status: currentAccount.subscription_status || null,
+            role: userRole || null,
+          } : null}
+        />
+      )}
     </div>
   );
 }

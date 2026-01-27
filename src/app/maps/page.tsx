@@ -10,8 +10,6 @@ import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import MapCard from './components/MapCard';
-import MapListItem from './components/MapListItem';
-import MapDetailsContent from './components/MapDetailsContent';
 import MapsPageLayout from './MapsPageLayout';
 import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
 import { getMapUrl } from '@/lib/maps/urls';
@@ -52,9 +50,7 @@ export default function MapsPage() {
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [loadingMyMaps, setLoadingMyMaps] = useState(false);
   
-  // Selected map for sidebar
-  const [selectedMap, setSelectedMap] = useState<MapItem | null>(null);
-  const { activeSidebar, toggleSidebar, closeSidebar } = useUnifiedSidebar();
+  const { activeSidebar } = useUnifiedSidebar();
 
   // Update view type when URL changes
   useEffect(() => {
@@ -334,36 +330,14 @@ export default function MapsPage() {
     return `${ownedMapsCount}`;
   }, [customMapsFeature, ownedMapsCount]);
 
-  const handleMapClick = (map: MapItem) => {
-    setSelectedMap(map);
-    toggleSidebar('map-details');
-  };
-
   const handleCloseSidebar = useCallback(() => {
-    closeSidebar();
-    setSelectedMap(null);
-  }, [closeSidebar]);
+    // Sidebar disabled - no action needed
+  }, []);
 
-  // Sidebar configurations
+  // Sidebar configurations - empty to disable sidebar
   const sidebarConfigs = useMemo(() => {
-    if (!selectedMap) return [];
-
-    return [
-      {
-        type: 'map-details' as const,
-        title: 'Map Details',
-        content: (
-          <MapDetailsContent
-            map={selectedMap}
-            account={account}
-            onClose={handleCloseSidebar}
-          />
-        ),
-        popupType: 'account' as const,
-        infoText: 'View map details, statistics, and join options',
-      },
-    ];
-  }, [selectedMap, account, handleCloseSidebar]);
+    return [];
+  }, []);
 
   return (
     <>
@@ -410,10 +384,6 @@ export default function MapsPage() {
                         key={map.id}
                         map={map}
                         account={account}
-                        variant="primary"
-                        fullWidth={true}
-                        onClick={() => handleMapClick(map)}
-                        showVisibility={true}
                       />
                     ))}
                 </div>
@@ -531,13 +501,12 @@ export default function MapsPage() {
                           );
                         })()}
                       </div>
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
                         {filteredMapsByRole.owner.map((map) => (
-                          <MapListItem
+                          <MapCard
                             key={map.id}
                             map={map}
                             account={account}
-                            onClick={() => handleMapClick(map)}
                             showRoleIcon={true}
                           />
                         ))}
@@ -549,13 +518,12 @@ export default function MapsPage() {
                   {filteredMapsByRole.manager.length > 0 && (
                     <div className="space-y-2">
                       <h3 className="text-xs font-semibold text-gray-900">Manager</h3>
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
                         {filteredMapsByRole.manager.map((map) => (
-                          <MapListItem
+                          <MapCard
                             key={map.id}
                             map={map}
                             account={account}
-                            onClick={() => handleMapClick(map)}
                             showRoleIcon={true}
                           />
                         ))}
@@ -567,13 +535,12 @@ export default function MapsPage() {
                   {filteredMapsByRole.editor.length > 0 && (
                     <div className="space-y-2">
                       <h3 className="text-xs font-semibold text-gray-900">Editor</h3>
-                      <div className="space-y-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
                         {filteredMapsByRole.editor.map((map) => (
-                          <MapListItem
+                          <MapCard
                             key={map.id}
                             map={map}
                             account={account}
-                            onClick={() => handleMapClick(map)}
                             showRoleIcon={true}
                           />
                         ))}
@@ -595,13 +562,12 @@ export default function MapsPage() {
                   {searchQuery ? 'No maps match your search' : 'No maps found'}
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
                   {filteredMapsByRole.community.map((map) => (
-                    <MapListItem
+                    <MapCard
                       key={map.id}
                       map={map}
                       account={account}
-                      onClick={() => handleMapClick(map)}
                       showRoleIcon={false}
                     />
                   ))}

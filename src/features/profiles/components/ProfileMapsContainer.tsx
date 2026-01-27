@@ -149,7 +149,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
       {/* Maps Grid - Responsive grid with better spacing */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {maps.map((map) => (
-          <MapCard key={map.id} map={map} account={account} showVisibility={true} fullWidth={true} />
+          <MapCard key={map.id} map={map} account={account} />
         ))}
       </div>
     </div>

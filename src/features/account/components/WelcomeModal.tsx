@@ -465,7 +465,13 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setShowGettingStarted(false)}
+                      onClick={() => {
+                        setLastAccountUsername(null);
+                        setLastAccountImage(null);
+                        setEmail('');
+                        setIsEmailValid(false);
+                        setShowGettingStarted(false);
+                      }}
                       className="w-full text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                     >
                       Choose different email

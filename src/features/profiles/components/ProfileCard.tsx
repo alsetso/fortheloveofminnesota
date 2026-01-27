@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserIcon, ArrowUpTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { UserIcon, ArrowUpTrayIcon, EyeIcon, Cog6ToothIcon, MapIcon } from '@heroicons/react/24/outline';
 import type { ProfileAccount } from '@/types/profile';
 import { getDisplayName, formatJoinDate, TRAIT_OPTIONS } from '@/types/profile';
 import { AccountService } from '@/features/auth';
@@ -19,9 +19,26 @@ interface ProfileCardProps {
   isOwnProfile: boolean;
   showViewProfile?: boolean;
   hideTopSection?: boolean;
+  /** Show action buttons (View Profile, Settings) - default true for own profile */
+  showActionButtons?: boolean;
+  /** Show quick stats section - default true for own profile */
+  showQuickStats?: boolean;
+  /** Quick stats data (optional, will fetch if not provided) */
+  quickStats?: {
+    mapsCount?: number;
+    mentionsCount?: number;
+  };
 }
 
-export default function ProfileCard({ account: initialAccount, isOwnProfile, showViewProfile = true, hideTopSection = false }: ProfileCardProps) {
+export default function ProfileCard({ 
+  account: initialAccount, 
+  isOwnProfile, 
+  showViewProfile = true, 
+  hideTopSection = false,
+  showActionButtons = isOwnProfile,
+  showQuickStats = isOwnProfile,
+  quickStats,
+}: ProfileCardProps) {
   const pathname = usePathname();
   const { user } = useAuth();
   const { success, error: showError } = useToast();
@@ -265,25 +282,75 @@ export default function ProfileCard({ account: initialAccount, isOwnProfile, sho
           </div>
         </div>
 
-        {/* Edit Link and Join Date */}
-        <div className="space-y-1">
-          {isOwnProfile && (
-            <div>
-              <Link
-                href="/settings"
-                className="text-[10px] font-medium text-gray-700 hover:text-gray-900 transition-colors"
-              >
-                Edit
-              </Link>
+        {/* Quick Stats Section */}
+        {showQuickStats && isOwnProfile && (
+          <div className="pt-2 border-t border-gray-200">
+            <div className="grid grid-cols-3 gap-2">
+              {/* Profile Views */}
+              {account.view_count !== undefined && (
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-900">
+                    {account.view_count.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-gray-500">Views</div>
+                </div>
+              )}
+              
+              {/* Maps Count */}
+              {quickStats?.mapsCount !== undefined && (
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-900">
+                    {quickStats.mapsCount}
+                  </div>
+                  <div className="text-[10px] text-gray-500">Maps</div>
+                </div>
+              )}
+              
+              {/* Mentions Count */}
+              {quickStats?.mentionsCount !== undefined && (
+                <div className="text-center">
+                  <div className="text-xs font-semibold text-gray-900">
+                    {quickStats.mentionsCount.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-gray-500">Mentions</div>
+                </div>
+              )}
             </div>
-          )}
-          <div className="text-[10px] text-gray-500">
-            Joined {joinDate}
           </div>
+        )}
+
+        {/* Join Date */}
+        <div className="text-[10px] text-gray-500">
+          Joined {joinDate}
         </div>
 
-        {/* View Profile Button */}
-        {showViewProfile && account.username && !isOnProfilePage && (
+        {/* Action Buttons */}
+        {showActionButtons && isOwnProfile && account.username && !isOnProfilePage && (
+          <div className="pt-2 space-y-2 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-2">
+              {/* View Profile Button */}
+              <Link
+                href={`/profile/${account.username}`}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
+              >
+                <EyeIcon className="w-3 h-3" />
+                <span>View Profile</span>
+              </Link>
+              
+              {/* Account Settings Button */}
+              <Link
+                href="/settings"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
+              >
+                <Cog6ToothIcon className="w-3 h-3" />
+                <span>Settings</span>
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Legacy View Profile Button (for non-own profiles) */}
+        {showViewProfile && !isOwnProfile && account.username && !isOnProfilePage && (
           <div className="pt-3 mt-3 border-t border-gray-200">
             <Link
               href={`/profile/${account.username}`}

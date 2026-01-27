@@ -514,14 +514,10 @@ export default function AccountDropdown({
             e.stopPropagation();
             setIsOpen(!isOpen);
           }}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors ${
+          className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm ${
             isDark
-              ? isOpen
-                ? 'bg-white/20 text-white'
-                : 'text-white hover:text-white hover:bg-white/10'
-              : isOpen
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+              ? 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
+              : 'bg-white/10 hover:bg-white/20 text-gray-900'
           }`}
           aria-label="Account menu"
           aria-expanded={isOpen}
@@ -537,14 +533,6 @@ export default function AccountDropdown({
               <UserIcon className="w-3 h-3 text-gray-500" />
             </div>
           )}
-          <svg 
-            className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
         </button>
 
         {/* Desktop Dropdown */}

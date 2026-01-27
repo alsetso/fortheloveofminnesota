@@ -76,7 +76,7 @@ export function useMapMembership(
         isOwner,
         isManager,
         userRole,
-        showMembers: isOwner || isMember,
+        showMembers: isOwner || isManager,
       });
       setLoading(false);
       return;

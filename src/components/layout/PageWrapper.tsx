@@ -1068,7 +1068,7 @@ export default function PageWrapper({
                   {/* Map Card Info - Accordion trigger */}
                   <button
                     onClick={() => handlePanelToggle(expandedPanel === 'map-info' ? null : 'map-info')}
-                    disabled={isNonMember && expandedPanel === 'map-info'}
+                    disabled={!!(isNonMember && expandedPanel === 'map-info')}
                     className={`flex-1 flex items-center gap-2 px-2 py-2 hover:bg-white/5 rounded-lg transition-colors ${
                       expandedPanel === 'map-info' ? 'bg-white/5' : ''
                     } ${isNonMember && expandedPanel === 'map-info' ? 'cursor-default' : ''}`}

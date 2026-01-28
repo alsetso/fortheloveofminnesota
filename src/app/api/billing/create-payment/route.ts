@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
             );
           }
           account = data;
+          }
         }
 
         // Verify customer ID matches

@@ -32,11 +32,12 @@ export async function POST(request: NextRequest) {
         }
 
         // Verify the account belongs to this user
+        // userId is guaranteed when requireAuth: true
         const { data: account, error: accountError } = await supabase
           .from('accounts')
           .select('id')
           .eq('id', finalAccountId)
-          .eq('user_id', userId)
+          .eq('user_id', userId!)
           .maybeSingle();
 
         if (accountError || !account) {

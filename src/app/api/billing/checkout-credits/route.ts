@@ -93,18 +93,28 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Get user email from Supabase auth (needed for Stripe customer creation)
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
+          return NextResponse.json(
+            { error: 'Failed to fetch user data' },
+            { status: 500 }
+          );
+        }
+
+        if (!user.email) {
+          return NextResponse.json(
+            { error: 'User email is required' },
+            { status: 400 }
+          );
+        }
+
         // Ensure Stripe customer exists
         let customerId = account.stripe_customer_id;
 
         if (!customerId) {
           try {
-            if (!user.email) {
-              return NextResponse.json(
-                { error: 'User email is required' },
-                { status: 400 }
-              );
-            }
-
             const customer = await stripe.customers.create({
               email: user.email,
               metadata: {
@@ -159,7 +169,7 @@ export async function POST(request: NextRequest) {
           cancel_url: cancelUrl,
           metadata: {
             accountId: account.id,
-            userId: user.id,
+            userId: userId!,
             purchaseType: 'credits',
           },
         });

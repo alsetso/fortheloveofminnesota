@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
               total_views: totalViews,
               date_range: dateRange,
             },
-            timestamp: now,
+            timestamp: Date.now(),
           });
           
           return NextResponse.json({
@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Transform database function results to API format
-        const allViews = (allViewsResult.data || []).map((row: any) => ({
+        const allViews = ((allViewsResult.data as any[]) || []).map((row: any) => ({
           id: row.map_id,
           name: row.map_name || 'Unnamed Map',
           slug: row.map_slug,
@@ -228,11 +228,11 @@ export async function GET(request: NextRequest) {
           first_viewed: row.first_viewed,
         }));
 
-        const totalCount = countResult?.data?.[0]?.total_count 
-          ? Number(countResult.data[0].total_count) 
+        const totalCount = (countResult?.data as any)?.[0]?.total_count
+          ? Number((countResult.data as any)[0].total_count) 
           : allViews.length;
-        const totalViews = countResult?.data?.[0]?.total_views
-          ? Number(countResult.data[0].total_views)
+        const totalViews = (countResult?.data as any)?.[0]?.total_views
+          ? Number((countResult.data as any)[0].total_views)
           : allViews.reduce((sum: number, v: any) => sum + v.view_count, 0);
 
         // Apply pagination

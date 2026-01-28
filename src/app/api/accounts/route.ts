@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
         updated_at,
         last_visit
       `)
-      .eq('user_id', userId)
+      .eq('user_id', userId!)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     const { count, error: countError } = await supabase
       .from('accounts')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+      .eq('user_id', userId!);
 
     if (countError) {
       console.error('[Accounts API] Error counting accounts:', countError);

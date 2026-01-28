@@ -7,6 +7,7 @@ import { validatePathParams, validateRequestBody } from '@/lib/security/validati
 import { z } from 'zod';
 import { commonSchemas } from '@/lib/security/validation';
 import { getAccountFeatureLimit } from '@/lib/billing/featureLimits';
+import { Database } from '@/types/supabase';
 
 /**
  * PATCH /api/maps/[id]/publish
@@ -81,7 +82,8 @@ export async function PATCH(
         }
 
         // Check ownership
-        if (map.account_id !== accountId) {
+        const mapData = map as { account_id: string; id: string; published_to_community: boolean };
+        if (mapData.account_id !== accountId) {
           return createErrorResponse('Forbidden - only map owner can publish', 403);
         }
 
@@ -97,21 +99,15 @@ export async function PATCH(
         }
 
         // Update publish status
-        const updateData: any = {
+        const updateData: Partial<Database['public']['Tables']['map']['Update']> = {
           published_to_community: published,
+          published_at: published ? new Date().toISOString() : null,
         };
 
-        // Set published_at timestamp when publishing (clear when unpublishing)
-        if (published) {
-          updateData.published_at = new Date().toISOString();
-        } else {
-          updateData.published_at = null;
-        }
-
-        const { data: updatedMap, error: updateError } = await supabase
-          .from('map')
+        const { data: updatedMap, error: updateError } = await (supabase
+          .from('map') as any)
           .update(updateData)
-          .eq('id', map.id)
+          .eq('id', mapData.id)
           .select('id, published_to_community, published_at')
           .single();
 

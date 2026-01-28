@@ -97,7 +97,7 @@ export const getAuthAndBilling = cache(async (): Promise<AuthAndBillingData> => 
       } as any);
 
       if (!error && Array.isArray(data)) {
-        features = data.map((row: any) => ({
+        features = (data as any[]).map((row: any) => ({
           slug: row.feature_slug,
           name: row.feature_name,
           limit_value: row.limit_value ?? null,

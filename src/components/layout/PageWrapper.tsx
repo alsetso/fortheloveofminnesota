@@ -674,6 +674,7 @@ export default function PageWrapper({
       window.addEventListener('hashchange', handleHashChange);
       return () => window.removeEventListener('hashchange', handleHashChange);
     }
+    return undefined;
   }, []);
 
   // Memoize navItems to prevent recreation on every render

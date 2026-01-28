@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   CheckIcon, 
   PencilIcon, 
@@ -21,10 +21,13 @@ import { useMapMembership } from '../hooks/useMapMembership';
 import toast from 'react-hot-toast';
 import SidebarHeader from '@/components/layout/SidebarHeader';
 import EmojiPicker from './EmojiPicker';
-import { MapPinIcon, Square3Stack3DIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import type { MapSettings, MapMember, MapMembershipRequest, MapCategory, MapBoundary, BoundaryData } from '@/types/map';
 import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 import type { BillingPlan } from '@/lib/billing/types';
+import { getMapUrl } from '@/lib/maps/urls';
+import { useRouter } from 'next/navigation';
+import { useDebounce } from '@/features/profiles/hooks/useDebounce';
 
 type BoundaryLayerKey = 'congressional_districts' | 'ctu_boundaries' | 'state_boundary' | 'county_boundaries';
 
@@ -43,6 +46,8 @@ interface MapSettingsSidebarProps {
     membership_rules: string | null;
     membership_questions: Array<{ id: number; question: string }>;
     tags?: Array<{ emoji: string; text: string }> | null;
+    published_to_community?: boolean;
+    published_at?: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -52,10 +57,11 @@ interface MapSettingsSidebarProps {
   userRole?: 'owner' | 'manager' | 'editor' | null;
 }
 
-type CollapsibleSection = 'basic' | 'appearance' | 'collaboration' | 'presentation' | 'new-members' | 'requests' | 'categories';
+type CollapsibleSection = 'publishing' | 'basic' | 'appearance' | 'collaboration' | 'presentation' | 'colors' | 'new-members' | 'requests' | 'categories' | 'danger-zone';
 
 export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isOwner: propIsOwner, userRole: propUserRole }: MapSettingsSidebarProps) {
   const { account } = useAuthStateSafe();
+  const router = useRouter();
   const isOwner = propIsOwner ?? (account?.id === initialMap.account_id);
   
   // Use useMapMembership hook to get role (already fetched on page level)
@@ -89,6 +95,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
   const initialEmoji = (initialMap.settings?.presentation as any)?.emoji || null;
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Publish state
+  const [publishedToCommunity, setPublishedToCommunity] = useState(initialMap.published_to_community || false);
+  const [isUpdatingPublish, setIsUpdatingPublish] = useState(false);
+
+  // Delete map state
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const mapUrl = getMapUrl({ id: initialMap.id, slug: initialMap.slug });
+  const deleteConfirmUrl = mapUrl.replace(/^\/map\//, ''); // Remove /map/ prefix for confirmation
 
   // Form state - using new structure
   const [formData, setFormData] = useState({
@@ -129,6 +145,12 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       membership: {
         max_members: initialMap.settings?.membership?.max_members ?? null,
       },
+      colors: {
+        owner: initialMap.settings?.colors?.owner || 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
+        manager: initialMap.settings?.colors?.manager || '#000000',
+        editor: initialMap.settings?.colors?.editor || '#000000',
+        'non-member': initialMap.settings?.colors?.['non-member'] || '#000000',
+      },
     },
     auto_approve_members: initialMap.auto_approve_members,
     membership_rules: initialMap.membership_rules || '',
@@ -147,10 +169,82 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
   
-  // Editing state - must be declared before useEffects that use it
-  const [isEditing, setIsEditing] = useState(false);
+  // Auto-save state
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [lastSavedField, setLastSavedField] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveTimeoutRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  
+  // Auto-save function - handles partial updates
+  const autoSave = useCallback(async (updateData: Partial<any>, fieldName?: string) => {
+    if (!canManage) return;
+    
+    setIsSaving(true);
+    setSaveError(null);
+    
+    try {
+      const response = await fetch(`/api/maps/${initialMap.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save';
+        try {
+          const data = await response.json();
+          errorMessage = data.error || data.message || errorMessage;
+        } catch {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      const updatedMap = data.map || data;
+      
+      // Update the map data
+      const fullUpdatedMap = {
+        ...initialMap,
+        ...updatedMap,
+        settings: {
+          ...initialMap.settings,
+          ...updatedMap.settings,
+        },
+      };
+      
+      if (onUpdated) {
+        onUpdated(fullUpdatedMap);
+      }
+      
+      if (fieldName) {
+        setLastSavedField(fieldName);
+        setTimeout(() => setLastSavedField(null), 2000);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save';
+      setSaveError(errorMessage);
+      toast.error(errorMessage, { duration: 3000 });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [canManage, initialMap, onUpdated]);
+
+  // Debounced auto-save for text inputs (800ms delay)
+  const debouncedAutoSave = useDebounce(autoSave, 800);
+  
+  // Immediate auto-save for selects, checkboxes, radio buttons
+  const immediateAutoSave = useCallback((updateData: Partial<any>, fieldName?: string) => {
+    // Clear any pending debounced saves for this field
+    if (fieldName && saveTimeoutRef.current.has(fieldName)) {
+      clearTimeout(saveTimeoutRef.current.get(fieldName)!);
+      saveTimeoutRef.current.delete(fieldName);
+    }
+    autoSave(updateData, fieldName);
+  }, [autoSave]);
   
   // Debug info: Billing features and plan comparison
   const { features: userFeatures, isLoading: featuresLoading, hasFeature, getFeature } = useBillingEntitlementsSafe();
@@ -261,7 +355,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
 
   // Fetch boundary options when boundary type changes
   useEffect(() => {
-    if (!isEditing) return;
+    if (!canManage) return;
 
     let cancelled = false;
 
@@ -314,120 +408,15 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
     return () => {
       cancelled = true;
     };
-  }, [formData.boundary, isEditing]);
+  }, [formData.boundary, canManage]);
 
-  const handleEdit = () => {
-    setIsEditing(true);
-    setError(null);
-  };
-
-  const handleCancel = () => {
-    setFormData({
-      name: initialMap.name,
-      description: initialMap.description || '',
-      slug: initialMap.slug,
-      visibility: initialMap.visibility,
-      emoji: initialEmoji,
-      boundary: (initialMap.boundary || 'statewide') as MapBoundary,
-      boundary_data: initialMap.boundary_data || null,
-      settings: {
-        appearance: {
-          map_style: initialMap.settings?.appearance?.map_style || 'street',
-          map_layers: initialMap.settings?.appearance?.map_layers || {},
-          meta: initialMap.settings?.appearance?.meta || {},
-          map_filters: initialMap.settings?.appearance?.map_filters || {},
-        },
-        collaboration: {
-          allow_pins: initialMap.settings?.collaboration?.allow_pins || false,
-          allow_areas: initialMap.settings?.collaboration?.allow_areas || false,
-          allow_posts: initialMap.settings?.collaboration?.allow_posts || false,
-          allow_clicks: initialMap.settings?.collaboration?.allow_clicks || false,
-          pin_permissions: initialMap.settings?.collaboration?.pin_permissions || { required_plan: null },
-          area_permissions: initialMap.settings?.collaboration?.area_permissions || { required_plan: null },
-          post_permissions: initialMap.settings?.collaboration?.post_permissions || { required_plan: null },
-          click_permissions: initialMap.settings?.collaboration?.click_permissions || { required_plan: null },
-        },
-        presentation: {
-          hide_creator: initialMap.settings?.presentation?.hide_creator || false,
-          is_featured: initialMap.settings?.presentation?.is_featured || false,
-          emoji: initialEmoji,
-          show_map_filters_icon: initialMap.settings?.presentation?.show_map_filters_icon ?? false,
-        },
-        membership: {
-          max_members: initialMap.settings?.membership?.max_members ?? null,
-        },
-      },
-      auto_approve_members: initialMap.auto_approve_members,
-      membership_rules: initialMap.membership_rules || '',
-      membership_questions: initialMap.membership_questions || [],
-    });
-    setIsEditing(false);
-    setError(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/maps/${initialMap.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: formData.name,
-          description: formData.description || null,
-          visibility: formData.visibility,
-          slug: formData.slug?.trim() || null,
-          boundary: formData.boundary,
-          boundary_data: formData.boundary_data,
-          settings: {
-            ...formData.settings,
-            presentation: {
-              ...formData.settings.presentation,
-              emoji: formData.emoji || null,
-            },
-          },
-          auto_approve_members: formData.auto_approve_members,
-          membership_rules: formData.membership_rules || null,
-          membership_questions: formData.membership_questions,
-        }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to update map';
-        try {
-          const data = await response.json();
-          errorMessage = data.error || data.message || errorMessage;
-        } catch {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      const updatedMap = data.map || data;
-
-      setIsEditing(false);
-      setIsSaving(false);
-      toast.success('Map settings saved', {
-        duration: 3000,
-      });
-      if (onUpdated) {
-        onUpdated(updatedMap);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update map';
-      setError(errorMessage);
-      setIsSaving(false);
-      toast.error(errorMessage, {
-        duration: 4000,
-      });
-    }
-  };
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      saveTimeoutRef.current.forEach(timeout => clearTimeout(timeout));
+      saveTimeoutRef.current.clear();
+    };
+  }, []);
 
   // Helper to get selected boundary layer
   const getSelectedBoundaryLayer = (): BoundaryLayerKey | null => {
@@ -551,6 +540,9 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
   const allowPins = initialMap.settings?.collaboration?.allow_pins || false;
   const allowAreas = initialMap.settings?.collaboration?.allow_areas || false;
   const allowPosts = initialMap.settings?.collaboration?.allow_posts || false;
+  // Hide posts for custom maps (posts removed from custom maps, backend kept)
+  const isLiveMap = initialMap.slug === 'live';
+  const showPosts = allowPosts && isLiveMap;
   const allowClicks = initialMap.settings?.collaboration?.allow_clicks || false;
 
   return (
@@ -558,9 +550,6 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       <SidebarHeader
         title="Map Settings"
         onClose={() => {
-          if (isEditing) {
-            handleCancel();
-          }
           if (onClose) {
             onClose();
           }
@@ -568,15 +557,6 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
         isOwner={isOwner}
         mapId={initialMap.id}
         mapName={initialMap.name}
-        onEdit={canManage && !isEditing ? handleEdit : undefined}
-        isEditing={isEditing}
-        isSaving={isSaving}
-        onSave={isEditing ? () => {
-          const form = document.querySelector('form');
-          if (form) {
-            form.requestSubmit();
-          }
-        } : undefined}
       />
 
       {/* Content */}
@@ -608,7 +588,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     <span>Draw areas on the map</span>
                   </div>
                 )}
-                {allowPosts && (
+                {showPosts && (
                   <div className="flex items-center gap-2 text-xs text-gray-700">
                     <DocumentTextIcon className="w-3.5 h-3.5 text-gray-500" />
                     <span>Create posts</span>
@@ -620,7 +600,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     <span>Click on map</span>
                   </div>
                 )}
-                {!allowPins && !allowAreas && !allowPosts && !allowClicks && (
+                {!allowPins && !allowAreas && !showPosts && !allowClicks && (
                   <div className="text-xs text-gray-500">
                     No collaboration permissions enabled
                   </div>
@@ -652,14 +632,273 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
             </div>
           </div>
         ) : (
-          // Owner/Manager - show editable form
-          <form onSubmit={handleSubmit} className="space-y-2">
-            {error && (
+          // Owner/Manager - show editable form (auto-saves on change)
+          <div className="space-y-2">
+            {saveError && (
               <div className="bg-red-50 border border-red-200 rounded-md p-[10px]">
-                <p className="text-xs text-red-600">{error}</p>
+                <p className="text-xs text-red-600">{saveError}</p>
               </div>
             )}
-            
+            {isSaving && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-[10px]">
+                <p className="text-xs text-blue-600">Saving...</p>
+              </div>
+            )}
+            {lastSavedField && !isSaving && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-[10px]">
+                <p className="text-xs text-green-600">Saved</p>
+              </div>
+            )}
+
+          {/* PUBLISHING SECTION - Only show for owners */}
+          {isOwner && (
+            <div className="border border-gray-200 rounded-md bg-white">
+              <button
+                type="button"
+                onClick={() => toggleSection('publishing')}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Squares2X2Icon className="w-4 h-4 text-gray-500" />
+                  <span>Publishing</span>
+                </div>
+                {openSections.has('publishing') ? (
+                  <ChevronUpIcon className="w-3 h-3" />
+                ) : (
+                  <ChevronDownIcon className="w-3 h-3" />
+                )}
+              </button>
+              {openSections.has('publishing') && (
+                <div className="px-3 pb-3 space-y-2 border-t border-gray-200 pt-2">
+                  {/* Custom URL Slug */}
+                  <div>
+                    <label htmlFor="slug" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Custom URL slug
+                    </label>
+                    <input
+                      id="slug"
+                      type="text"
+                      value={formData.slug}
+                      onChange={(e) => {
+                        const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                        setFormData({ ...formData, slug: value });
+                        debouncedAutoSave({ slug: value?.trim() || null }, 'slug');
+                      }}
+                      className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      placeholder="my-custom-map"
+                      disabled={!canManage || isSaving}
+                      pattern="[a-z0-9-]+"
+                      minLength={3}
+                      maxLength={100}
+                    />
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Use a custom URL like /map/my-custom-map
+                    </p>
+                  </div>
+
+                  {/* Visibility */}
+                  <div className="pt-2 border-t border-gray-200">
+                    <label htmlFor="visibility" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Visibility
+                    </label>
+                    <select
+                      id="visibility"
+                      value={formData.visibility}
+                      onChange={(e) => {
+                        const newVisibility = e.target.value as 'public' | 'private';
+                        setFormData({
+                          ...formData,
+                          visibility: newVisibility,
+                        });
+                        immediateAutoSave({ visibility: newVisibility }, 'visibility');
+                      }}
+                      className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      disabled={!canManage || isSaving}
+                    >
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                    </select>
+                  </div>
+
+                  {/* Boundary */}
+                  <div className="pt-2 border-t border-gray-200">
+                    <label htmlFor="boundary" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Geographic Boundary
+                    </label>
+                    <select
+                      id="boundary"
+                      value={formData.boundary}
+                      onChange={(e) => {
+                        const newBoundary = e.target.value as MapBoundary;
+                        setFormData({
+                          ...formData,
+                          boundary: newBoundary,
+                          boundary_data: newBoundary === 'statewide' ? null : formData.boundary_data,
+                        });
+                        immediateAutoSave({
+                          boundary: newBoundary,
+                          boundary_data: newBoundary === 'statewide' ? null : formData.boundary_data,
+                        }, 'boundary');
+                      }}
+                      className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      disabled={!canManage || isSaving}
+                    >
+                      <option value="statewide">Statewide</option>
+                      <option value="county">County</option>
+                      <option value="city">City</option>
+                      <option value="town">Town</option>
+                      <option value="district">District</option>
+                    </select>
+                  </div>
+
+                  {/* Boundary Data Selection */}
+                  {formData.boundary !== 'statewide' && (
+                    <div>
+                      <label htmlFor="boundary_data" className="block text-xs font-medium text-gray-500 mb-0.5">
+                        {formData.boundary === 'county' && 'Select County'}
+                        {formData.boundary === 'city' && 'Select City'}
+                        {formData.boundary === 'town' && 'Select Town'}
+                        {formData.boundary === 'district' && 'Select District'}
+                      </label>
+                      {loadingBoundaries ? (
+                        <div className="text-xs text-gray-500 py-2">Loading...</div>
+                      ) : (
+                        <select
+                          id="boundary_data"
+                          value={
+                            formData.boundary === 'county'
+                              ? formData.boundary_data?.county_id || ''
+                              : formData.boundary === 'city' || formData.boundary === 'town'
+                              ? formData.boundary_data?.ctu_id || ''
+                              : formData.boundary === 'district'
+                              ? formData.boundary_data?.district_number?.toString() || ''
+                              : ''
+                          }
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            let newBoundaryData: BoundaryData | null = null;
+
+                            if (formData.boundary === 'county') {
+                              const county = counties.find((c) => c.id === value);
+                              if (county) {
+                                newBoundaryData = {
+                                  county_id: county.id,
+                                  county_name: county.county_name,
+                                };
+                              }
+                            } else if (formData.boundary === 'city' || formData.boundary === 'town') {
+                              const ctu = cities.find((c) => c.id === value);
+                              if (ctu) {
+                                newBoundaryData = {
+                                  ctu_id: ctu.id,
+                                  city_name: ctu.feature_name,
+                                  ctu_class: ctu.ctu_class as 'CITY' | 'TOWNSHIP' | 'UNORGANIZED TERRITORY',
+                                };
+                              }
+                            } else if (formData.boundary === 'district') {
+                              const district = districts.find((d) => d.district_number.toString() === value);
+                              if (district) {
+                                newBoundaryData = {
+                                  district_number: district.district_number,
+                                  district_name: district.district_name,
+                                };
+                              }
+                            }
+
+                            setFormData({
+                              ...formData,
+                              boundary_data: newBoundaryData,
+                            });
+                            immediateAutoSave({ boundary_data: newBoundaryData }, 'boundary_data');
+                          }}
+                          className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
+                          disabled={!canManage || isSaving}
+                        >
+                          <option value="">Select {formData.boundary}...</option>
+                          {formData.boundary === 'county' &&
+                            counties.map((county) => (
+                              <option key={county.id} value={county.id}>
+                                {county.county_name}
+                              </option>
+                            ))}
+                          {(formData.boundary === 'city' || formData.boundary === 'town') &&
+                            cities
+                              .filter((c) => (formData.boundary === 'city' ? c.ctu_class === 'CITY' : c.ctu_class === 'TOWNSHIP'))
+                              .map((city) => (
+                                <option key={city.id} value={city.id}>
+                                  {city.feature_name}
+                                </option>
+                              ))}
+                          {formData.boundary === 'district' &&
+                            districts.map((district) => (
+                              <option key={district.district_number} value={district.district_number.toString()}>
+                                {district.district_name || `District ${district.district_number}`}
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Publish to Community */}
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="publish_to_community" className="text-xs text-gray-600">
+                        Publish to community
+                      </label>
+                      <input
+                        id="publish_to_community"
+                        type="checkbox"
+                        checked={publishedToCommunity}
+                        onChange={async (e) => {
+                          const newValue = e.target.checked;
+                          setIsUpdatingPublish(true);
+                          try {
+                            const response = await fetch(`/api/maps/${initialMap.id}/publish`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ published: newValue }),
+                            });
+                            if (!response.ok) {
+                              const data = await response.json();
+                              throw new Error(data.error || 'Failed to update publish status');
+                            }
+                            setPublishedToCommunity(newValue);
+                            toast.success(newValue ? 'Map published to community' : 'Map unpublished from community');
+                            if (onUpdated) {
+                              const updated = await response.json();
+                              onUpdated({ ...initialMap, published_to_community: newValue, published_at: updated.data?.published_at });
+                            }
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : 'Failed to update publish status');
+                            // Revert checkbox on error
+                            e.target.checked = !newValue;
+                          } finally {
+                            setIsUpdatingPublish(false);
+                          }
+                        }}
+                        className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                        disabled={isUpdatingPublish || !hasFeature('map_publish_to_community')}
+                      />
+                    </div>
+                    {!hasFeature('map_publish_to_community') ? (
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        Requires Contributor plan or higher
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-gray-500 mt-1">
+                        {publishedToCommunity 
+                          ? 'Map appears in Community feed on /maps'
+                          : initialMap.visibility === 'public'
+                            ? 'Map hidden from Community feed (still accessible via direct link)'
+                            : 'Map hidden from Community feed (members only via direct link)'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* BASIC INFO SECTION */}
           <div className="border border-gray-200 rounded-md bg-white">
@@ -691,7 +930,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                         type="button"
                         ref={emojiButtonRef}
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                        disabled={!isEditing || isSaving}
+                        disabled={!canManage || isSaving}
                         className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed flex items-center justify-center min-h-[40px]"
                       >
                         <span className="text-2xl">{formData.emoji || '📍'}</span>
@@ -713,6 +952,15 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               },
                             });
                             setShowEmojiPicker(false);
+                            immediateAutoSave({
+                              settings: {
+                                ...formData.settings,
+                                presentation: {
+                                  ...formData.settings.presentation,
+                                  emoji,
+                                },
+                              },
+                            }, 'emoji');
                           }}
                           triggerRef={emojiButtonRef as React.RefObject<HTMLElement>}
                         />
@@ -732,6 +980,15 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                                 },
                               },
                             });
+                            immediateAutoSave({
+                              settings: {
+                                ...formData.settings,
+                                presentation: {
+                                  ...formData.settings.presentation,
+                                  emoji: null,
+                                },
+                              },
+                            }, 'emoji');
                           }}
                           className="absolute top-1 right-1 p-0.5 text-gray-400 hover:text-gray-600 rounded"
                           aria-label="Remove emoji"
@@ -753,10 +1010,13 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     type="text"
                     required
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, name: e.target.value });
+                      debouncedAutoSave({ name: e.target.value.trim() }, 'name');
+                    }}
                     className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder="Map name"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
 
@@ -768,175 +1028,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                   <textarea
                     id="description"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, description: e.target.value });
+                      debouncedAutoSave({ description: e.target.value || null }, 'description');
+                    }}
                     className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder="Map description (optional)"
                     rows={3}
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
-
-                {/* Visibility */}
-                <div>
-                  <label htmlFor="visibility" className="block text-xs font-medium text-gray-500 mb-0.5">
-                    Visibility
-                  </label>
-                  <select
-                    id="visibility"
-                    value={formData.visibility}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        visibility: e.target.value as 'public' | 'private',
-                      })
-                    }
-                    className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    disabled={!isEditing || isSaving}
-                  >
-                    <option value="public">Public</option>
-                    <option value="private">Private</option>
-                  </select>
-                </div>
-
-                {/* Slug */}
-                <div>
-                  <label htmlFor="slug" className="block text-xs font-medium text-gray-500 mb-0.5">
-                    Custom URL slug
-                  </label>
-                  <input
-                    id="slug"
-                    type="text"
-                    value={formData.slug}
-                    onChange={(e) => {
-                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                      setFormData({ ...formData, slug: value });
-                    }}
-                    className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    placeholder="my-custom-map"
-                    disabled={!isEditing || isSaving}
-                    pattern="[a-z0-9-]+"
-                    minLength={3}
-                    maxLength={100}
-                  />
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    Use a custom URL like /map/my-custom-map
-                  </p>
-                </div>
-
-                {/* Boundary */}
-                <div>
-                  <label htmlFor="boundary" className="block text-xs font-medium text-gray-500 mb-0.5">
-                    Geographic Boundary
-                  </label>
-                  <select
-                    id="boundary"
-                    value={formData.boundary}
-                    onChange={(e) => {
-                      const newBoundary = e.target.value as MapBoundary;
-                      setFormData({
-                        ...formData,
-                        boundary: newBoundary,
-                        boundary_data: newBoundary === 'statewide' ? null : formData.boundary_data,
-                      });
-                    }}
-                    className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    disabled={!isEditing || isSaving}
-                  >
-                    <option value="statewide">Statewide</option>
-                    <option value="county">County</option>
-                    <option value="city">City</option>
-                    <option value="town">Town</option>
-                    <option value="district">District</option>
-                  </select>
-                </div>
-
-                {/* Boundary Data Selection */}
-                {formData.boundary !== 'statewide' && (
-                  <div>
-                    <label htmlFor="boundary_data" className="block text-xs font-medium text-gray-500 mb-0.5">
-                      {formData.boundary === 'county' && 'Select County'}
-                      {formData.boundary === 'city' && 'Select City'}
-                      {formData.boundary === 'town' && 'Select Town'}
-                      {formData.boundary === 'district' && 'Select District'}
-                    </label>
-                    {loadingBoundaries ? (
-                      <div className="text-xs text-gray-500 py-2">Loading...</div>
-                    ) : (
-                      <select
-                        id="boundary_data"
-                        value={
-                          formData.boundary === 'county'
-                            ? formData.boundary_data?.county_id || ''
-                            : formData.boundary === 'city' || formData.boundary === 'town'
-                            ? formData.boundary_data?.ctu_id || ''
-                            : formData.boundary === 'district'
-                            ? formData.boundary_data?.district_number?.toString() || ''
-                            : ''
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          let newBoundaryData: BoundaryData | null = null;
-
-                          if (formData.boundary === 'county') {
-                            const county = counties.find((c) => c.id === value);
-                            if (county) {
-                              newBoundaryData = {
-                                county_id: county.id,
-                                county_name: county.county_name,
-                              };
-                            }
-                          } else if (formData.boundary === 'city' || formData.boundary === 'town') {
-                            const ctu = cities.find((c) => c.id === value);
-                            if (ctu) {
-                              newBoundaryData = {
-                                ctu_id: ctu.id,
-                                city_name: ctu.feature_name,
-                                ctu_class: ctu.ctu_class as 'CITY' | 'TOWNSHIP' | 'UNORGANIZED TERRITORY',
-                              };
-                            }
-                          } else if (formData.boundary === 'district') {
-                            const district = districts.find((d) => d.district_number.toString() === value);
-                            if (district) {
-                              newBoundaryData = {
-                                district_number: district.district_number,
-                                district_name: district.district_name,
-                              };
-                            }
-                          }
-
-                          setFormData({
-                            ...formData,
-                            boundary_data: newBoundaryData,
-                          });
-                        }}
-                        className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
-                        disabled={!isEditing || isSaving}
-                      >
-                        <option value="">Select {formData.boundary}...</option>
-                        {formData.boundary === 'county' &&
-                          counties.map((county) => (
-                            <option key={county.id} value={county.id}>
-                              {county.county_name}
-                            </option>
-                          ))}
-                        {(formData.boundary === 'city' || formData.boundary === 'town') &&
-                          cities
-                            .filter((c) => (formData.boundary === 'city' ? c.ctu_class === 'CITY' : c.ctu_class === 'TOWNSHIP'))
-                            .map((city) => (
-                              <option key={city.id} value={city.id}>
-                                {city.feature_name}
-                              </option>
-                            ))}
-                        {formData.boundary === 'district' &&
-                          districts.map((district) => (
-                            <option key={district.district_number} value={district.district_number.toString()}>
-                              {district.district_name || `District ${district.district_number}`}
-                            </option>
-                          ))}
-                      </select>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -968,20 +1069,28 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                   <select
                     id="map_style"
                     value={formData.settings.appearance.map_style}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const newMapStyle = e.target.value as 'street' | 'satellite' | 'light' | 'dark';
                       setFormData({
                         ...formData,
                         settings: {
                           ...formData.settings,
                           appearance: {
                             ...formData.settings.appearance,
-                            map_style: e.target.value as 'street' | 'satellite' | 'light' | 'dark',
+                            map_style: newMapStyle,
                           },
                         },
-                      })
-                    }
+                      });
+                      immediateAutoSave({
+                        settings: {
+                          appearance: {
+                            map_style: newMapStyle,
+                          },
+                        },
+                      }, 'map_style');
+                    }}
                     className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-white disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   >
                     <option value="street">Street</option>
                     <option value="satellite">Satellite</option>
@@ -1016,10 +1125,23 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                             name="default-boundary-layer"
                             checked={isChecked}
                             onChange={() => {
-                              setBoundaryLayer(opt.id === 'none' ? null : (opt.id as BoundaryLayerKey));
+                              const layer = opt.id === 'none' ? null : (opt.id as BoundaryLayerKey);
+                              setBoundaryLayer(layer);
+                              immediateAutoSave({
+                                settings: {
+                                  appearance: {
+                                    map_layers: {
+                                      congressional_districts: layer === 'congressional_districts',
+                                      ctu_boundaries: layer === 'ctu_boundaries',
+                                      state_boundary: layer === 'state_boundary',
+                                      county_boundaries: layer === 'county_boundaries',
+                                    },
+                                  },
+                                },
+                              }, 'boundary_layer');
                             }}
                             className="w-4 h-4 text-gray-900 border-gray-300 focus:ring-gray-900"
-                            disabled={!isEditing || isSaving}
+                            disabled={!canManage || isSaving}
                           />
                         </label>
                       );
@@ -1036,7 +1158,8 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     id="buildingsEnabled"
                     type="checkbox"
                     checked={formData.settings.appearance.meta?.buildingsEnabled || false}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const checked = e.target.checked;
                       setFormData({
                         ...formData,
                         settings: {
@@ -1045,14 +1168,24 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                             ...formData.settings.appearance,
                             meta: {
                               ...formData.settings.appearance.meta,
-                              buildingsEnabled: e.target.checked,
+                              buildingsEnabled: checked,
                             },
                           },
                         },
-                      })
-                    }
+                      });
+                      immediateAutoSave({
+                        settings: {
+                          appearance: {
+                            meta: {
+                              ...formData.settings.appearance.meta,
+                              buildingsEnabled: checked,
+                            },
+                          },
+                        },
+                      }, 'buildingsEnabled');
+                    }}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
 
@@ -1067,7 +1200,8 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     min={0}
                     max={60}
                     value={formData.settings.appearance.meta?.pitch ?? 0}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const pitch = Number(e.target.value);
                       setFormData({
                         ...formData,
                         settings: {
@@ -1076,14 +1210,24 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                             ...formData.settings.appearance,
                             meta: {
                               ...formData.settings.appearance.meta,
-                              pitch: Number(e.target.value),
+                              pitch,
                             },
                           },
                         },
-                      })
-                    }
+                      });
+                      debouncedAutoSave({
+                        settings: {
+                          appearance: {
+                            meta: {
+                              ...formData.settings.appearance.meta,
+                              pitch,
+                            },
+                          },
+                        },
+                      }, 'pitch');
+                    }}
                     className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
 
@@ -1096,7 +1240,8 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     id="terrainEnabled"
                     type="checkbox"
                     checked={formData.settings.appearance.meta?.terrainEnabled || false}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const checked = e.target.checked;
                       setFormData({
                         ...formData,
                         settings: {
@@ -1105,14 +1250,24 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                             ...formData.settings.appearance,
                             meta: {
                               ...formData.settings.appearance.meta,
-                              terrainEnabled: e.target.checked,
+                              terrainEnabled: checked,
                             },
                           },
                         },
-                      })
-                    }
+                      });
+                      immediateAutoSave({
+                        settings: {
+                          appearance: {
+                            meta: {
+                              ...formData.settings.appearance.meta,
+                              terrainEnabled: checked,
+                            },
+                          },
+                        },
+                      }, 'terrainEnabled');
+                    }}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
 
@@ -1149,7 +1304,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                         })
                       }
                       className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
-                      disabled={!isEditing || isSaving}
+                      disabled={!canManage || isSaving}
                     />
                   </div>
 
@@ -1162,7 +1317,8 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                       id="filter_map_styles"
                       type="checkbox"
                       checked={formData.settings.appearance.map_filters?.map_styles || false}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const checked = e.target.checked;
                         setFormData({
                           ...formData,
                           settings: {
@@ -1171,14 +1327,24 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               ...formData.settings.appearance,
                               map_filters: {
                                 ...formData.settings.appearance.map_filters,
-                                map_styles: e.target.checked,
+                                map_styles: checked,
                               },
                             },
                           },
-                        })
-                      }
+                        });
+                        immediateAutoSave({
+                          settings: {
+                            appearance: {
+                              map_filters: {
+                                ...formData.settings.appearance.map_filters,
+                                map_styles: checked,
+                              },
+                            },
+                          },
+                        }, 'filter_map_styles');
+                      }}
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                      disabled={!isEditing || isSaving}
+                      disabled={!canManage || isSaving}
                     />
                   </div>
 
@@ -1191,7 +1357,8 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                       id="filter_global_layers"
                       type="checkbox"
                       checked={formData.settings.appearance.map_filters?.global_layers || false}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const checked = e.target.checked;
                         setFormData({
                           ...formData,
                           settings: {
@@ -1200,14 +1367,24 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               ...formData.settings.appearance,
                               map_filters: {
                                 ...formData.settings.appearance.map_filters,
-                                global_layers: e.target.checked,
+                                global_layers: checked,
                               },
                             },
                           },
-                        })
-                      }
+                        });
+                        immediateAutoSave({
+                          settings: {
+                            appearance: {
+                              map_filters: {
+                                ...formData.settings.appearance.map_filters,
+                                global_layers: checked,
+                              },
+                            },
+                          },
+                        }, 'filter_global_layers');
+                      }}
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                      disabled={!isEditing || isSaving}
+                      disabled={!canManage || isSaving}
                     />
                   </div>
                 </div>
@@ -1267,22 +1444,30 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               value={currentValue}
                               onChange={(e) => {
                                 const value = parseInt(e.target.value, 10);
+                                const maxMembers = value > 0 ? value : null;
                                 setFormData({
                                   ...formData,
                                   settings: {
                                     ...formData.settings,
                                     membership: {
                                       ...formData.settings.membership,
-                                      max_members: value > 0 ? value : null,
+                                      max_members: maxMembers,
                                     },
                                   },
                                 });
+                                debouncedAutoSave({
+                                  settings: {
+                                    membership: {
+                                      max_members: maxMembers,
+                                    },
+                                  },
+                                }, 'max_members');
                               }}
                               className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-gray-900 [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-gray-900 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:cursor-pointer"
                               style={{
                                 background: `linear-gradient(to right, #111827 0%, #111827 ${((currentValue - minLimit) / (maxLimit - minLimit)) * 100}%, #e5e7eb ${((currentValue - minLimit) / (maxLimit - minLimit)) * 100}%, #e5e7eb 100%)`
                               }}
-                              disabled={!isEditing || isSaving}
+                              disabled={!canManage || isSaving}
                             />
                             <div className="flex items-center justify-between mt-0.5">
                               <span className="text-[10px] text-gray-400">{minLimit}</span>
@@ -1308,9 +1493,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                                     },
                                   },
                                 });
+                                immediateAutoSave({
+                                  settings: {
+                                    membership: {
+                                      max_members: null,
+                                    },
+                                  },
+                                }, 'max_members');
                               }}
                               className="mt-1 text-[11px] text-gray-500 hover:text-gray-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
-                              disabled={!isEditing || isSaving}
+                              disabled={!canManage || isSaving}
                             >
                               Remove limit
                             </button>
@@ -1319,19 +1511,27 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                           <button
                             type="button"
                             onClick={() => {
+                              const value = Math.min(defaultLimit, maxLimit);
                               setFormData({
                                 ...formData,
                                 settings: {
                                   ...formData.settings,
                                   membership: {
                                     ...formData.settings.membership,
-                                    max_members: Math.min(defaultLimit, maxLimit), // Default to 50, but cap at plan limit
+                                    max_members: value,
                                   },
                                 },
                               });
+                              immediateAutoSave({
+                                settings: {
+                                  membership: {
+                                    max_members: value,
+                                  },
+                                },
+                              }, 'max_members');
                             }}
                             className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            disabled={!isEditing || isSaving}
+                            disabled={!canManage || isSaving}
                           >
                             Set member limit (defaults to {Math.min(defaultLimit, maxLimit)})
                           </button>
@@ -1349,11 +1549,14 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                   <textarea
                     id="membership_rules"
                     value={formData.membership_rules}
-                    onChange={(e) => setFormData({ ...formData, membership_rules: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, membership_rules: e.target.value });
+                      debouncedAutoSave({ membership_rules: e.target.value || null }, 'membership_rules');
+                    }}
                     className="w-full px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
                     placeholder="Custom rules or terms for membership (optional)"
                     rows={3}
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
 
@@ -1376,20 +1579,28 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                       id="allow_pins"
                       type="checkbox"
                       checked={formData.settings.collaboration.allow_pins}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const checked = e.target.checked;
                         setFormData({
                           ...formData,
                           settings: {
                             ...formData.settings,
                             collaboration: {
                               ...formData.settings.collaboration,
-                              allow_pins: e.target.checked,
+                              allow_pins: checked,
                             },
                           },
-                        })
-                      }
+                        });
+                        immediateAutoSave({
+                          settings: {
+                            collaboration: {
+                              allow_pins: checked,
+                            },
+                          },
+                        }, 'allow_pins');
+                      }}
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                      disabled={!canManage || isSaving || formData.visibility === 'private'}
                     />
                   </div>
 
@@ -1401,47 +1612,66 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                       id="allow_areas"
                       type="checkbox"
                       checked={formData.settings.collaboration.allow_areas}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const checked = e.target.checked;
                         setFormData({
                           ...formData,
                           settings: {
                             ...formData.settings,
                             collaboration: {
                               ...formData.settings.collaboration,
-                              allow_areas: e.target.checked,
+                              allow_areas: checked,
                             },
                           },
-                        })
-                      }
+                        });
+                        immediateAutoSave({
+                          settings: {
+                            collaboration: {
+                              allow_areas: checked,
+                            },
+                          },
+                        }, 'allow_areas');
+                      }}
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                      disabled={!canManage || isSaving || formData.visibility === 'private'}
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="allow_posts" className="text-xs text-gray-600">
-                      Allow others to create posts
-                    </label>
-                    <input
-                      id="allow_posts"
-                      type="checkbox"
-                      checked={formData.settings.collaboration.allow_posts}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          settings: {
-                            ...formData.settings,
-                            collaboration: {
-                              ...formData.settings.collaboration,
-                              allow_posts: e.target.checked,
+                  {/* Posts setting hidden for custom maps */}
+                  {isLiveMap && (
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="allow_posts" className="text-xs text-gray-600">
+                        Allow others to create posts
+                      </label>
+                      <input
+                        id="allow_posts"
+                        type="checkbox"
+                        checked={formData.settings.collaboration.allow_posts}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData({
+                            ...formData,
+                            settings: {
+                              ...formData.settings,
+                              collaboration: {
+                                ...formData.settings.collaboration,
+                                allow_posts: checked,
+                              },
                             },
-                          },
-                        })
-                      }
-                      className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
-                    />
-                  </div>
+                          });
+                          immediateAutoSave({
+                            settings: {
+                              collaboration: {
+                                allow_posts: checked,
+                              },
+                            },
+                          }, 'allow_posts');
+                        }}
+                        className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                        disabled={!canManage || isSaving || formData.visibility === 'private'}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between">
                     <label htmlFor="allow_clicks" className="text-xs text-gray-600">
@@ -1451,20 +1681,28 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                       id="allow_clicks"
                       type="checkbox"
                       checked={formData.settings.collaboration.allow_clicks}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const checked = e.target.checked;
                         setFormData({
                           ...formData,
                           settings: {
                             ...formData.settings,
                             collaboration: {
                               ...formData.settings.collaboration,
-                              allow_clicks: e.target.checked,
+                              allow_clicks: checked,
                             },
                           },
-                        })
-                      }
+                        });
+                        immediateAutoSave({
+                          settings: {
+                            collaboration: {
+                              allow_clicks: checked,
+                            },
+                          },
+                        }, 'allow_clicks');
+                      }}
                       className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                      disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                      disabled={!canManage || isSaving || formData.visibility === 'private'}
                     />
                   </div>
                       
@@ -1488,9 +1726,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                               },
                             },
                           });
+                          immediateAutoSave({
+                            settings: {
+                              collaboration: {
+                                pin_permissions: { required_plan: value as any },
+                              },
+                            },
+                          }, 'pin_permissions');
                         }}
                         className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                        disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                        disabled={!canManage || isSaving || formData.visibility === 'private'}
                           >
                             <option value="any">Any authenticated user</option>
                             <option value="hobby">Hobby plan or higher</option>
@@ -1520,9 +1765,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                                   },
                                 },
                               });
+                              immediateAutoSave({
+                                settings: {
+                                  collaboration: {
+                                    area_permissions: { required_plan: value as any },
+                                  },
+                                },
+                              }, 'area_permissions');
                             }}
                             className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                            disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                            disabled={!canManage || isSaving || formData.visibility === 'private'}
                           >
                             <option value="any">Any authenticated user</option>
                             <option value="hobby">Hobby plan or higher</option>
@@ -1533,7 +1785,8 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                         </div>
                       )}
                       
-                      {formData.settings.collaboration.allow_posts && (
+                      {/* Posts permissions hidden for custom maps */}
+                      {isLiveMap && formData.settings.collaboration.allow_posts && (
                         <div className="pt-2 border-t border-gray-200 space-y-1.5">
                           <label className="text-[10px] font-medium text-gray-500">
                             Minimum plan to create posts
@@ -1552,9 +1805,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                                   },
                                 },
                               });
+                              immediateAutoSave({
+                                settings: {
+                                  collaboration: {
+                                    post_permissions: { required_plan: value as any },
+                                  },
+                                },
+                              }, 'post_permissions');
                             }}
                             className="w-full text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
-                            disabled={!isEditing || isSaving || formData.visibility === 'private'}
+                            disabled={!canManage || isSaving || formData.visibility === 'private'}
                           >
                             <option value="any">Any authenticated user</option>
                             <option value="hobby">Hobby plan or higher</option>
@@ -1596,20 +1856,28 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     id="is_featured"
                     type="checkbox"
                     checked={formData.settings.presentation.is_featured}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const checked = e.target.checked;
                       setFormData({
                         ...formData,
                         settings: {
                           ...formData.settings,
                           presentation: {
                             ...formData.settings.presentation,
-                            is_featured: e.target.checked,
+                            is_featured: checked,
                           },
                         },
-                      })
-                    }
+                      });
+                      immediateAutoSave({
+                        settings: {
+                          presentation: {
+                            is_featured: checked,
+                          },
+                        },
+                      }, 'is_featured');
+                    }}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
                 <p className="text-[11px] text-gray-500">
@@ -1624,20 +1892,28 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     id="hide_creator"
                     type="checkbox"
                     checked={formData.settings.presentation.hide_creator}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const checked = e.target.checked;
                       setFormData({
                         ...formData,
                         settings: {
                           ...formData.settings,
                           presentation: {
                             ...formData.settings.presentation,
-                            hide_creator: e.target.checked,
+                            hide_creator: checked,
                           },
                         },
-                      })
-                    }
+                      });
+                      immediateAutoSave({
+                        settings: {
+                          presentation: {
+                            hide_creator: checked,
+                          },
+                        },
+                      }, 'hide_creator');
+                    }}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
                 <p className="text-[11px] text-gray-500">
@@ -1652,20 +1928,28 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     id="show_map_filters_icon"
                     type="checkbox"
                     checked={formData.settings.presentation.show_map_filters_icon}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const checked = e.target.checked;
                       setFormData({
                         ...formData,
                         settings: {
                           ...formData.settings,
                           presentation: {
                             ...formData.settings.presentation,
-                            show_map_filters_icon: e.target.checked,
+                            show_map_filters_icon: checked,
                           },
                         },
-                      })
-                    }
+                      });
+                      immediateAutoSave({
+                        settings: {
+                          presentation: {
+                            show_map_filters_icon: checked,
+                          },
+                        },
+                      }, 'show_map_filters_icon');
+                    }}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
                 <p className="text-[11px] text-gray-500">
@@ -1674,6 +1958,214 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               </div>
             )}
           </div>
+
+          {/* COLORS SECTION - Only show for owners */}
+          {isOwner && (
+            <div className="border border-gray-200 rounded-md bg-white">
+              <button
+                type="button"
+                onClick={() => toggleSection('colors')}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-900 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <PaintBrushIcon className="w-4 h-4 text-gray-500" />
+                  <span>Colors</span>
+                </div>
+                {openSections.has('colors') ? (
+                  <ChevronUpIcon className="w-3 h-3" />
+                ) : (
+                  <ChevronDownIcon className="w-3 h-3" />
+                )}
+              </button>
+              {openSections.has('colors') && (
+                <div className="px-3 pb-3 space-y-3 border-t border-gray-200 pt-2">
+                  <p className="text-[11px] text-gray-500">
+                    Customize the page background color for each role. Use the "View As" selector to preview changes.
+                  </p>
+                  
+                  {/* Owner Color */}
+                  <div>
+                    <label htmlFor="color_owner" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Owner Background
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="color_owner"
+                        type="text"
+                        value={formData.settings.colors.owner}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({
+                            ...formData,
+                            settings: {
+                              ...formData.settings,
+                              colors: {
+                                ...formData.settings.colors,
+                                owner: value,
+                              },
+                            },
+                          });
+                          debouncedAutoSave({
+                            settings: {
+                              colors: {
+                                owner: value,
+                              },
+                            },
+                          }, 'color_owner');
+                        }}
+                        className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        placeholder="linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F) or #000000"
+                        disabled={!canManage || isSaving}
+                      />
+                      <div
+                        className="w-10 h-10 rounded-md border border-gray-200 flex-shrink-0"
+                        style={{ background: formData.settings.colors.owner }}
+                        title="Preview"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Default: gradient (linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F))
+                    </p>
+                  </div>
+
+                  {/* Manager Color */}
+                  <div>
+                    <label htmlFor="color_manager" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Manager Background
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="color_manager"
+                        type="text"
+                        value={formData.settings.colors.manager}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({
+                            ...formData,
+                            settings: {
+                              ...formData.settings,
+                              colors: {
+                                ...formData.settings.colors,
+                                manager: value,
+                              },
+                            },
+                          });
+                          debouncedAutoSave({
+                            settings: {
+                              colors: {
+                                manager: value,
+                              },
+                            },
+                          }, 'color_manager');
+                        }}
+                        className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        placeholder="#000000 or linear-gradient(...)"
+                        disabled={!canManage || isSaving}
+                      />
+                      <div
+                        className="w-10 h-10 rounded-md border border-gray-200 flex-shrink-0"
+                        style={{ background: formData.settings.colors.manager }}
+                        title="Preview"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Default: black (#000000)
+                    </p>
+                  </div>
+
+                  {/* Editor Color */}
+                  <div>
+                    <label htmlFor="color_editor" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Editor Background
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="color_editor"
+                        type="text"
+                        value={formData.settings.colors.editor}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({
+                            ...formData,
+                            settings: {
+                              ...formData.settings,
+                              colors: {
+                                ...formData.settings.colors,
+                                editor: value,
+                              },
+                            },
+                          });
+                          debouncedAutoSave({
+                            settings: {
+                              colors: {
+                                editor: value,
+                              },
+                            },
+                          }, 'color_editor');
+                        }}
+                        className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        placeholder="#000000 or linear-gradient(...)"
+                        disabled={!canManage || isSaving}
+                      />
+                      <div
+                        className="w-10 h-10 rounded-md border border-gray-200 flex-shrink-0"
+                        style={{ background: formData.settings.colors.editor }}
+                        title="Preview"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Default: black (#000000)
+                    </p>
+                  </div>
+
+                  {/* Non-Member Color */}
+                  <div>
+                    <label htmlFor="color_non_member" className="block text-xs font-medium text-gray-500 mb-0.5">
+                      Non-Member Background
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="color_non_member"
+                        type="text"
+                        value={formData.settings.colors['non-member']}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setFormData({
+                            ...formData,
+                            settings: {
+                              ...formData.settings,
+                              colors: {
+                                ...formData.settings.colors,
+                                'non-member': value,
+                              },
+                            },
+                          });
+                          debouncedAutoSave({
+                            settings: {
+                              colors: {
+                                'non-member': value,
+                              },
+                            },
+                          }, 'color_non_member');
+                        }}
+                        className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors disabled:bg-gray-50 disabled:cursor-not-allowed"
+                        placeholder="#000000 or linear-gradient(...)"
+                        disabled={!canManage || isSaving}
+                      />
+                      <div
+                        className="w-10 h-10 rounded-md border border-gray-200 flex-shrink-0"
+                        style={{ background: formData.settings.colors['non-member'] }}
+                        title="Preview"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Default: black (#000000)
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* NEW MEMBERS SECTION */}
           <div className="border border-gray-200 rounded-md bg-white">
@@ -1703,14 +2195,16 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                     id="auto_approve_members"
                     type="checkbox"
                     checked={formData.auto_approve_members}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const checked = e.target.checked;
                       setFormData({
                         ...formData,
-                        auto_approve_members: e.target.checked,
-                      })
-                    }
+                        auto_approve_members: checked,
+                      });
+                      immediateAutoSave({ auto_approve_members: checked }, 'auto_approve_members');
+                    }}
                     className="w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
-                    disabled={!isEditing || isSaving}
+                    disabled={!canManage || isSaving}
                   />
                 </div>
                 <p className="text-[11px] text-gray-500">
@@ -1732,21 +2226,24 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                             const updated = [...formData.membership_questions];
                             updated[idx] = { ...q, question: e.target.value };
                             setFormData({ ...formData, membership_questions: updated });
+                            debouncedAutoSave({ membership_questions: updated }, 'membership_questions');
                           }}
                           className="flex-1 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 disabled:bg-gray-50"
                           placeholder="Question text"
-                          disabled={!isEditing || isSaving}
+                          disabled={!canManage || isSaving}
                         />
                         <button
                           type="button"
                           onClick={() => {
+                            const updated = formData.membership_questions.filter((_, i) => i !== idx);
                             setFormData({
                               ...formData,
-                              membership_questions: formData.membership_questions.filter((_, i) => i !== idx),
+                              membership_questions: updated,
                             });
+                            immediateAutoSave({ membership_questions: updated }, 'membership_questions');
                           }}
                           className="p-1 text-gray-400 hover:text-gray-600"
-                          disabled={!isEditing || isSaving}
+                          disabled={!canManage || isSaving}
                         >
                           <XMarkIcon className="w-3 h-3" />
                         </button>
@@ -1756,16 +2253,18 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                       <button
                         type="button"
                         onClick={() => {
+                          const updated = [
+                            ...formData.membership_questions,
+                            { id: formData.membership_questions.length, question: '' },
+                          ];
                           setFormData({
                             ...formData,
-                            membership_questions: [
-                              ...formData.membership_questions,
-                              { id: formData.membership_questions.length, question: '' },
-                            ],
+                            membership_questions: updated,
                           });
+                          immediateAutoSave({ membership_questions: updated }, 'membership_questions');
                         }}
                         className="text-xs text-indigo-600 hover:text-indigo-700"
-                        disabled={!isEditing || isSaving}
+                        disabled={!canManage || isSaving}
                       >
                         + Add question
                       </button>
@@ -1903,7 +2402,90 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
               </div>
             )}
           </div>
-          </form>
+          </div>
+        )}
+
+        {/* DANGER ZONE SECTION - Only show for owners */}
+        {isOwner && (
+          <div className="mt-3 border border-red-200 rounded-md bg-white">
+            <button
+              type="button"
+              onClick={() => toggleSection('danger-zone')}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
+                <span>Danger Zone</span>
+              </div>
+              {openSections.has('danger-zone') ? (
+                <ChevronUpIcon className="w-3 h-3" />
+              ) : (
+                <ChevronDownIcon className="w-3 h-3" />
+              )}
+            </button>
+            {openSections.has('danger-zone') && (
+              <div className="px-3 pb-3 space-y-3 border-t border-red-200 pt-2">
+                <div className="bg-red-50 border border-red-200 rounded-md p-[10px]">
+                  <p className="text-xs text-red-800 font-medium mb-1">Delete Map</p>
+                  <p className="text-[11px] text-red-700 mb-3">
+                    Once you delete a map, there is no going back. This will permanently delete the map and all its content.
+                  </p>
+                  <div className="space-y-2">
+                    <div>
+                      <label htmlFor="delete-confirm" className="block text-xs font-medium text-red-800 mb-1">
+                        Type <code className="px-1 py-0.5 bg-red-100 rounded text-[10px] font-mono">{deleteConfirmUrl}</code> to confirm:
+                      </label>
+                      <input
+                        id="delete-confirm"
+                        type="text"
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder={deleteConfirmUrl}
+                        className="w-full px-[10px] py-[10px] border border-red-300 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+                        disabled={isDeleting}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (deleteConfirmText !== deleteConfirmUrl) {
+                          toast.error('Confirmation text does not match');
+                          return;
+                        }
+
+                        if (!confirm('Are you sure you want to delete this map? This action cannot be undone.')) {
+                          return;
+                        }
+
+                        setIsDeleting(true);
+                        try {
+                          const response = await fetch(`/api/maps/${initialMap.id}`, {
+                            method: 'DELETE',
+                          });
+
+                          if (!response.ok) {
+                            const data = await response.json();
+                            throw new Error(data.error || 'Failed to delete map');
+                          }
+
+                          toast.success('Map deleted successfully');
+                          router.push('/maps');
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : 'Failed to delete map');
+                        } finally {
+                          setIsDeleting(false);
+                        }
+                      }}
+                      disabled={deleteConfirmText !== deleteConfirmUrl || isDeleting}
+                      className="w-full px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-600"
+                    >
+                      {isDeleting ? 'Deleting...' : 'Delete Map'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         
         {/* Debug Info Section - Shows plan and features */}
@@ -2058,22 +2640,25 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                         : 'Disabled'}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">Create Posts</span>
-                    <span className={`font-medium ${
-                      formData.settings.collaboration.allow_posts
-                        ? (formData.settings.collaboration.post_permissions?.required_plan
-                            ? 'text-blue-600' // Plan-based
-                            : 'text-red-600') // Owner-granted
-                        : 'text-gray-400'
-                    }`}>
-                      {formData.settings.collaboration.allow_posts
-                        ? (formData.settings.collaboration.post_permissions?.required_plan
-                            ? `${formData.settings.collaboration.post_permissions.required_plan}+`
-                            : 'Enabled')
-                        : 'Disabled'}
-                    </span>
-                  </div>
+                  {/* Posts status hidden for custom maps */}
+                  {isLiveMap && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-700">Create Posts</span>
+                      <span className={`font-medium ${
+                        formData.settings.collaboration.allow_posts
+                          ? (formData.settings.collaboration.post_permissions?.required_plan
+                              ? 'text-blue-600' // Plan-based
+                              : 'text-red-600') // Owner-granted
+                          : 'text-gray-400'
+                      }`}>
+                        {formData.settings.collaboration.allow_posts
+                          ? (formData.settings.collaboration.post_permissions?.required_plan
+                              ? `${formData.settings.collaboration.post_permissions.required_plan}+`
+                              : 'Enabled')
+                          : 'Disabled'}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span className="text-gray-700">Click on Map</span>
                     <span className={`font-medium ${

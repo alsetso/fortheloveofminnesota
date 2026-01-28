@@ -11,6 +11,33 @@ import React, {
 } from 'react';
 import { useAuthStateSafe } from '@/features/auth';
 
+// Context for initial billing data from server
+const InitialBillingDataContext = createContext<{
+  accountId: string | null;
+  features: AccountFeatureEntitlement[];
+} | null>(null);
+
+export function InitialBillingDataProvider({
+  children,
+  initialData,
+}: {
+  children: React.ReactNode;
+  initialData: {
+    accountId: string | null;
+    features: AccountFeatureEntitlement[];
+  } | null;
+}) {
+  return (
+    <InitialBillingDataContext.Provider value={initialData}>
+      {children}
+    </InitialBillingDataContext.Provider>
+  );
+}
+
+function useInitialBillingData() {
+  return useContext(InitialBillingDataContext);
+}
+
 export type AccountFeatureEntitlement = {
   slug: string;
   name: string;
@@ -65,16 +92,32 @@ function normalizeEntitlements(payload: unknown): AccountFeatureEntitlement[] {
 
 export function BillingEntitlementsProvider({ children }: { children: React.ReactNode }) {
   const { user, account, activeAccountId } = useAuthStateSafe();
+  const initialData = useInitialBillingData();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [accountId, setAccountId] = useState<string | null>(null);
-  const [features, setFeatures] = useState<AccountFeatureEntitlement[]>([]);
+  const [accountId, setAccountId] = useState<string | null>(initialData?.accountId || null);
+  const [features, setFeatures] = useState<AccountFeatureEntitlement[]>(initialData?.features || []);
   
   // Cache features per account
   const featuresCache = useRef<Map<string, { features: AccountFeatureEntitlement[]; timestamp: number }>>(new Map());
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   const requestSeq = useRef(0);
+
+  // Initialize from server data if available
+  useEffect(() => {
+    if (initialData) {
+      setAccountId(initialData.accountId);
+      setFeatures(initialData.features);
+      // Cache the initial data
+      if (initialData.accountId) {
+        featuresCache.current.set(initialData.accountId, {
+          features: initialData.features,
+          timestamp: Date.now(),
+        });
+      }
+    }
+  }, [initialData]);
 
   const refresh = useCallback(async () => {
     const nextSeq = ++requestSeq.current;
@@ -98,6 +141,20 @@ export function BillingEntitlementsProvider({ children }: { children: React.Reac
       setFeatures(cached.features);
       setError(null);
       setIsLoading(false);
+      return;
+    }
+
+    // If initial data matches current account, use it (no need to refetch immediately)
+    if (initialData && initialData.accountId === targetAccountId && initialData.features.length > 0) {
+      setAccountId(targetAccountId);
+      setFeatures(initialData.features);
+      setError(null);
+      setIsLoading(false);
+      // Cache the initial data
+      featuresCache.current.set(targetAccountId, {
+        features: initialData.features,
+        timestamp: now,
+      });
       return;
     }
 
@@ -137,7 +194,7 @@ export function BillingEntitlementsProvider({ children }: { children: React.Reac
       if (nextSeq !== requestSeq.current) return;
       setIsLoading(false);
     }
-  }, [user, account, activeAccountId]);
+  }, [user, account, activeAccountId, initialData]);
 
   // Refresh when the active account changes
   useEffect(() => {

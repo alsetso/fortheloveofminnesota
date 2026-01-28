@@ -46,6 +46,7 @@ interface JoinMapSidebarProps {
 export default function JoinMapSidebar({
   mapId,
   mapName,
+  mapData,
   autoApproveMembers,
   membershipQuestions,
   membershipRules,
@@ -61,6 +62,9 @@ export default function JoinMapSidebar({
   onJoinSuccess,
   onClose,
 }: JoinMapSidebarProps) {
+  // Hide posts for custom maps (posts removed from custom maps, backend kept)
+  const isLiveMap = mapData?.slug === 'live';
+  const showPosts = allowPosts && isLiveMap;
   const { account, activeAccountId } = useAuthStateSafe();
   const router = useRouter();
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -342,7 +346,7 @@ export default function JoinMapSidebar({
               </div>
 
               {/* Collaboration Tools */}
-              {(allowPins || allowAreas || allowPosts) && (
+              {(allowPins || allowAreas || showPosts) && (
                 <div className="space-y-1.5">
                   <div className="text-[10px] font-medium text-gray-500">Collaboration Tools</div>
                   <div className="bg-white border border-gray-200 rounded-md p-[10px]">
@@ -369,7 +373,7 @@ export default function JoinMapSidebar({
                           )}
                         </div>
                       )}
-                      {allowPosts && (
+                      {showPosts && (
                         <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
                           <DocumentTextIcon className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" />
                           <span className="text-xs font-medium text-gray-700">Posts</span>

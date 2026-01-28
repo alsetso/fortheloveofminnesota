@@ -62,8 +62,8 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
     const fetchMaps = async () => {
       setLoading(true);
       try {
-        // Fetch primary maps and popular maps
-        const response = await fetch('/api/maps?visibility=public&limit=50');
+        // Fetch primary maps and popular maps (published to community)
+        const response = await fetch('/api/maps?community=true&limit=50');
         if (!response.ok) {
           throw new Error('Failed to fetch maps');
         }
@@ -102,7 +102,7 @@ export default function MapsSelectorDropdown({ className = '' }: MapsSelectorDro
     const fetchCommunityMaps = async () => {
       setLoadingCommunityMaps(true);
       try {
-        const response = await fetch('/api/maps?collection_type=community&visibility=public');
+        const response = await fetch('/api/maps?community=true&limit=50');
         if (!response.ok) throw new Error('Failed to fetch community maps');
         const data = await response.json();
         

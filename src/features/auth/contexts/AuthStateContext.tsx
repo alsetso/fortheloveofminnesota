@@ -65,16 +65,28 @@ const AuthStateContext = createContext<AuthStateContextType | undefined>(undefin
 const LAST_SELECTED_ACCOUNT_KEY = 'LAST_SELECTED_ACCOUNT';
 const OLD_ACCOUNT_STORAGE_KEY = 'mnuda_active_account_id'; // Legacy key for migration
 
-export function AuthStateProvider({ children }: { children: ReactNode }) {
+interface AuthStateProviderProps {
+  children: ReactNode;
+  /** Initial auth data from server - if provided, skips client-side auth fetch */
+  initialAuth?: {
+    userId: string | null;
+    accountId: string | null;
+  } | null;
+}
+
+export function AuthStateProvider({ children, initialAuth }: AuthStateProviderProps) {
   const router = useRouter();
   
   // Core auth state
+  // If initialAuth is provided, start with user loaded (but we still need to fetch User object)
   const [user, setUser] = useState<User | null>(null);
   const [account, setAccount] = useState<Account | null>(null);
-  const [activeAccountId, setActiveAccountIdState] = useState<string | null>(null);
+  const [activeAccountId, setActiveAccountIdState] = useState<string | null>(
+    initialAuth?.accountId || null
+  );
   
-  // Loading states
-  const [isLoading, setIsLoading] = useState(true);
+  // Loading states - if initialAuth provided, start as not loading (will be set correctly after initial fetch)
+  const [isLoading, setIsLoading] = useState(!initialAuth?.userId);
   const [isAccountLoading, setIsAccountLoading] = useState(false);
   
   // Modal state
@@ -110,31 +122,56 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
     let timeoutId: NodeJS.Timeout;
 
     const initAuth = async () => {
-      try {
-        timeoutId = setTimeout(() => {
+      // If we have initial auth data, we know user is authenticated
+      // Still need to fetch User object for full context, but can skip if already have it
+      if (initialAuth?.userId) {
+        try {
+          // Quick fetch to get User object - should be fast since we know user exists
+          const { data: { user: authUser }, error } = await supabase.auth.getUser();
+          
+          if (!mounted) return;
+
+          if (error || !authUser) {
+            setUser(null);
+            setIsLoading(false);
+          } else {
+            setUser(authUser);
+            setIsLoading(false);
+          }
+        } catch {
           if (mounted) {
             setUser(null);
             setIsLoading(false);
           }
-        }, 2000);
-
-        const { data: { user: authUser }, error } = await supabase.auth.getUser();
-        
-        clearTimeout(timeoutId);
-        if (!mounted) return;
-
-        if (error || !authUser) {
-          setUser(null);
-        } else {
-          setUser(authUser);
         }
-        
-        setIsLoading(false);
-      } catch {
-        clearTimeout(timeoutId);
-        if (mounted) {
-          setUser(null);
+      } else {
+        // No initial auth - do full check with timeout
+        try {
+          timeoutId = setTimeout(() => {
+            if (mounted) {
+              setUser(null);
+              setIsLoading(false);
+            }
+          }, 2000);
+
+          const { data: { user: authUser }, error } = await supabase.auth.getUser();
+          
+          clearTimeout(timeoutId);
+          if (!mounted) return;
+
+          if (error || !authUser) {
+            setUser(null);
+          } else {
+            setUser(authUser);
+          }
+          
           setIsLoading(false);
+        } catch {
+          clearTimeout(timeoutId);
+          if (mounted) {
+            setUser(null);
+            setIsLoading(false);
+          }
         }
       }
     };
@@ -157,10 +194,10 @@ export function AuthStateProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initialAuth?.userId]);
 
   // Load active account when user or activeAccountId changes
   useEffect(() => {

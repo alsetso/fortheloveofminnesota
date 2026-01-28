@@ -6,6 +6,8 @@ import { ToastContainer } from '@/features/ui/components/Toast'
 import { Providers } from '@/components/providers/Providers'
 import { ErrorBoundary } from '@/components/errors/ErrorBoundary'
 import LocalStorageCleanup from '@/components/utils/LocalStorageCleanup'
+import { getAuthAndBilling } from '@/lib/server/getAuthAndBilling'
+import { InitialBillingDataProvider } from '@/contexts/BillingEntitlementsContext'
 // Removed usage/billing context and modals after simplifying app
 // Footer moved to PageLayout component for consistent page structure
 
@@ -72,11 +74,15 @@ export const metadata: Metadata = {
   category: 'Community & Social',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Fetch auth + billing once per request (cached via React cache())
+  // This ensures only one auth check across all pages
+  const { auth, billing } = await getAuthAndBilling();
+
   return (
     <html lang="en" className="h-full w-full">
       <body className="min-h-screen w-full" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -119,16 +125,18 @@ export default function RootLayout({
           />
         </noscript>
         {/* End Meta Pixel Code */}
-        <Providers>
-          <ErrorBoundary>
-            <LocalStorageCleanup />
-            {/* Pages handle their own header/footer via PageLayout component */}
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
-              {children}
-            </div>
-            <ToastContainer />
-          </ErrorBoundary>
-        </Providers>
+        <InitialBillingDataProvider initialData={billing}>
+          <Providers initialAuth={auth}>
+            <ErrorBoundary>
+              <LocalStorageCleanup />
+              {/* Pages handle their own header/footer via PageLayout component */}
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
+                {children}
+              </div>
+              <ToastContainer />
+            </ErrorBoundary>
+          </Providers>
+        </InitialBillingDataProvider>
       </body>
     </html>
   )

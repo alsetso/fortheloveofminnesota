@@ -9,6 +9,7 @@ import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validateQueryParams, validateRequestBody } from '@/lib/security/validation';
 import { z } from 'zod';
 import { commonSchemas } from '@/lib/security/validation';
+import { MAP_FEATURE_SLUG, checkMapLimitServer } from '@/lib/billing/mapLimits';
 
 /**
  * GET /api/maps
@@ -23,6 +24,7 @@ const mapsQuerySchema = z.object({
   visibility: z.enum(['public', 'private']).optional(),
   account_id: commonSchemas.uuid.optional(),
   category: z.enum(['community', 'professional', 'government', 'atlas', 'user']).optional(),
+  community: z.coerce.boolean().optional(), // Filter by published_to_community
   limit: z.coerce.number().int().positive().max(200).default(50),
   offset: z.coerce.number().int().nonnegative().default(0),
 });
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
           return validation.error;
         }
         
-        const { visibility, account_id, category, limit, offset } = validation.data;
+        const { visibility, account_id, category, community, limit, offset } = validation.data;
 
     // Build query - use new structure
     let query = supabase
@@ -59,6 +61,8 @@ export async function GET(request: NextRequest) {
         settings,
         member_count,
         is_active,
+        published_to_community,
+        published_at,
         tags,
         created_at,
         updated_at,
@@ -70,10 +74,19 @@ export async function GET(request: NextRequest) {
           image_url
         )
       `)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .eq('is_active', true);
 
         // Apply filters
+        if (community) {
+          // Filter by published_to_community for community discovery
+          query = query.eq('published_to_community', true);
+          // Order by published_at (most recently published first), then created_at
+          query = query.order('published_at', { ascending: false, nullsFirst: false });
+          query = query.order('created_at', { ascending: false });
+        } else {
+          query = query.order('created_at', { ascending: false });
+        }
+
         if (visibility) {
           query = query.eq('visibility', visibility);
         }
@@ -86,9 +99,9 @@ export async function GET(request: NextRequest) {
         // For now, we'll filter after fetching (or use a separate query)
         // This requires a more complex query structure
 
-    // For anonymous users, only show public maps
+    // For anonymous users, only show public maps (unless community=true, where RLS handles private published maps)
     // For authenticated users, RLS will handle visibility (public + own private + member of)
-    if (!auth) {
+    if (!auth && !community) {
       query = query.eq('visibility', 'public');
     }
 
@@ -163,13 +176,7 @@ export async function POST(request: NextRequest) {
 
         const supabase = await createServerClientWithAuth(cookies());
         
-        // Verify user session is loaded
-        const { data: { user: supabaseUser }, error: userError } = await supabase.auth.getUser();
-        
-        if (userError || !supabaseUser || supabaseUser.id !== userId) {
-          return createErrorResponse('Authentication failed', 401);
-        }
-        
+        // userId is already validated by withSecurity middleware
         // Validate request body
         const validation = await validateRequestBody(req, createMapSchema, REQUEST_SIZE_LIMITS.json);
         if (!validation.success) {
@@ -221,8 +228,8 @@ export async function POST(request: NextRequest) {
         
         // Admins can bypass all limits
         if (!isAdmin) {
-          // Count existing maps for this account
-          const { count: currentMapCount, error: mapsError } = await supabase
+          // INVARIANT: Count owned maps - this is the single source of truth
+          const { count: ownedMapsCount, error: mapsError } = await supabase
             .from('map')
             .select('*', { count: 'exact', head: true })
             .eq('account_id', finalAccountId);
@@ -234,29 +241,25 @@ export async function POST(request: NextRequest) {
             return createErrorResponse('Failed to check map limit', 500);
           }
 
-          const used = currentMapCount ?? 0;
-
+          // Get feature limit using canonical slug
           const { data: mapRows, error: mapFeatureError } = await supabase.rpc('get_account_feature_limit', {
             account_id: finalAccountId,
-            feature_slug: 'custom_maps',
+            feature_slug: MAP_FEATURE_SLUG,
           } as any);
 
-          const mapLimit = Array.isArray(mapRows) && (mapRows as any[]).length > 0 ? (mapRows[0] as any) : null;
+          const featureLimit = Array.isArray(mapRows) && (mapRows as any[]).length > 0 ? (mapRows[0] as any) : null;
 
-          if (mapFeatureError || !mapLimit || !mapLimit.has_feature) {
-            return createErrorResponse(
-              'Map creation is not available on your current plan. Upgrade to create maps.',
-              403
-            );
+          if (mapFeatureError) {
+            if (process.env.NODE_ENV === 'development') {
+              console.error('[Maps API] Error fetching feature limit:', mapFeatureError);
+            }
+            return createErrorResponse('Failed to check map limit', 500);
           }
 
-          if (mapLimit.is_unlimited) {
-            // Allowed
-          } else if (mapLimit.limit_type === 'count' && mapLimit.limit_value !== null && used >= mapLimit.limit_value) {
-            return createErrorResponse(
-              `Map limit reached. You have ${used}/${mapLimit.limit_value} maps. Upgrade your plan to create more maps.`,
-              403
-            );
+          // Use centralized limit check (enforces invariant)
+          const limitCheck = checkMapLimitServer(ownedMapsCount ?? 0, featureLimit);
+          if (!limitCheck.canCreate) {
+            return createErrorResponse(limitCheck.errorMessage || 'Map limit reached', 403);
           }
         }
 

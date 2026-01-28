@@ -1,59 +1,163 @@
 'use client';
 
-import { useState } from 'react';
-import { CursorArrowRaysIcon, MapPinIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
-import { CursorArrowRaysIcon as CursorArrowRaysIconSolid, MapPinIcon as MapPinIconSolid, PencilSquareIcon as PencilSquareIconSolid } from '@heroicons/react/24/solid';
+import { useState, useMemo, useCallback } from 'react';
+import { 
+  CursorArrowRaysIcon, 
+  MapPinIcon, 
+  PencilSquareIcon 
+} from '@heroicons/react/24/outline';
+import { 
+  CursorArrowRaysIcon as CursorArrowRaysIconSolid, 
+  MapPinIcon as MapPinIconSolid, 
+  PencilSquareIcon as PencilSquareIconSolid 
+} from '@heroicons/react/24/solid';
 import { canUserPerformMapAction, type PlanLevel } from '@/lib/maps/permissions';
 import type { MapData } from '@/types/map';
 
+type ToolId = 'click' | 'pin' | 'draw';
+type ViewAsRole = 'owner' | 'manager' | 'editor' | 'non-member';
+
 interface CollaborationToolsNavProps {
-  onToolSelect?: (tool: 'click' | 'pin' | 'draw') => void;
-  activeTool?: 'click' | 'pin' | 'draw' | null;
+  onToolSelect?: (tool: ToolId) => void;
+  activeTool?: ToolId | null;
   map?: MapData | null;
   isOwner?: boolean;
+  isMember?: boolean;
   userContext?: {
     accountId: string;
     plan: PlanLevel;
     subscription_status: string | null;
     role?: 'owner' | 'manager' | 'editor' | null;
   } | null;
+  viewAsRole?: ViewAsRole;
+  onJoinClick?: () => void;
+  mapSettings?: {
+    colors?: {
+      owner?: string;
+      manager?: string;
+      editor?: string;
+      'non-member'?: string;
+    };
+  } | null;
 }
+
+interface ToolConfig {
+  id: ToolId;
+  label: string;
+  icon: typeof CursorArrowRaysIcon;
+  iconSolid: typeof CursorArrowRaysIconSolid;
+  actionKey: 'allow_clicks' | 'allow_pins' | 'allow_areas';
+  permissionKey: 'clicks' | 'pins' | 'areas';
+}
+
+const OWNER_GRADIENT = 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)';
+const BLACK_BACKGROUND = '#000000';
+const GRADIENT_BORDER_COLOR = 'rgba(255, 183, 0, 0.4)'; // Matches gradient start color (#FFB700)
+const BLACK_BORDER_COLOR = 'rgba(255, 255, 255, 0.1)';
+
+const TOOL_CONFIGS: ToolConfig[] = [
+  { 
+    id: 'click', 
+    label: 'Click', 
+    icon: CursorArrowRaysIcon, 
+    iconSolid: CursorArrowRaysIconSolid,
+    actionKey: 'allow_clicks',
+    permissionKey: 'clicks',
+  },
+  { 
+    id: 'pin', 
+    label: 'Pin', 
+    icon: MapPinIcon, 
+    iconSolid: MapPinIconSolid,
+    actionKey: 'allow_pins',
+    permissionKey: 'pins',
+  },
+  { 
+    id: 'draw', 
+    label: 'Draw', 
+    icon: PencilSquareIcon, 
+    iconSolid: PencilSquareIconSolid,
+    actionKey: 'allow_areas',
+    permissionKey: 'areas',
+  },
+];
 
 export default function CollaborationToolsNav({ 
   onToolSelect, 
   activeTool = null,
   map,
   isOwner = false,
-  userContext
+  isMember = false,
+  userContext,
+  viewAsRole,
+  onJoinClick,
+  mapSettings,
 }: CollaborationToolsNavProps) {
-  const [hoveredTool, setHoveredTool] = useState<'click' | 'pin' | 'draw' | null>(null);
+  const [hoveredTool, setHoveredTool] = useState<ToolId | null>(null);
 
-  // Check if feature is enabled by owner (owner override)
-  const isFeatureEnabled = (toolId: 'click' | 'pin' | 'draw') => {
+  // Determine if we're showing non-member view
+  const isNonMemberView = useMemo(() => {
+    // If owner is viewing as non-member, show non-member view
+    if (isOwner && viewAsRole === 'non-member') return true;
+    // If not owner and not member, show non-member view
+    if (!isOwner && !isMember) return true;
+    return false;
+  }, [isOwner, isMember, viewAsRole]);
+
+  // Get background color based on viewAsRole and mapSettings
+  const backgroundColor = useMemo(() => {
+    if (!viewAsRole) return BLACK_BACKGROUND;
+    
+    // Get color from mapSettings if available
+    const roleColor = mapSettings?.colors?.[viewAsRole];
+    if (roleColor && roleColor.trim() !== '') {
+      return roleColor;
+    }
+    
+    // Fallback to default: gradient for owner, black for others
+    return viewAsRole === 'owner' ? OWNER_GRADIENT : BLACK_BACKGROUND;
+  }, [viewAsRole, mapSettings]);
+
+  // Get border color based on background
+  const borderColor = useMemo(() => {
+    // Use gradient border if the background is actually a gradient
+    const isGradient = backgroundColor.includes('gradient');
+    return isGradient ? GRADIENT_BORDER_COLOR : BLACK_BORDER_COLOR;
+  }, [backgroundColor]);
+
+  const containerStyle = useMemo(
+    () => ({
+      background: backgroundColor,
+      borderColor: borderColor,
+      borderWidth: '1px',
+      borderStyle: 'solid',
+    }),
+    [backgroundColor, borderColor]
+  );
+
+  const isFeatureEnabled = useCallback((tool: ToolConfig): boolean => {
     if (!map) return false;
-    
     const collaboration = map.settings?.collaboration || {};
-    const actionMap: Record<'click' | 'pin' | 'draw', 'allow_clicks' | 'allow_pins' | 'allow_areas'> = {
-      click: 'allow_clicks',
-      pin: 'allow_pins',
-      draw: 'allow_areas',
-    };
-    
-    const allowKey = actionMap[toolId];
-    return collaboration[allowKey] === true;
-  };
+    return collaboration[tool.actionKey] === true;
+  }, [map]);
 
-  // Check permissions for each tool
-  const getToolPermission = (toolId: 'click' | 'pin' | 'draw') => {
-    // Owner always has access
-    if (isOwner) {
+  const getToolPermission = useCallback((tool: ToolConfig) => {
+    // Non-member view: all tools disabled, show join prompt
+    if (isNonMemberView) {
+      const ownerEnabled = isFeatureEnabled(tool);
+      return { 
+        allowed: false, 
+        reason: 'non_member' as const,
+        isOwnerOverride: ownerEnabled,
+      };
+    }
+
+    if (isOwner && viewAsRole !== 'non-member') {
       return { allowed: true, reason: undefined, isOwnerOverride: false };
     }
 
-    // Check if feature is enabled by owner
-    const ownerEnabled = isFeatureEnabled(toolId);
+    const ownerEnabled = isFeatureEnabled(tool);
 
-    // If no map, show as disabled (but still visible)
     if (!map) {
       return { 
         allowed: false, 
@@ -62,7 +166,6 @@ export default function CollaborationToolsNav({
       };
     }
 
-    // If no user context, show as disabled but indicate owner override if enabled
     if (!userContext) {
       return { 
         allowed: false, 
@@ -71,85 +174,95 @@ export default function CollaborationToolsNav({
       };
     }
 
-    // Map action type for permission checking
-    const actionMap: Record<'click' | 'pin' | 'draw', 'clicks' | 'pins' | 'areas'> = {
-      click: 'clicks',
-      pin: 'pins',
-      draw: 'areas',
-    };
-
-    const action = actionMap[toolId];
-    const permissionCheck = canUserPerformMapAction(action, map, userContext, isOwner);
+    const permissionCheck = canUserPerformMapAction(
+      tool.permissionKey, 
+      map, 
+      userContext, 
+      isOwner && viewAsRole !== 'non-member'
+    );
     
     return {
       allowed: permissionCheck.allowed,
       reason: permissionCheck.reason,
       isOwnerOverride: ownerEnabled && !permissionCheck.allowed,
     };
-  };
+  }, [isNonMemberView, isOwner, viewAsRole, map, userContext, isFeatureEnabled]);
 
-  const tools = [
-    { id: 'click' as const, label: 'Click', icon: CursorArrowRaysIcon, iconSolid: CursorArrowRaysIconSolid },
-    { id: 'pin' as const, label: 'Pin', icon: MapPinIcon, iconSolid: MapPinIconSolid },
-    { id: 'draw' as const, label: 'Draw', icon: PencilSquareIcon, iconSolid: PencilSquareIconSolid },
-  ].map(tool => ({
-    ...tool,
-    permission: getToolPermission(tool.id),
-  }));
+  const tools = useMemo(
+    () => TOOL_CONFIGS.map(tool => ({
+      ...tool,
+      permission: getToolPermission(tool),
+    })),
+    [getToolPermission]
+  );
 
-  const handleToolClick = (toolId: 'click' | 'pin' | 'draw') => {
+  const handleToolClick = useCallback((toolId: ToolId) => {
+    // If non-member view, clicking any tool should trigger join flow
+    if (isNonMemberView && onJoinClick) {
+      onJoinClick();
+      return;
+    }
+    
     if (onToolSelect) {
       onToolSelect(toolId);
     }
-  };
+  }, [isNonMemberView, onJoinClick, onToolSelect]);
 
-  // Render tool buttons (shared between mobile and desktop)
-  const renderTools = () => (
-    <>
-      {tools.map((tool) => {
-        const isActive = activeTool === tool.id;
-        const isHovered = hoveredTool === tool.id;
-        const Icon = (isActive || isHovered) ? tool.iconSolid : tool.icon;
-        const isDisabled = !tool.permission.allowed;
-        const isOwnerOverride = tool.permission.isOwnerOverride;
-        
-        return (
-          <button
-            key={tool.id}
-            onClick={() => {
-              if (!isDisabled) {
-                handleToolClick(tool.id);
-              }
-            }}
-            onMouseEnter={() => !isDisabled && setHoveredTool(tool.id)}
-            onMouseLeave={() => setHoveredTool(null)}
-            disabled={isDisabled}
-            className={`relative flex items-center justify-center w-8 h-8 rounded-md transition-all ${
-              isDisabled
-                ? 'opacity-40 cursor-not-allowed text-white/40'
-                : isActive
-                ? 'bg-white/20 text-white'
-                : 'text-white/70 hover:text-white hover:bg-white/10'
-            }`}
-            aria-label={tool.label}
-            title={isDisabled ? `${tool.label} is disabled` : tool.label}
-          >
-            <Icon className="w-4 h-4" />
-            {isOwnerOverride && (
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full border border-white" />
-            )}
-          </button>
-        );
-      })}
-    </>
-  );
+  const handleToolHover = useCallback((toolId: ToolId | null) => {
+    setHoveredTool(toolId);
+  }, []);
 
   return (
     <div className="absolute top-4 left-0 right-0 z-40 pointer-events-none">
       <div className="flex items-center justify-center px-4">
-        <div className="bg-black rounded-lg border border-white/10 shadow-lg px-2 py-1.5 pointer-events-auto">
+        <div 
+          className="rounded-lg border shadow-lg px-2 py-1.5 pointer-events-auto transition-all"
+          style={containerStyle}
+        >
           <div className="flex items-center gap-1">
-            {renderTools()}
+            {tools.map((tool) => {
+              const isActive = activeTool === tool.id;
+              const isHovered = hoveredTool === tool.id;
+              const Icon = (isActive || isHovered) ? tool.iconSolid : tool.icon;
+              const isDisabled = !tool.permission.allowed;
+              const isOwnerOverride = tool.permission.isOwnerOverride;
+              const isNonMemberDisabled = isNonMemberView && isDisabled;
+              
+              // For non-member view, allow clicking to trigger join
+              const canClick = !isDisabled || isNonMemberView;
+              
+              return (
+                <button
+                  key={tool.id}
+                  onClick={() => canClick && handleToolClick(tool.id)}
+                  onMouseEnter={() => canClick && handleToolHover(tool.id)}
+                  onMouseLeave={() => handleToolHover(null)}
+                  disabled={!canClick}
+                  className={`relative flex items-center justify-center w-8 h-8 rounded-md transition-all ${
+                    isNonMemberDisabled
+                      ? 'opacity-60 cursor-pointer text-white/60 hover:opacity-80 hover:text-white/80'
+                      : isDisabled
+                      ? 'opacity-40 cursor-not-allowed text-white/40'
+                      : isActive
+                      ? 'bg-white/20 text-white'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                  }`}
+                  aria-label={tool.label}
+                  title={
+                    isNonMemberDisabled 
+                      ? `Join to use ${tool.label}` 
+                      : isDisabled 
+                      ? `${tool.label} is disabled` 
+                      : tool.label
+                  }
+                >
+                  <Icon className="w-4 h-4" />
+                  {isOwnerOverride && !isNonMemberView && (
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full border border-white" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

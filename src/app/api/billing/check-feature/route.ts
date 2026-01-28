@@ -23,16 +23,7 @@ export async function GET(request: NextRequest) {
       try {
         const supabase = await createServerClientWithAuth(cookies());
         
-        // Verify user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user || user.id !== userId) {
-          return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-          );
-        }
-
+        // userId and accountId are guaranteed from security middleware
         if (!accountId) {
           return NextResponse.json(
             { error: 'Account not found', message: 'No active account selected' },

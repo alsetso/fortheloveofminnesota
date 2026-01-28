@@ -6,13 +6,14 @@ import MapCard from '@/app/maps/components/MapCard';
 import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from '@/app/maps/types';
 import Link from 'next/link';
-import { PlusIcon, ExclamationTriangleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, ExclamationTriangleIcon, ClockIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 import { supabase } from '@/lib/supabase';
+import { MAP_FEATURE_SLUG, calculateMapLimitState } from '@/lib/billing/mapLimits';
 
 export default function HomeMapsSidebar() {
   const { account: authAccount } = useAuthStateSafe();
-  const { features, getFeature } = useBillingEntitlementsSafe();
+  const { features, getFeature, featuresBySlug, isLoading, error, accountId } = useBillingEntitlementsSafe();
   const [myMapsByRole, setMyMapsByRole] = useState<{
     owner: MapItem[];
     manager: MapItem[];
@@ -23,8 +24,7 @@ export default function HomeMapsSidebar() {
     editor: [],
   });
   const [loadingMaps, setLoadingMaps] = useState(false);
-  const [mapUsage, setMapUsage] = useState<number>(0);
-  const [loadingUsage, setLoadingUsage] = useState(false);
+  const [mapsError, setMapsError] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<Array<{
     map_id: string;
     map: MapItem;
@@ -32,38 +32,13 @@ export default function HomeMapsSidebar() {
     created_at: string;
   }>>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
+  const [isOwnSectionOpen, setIsOwnSectionOpen] = useState(true);
+  const [isApartOfSectionOpen, setIsApartOfSectionOpen] = useState(true);
 
-  // Get map feature limit
+  // Get map feature - single canonical slug (invariant enforcement)
   const mapFeature = useMemo(() => {
-    return getFeature('custom_maps') || getFeature('map') || getFeature('unlimited_maps');
-  }, [features, getFeature]);
-
-  // Fetch map usage count
-  useEffect(() => {
-    if (!authAccount?.id) {
-      setMapUsage(0);
-      return;
-    }
-
-    const fetchUsage = async () => {
-      setLoadingUsage(true);
-      try {
-        const response = await fetch('/api/billing/usage', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setMapUsage(data.usage?.custom_maps || data.usage?.maps || data.usage?.map || 0);
-        }
-      } catch (err) {
-        console.error('Error fetching map usage:', err);
-      } finally {
-        setLoadingUsage(false);
-      }
-    };
-
-    fetchUsage();
-  }, [authAccount?.id]);
+    return getFeature(MAP_FEATURE_SLUG);
+  }, [getFeature]);
 
   // Fetch my maps grouped by role
   useEffect(() => {
@@ -183,6 +158,7 @@ export default function HomeMapsSidebar() {
         }
       } catch (err) {
         console.error('Error fetching my maps:', err);
+        setMapsError('Failed to load maps. Please try again.');
         setMyMapsByRole({ owner: [], manager: [], editor: [] });
       } finally {
         setLoadingMaps(false);
@@ -299,150 +275,200 @@ export default function HomeMapsSidebar() {
     return plan.charAt(0).toUpperCase() + plan.slice(1);
   }, [authAccount?.plan]);
 
-  // Calculate limit display
+  // Calculate limit state from owned maps count (invariant: owned maps array is source of truth)
+  const ownedMapsCount = myMapsByRole.owner.length;
+  const limitState = useMemo(() => {
+    return calculateMapLimitState(ownedMapsCount, mapFeature);
+  }, [ownedMapsCount, mapFeature]);
+
+  // Format limit display (without plan name - shown separately)
   const limitDisplay = useMemo(() => {
     if (!mapFeature) return null;
-    const planText = planDisplayName ? ` (${planDisplayName} Plan)` : '';
-    if (mapFeature.is_unlimited) {
-      return { text: `${mapUsage} maps (unlimited)${planText}`, isAtLimit: false };
+    
+    // Always show x/x format if we have a limit
+    let displayText = limitState.displayText;
+    if (mapFeature.limit_type === 'count' && mapFeature.limit_value !== null && !mapFeature.is_unlimited) {
+      displayText = `${ownedMapsCount} / ${mapFeature.limit_value} maps`;
     }
-    if (mapFeature.limit_type === 'count' && mapFeature.limit_value !== null) {
-      const isAtLimit = mapUsage >= mapFeature.limit_value;
-      return {
-        text: `${mapUsage} / ${mapFeature.limit_value} maps${planText}`,
-        isAtLimit,
-        limit: mapFeature.limit_value,
-      };
-    }
-    return null;
-  }, [mapFeature, mapUsage, planDisplayName]);
-
-  const canCreateMore = useMemo(() => {
-    if (!mapFeature) return false;
-    if (mapFeature.is_unlimited) return true;
-    if (mapFeature.limit_type === 'count' && mapFeature.limit_value !== null) {
-      return mapUsage < mapFeature.limit_value;
-    }
-    return false;
-  }, [mapFeature, mapUsage]);
+    
+    return {
+      text: displayText,
+      isAtLimit: limitState.isAtLimit,
+      limit: mapFeature.limit_value,
+    };
+  }, [mapFeature, limitState, ownedMapsCount]);
 
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto scrollbar-hide p-[10px] space-y-3">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-semibold text-gray-900">My Maps</h2>
-          <Link
-            href="/map/new"
-            className={`flex items-center gap-1 text-xs transition-colors ${
-              canCreateMore
-                ? 'text-gray-600 hover:text-gray-900'
-                : 'text-gray-400 cursor-not-allowed'
-            }`}
-            onClick={(e) => {
-              if (!canCreateMore) {
-                e.preventDefault();
-              }
-            }}
-            title={!canCreateMore ? 'Map limit reached' : 'Create new map'}
-          >
-            <PlusIcon className="w-3 h-3" />
-            <span>New</span>
-          </Link>
-        </div>
-
-        {/* Plan Limit Display */}
-        {limitDisplay && (
-          <div className={`bg-white border rounded-md p-[10px] ${
-            limitDisplay.isAtLimit
-              ? 'border-amber-200 bg-amber-50'
-              : 'border-gray-200'
-          }`}>
+        <div className="space-y-2 mb-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold text-gray-900">My Maps</h2>
+            <Link
+              href="/map/new"
+              className={`flex items-center gap-1 text-xs transition-colors ${
+                limitState.canCreate
+                  ? 'text-gray-600 hover:text-gray-900'
+                  : 'text-gray-400 cursor-not-allowed'
+              }`}
+              onClick={(e) => {
+                // Guardrail: prevent navigation if at limit
+                if (!limitState.canCreate) {
+                  e.preventDefault();
+                  return;
+                }
+              }}
+              title={!limitState.canCreate ? 'Map limit reached' : 'Create new map'}
+            >
+              <PlusIcon className="w-3 h-3" />
+              <span>New</span>
+            </Link>
+          </div>
+          
+          {/* Plan Label */}
+          {planDisplayName && (
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                {limitDisplay.isAtLimit && (
-                  <ExclamationTriangleIcon className="w-3 h-3 text-amber-600" />
-                )}
-                <span className={`text-xs ${
-                  limitDisplay.isAtLimit ? 'text-amber-900 font-medium' : 'text-gray-600'
-                }`}>
-                  {limitDisplay.text}
-                </span>
-              </div>
-              {limitDisplay.isAtLimit && (
+              <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                {planDisplayName} Plan
+              </span>
+              {limitState.isAtLimit && (
                 <Link
                   href="/billing"
-                  className="text-xs font-medium text-amber-700 hover:text-amber-900"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-800 underline"
                 >
                   Upgrade
                 </Link>
               )}
             </div>
+          )}
+          
+          {/* Map Count/Limit Display */}
+          {limitDisplay && (
+            <div className="flex items-center">
+              <span className="text-xs text-gray-600">
+                {limitDisplay.isAtLimit && mapFeature?.limit_value !== null
+                  ? `${ownedMapsCount} / ${mapFeature.limit_value} maps`
+                  : limitDisplay.text}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Error State */}
+        {mapsError && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-[10px]">
+            <p className="text-xs text-red-900">{mapsError}</p>
+            <button
+              onClick={() => {
+                setMapsError(null);
+                if (authAccount?.id) {
+                  // Trigger refetch by updating dependency
+                  window.location.reload();
+                }
+              }}
+              className="mt-2 text-xs font-medium text-red-700 hover:text-red-900 underline"
+            >
+              Retry
+            </button>
           </div>
         )}
 
         {/* Loading State */}
-        {loadingMaps && (
+        {loadingMaps && !mapsError && (
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-            <p className="text-xs text-gray-500 text-center py-4">Loading maps...</p>
+            <div className="flex items-center justify-center gap-2 py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+              <p className="text-xs text-gray-500">Loading maps...</p>
+            </div>
           </div>
         )}
 
         {/* Empty State */}
-        {!loadingMaps && allMaps.length === 0 && (
+        {!loadingMaps && !mapsError && allMaps.length === 0 && (
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">
             <p className="text-xs text-gray-500 text-center py-4">You are not a member of any maps yet</p>
-            <Link
-              href="/map/new"
-              className="block mt-2 text-center text-xs font-medium text-gray-900 hover:text-gray-700"
-            >
-              Create your first map
-            </Link>
+            {limitState.canCreate && (
+              <Link
+                href="/map/new"
+                className="block mt-2 text-center text-xs font-medium text-gray-900 hover:text-gray-700"
+              >
+                Create your first map
+              </Link>
+            )}
           </div>
         )}
 
         {/* Grouped by Role */}
         {!loadingMaps && allMaps.length > 0 && (
           <div className="space-y-3">
-            {/* Owner Section */}
+            {/* Owner Section Accordion */}
             {myMapsByRole.owner.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold text-gray-900 mb-2">Own</h3>
-                <div className="space-y-2">
-                  {myMapsByRole.owner.map((map) => (
-                    <MapCard
-                      key={map.id}
-                      map={map}
-                      account={authAccount}
-                      showRoleIcon={true}
-                    />
-                  ))}
-                </div>
+              <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+                <button
+                  onClick={() => setIsOwnSectionOpen(!isOwnSectionOpen)}
+                  className="w-full flex items-center justify-between p-[10px] hover:bg-gray-50 transition-colors"
+                >
+                  <h3 className="text-xs font-semibold text-gray-900">
+                    Own ({myMapsByRole.owner.length})
+                  </h3>
+                  {isOwnSectionOpen ? (
+                    <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                  )}
+                </button>
+                {isOwnSectionOpen && (
+                  <div className="px-[10px] pb-[10px] space-y-2">
+                    {myMapsByRole.owner.map((map) => (
+                      <MapCard
+                        key={map.id}
+                        map={map}
+                        account={authAccount}
+                        showRoleIcon={true}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Apart of Section (Manager + Editor combined) */}
+            {/* Apart of Section Accordion (Manager + Editor combined) */}
             {(myMapsByRole.manager.length > 0 || myMapsByRole.editor.length > 0) && (
-              <div>
-                <h3 className="text-xs font-semibold text-gray-900 mb-2">Apart of</h3>
-                <div className="space-y-2">
-                  {myMapsByRole.manager.map((map) => (
-                    <MapCard
-                      key={map.id}
-                      map={map}
-                      account={authAccount}
-                      showRoleIcon={true}
-                    />
-                  ))}
-                  {myMapsByRole.editor.map((map) => (
-                    <MapCard
-                      key={map.id}
-                      map={map}
-                      account={authAccount}
-                      showRoleIcon={true}
-                    />
-                  ))}
-                </div>
+              <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+                <button
+                  onClick={() => setIsApartOfSectionOpen(!isApartOfSectionOpen)}
+                  className="w-full flex items-center justify-between p-[10px] hover:bg-gray-50 transition-colors"
+                >
+                  <h3 className="text-xs font-semibold text-gray-900">
+                    Apart of ({myMapsByRole.manager.length + myMapsByRole.editor.length})
+                  </h3>
+                  {isApartOfSectionOpen ? (
+                    <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                  )}
+                </button>
+                {isApartOfSectionOpen && (
+                  <div className="px-[10px] pb-[10px] space-y-2">
+                    {myMapsByRole.manager.map((map) => (
+                      <MapCard
+                        key={map.id}
+                        map={map}
+                        account={authAccount}
+                        showRoleIcon={true}
+                      />
+                    ))}
+                    {myMapsByRole.editor.map((map) => (
+                      <MapCard
+                        key={map.id}
+                        map={map}
+                        account={authAccount}
+                        showRoleIcon={true}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

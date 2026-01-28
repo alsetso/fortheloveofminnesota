@@ -14,6 +14,7 @@ interface InlineMapProps {
   fullscreen?: boolean;
   initialZoom?: number;
   hideMarker?: boolean;
+  onZoomChange?: (zoom: number) => void;
 }
 
 export default function InlineMap({ 
@@ -23,12 +24,14 @@ export default function InlineMap({
   onOpenFullscreen,
   fullscreen = false,
   initialZoom,
-  hideMarker = false
+  hideMarker = false,
+  onZoomChange
 }: InlineMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<MapboxMapInstance | null>(null);
   const markerRef = useRef<any>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState<number | null>(null);
   
   // Address search state
   const [addressSearch, setAddressSearch] = useState('');
@@ -81,7 +84,13 @@ export default function InlineMap({
       zoom: zoomLevel,
       duration: 500,
     });
-  }, [mapLoaded, hideMarker, initialZoom]);
+    
+    // Update zoom state
+    setCurrentZoom(zoomLevel);
+    if (onZoomChange) {
+      onZoomChange(zoomLevel);
+    }
+  }, [mapLoaded, hideMarker, initialZoom, onZoomChange]);
 
   // Search addresses
   const searchAddresses = useCallback(async (query: string) => {
@@ -263,12 +272,54 @@ export default function InlineMap({
             
             setMapLoaded(true);
             
+            // Get initial zoom
+            const initialZoomLevel = typeof map.getZoom === 'function' ? map.getZoom() : null;
+            if (initialZoomLevel !== null) {
+              setCurrentZoom(initialZoomLevel);
+              if (onZoomChange) {
+                onZoomChange(initialZoomLevel);
+              }
+            }
+            
             if (lat && lng) {
               const latNum = parseFloat(lat);
               const lngNum = parseFloat(lng);
               if (!isNaN(latNum) && !isNaN(lngNum)) {
                 updateMarker(lngNum, latNum);
               }
+            }
+          }
+        });
+        
+        // Track zoom changes
+        map.on('zoom', () => {
+          if (mounted && map && !(map as any)._removed) {
+            try {
+              const zoom = typeof map.getZoom === 'function' ? map.getZoom() : null;
+              if (zoom !== null) {
+                setCurrentZoom(zoom);
+                if (onZoomChange) {
+                  onZoomChange(zoom);
+                }
+              }
+            } catch (err) {
+              // Ignore
+            }
+          }
+        });
+        
+        map.on('zoomend', () => {
+          if (mounted && map && !(map as any)._removed) {
+            try {
+              const zoom = typeof map.getZoom === 'function' ? map.getZoom() : null;
+              if (zoom !== null) {
+                setCurrentZoom(zoom);
+                if (onZoomChange) {
+                  onZoomChange(zoom);
+                }
+              }
+            } catch (err) {
+              // Ignore
             }
           }
         });

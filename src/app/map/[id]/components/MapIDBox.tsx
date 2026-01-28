@@ -66,6 +66,7 @@ interface MapIDBoxProps {
   membership_questions?: Array<{ id: number; question: string }>;
   membership_rules?: string | null;
   isMember?: boolean;
+  effectiveIsMember?: boolean;
   onJoinClick?: () => void;
   activeSidebar?: string | null;
   mapSettings?: {
@@ -83,6 +84,12 @@ interface MapIDBoxProps {
         editors_can_edit?: boolean;
       };
     };
+    colors?: {
+      owner?: string;
+      manager?: string;
+      editor?: string;
+      'non-member'?: string;
+    };
   } | null;
   userRole?: 'owner' | 'manager' | 'editor' | null;
   checkPermission?: (action: 'pins' | 'areas' | 'posts' | 'clicks') => boolean | undefined;
@@ -98,6 +105,9 @@ interface MapIDBoxProps {
     };
   } | null;
   onLocationPopupChange?: (popup: { isOpen: boolean; lat: number; lng: number; address: string | null; mapMeta: Record<string, any> | null }) => void;
+  viewAsRole?: 'owner' | 'manager' | 'editor' | 'non-member';
+  onOpenContributeOverlay?: (coordinates: { lat: number; lng: number }, mapMeta: Record<string, any> | null, fullAddress?: string | null) => void;
+  onRemoveClickMarker?: (removeFn: () => void) => void;
 }
 
 interface MapPin {
@@ -177,6 +187,7 @@ export default function MapIDBox({
   membership_questions = [],
   membership_rules = null,
   isMember = false,
+  effectiveIsMember: effectiveIsMemberProp,
   onJoinClick,
   activeSidebar = null,
   mapSettings = null,
@@ -184,6 +195,9 @@ export default function MapIDBox({
   checkPermission,
   mapData,
   onLocationPopupChange,
+  viewAsRole,
+  onOpenContributeOverlay,
+  onRemoveClickMarker,
 }: MapIDBoxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const { account: currentAccount, activeAccountId } = useAuthStateSafe();
@@ -279,7 +293,9 @@ export default function MapIDBox({
   // Use unified click handler - expose location popup state
   // Only pass mapData if it's a full MapData object (has all required fields)
   const fullMapData = mapData && 'name' in mapData && 'slug' in mapData ? mapData as any : null;
-  const { locationSelectPopup: unifiedLocationPopup, closePopup: closeUnifiedPopup, popupAddress } = useUnifiedMapClickHandler({
+  // effectiveIsMember prop takes precedence, fallback to isMember
+  const effectiveIsMember = effectiveIsMemberProp !== undefined ? effectiveIsMemberProp : isMember;
+  const { locationSelectPopup: unifiedLocationPopup, closePopup: closeUnifiedPopup, popupAddress, removeClickMarker } = useUnifiedMapClickHandler({
     map: mapInstance,
     mapLoaded,
     mapData: fullMapData,
@@ -293,6 +309,8 @@ export default function MapIDBox({
       subscription_status: null,
     } : null),
     isOwner,
+    isMember: isMember || false,
+    effectiveIsMember: effectiveIsMember || false,
     userRole: userRole || null,
     checkPermission: checkPermissionWrapper,
     pinMode,
@@ -359,7 +377,7 @@ export default function MapIDBox({
       }
     },
     onMapClick: async (coordinates, mapMeta) => {
-      // Handle pin creation when in pin mode
+      // Handle pin creation when in pin mode - use contribute overlay
       if (!pinMode || showAreaDrawModal) return;
       
       const canAddPins = isOwner || (visibility === 'public' && allowOthersToPostPins);
@@ -376,47 +394,16 @@ export default function MapIDBox({
 
       const { lat, lng } = coordinates;
       
-      // Auto-create pin for owners (no form)
-      try {
-        const response = await fetch(`/api/maps/${mapId}/pins`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            emoji: null,
-            caption: null,
-            image_url: null,
-            video_url: null,
-            lat,
-            lng,
-          }),
-        });
-
-        if (response.ok) {
-          // Refresh pins list
-          const refreshResponse = await fetch(`/api/maps/${mapId}/pins`);
-          if (refreshResponse.ok) {
-            const refreshData = await refreshResponse.json();
-            setPins(refreshData.pins || []);
-          }
-          setPinMode(false); // Exit pin mode after creating
-        } else {
-          // Handle permission errors
-          const errorData = await response.json().catch(() => ({}));
-          if (response.status === 403 && errorData.reason === 'plan_required') {
-            window.dispatchEvent(new CustomEvent('map-action-permission-denied', {
-              detail: {
-                action: 'pins',
-                requiredPlan: errorData.requiredPlan,
-                currentPlan: errorData.currentPlan,
-              }
-            }));
-            setPinMode(false);
-          }
-        }
-      } catch (err) {
-        console.error('Error creating pin:', err);
+      // Remove click marker before opening overlay
+      if (removeClickMarker) {
+        removeClickMarker();
+      }
+      
+      // Use contribute overlay (same as "Add to Map" button in location selected)
+      if (onOpenContributeOverlay) {
+        // Address will be reverse geocoded in the contribute overlay
+        onOpenContributeOverlay({ lat, lng }, mapMeta || null, null);
+        setPinMode(false); // Exit pin mode after opening overlay
       }
     },
   });
@@ -430,6 +417,14 @@ export default function MapIDBox({
       });
     }
   }, [unifiedLocationPopup, popupAddress, onLocationPopupChange]);
+  
+  // Expose remove click marker function to parent
+  useEffect(() => {
+    if (onRemoveClickMarker && removeClickMarker) {
+      onRemoveClickMarker(removeClickMarker);
+    }
+  }, [onRemoveClickMarker, removeClickMarker]);
+  
   const hiddenLayersRef = useRef<Map<string, 'visible' | 'none' | undefined>>(new Map());
 
   // Use active account ID from dropdown
@@ -1354,76 +1349,10 @@ export default function MapIDBox({
           bottom: 0,
         }}
       />
-      {/* Floating Join Map Card - Show when sidebar/pop-up is not open */}
-      {/* Show for: unauthenticated users OR authenticated users who are not members/owners */}
-      {!isMember && !isOwner && mapLoaded && activeSidebar === null && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
-          <div className="bg-white border border-gray-200 rounded-md p-[10px] shadow-lg max-w-xs w-full">
-            <div className="flex flex-col gap-3">
-              {/* Heading */}
-              <div className="space-y-1.5">
-                <h3 className="text-sm font-semibold text-gray-900 text-center">{title || 'Join Map'}</h3>
-                
-                {/* Description */}
-                {description && (
-                  <p className="text-xs text-gray-600 text-center line-clamp-2">{description}</p>
-                )}
-                
-                {/* Visibility Badge */}
-                <div className="flex items-center justify-center gap-1.5">
-                  {visibility === 'public' ? (
-                    <>
-                      <GlobeAltIcon className="w-3 h-3 text-gray-500" />
-                      <span className="text-xs font-medium text-gray-700 capitalize">Public Map</span>
-                    </>
-                  ) : (
-                    <>
-                      <LockClosedIcon className="w-3 h-3 text-gray-500" />
-                      <span className="text-xs font-medium text-gray-700 capitalize">Private Map</span>
-                    </>
-                  )}
-                </div>
-              </div>
+      {/* Desktop: Join experience now handled by PageWrapper info card */}
 
-              {/* Collaboration Tools Icons */}
-              {(allowOthersToPostPins || allowOthersToAddAreas) && (
-                <div className="flex items-center justify-center gap-2 flex-wrap">
-                  {allowOthersToPostPins && (
-                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
-                      <MapPinIcon className="w-3.5 h-3.5 text-gray-600" />
-                      <span className="text-xs font-medium text-gray-700">Pins</span>
-                    </div>
-                  )}
-                  {allowOthersToAddAreas && (
-                    <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
-                      <Square3Stack3DIcon className="w-3.5 h-3.5 text-gray-600" />
-                      <span className="text-xs font-medium text-gray-700">Areas</span>
-                    </div>
-                  )}
-                </div>
-              )}
+      {/* Mobile: Join experience now handled by PageWrapper info card */}
 
-              {/* Join Button */}
-              <button
-                onClick={() => {
-                  // If not authenticated, open sign in modal
-                  if (!current_account_id) {
-                    openWelcome();
-                  } else if (onJoinClick) {
-                    // If authenticated but not a member, open join sidebar
-                    onJoinClick();
-                  }
-                }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
-                aria-label={current_account_id ? "Join Map" : "Sign in to join map"}
-              >
-                <UserPlusIcon className="w-3 h-3" />
-                <span>{current_account_id ? 'Join Map' : 'Sign In to Join'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
           <div className="text-center">
@@ -1491,8 +1420,8 @@ export default function MapIDBox({
       {/* Entity sidebar is now handled by page-level useEntitySidebar hook */}
       {/* Layer clicks still use local state (not migrated yet) */}
 
-      {/* Collaboration Tools Nav - Only show for authenticated members or owners */}
-      {mapLoaded && current_account_id && (isMember || isOwner) && (
+      {/* Collaboration Tools Nav - Show for members, owners, and non-members (for preview/join prompt) */}
+      {mapLoaded && current_account_id && (
         <CollaborationToolsNav
           onToolSelect={handleToolSelect}
           activeTool={activeTool}
@@ -1551,12 +1480,16 @@ export default function MapIDBox({
             account: account || null,
           } as any}
           isOwner={isOwner}
+          isMember={isMember}
           userContext={currentAccountId && currentAccount ? {
             accountId: currentAccountId,
             plan: (userPlan || 'hobby') as any,
             subscription_status: currentAccount.subscription_status || null,
             role: userRole || null,
           } : null}
+          viewAsRole={viewAsRole}
+          onJoinClick={onJoinClick}
+          mapSettings={mapSettings}
         />
       )}
     </div>

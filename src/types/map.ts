@@ -68,6 +68,12 @@ export interface MapSettings {
   membership?: {
     max_members?: number; // Owner-set limit (null/undefined = no limit, but still subject to plan limit)
   };
+  colors?: {
+    owner?: string; // Background color/gradient for owner role (default: gradient)
+    manager?: string; // Background color/gradient for manager role (default: black)
+    editor?: string; // Background color/gradient for editor role (default: black)
+    'non-member'?: string; // Background color/gradient for non-member role (default: black)
+  };
 }
 
 /**
@@ -167,6 +173,8 @@ export interface MapData {
   cover_image_url: string | null;
   image_url: string | null;
   tags: MapTag[] | null;
+  published_to_community?: boolean;
+  published_at?: string | null;
   created_at: string;
   updated_at: string;
   account: {
@@ -196,6 +204,8 @@ export interface MapItem {
   boundary_data?: BoundaryData | null;
   member_count: number;
   view_count?: number;
+  published_to_community?: boolean;
+  published_at?: string | null;
   tags?: MapTag[] | null;
   thumbnail?: string;
   href?: string;

@@ -31,54 +31,24 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user || user.id !== userId) {
+        // userId and accountId are guaranteed from security middleware
+        // Use accountId from context (already validated)
+        if (!accountId) {
           return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
+            { error: 'Account not found', message: 'No active account selected' },
+            { status: 404 }
           );
         }
 
-        // Get active account ID from cookie
-        const activeAccountIdCookie = request.cookies.get('active_account_id');
-        const activeAccountId = activeAccountIdCookie?.value || null;
-
-        // Get account with stripe_customer_id
-        let account;
-        if (activeAccountId) {
-          const { data, error } = await supabase
-            .from('accounts')
-            .select('id, stripe_customer_id')
-            .eq('id', activeAccountId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-          
-          if (error) {
-            return NextResponse.json(
-              { error: 'Failed to fetch account' },
-              { status: 500 }
-            );
-          }
-          account = data;
-        } else {
-          const { data, error } = await supabase
-            .from('accounts')
-            .select('id, stripe_customer_id')
-            .eq('user_id', user.id)
-            .limit(1)
-            .maybeSingle();
-          
-          if (error) {
-            return NextResponse.json(
-              { error: 'Failed to fetch account' },
-              { status: 500 }
-            );
-          }
-          account = data;
-        }
-
-        if (!account) {
+        // Get account to verify it exists and get stripe_customer_id
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('id, stripe_customer_id')
+          .eq('id', accountId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (accountError || !account) {
           return NextResponse.json(
             { error: 'Account not found' },
             { status: 404 }

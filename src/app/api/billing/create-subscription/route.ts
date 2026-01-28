@@ -42,26 +42,16 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user || user.id !== userId) {
-          return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
-          );
-        }
-
-        // Verify customer belongs to user's account
-        const activeAccountIdCookie = request.cookies.get('active_account_id');
-        const activeAccountId = activeAccountIdCookie?.value || null;
-
+        // userId and accountId are guaranteed from security middleware
+        // Use accountId from context (already validated)
         let account;
-        if (activeAccountId) {
+        if (accountId) {
+          // Verify the account belongs to this user (defensive check)
           const { data, error } = await supabase
             .from('accounts')
             .select('id, stripe_customer_id')
-            .eq('id', activeAccountId)
-            .eq('user_id', user.id)
+            .eq('id', accountId)
+            .eq('user_id', userId)
             .maybeSingle();
           
           if (error || !data) {
@@ -72,10 +62,11 @@ export async function POST(request: NextRequest) {
           }
           account = data;
         } else {
+          // Fallback to first account
           const { data, error } = await supabase
             .from('accounts')
             .select('id, stripe_customer_id')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .limit(1)
             .maybeSingle();
           

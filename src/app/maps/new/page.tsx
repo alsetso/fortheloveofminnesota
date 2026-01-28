@@ -16,6 +16,8 @@ import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import { getMapUrl } from '@/lib/maps/urls';
+import { MAP_FEATURE_SLUG, calculateMapLimitState } from '@/lib/billing/mapLimits';
+import type { AccountFeatureEntitlement } from '@/contexts/BillingEntitlementsContext';
 
 export default function NewMapPage() {
   const router = useRouter();
@@ -29,7 +31,8 @@ export default function NewMapPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [mapLimit, setMapLimit] = useState<{current: number; max: number | null; type: string} | null>(null);
-  const [customMapsFeature, setCustomMapsFeature] = useState<{slug: string; name: string; limit_value: number | null; limit_type: string | null; is_unlimited: boolean} | null>(null);
+  const [customMapsFeature, setCustomMapsFeature] = useState<AccountFeatureEntitlement | null>(null);
+  const [limitError, setLimitError] = useState<string | null>(null);
   const [plans, setPlans] = useState<Array<{slug: string; name: string; display_order: number; is_active?: boolean; features?: Array<{slug: string; limit_value?: number | null; limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>}>>([]);
   const isAdmin = account?.role === 'admin';
   const totalSteps = isAdmin ? 7 : 6; // Add admin step if user is admin
@@ -86,41 +89,29 @@ export default function NewMapPage() {
             const features: any[] = Array.isArray(featuresData.features) ? featuresData.features : [];
             console.log('[NewMapPage] Features array:', features);
 
-            // Look for 'map' feature first, then fallback to 'custom_maps'
-            const limited = features.find((f) => f.slug === 'map') || features.find((f) => f.slug === 'custom_maps');
-            console.log('[NewMapPage] map/custom_maps feature:', limited);
+            // Use canonical feature slug (invariant enforcement)
+            const feature = features.find((f) => f.slug === MAP_FEATURE_SLUG) as AccountFeatureEntitlement | undefined;
+            console.log('[NewMapPage] custom_maps feature:', feature);
 
-            // Store the feature data for use in the modal
-            if (limited) {
-              setCustomMapsFeature({
-                slug: limited.slug,
-                name: limited.name || 'Maps',
-                limit_value: limited.limit_value ?? null,
-                limit_type: limited.limit_type || null,
-                is_unlimited: limited.is_unlimited || false,
+            // Store feature for centralized limit calculation
+            setCustomMapsFeature(feature || null);
+
+            // Use centralized limit calculation (invariant: owned maps count is source of truth)
+            const limitState = calculateMapLimitState(currentCount, feature || null);
+            
+            // Set limit display data (backward compatibility with existing UI)
+            if (limitState.isAtLimit && !limitState.canCreate) {
+              setLimitError(limitState.displayText);
+              setMapLimit({ current: currentCount, max: 0, type: 'count' });
+            } else if (feature?.is_unlimited || feature?.limit_type === 'unlimited') {
+              setMapLimit({ current: currentCount, max: null, type: 'unlimited' });
+            } else {
+              setMapLimit({
+                current: currentCount,
+                max: feature?.limit_value ?? null,
+                type: feature?.limit_type || 'count',
               });
             }
-
-            if (limited && (limited.is_unlimited || limited.limit_type === 'unlimited')) {
-              console.log('[NewMapPage] Map limit: unlimited');
-              setMapLimit({ current: currentCount, max: null, type: 'unlimited' });
-              return;
-            }
-
-            if (limited) {
-              const limitData = {
-                current: currentCount,
-                max: limited.limit_value ?? null,
-                type: limited.limit_type || 'count',
-              };
-              console.log('[NewMapPage] Map limit set:', limitData);
-              setMapLimit(limitData);
-              return;
-            }
-
-            // No explicit entitlement row returned (treat as no access)
-            console.log('[NewMapPage] No map feature found, setting limit to 0');
-            setMapLimit({ current: currentCount, max: 0, type: 'count' });
           } else {
             console.error('[NewMapPage] Failed to fetch user features:', featuresResponse.status, featuresResponse.statusText);
           }
@@ -310,6 +301,15 @@ export default function NewMapPage() {
     if (!title.trim()) {
       setError('Title is required');
       return;
+    }
+
+    // Guardrail: Check limit before submission (defensive check)
+    if (customMapsFeature && mapLimit) {
+      const limitState = calculateMapLimitState(mapLimit.current, customMapsFeature);
+      if (!limitState.canCreate) {
+        setError(`Map limit reached. ${limitState.displayText}`);
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -718,8 +718,8 @@ export default function NewMapPage() {
     
     console.log('[NewMapPage] upgradeInfo: next plan found:', nextPlan.name, nextPlan.features?.length || 0, 'features');
     
-    // Get "map" feature from next plan (not "custom_maps")
-    const nextPlanMapFeature = nextPlan.features?.find(f => f.slug === 'map');
+    // Get canonical feature from next plan
+    const nextPlanMapFeature = nextPlan.features?.find(f => f.slug === MAP_FEATURE_SLUG);
     console.log('[NewMapPage] upgradeInfo: next plan map feature:', nextPlanMapFeature);
     
     const nextPlanLimit = nextPlanMapFeature?.limit_value ?? null;

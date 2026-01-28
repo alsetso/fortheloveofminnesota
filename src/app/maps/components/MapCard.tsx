@@ -10,18 +10,22 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from '../types';
 
+type ViewAsRole = 'non-member' | 'member' | 'owner';
+
 interface MapCardProps {
   map: MapItem;
   account: { plan?: string | null; id?: string } | null;
   onClick?: () => void;
   showRoleIcon?: boolean;
+  viewAsRole?: ViewAsRole;
 }
 
 export default function MapCard({ 
   map, 
   account: userAccount, 
   onClick,
-  showRoleIcon = false
+  showRoleIcon = false,
+  viewAsRole = 'non-member'
 }: MapCardProps) {
   const router = useRouter();
   const { openComingSoon } = useAppModalContextSafe();
@@ -110,9 +114,51 @@ export default function MapCard({
     }
   }, [isComingSoon, map.name, map.requiresPro, (map as any).map_type, map.href, map.id, canAccess, openComingSoon, router, onClick]);
 
+  // Style based on viewAsRole
+  const cardStyle = useMemo(() => {
+    switch (viewAsRole) {
+      case 'owner':
+        return {
+          borderColor: 'rgba(255, 183, 0, 0.4)',
+          borderWidth: '2px',
+          background: 'linear-gradient(to right, rgba(255, 183, 0, 0.05), rgba(221, 74, 0, 0.05), rgba(92, 15, 47, 0.05))',
+        };
+      case 'member':
+        return {
+          borderColor: 'rgba(99, 102, 241, 0.4)',
+          borderWidth: '2px',
+          background: 'rgba(99, 102, 241, 0.02)',
+        };
+      case 'non-member':
+      default:
+        return {
+          borderColor: 'rgb(229, 231, 235)',
+          borderWidth: '1px',
+          background: 'white',
+        };
+    }
+  }, [viewAsRole]);
+
   const content = (
     <div 
-      className="bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors cursor-pointer group overflow-hidden relative"
+      className="rounded-md transition-all cursor-pointer group overflow-hidden relative"
+      style={{
+        borderColor: cardStyle.borderColor,
+        borderWidth: cardStyle.borderWidth,
+        borderStyle: 'solid',
+        background: cardStyle.background,
+      }}
+      onMouseEnter={(e) => {
+        if (viewAsRole === 'non-member') {
+          e.currentTarget.style.background = 'rgb(249, 250, 251)';
+        } else {
+          e.currentTarget.style.opacity = '0.9';
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = cardStyle.background;
+        e.currentTarget.style.opacity = '1';
+      }}
       onClick={handleClick}
     >
       {/* Large Map Preview Area - Full Card Height */}
@@ -151,24 +197,24 @@ export default function MapCard({
         <div className="absolute top-2 left-2 flex items-center gap-1.5 z-10">
           {/* Visibility Icon */}
           {map.visibility && (
-            <div className="bg-white/90 backdrop-blur-sm rounded-md p-1" title={map.visibility === 'public' ? 'Public map' : 'Private map'}>
+            <div className="bg-white/10 rounded-md p-1" title={map.visibility === 'public' ? 'Public map' : 'Private map'}>
               {map.visibility === 'public' ? (
-                <GlobeAltIcon className="w-3 h-3 text-gray-600" />
+                <GlobeAltIcon className="w-3 h-3 text-white" />
               ) : (
-                <LockClosedIcon className="w-3 h-3 text-gray-600" />
+                <LockClosedIcon className="w-3 h-3 text-white" />
               )}
             </div>
           )}
           
           {/* Role Icon (for My Maps view) */}
           {showRoleIcon && map.current_user_role && (
-            <div className="bg-white/90 backdrop-blur-sm rounded-md p-1" title={`You are ${map.current_user_role}`}>
+            <div className="bg-white/10 rounded-md p-1" title={`You are ${map.current_user_role}`}>
               {map.current_user_role === 'owner' ? (
-                <StarIcon className="w-3 h-3 text-amber-500" />
+                <StarIcon className="w-3 h-3 text-white" />
               ) : map.current_user_role === 'manager' ? (
-                <ShieldCheckIcon className="w-3 h-3 text-blue-500" />
+                <ShieldCheckIcon className="w-3 h-3 text-white" />
               ) : (
-                <PencilIcon className="w-3 h-3 text-gray-500" />
+                <PencilIcon className="w-3 h-3 text-white" />
               )}
             </div>
           )}
@@ -177,8 +223,8 @@ export default function MapCard({
         {/* Role Label - Top Right */}
         {map.current_user_role && (
           <div className="absolute top-2 right-2 z-10">
-            <div className="bg-white/90 backdrop-blur-sm rounded-md px-1.5 py-0.5 flex items-center justify-center">
-              <span className="text-[10px] font-medium text-gray-700 capitalize text-center">
+            <div className="bg-white/10 rounded-md px-1.5 py-0.5 flex items-center justify-center">
+              <span className="text-[10px] font-medium text-white capitalize text-center">
                 {map.current_user_role}
               </span>
             </div>
@@ -211,6 +257,21 @@ export default function MapCard({
               <div className="flex items-center gap-1">
                 <EyeIcon className="w-3 h-3" />
                 <span>{map.view_count.toLocaleString()}</span>
+              </div>
+            )}
+            {map.visibility && (
+              <div className="flex items-center gap-1" title={map.visibility === 'public' ? 'Public map' : 'Private map'}>
+                {map.visibility === 'public' ? (
+                  <>
+                    <GlobeAltIcon className="w-3 h-3" />
+                    <span className="capitalize">{map.visibility}</span>
+                  </>
+                ) : (
+                  <>
+                    <LockClosedIcon className="w-3 h-3" />
+                    <span className="capitalize">{map.visibility}</span>
+                  </>
+                )}
               </div>
             )}
           </div>

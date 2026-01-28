@@ -30,12 +30,14 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user || user.id !== userId) {
+        // userId is guaranteed from security middleware
+        // We need to get user email for Stripe, but userId is already validated
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
           return NextResponse.json(
-            { error: 'Unauthorized' },
-            { status: 401 }
+            { error: 'Failed to fetch user data' },
+            { status: 500 }
           );
         }
 

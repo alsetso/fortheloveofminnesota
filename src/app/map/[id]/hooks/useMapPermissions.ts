@@ -20,6 +20,7 @@ interface UseMapPermissionsOptions {
   } | null;
   isOwner: boolean;
   userRole: 'owner' | 'manager' | 'editor' | null;
+  viewAsRole?: 'owner' | 'manager' | 'editor' | 'non-member';
 }
 
 /**
@@ -31,6 +32,7 @@ export function useMapPermissions({
   account,
   isOwner,
   userRole,
+  viewAsRole,
 }: UseMapPermissionsOptions) {
   const [upgradePrompt, setUpgradePrompt] = useState<UpgradePrompt>({
     isOpen: false,
@@ -59,10 +61,17 @@ export function useMapPermissions({
   /**
    * Check if user can perform an action on the map
    * Returns true if allowed, false if not (and shows upgrade prompt if needed)
+   * When owner is viewing as different role, use that role for permission checks
    */
   const checkPermission = useCallback(
     (action: 'pins' | 'areas' | 'posts' | 'clicks'): boolean | undefined => {
       if (!mapData || !account) return undefined;
+
+      // If owner is viewing as different role, override the role and isOwner flag
+      const effectiveRole = (isOwner && viewAsRole && viewAsRole !== 'owner') 
+        ? (viewAsRole === 'non-member' ? null : viewAsRole)
+        : userRole;
+      const effectiveIsOwner = isOwner && (!viewAsRole || viewAsRole === 'owner');
 
       const permissionCheck = canUserPerformMapAction(
         action,
@@ -71,9 +80,9 @@ export function useMapPermissions({
           accountId: account.id,
           plan: (account.plan || 'hobby') as PlanLevel,
           subscription_status: account.subscription_status,
-          role: userRole || null,
+          role: effectiveRole || null,
         },
-        isOwner
+        effectiveIsOwner
       );
 
       if (!permissionCheck.allowed && permissionCheck.reason === 'plan_required') {
@@ -88,7 +97,7 @@ export function useMapPermissions({
 
       return permissionCheck.allowed;
     },
-    [mapData, account, isOwner, userRole]
+    [mapData, account, isOwner, userRole, viewAsRole]
   );
 
   const closeUpgradePrompt = useCallback(() => {

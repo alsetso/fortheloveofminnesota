@@ -16,6 +16,8 @@ interface LocationSelectPopupProps {
   mentionTypeId?: string | null;
   mentionTypeName?: string | null;
   onAddToMap?: (coordinates: { lat: number; lng: number }, mapMeta?: Record<string, any> | null, mentionTypeId?: string | null) => void;
+  allowPins?: boolean; // Whether map settings allow posting pins
+  isOwner?: boolean; // Owner can always add pins regardless of settings
 }
 
 /**
@@ -33,6 +35,8 @@ export default function LocationSelectPopup({
   mentionTypeId: propMentionTypeId,
   mentionTypeName: propMentionTypeName,
   onAddToMap,
+  allowPins = true, // Default to true for backward compatibility (live map, etc.)
+  isOwner = false,
 }: LocationSelectPopupProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -361,26 +365,28 @@ export default function LocationSelectPopup({
             </div>
           )}
 
-          {/* Add to Map Button */}
-          <button
-            onClick={handleAddToMap}
-            className={`w-full px-4 py-3 text-sm font-medium rounded-md transition-colors border flex items-center justify-center gap-2 ${
-              useTransparentUI
-                ? 'text-white bg-white/10 border-white/30 hover:bg-white/20'
-                : selectedMentionType
-                ? 'text-gray-900 bg-white border-gray-300 hover:bg-gray-50'
-                : 'text-gray-900 bg-white border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {selectedMentionType ? (
-              <>
-                <span className="text-base">{selectedMentionType.emoji}</span>
-                <span>Add {selectedMentionType.name}</span>
-              </>
-            ) : (
-              'Add to Map'
-            )}
-          </button>
+          {/* Add to Map Button - Only show if pins are allowed or user is owner */}
+          {(allowPins || isOwner) && (
+            <button
+              onClick={handleAddToMap}
+              className={`w-full px-4 py-3 text-sm font-medium rounded-md transition-colors border flex items-center justify-center gap-2 ${
+                useTransparentUI
+                  ? 'text-white bg-white/10 border-white/30 hover:bg-white/20'
+                  : selectedMentionType
+                  ? 'text-gray-900 bg-white border-gray-300 hover:bg-gray-50'
+                  : 'text-gray-900 bg-white border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {selectedMentionType ? (
+                <>
+                  <span className="text-base">{selectedMentionType.emoji}</span>
+                  <span>Add {selectedMentionType.name}</span>
+                </>
+              ) : (
+                'Add to Map'
+              )}
+            </button>
+          )}
         </div>
       </div>
     </>

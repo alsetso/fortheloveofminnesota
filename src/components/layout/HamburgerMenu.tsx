@@ -14,7 +14,6 @@ interface NavLink {
 const navLinks: NavLink[] = [
   { label: 'Home', href: '/' },
   { label: 'Maps', href: '/maps' },
-  { label: 'People', href: '/people' },
   { label: 'Government', href: '/gov' },
   { label: 'Profile', href: '/profile', requiresAuth: true },
 ];

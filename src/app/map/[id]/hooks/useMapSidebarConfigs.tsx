@@ -22,6 +22,7 @@ const SidebarLoadingFallback: React.FC = () => (
 
 interface UseMapSidebarConfigsOptions {
   mapData: MapData | null;
+  mapId: string | null;
   isOwner: boolean;
   isMember: boolean;
   isManager: boolean;
@@ -47,6 +48,7 @@ interface UseMapSidebarConfigsOptions {
  */
 export function useMapSidebarConfigs({
   mapData,
+  mapId,
   isOwner,
   isMember,
   isManager,
@@ -195,14 +197,16 @@ export function useMapSidebarConfigs({
       });
     }
 
-    // Add posts section - only for members and owners
-    if (isMember || isOwner) {
+    // Add posts section - only for members and owners, and only for live map
+    // Posts are temporarily removed from custom maps
+    const isLiveMap = mapData?.slug === 'live' || mapId === 'live';
+    if ((isMember || isOwner) && isLiveMap && mapData) {
       configs.push({
         type: 'posts' as const,
         title: 'Posts',
         content: (
           <Suspense fallback={<SidebarLoadingFallback />}>
-            <MapPosts mapId={mapData.id} onClose={closeSidebar} />
+            <MapPosts mapId={mapData.id} mapSlug={mapData.slug} onClose={closeSidebar} />
           </Suspense>
         ),
         popupType: 'account',
@@ -260,6 +264,7 @@ export function useMapSidebarConfigs({
     return configs;
   }, [
     mapData,
+    mapId,
     isOwner,
     showMembers,
     isMember,

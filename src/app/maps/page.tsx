@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MagnifyingGlassIcon, PlusIcon, MapIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, PlusIcon, MapIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 import PageWrapper from '@/components/layout/PageWrapper';
@@ -14,8 +14,10 @@ import MapsPageLayout from './MapsPageLayout';
 import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
 import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from './types';
+import { MAP_FEATURE_SLUG, calculateMapLimitState } from '@/lib/billing/mapLimits';
 
-type ViewType = 'community' | 'my-maps';
+type ViewType = 'featured' | 'community' | 'my-maps';
+type ViewAsRole = 'non-member' | 'member' | 'owner';
 
 export default function MapsPage() {
   const router = useRouter();
@@ -28,7 +30,8 @@ export default function MapsPage() {
   const [viewType, setViewType] = useState<ViewType>(() => {
     const param = searchParams.get('view');
     if (param === 'my-maps' && account) return 'my-maps';
-    return 'community';
+    if (param === 'community') return 'community';
+    return 'featured';
   });
   
   // Search
@@ -50,30 +53,54 @@ export default function MapsPage() {
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [loadingMyMaps, setLoadingMyMaps] = useState(false);
   
+  // View As role state
+  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem('maps_view_as_role') as ViewAsRole | null;
+      if (stored && ['non-member', 'member', 'owner'].includes(stored)) {
+        return stored;
+      }
+    }
+    return 'non-member';
+  });
+  const [isViewAsOpen, setIsViewAsOpen] = useState(false);
+  
   const { activeSidebar } = useUnifiedSidebar();
+  
+  // Persist viewAsRole to sessionStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('maps_view_as_role', viewAsRole);
+    }
+  }, [viewAsRole]);
 
   // Update view type when URL changes
   useEffect(() => {
     const param = searchParams.get('view');
     if (param === 'my-maps' && account) {
       setViewType('my-maps');
-    } else {
+    } else if (param === 'community') {
       setViewType('community');
+    } else {
+      setViewType('featured');
     }
   }, [searchParams, account]);
 
   // Fetch featured maps
   useEffect(() => {
+    if (viewType !== 'featured') return;
+    
     const fetchFeatured = async () => {
       setLoadingFeatured(true);
       try {
-        const response = await fetch('/api/maps?visibility=public&limit=100');
+        // Only fetch maps that are published to community
+        const response = await fetch('/api/maps?community=true&limit=100');
         if (!response.ok) throw new Error('Failed to fetch maps');
         const data = await response.json();
         
-        // Filter for featured maps (settings.presentation.is_featured)
+        // Filter for featured maps (settings.presentation.is_featured) that are also published
         const featured = (data.maps || [])
-          .filter((map: any) => map.settings?.presentation?.is_featured === true)
+          .filter((map: any) => map.settings?.presentation?.is_featured === true && map.published_to_community === true)
           .map((map: any) => ({
             ...map,
             name: map.name || map.title,
@@ -108,7 +135,7 @@ export default function MapsPage() {
     };
     
     fetchFeatured();
-  }, []);
+  }, [viewType]);
 
   // Fetch community maps
   useEffect(() => {
@@ -117,7 +144,8 @@ export default function MapsPage() {
     const fetchCommunity = async () => {
       setLoadingCommunity(true);
       try {
-        const response = await fetch('/api/maps?visibility=public&limit=200');
+        // Use community=true to filter by published_to_community
+        const response = await fetch('/api/maps?community=true&limit=200');
         if (!response.ok) throw new Error('Failed to fetch maps');
         const data = await response.json();
         
@@ -131,6 +159,7 @@ export default function MapsPage() {
             categories: map.categories || [],
             account_id: map.account_id,
             visibility: map.visibility || 'public',
+            published_to_community: map.published_to_community || false,
           }));
         
         // Fetch stats
@@ -261,6 +290,17 @@ export default function MapsPage() {
 
   // Filter maps by search
   const filteredMapsByRole = useMemo(() => {
+    if (viewType === 'featured') {
+      const filtered = searchQuery.trim()
+        ? featuredMaps.filter(map => {
+            const query = searchQuery.toLowerCase();
+            return (map.name || '').toLowerCase().includes(query) ||
+                   (map.description || '').toLowerCase().includes(query);
+          })
+        : featuredMaps;
+      return { owner: [], manager: [], editor: [], community: [], featured: filtered };
+    }
+    
     if (viewType === 'community') {
       const filtered = searchQuery.trim()
         ? communityMaps.filter(map => {
@@ -269,7 +309,7 @@ export default function MapsPage() {
                    (map.description || '').toLowerCase().includes(query);
           })
         : communityMaps;
-      return { owner: [], manager: [], editor: [], community: filtered };
+      return { owner: [], manager: [], editor: [], community: filtered, featured: [] };
     }
     
     // For my-maps, filter each role group
@@ -287,48 +327,35 @@ export default function MapsPage() {
       manager: filterMaps(myMapsByRole.manager),
       editor: filterMaps(myMapsByRole.editor),
       community: [],
+      featured: [],
     };
-  }, [viewType, communityMaps, myMapsByRole, searchQuery]);
+  }, [viewType, featuredMaps, communityMaps, myMapsByRole, searchQuery]);
   
-  // Total count for my maps
-  const totalMyMapsCount = useMemo(() => {
+  // Total count for current view
+  const totalCount = useMemo(() => {
+    if (viewType === 'featured') return filteredMapsByRole.featured.length;
     if (viewType === 'community') return filteredMapsByRole.community.length;
     return filteredMapsByRole.owner.length + filteredMapsByRole.manager.length + filteredMapsByRole.editor.length;
   }, [viewType, filteredMapsByRole]);
 
-  // Get custom_maps feature limit and current owned maps count
+  // Get custom_maps feature using canonical slug (invariant enforcement)
   const customMapsFeature = useMemo(() => {
-    return features.find(f => f.slug === 'custom_maps');
+    return features.find(f => f.slug === MAP_FEATURE_SLUG);
   }, [features]);
 
+  // Owned maps count is source of truth (invariant)
   const ownedMapsCount = useMemo(() => {
     return filteredMapsByRole.owner.length;
   }, [filteredMapsByRole.owner.length]);
 
-  // Check if limit is reached
-  const isLimitReached = useMemo(() => {
-    if (!customMapsFeature) return false;
-    if (customMapsFeature.is_unlimited || customMapsFeature.limit_type === 'unlimited') return false;
-    if (customMapsFeature.limit_type === 'count' && customMapsFeature.limit_value !== null) {
-      return ownedMapsCount >= customMapsFeature.limit_value;
-    }
-    return false;
-  }, [customMapsFeature, ownedMapsCount]);
+  // Use centralized limit calculation (invariant enforcement)
+  const limitState = useMemo(() => {
+    return calculateMapLimitState(ownedMapsCount, customMapsFeature || null);
+  }, [ownedMapsCount, customMapsFeature]);
 
-  // Format map limit display
-  const mapLimitDisplay = useMemo(() => {
-    if (!customMapsFeature) return null;
-    
-    if (customMapsFeature.is_unlimited || customMapsFeature.limit_type === 'unlimited') {
-      return `${ownedMapsCount} (unlimited)`;
-    }
-    
-    if (customMapsFeature.limit_type === 'count' && customMapsFeature.limit_value !== null) {
-      return `${ownedMapsCount} / ${customMapsFeature.limit_value}`;
-    }
-    
-    return `${ownedMapsCount}`;
-  }, [customMapsFeature, ownedMapsCount]);
+  // Backward compatibility: isLimitReached and mapLimitDisplay
+  const isLimitReached = limitState.isAtLimit;
+  const mapLimitDisplay = limitState.displayText;
 
   const handleCloseSidebar = useCallback(() => {
     // Sidebar disabled - no action needed
@@ -367,38 +394,28 @@ export default function MapsPage() {
 
           {/* Map Feed */}
           <div className="space-y-3">
-            {/* Featured Maps Section */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-gray-900">Featured</h2>
-                <span className="text-xs text-gray-500">({featuredMaps.length})</span>
-              </div>
-              {loadingFeatured ? (
-                <div className="text-xs text-gray-500">Loading featured maps...</div>
-              ) : featuredMaps.length === 0 ? (
-                <div className="text-xs text-gray-500">No featured maps</div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                  {featuredMaps.map((map) => (
-                      <MapCard
-                        key={map.id}
-                        map={map}
-                        account={account}
-                      />
-                    ))}
-                </div>
-              )}
-            </div>
-
             {/* All Maps */}
-            <div className="space-y-2 pt-6">
+            <div className="space-y-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-1">
                   <h2 className="text-sm font-semibold text-gray-900">
-                    {viewType === 'community' ? 'All Maps' : 'My Maps'}
+                    {viewType === 'featured' ? 'Featured' : viewType === 'community' ? 'All Maps' : 'My Maps'}
                   </h2>
                   {/* View Toggle */}
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setViewType('featured');
+                        router.push('/maps?view=featured');
+                      }}
+                      className={`text-xs font-medium transition-colors ${
+                        viewType === 'featured'
+                          ? 'text-gray-900'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Featured
+                    </button>
                     <button
                       onClick={() => {
                         setViewType('community');
@@ -430,6 +447,53 @@ export default function MapsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* View As Selector */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsViewAsOpen(!isViewAsOpen)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                      title="View maps as different role"
+                    >
+                      <span className="text-[10px] text-gray-500 uppercase tracking-wide">View As:</span>
+                      <span className="capitalize">{viewAsRole === 'non-member' ? 'Non Member' : viewAsRole}</span>
+                      <ChevronDownIcon 
+                        className={`w-3 h-3 transition-transform duration-200 ${isViewAsOpen ? 'rotate-180' : ''}`} 
+                      />
+                    </button>
+
+                    {isViewAsOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-10"
+                          onClick={() => setIsViewAsOpen(false)}
+                          aria-hidden="true"
+                        />
+                        <div className="absolute top-full right-0 mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg min-w-[140px]">
+                          {[
+                            { value: 'non-member' as ViewAsRole, label: 'Non Member' },
+                            { value: 'member' as ViewAsRole, label: 'Member' },
+                            { value: 'owner' as ViewAsRole, label: 'Owner' },
+                          ].map((role) => (
+                            <button
+                              key={role.value}
+                              onClick={() => {
+                                setViewAsRole(role.value);
+                                setIsViewAsOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${
+                                viewAsRole === role.value
+                                  ? 'bg-indigo-50 text-indigo-900 font-medium'
+                                  : 'text-gray-900'
+                              }`}
+                            >
+                              {role.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
                   {/* Search */}
                   <div className="relative">
                     <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500" />
@@ -441,78 +505,141 @@ export default function MapsPage() {
                       className="pl-7 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
                     />
                   </div>
-                  {viewType === 'my-maps' && account && (
+                  {account && (
                     <div className="flex items-center gap-2">
-                      {mapLimitDisplay && (
-                        <span className={`text-xs ${isLimitReached ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                          {mapLimitDisplay}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => {
-                          if (isLimitReached) {
-                            router.push('/billing');
-                          } else {
+                      {!limitState.canCreate ? (
+                        <>
+                          <button
+                            onClick={() => {
+                              router.push('/billing');
+                            }}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors text-white bg-red-600 hover:bg-red-700"
+                            title="Map limit reached. Click to upgrade."
+                          >
+                            <PlusIcon className="w-3 h-3" />
+                            <span>Upgrade</span>
+                          </button>
+                          {customMapsFeature?.limit_value !== null && customMapsFeature?.limit_value !== undefined && (
+                            <span className="text-xs text-gray-500">
+                              ({customMapsFeature.limit_value})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
                             router.push('/maps/new');
-                          }
-                        }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                          isLimitReached
-                            ? 'text-white bg-red-600 hover:bg-red-700'
-                            : 'text-white bg-indigo-600 hover:bg-indigo-700'
-                        }`}
-                        title={isLimitReached ? 'Map limit reached. Click to upgrade.' : 'Create a new map'}
-                      >
-                        <PlusIcon className="w-3 h-3" />
-                        <span>{isLimitReached ? 'Upgrade' : 'Create Map'}</span>
-                      </button>
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors text-white bg-indigo-600 hover:bg-indigo-700"
+                          title="Create a new map"
+                        >
+                          <PlusIcon className="w-3 h-3" />
+                          <span>Create Map</span>
+                        </button>
+                      )}
                     </div>
                   )}
                   <span className="text-xs text-gray-500">
-                    ({viewType === 'community' ? filteredMapsByRole.community.length : totalMyMapsCount})
+                    ({totalCount})
                   </span>
                 </div>
               </div>
-              {viewType === 'my-maps' && loadingMyMaps ? (
+              {viewType === 'featured' && loadingFeatured ? (
+                <div className="text-xs text-gray-500">Loading featured maps...</div>
+              ) : viewType === 'my-maps' && loadingMyMaps ? (
                 <div className="text-xs text-gray-500">Loading your maps...</div>
               ) : viewType === 'community' && loadingCommunity ? (
                 <div className="text-xs text-gray-500">Loading maps...</div>
+              ) : viewType === 'featured' ? (
+                filteredMapsByRole.featured.length === 0 ? (
+                  <div className="text-xs text-gray-500 text-center py-8">
+                    {searchQuery ? 'No featured maps match your search' : 'No featured maps'}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
+                    {filteredMapsByRole.featured.map((map) => (
+                      <MapCard
+                        key={map.id}
+                        map={map}
+                        account={account}
+                        showRoleIcon={false}
+                        viewAsRole={viewAsRole}
+                      />
+                    ))}
+                  </div>
+                )
               ) : viewType === 'my-maps' ? (
                 <div className="space-y-4">
                   {/* Owner Section */}
-                  {filteredMapsByRole.owner.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-semibold text-gray-900">Owner</h3>
-                        {(() => {
-                          const mapFeature = features.find(f => f.slug === 'map' || f.slug === 'custom_maps');
-                          if (!mapFeature) return null;
-                          
-                          const limitDisplay = mapFeature.is_unlimited
-                            ? `${ownedMapsCount} (unlimited)`
-                            : mapFeature.limit_value !== null
-                              ? `${ownedMapsCount} / ${mapFeature.limit_value}`
-                              : `${ownedMapsCount}`;
-                          
-                          return (
-                            <span className={`text-xs ${ownedMapsCount >= (mapFeature.limit_value || Infinity) ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                              {limitDisplay}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                        {filteredMapsByRole.owner.map((map) => (
-                          <MapCard
-                            key={map.id}
-                            map={map}
-                            account={account}
-                            showRoleIcon={true}
-                          />
-                        ))}
-                      </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold text-gray-900">Owner</h3>
+                      {(() => {
+                        const mapFeature = features.find(f => f.slug === 'custom_maps');
+                        if (!mapFeature) return null;
+                        
+                        const limitDisplay = mapFeature.is_unlimited
+                          ? `${ownedMapsCount} (unlimited)`
+                          : mapFeature.limit_value !== null
+                            ? `${ownedMapsCount} / ${mapFeature.limit_value}`
+                            : `${ownedMapsCount}`;
+                        
+                        return (
+                          <span className={`text-xs ${ownedMapsCount >= (mapFeature.limit_value || Infinity) ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                            {limitDisplay}
+                          </span>
+                        );
+                      })()}
                     </div>
-                  )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
+                      {/* Placeholder Create Map Card */}
+                      {account && (
+                        <div
+                          onClick={() => {
+                            if (!limitState.canCreate) {
+                              router.push('/billing');
+                              return;
+                            }
+                            router.push('/maps/new');
+                          }}
+                          className={`bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors cursor-pointer group overflow-hidden relative ${
+                            !limitState.canCreate ? 'opacity-60' : ''
+                          }`}
+                        >
+                          <div className="w-full h-48 bg-gray-100 relative overflow-hidden flex items-center justify-center">
+                            {!limitState.canCreate ? (
+                              <div className="flex flex-col items-center justify-center gap-2 p-[10px]">
+                                <div className="text-xs font-semibold text-red-600">Limit Reached</div>
+                                <div className="text-[10px] text-gray-500 text-center">
+                                  {customMapsFeature?.limit_value !== null && customMapsFeature?.limit_value !== undefined
+                                    ? `(${customMapsFeature.limit_value})`
+                                    : ''}
+                                </div>
+                                <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors">
+                                  <PlusIcon className="w-3 h-3" />
+                                  <span>Upgrade</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center gap-2 p-[10px]">
+                                <PlusIcon className="w-8 h-8 text-gray-400" />
+                                <div className="text-xs font-semibold text-gray-700">Create Map</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {filteredMapsByRole.owner.map((map) => (
+                        <MapCard
+                          key={map.id}
+                          map={map}
+                          account={account}
+                          showRoleIcon={true}
+                          viewAsRole={viewAsRole}
+                        />
+                      ))}
+                    </div>
+                  </div>
                   
                   {/* Manager Section */}
                   {filteredMapsByRole.manager.length > 0 && (
@@ -525,6 +652,7 @@ export default function MapsPage() {
                             map={map}
                             account={account}
                             showRoleIcon={true}
+                            viewAsRole={viewAsRole}
                           />
                         ))}
                       </div>
@@ -542,6 +670,7 @@ export default function MapsPage() {
                             map={map}
                             account={account}
                             showRoleIcon={true}
+                            viewAsRole={viewAsRole}
                           />
                         ))}
                       </div>
@@ -549,7 +678,7 @@ export default function MapsPage() {
                   )}
                   
                   {/* Empty state */}
-                  {totalMyMapsCount === 0 && (
+                  {totalCount === 0 && (
                     <div className="text-xs text-gray-500 text-center py-8">
                       {searchQuery
                         ? 'No maps match your search'
@@ -569,6 +698,7 @@ export default function MapsPage() {
                       map={map}
                       account={account}
                       showRoleIcon={false}
+                      viewAsRole={viewAsRole}
                     />
                   ))}
                 </div>

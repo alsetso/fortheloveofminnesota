@@ -13,13 +13,18 @@ import { GlobalErrorHandler } from '@/components/utils/GlobalErrorHandler';
 
 interface ProvidersProps {
   children: ReactNode;
+  /** Initial auth data from server - passed to AuthStateProvider to skip client-side fetch */
+  initialAuth?: {
+    userId: string | null;
+    accountId: string | null;
+  } | null;
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children, initialAuth }: ProvidersProps) {
   return (
     <StripeProvider>
       <AuthProvider>
-        <AuthStateProvider>
+        <AuthStateProvider initialAuth={initialAuth}>
           <AdminImpersonationProvider>
             <ProfileProvider>
               <ToastProvider>

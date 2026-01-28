@@ -6,6 +6,8 @@ import { useReverseGeocode } from '@/hooks/useReverseGeocode';
 import { useClickMarker } from '@/hooks/useClickMarker';
 import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
+import { useToastContext } from '@/features/ui/contexts/ToastContext';
+import { createToast } from '@/features/ui/services/toast';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import type { MapData } from '@/types/map';
 
@@ -35,6 +37,8 @@ interface UnifiedMapClickHandlerOptions {
     subscription_status: string | null;
   } | null;
   isOwner: boolean;
+  isMember: boolean;
+  effectiveIsMember: boolean;
   userRole: 'owner' | 'manager' | 'editor' | null;
   checkPermission: (action: 'pins' | 'areas' | 'posts' | 'clicks') => boolean | undefined;
   // Mode flags
@@ -71,6 +75,8 @@ export function useUnifiedMapClickHandler({
   mapData,
   account,
   isOwner,
+  isMember,
+  effectiveIsMember,
   userRole,
   checkPermission,
   pinMode = false,
@@ -81,11 +87,15 @@ export function useUnifiedMapClickHandler({
   onMapClick,
 }: UnifiedMapClickHandlerOptions) {
   const router = useRouter();
+  const { addToast } = useToastContext();
   const mapInstanceRef = useRef(map);
   
   // Store frequently changing values in refs
   const mapDataRef = useRef(mapData);
   const accountRef = useRef(account);
+  const isOwnerRef = useRef(isOwner);
+  const isMemberRef = useRef(isMember);
+  const effectiveIsMemberRef = useRef(effectiveIsMember);
   const checkPermissionRef = useRef(checkPermission);
   const pinModeRef = useRef(pinMode);
   const showAreaDrawModalRef = useRef(showAreaDrawModal);
@@ -98,6 +108,9 @@ export function useUnifiedMapClickHandler({
   useEffect(() => { mapInstanceRef.current = map; }, [map]);
   useEffect(() => { mapDataRef.current = mapData; }, [mapData]);
   useEffect(() => { accountRef.current = account; }, [account]);
+  useEffect(() => { isOwnerRef.current = isOwner; }, [isOwner]);
+  useEffect(() => { isMemberRef.current = isMember; }, [isMember]);
+  useEffect(() => { effectiveIsMemberRef.current = effectiveIsMember; }, [effectiveIsMember]);
   useEffect(() => { checkPermissionRef.current = checkPermission; }, [checkPermission]);
   useEffect(() => { pinModeRef.current = pinMode; }, [pinMode]);
   useEffect(() => { showAreaDrawModalRef.current = showAreaDrawModal; }, [showAreaDrawModal]);
@@ -274,6 +287,28 @@ export function useUnifiedMapClickHandler({
   }, []);
 
   /**
+   * Check if clicks should be rejected (non-member or collaboration tool disabled)
+   */
+  const shouldRejectClick = useCallback(() => {
+    const currentMapData = mapDataRef.current;
+    const currentIsOwner = isOwnerRef.current;
+    const currentEffectiveIsMember = effectiveIsMemberRef.current;
+    
+    // Check if collaboration tool (allow_clicks) is disabled
+    const allowClicks = currentMapData?.settings?.collaboration?.allow_clicks ?? false;
+    if (!allowClicks && !currentIsOwner) {
+      return true;
+    }
+    
+    // Check if user is non-member (not owner and not effective member)
+    if (!currentIsOwner && !currentEffectiveIsMember) {
+      return true;
+    }
+    
+    return false;
+  }, []);
+
+  /**
    * Handle map click with unified logic
    */
   const handleMapClick = useCallback(async (e: any) => {
@@ -294,6 +329,16 @@ export function useUnifiedMapClickHandler({
 
     const mapboxMap = mapInstanceRef.current as any;
     if (!mapboxMap || mapboxMap.removed) {
+      isProcessingClickRef.current = false;
+      return;
+    }
+
+    // Check if clicks should be rejected (non-member or collaboration tool disabled)
+    if (shouldRejectClick()) {
+      addToast(createToast('error', 'Map clicks disabled', {
+        message: 'You must be a member and the collaboration tool must be enabled to interact with the map.',
+        duration: 3000,
+      }));
       isProcessingClickRef.current = false;
       return;
     }
@@ -381,6 +426,7 @@ export function useUnifiedMapClickHandler({
             point: e.point,
             currentMapData,
             currentAccount,
+            currentIsOwner: isOwnerRef.current,
             currentCheckPermission,
             currentPinMode,
             currentShowAreaDrawModal,
@@ -395,7 +441,7 @@ export function useUnifiedMapClickHandler({
       // Always reset processing flag after handling
       isProcessingClickRef.current = false;
     }
-  }, [detectClickTarget]);
+  }, [detectClickTarget, shouldRejectClick, addToast]);
 
   // Register unified click handler
   useEffect(() => {
@@ -418,6 +464,7 @@ export function useUnifiedMapClickHandler({
     locationSelectPopup,
     closePopup,
     popupAddress: locationSelectPopup.address || reverseGeocodeAddress,
+    removeClickMarker: removeClickMarkerRef.current,
   };
 }
 
@@ -431,6 +478,7 @@ async function handleMapClickTarget({
   point,
   currentMapData,
   currentAccount,
+  currentIsOwner,
   currentCheckPermission,
   currentPinMode,
   currentShowAreaDrawModal,
@@ -445,6 +493,7 @@ async function handleMapClickTarget({
   point: { x: number; y: number };
   currentMapData: MapData | null;
   currentAccount: { id: string; plan: string | null; subscription_status: string | null } | null;
+  currentIsOwner: boolean;
   currentCheckPermission: (action: 'pins' | 'areas' | 'posts' | 'clicks') => boolean | undefined;
   currentPinMode: boolean;
   currentShowAreaDrawModal: boolean;
@@ -463,9 +512,36 @@ async function handleMapClickTarget({
       }
     }
 
+    // Capture mapbox feature at click point for map_meta (same as location selection)
+    let mapMeta: Record<string, any> | null = null;
+    try {
+      const projectedPoint = mapboxMap.project([lng, lat]);
+      const result = queryFeatureAtPoint(mapboxMap, projectedPoint, 'labels-first', false);
+      if (result) {
+        const extractedFeature = 'feature' in result ? result.feature : result;
+        if (extractedFeature && 'layerId' in extractedFeature) {
+          mapMeta = {
+            location: null,
+            feature: {
+              layerId: extractedFeature.layerId,
+              sourceLayer: extractedFeature.sourceLayer,
+              category: extractedFeature.category,
+              name: extractedFeature.name,
+              label: extractedFeature.label,
+              icon: extractedFeature.icon,
+              properties: extractedFeature.properties,
+              showIntelligence: extractedFeature.showIntelligence,
+            },
+          };
+        }
+      }
+    } catch (err) {
+      console.debug('[UnifiedMapClickHandler] Error capturing map feature in pin mode:', err);
+    }
+
     // Call custom handler if provided
     if (onMapClick) {
-      onMapClick({ lat, lng }, null);
+      onMapClick({ lat, lng }, mapMeta);
     }
     return;
   }
@@ -476,9 +552,9 @@ async function handleMapClickTarget({
     return;
   }
 
-  // Check if map settings allow clicks
+  // Check if map settings allow clicks (owners can always click)
   const allowClicks = currentMapData?.settings?.collaboration?.allow_clicks ?? false;
-  if (!allowClicks) {
+  if (!allowClicks && !currentIsOwner) {
     return;
   }
 

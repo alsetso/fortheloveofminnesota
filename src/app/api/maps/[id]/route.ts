@@ -71,6 +71,8 @@ export async function GET(
             auto_approve_members,
             membership_rules,
             membership_questions,
+            published_to_community,
+            published_at,
             tags,
             created_at,
             updated_at,
@@ -188,6 +190,12 @@ const updateMapSchema = z.object({
     }).optional(),
     membership: z.object({
       max_members: z.number().int().positive().optional().nullable(),
+    }).optional(),
+    colors: z.object({
+      owner: z.string().optional(),
+      manager: z.string().optional(),
+      editor: z.string().optional(),
+      'non-member': z.string().optional(),
     }).optional(),
   }).optional(),
   auto_approve_members: z.boolean().optional(),
@@ -363,6 +371,18 @@ export async function PUT(
               presentation: {
                 ...currentSettings.presentation,
                 ...body.settings.presentation,
+              },
+            }),
+            ...(body.settings.membership && {
+              membership: {
+                ...currentSettings.membership,
+                ...body.settings.membership,
+              },
+            }),
+            ...(body.settings.colors && {
+              colors: {
+                ...currentSettings.colors,
+                ...body.settings.colors,
               },
             }),
           };

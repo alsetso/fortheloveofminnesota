@@ -29,15 +29,6 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerClientWithAuth(cookies());
         
         // userId is guaranteed from security middleware
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user || user.id !== userId) {
-          return NextResponse.json(
-            { error: 'Authentication required' },
-            { status: 401 }
-          );
-        }
-
         // Validate query parameters
         const url = new URL(req.url);
         const validation = validateQueryParams(url.searchParams, accountsQuerySchema);
@@ -65,7 +56,7 @@ export async function GET(request: NextRequest) {
         updated_at,
         last_visit
       `)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -81,7 +72,7 @@ export async function GET(request: NextRequest) {
     const { count, error: countError } = await supabase
       .from('accounts')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (countError) {
       console.error('[Accounts API] Error counting accounts:', countError);
@@ -135,15 +126,6 @@ export async function POST(request: NextRequest) {
         const supabase = await createServerClientWithAuth(cookies());
         
         // userId is guaranteed from security middleware
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user || user.id !== userId) {
-          return NextResponse.json(
-            { error: 'Authentication required' },
-            { status: 401 }
-          );
-        }
-
         // Validate request body
         const { validateRequestBody } = await import('@/lib/security/validation');
         const validation = await validateRequestBody(req, createAccountSchema, REQUEST_SIZE_LIMITS.json);
@@ -161,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Create account for current user (user_id is set from auth context)
     type AccountsInsert = Database['public']['Tables']['accounts']['Insert'];
     const insertData: AccountsInsert = {
-      user_id: user.id,
+      user_id: userId,
       username: username || null,
       first_name: first_name || null,
       last_name: last_name || null,

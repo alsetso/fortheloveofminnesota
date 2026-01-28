@@ -8,7 +8,7 @@ import { useToast } from '@/features/ui';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { supabase } from '@/lib/supabase';
-import { XMarkIcon, ChevronLeftIcon, UserIcon, PhotoIcon, CheckCircleIcon, MagnifyingGlassIcon, CameraIcon, UserPlusIcon, ChevronDownIcon, InformationCircleIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ChevronLeftIcon, UserIcon, PhotoIcon, CheckCircleIcon, MagnifyingGlassIcon, CameraIcon, UserPlusIcon, ChevronDownIcon, EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import ImagePreviewContainer from '@/components/modals/ImagePreviewContainer';
 import InlineMap from '@/components/map/InlineMap';
@@ -26,9 +26,10 @@ interface ContributeOverlayProps {
   onClose: () => void;
   mapId: string;
   mapSlug?: string | null;
+  onMentionCreated?: (mention: Mention) => void;
 }
 
-export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: ContributeOverlayProps) {
+export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug, onMentionCreated }: ContributeOverlayProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, account, activeAccountId, isLoading, signOut } = useAuthStateSafe();
@@ -45,6 +46,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
   const [fullAddress, setFullAddress] = useState<string | null>(null);
   const [mapMeta, setMapMeta] = useState<Record<string, any> | null>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [mapZoom, setMapZoom] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdMention, setCreatedMention] = useState<Mention | null>(null);
@@ -212,6 +214,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
       setSelectedTypeId('');
       setFullAddress(null);
       setMapMeta(null);
+      setMapZoom(null);
       if (mediaPreview && mediaPreview.startsWith('blob:')) {
         URL.revokeObjectURL(mediaPreview);
       }
@@ -229,26 +232,32 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
 
   // Handle location selection from map
   const handleLocationSelect = useCallback((selectedLat: number, selectedLng: number) => {
-    setLat(selectedLat.toFixed(6));
-    setLng(selectedLng.toFixed(6));
-  }, []);
+    const newLat = selectedLat.toFixed(6);
+    const newLng = selectedLng.toFixed(6);
+    
+    // Clear existing address and mapMeta when location changes
+    // This ensures fresh data is fetched for the new location
+    if (lat !== newLat || lng !== newLng) {
+      setFullAddress(null);
+      setMapMeta(null);
+    }
+    
+    setLat(newLat);
+    setLng(newLng);
+  }, [lat, lng]);
 
-  // Reverse geocode coordinates only if not already provided
+  // Reverse geocode coordinates when they change
   useEffect(() => {
     if (!lat || !lng) {
-      if (!fullAddress && !mapMeta) {
-        setFullAddress(null);
-        setMapMeta(null);
-      }
+      setFullAddress(null);
+      setMapMeta(null);
       setIsReverseGeocoding(false);
       return;
     }
 
-    // Skip reverse geocoding if we already have address and mapMeta (from LocationSelectPopup)
-    if (fullAddress && mapMeta) {
-      setIsReverseGeocoding(false);
-      return;
-    }
+    // Always fetch fresh data when coordinates change
+    // The handleLocationSelect callback clears fullAddress and mapMeta when coordinates change,
+    // ensuring fresh data is fetched for each new location
 
     let cancelled = false;
     setIsReverseGeocoding(true);
@@ -281,21 +290,17 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
           
           if (data.features && data.features.length > 0) {
             const feature = data.features[0];
-            // Only update if we don't already have this data
-            if (!fullAddress) {
-              setFullAddress(feature.place_name || null);
-            }
-            if (!mapMeta) {
-              setMapMeta({
-                feature: feature,
-                place_name: feature.place_name,
-                text: feature.text,
-                place_type: feature.place_type,
-                properties: feature.properties,
-                context: feature.context,
-                geometry: feature.geometry,
-              });
-            }
+            // Always update with fresh data from reverse geocoding
+            setFullAddress(feature.place_name || null);
+            setMapMeta({
+              feature: feature,
+              place_name: feature.place_name,
+              text: feature.text,
+              place_type: feature.place_type,
+              properties: feature.properties,
+              context: feature.context,
+              geometry: feature.geometry,
+            });
           } else {
             if (!fullAddress && !mapMeta) {
               setFullAddress(null);
@@ -671,39 +676,52 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
         map_meta: mapMeta || undefined,
       }, activeAccountId);
 
+      // Dispatch event for MentionsLayer to refresh
+      window.dispatchEvent(new CustomEvent('mention-created', {
+        detail: { mention }
+      }));
+
       setCreatedMention(mention);
-      window.location.hash = 'success';
-      setShowSuccessScreen(true);
       
-      // Trigger confetti with proper cleanup
-      const duration = 3000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-      const interval = setInterval(() => {
-        const timeLeft = animationEnd - Date.now();
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          return;
+      // If callback provided, use it (map page will handle fly-to and modal)
+      // Otherwise, show success screen in overlay
+      if (onMentionCreated) {
+        onMentionCreated(mention);
+        setIsSubmitting(false);
+      } else {
+        window.location.hash = 'success';
+        setShowSuccessScreen(true);
+        
+        // Trigger confetti with proper cleanup
+        const duration = 3000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+        const interval = setInterval(() => {
+          const timeLeft = animationEnd - Date.now();
+          if (timeLeft <= 0) {
+            clearInterval(interval);
+            return;
+          }
+          const particleCount = 50 * (timeLeft / duration);
+          confetti({
+            ...defaults,
+            particleCount,
+            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+          });
+          confetti({
+            ...defaults,
+            particleCount,
+            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+          });
+        }, 250);
+        
+        // Cleanup interval on unmount or overlay close
+        const cleanup = () => clearInterval(interval);
+        // Store cleanup in a way that survives component updates
+        if (typeof window !== 'undefined') {
+          (window as any).__contributeConfettiCleanup = cleanup;
         }
-        const particleCount = 50 * (timeLeft / duration);
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        });
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        });
-      }, 250);
-      
-      // Cleanup interval on unmount or overlay close
-      const cleanup = () => clearInterval(interval);
-      // Store cleanup in a way that survives component updates
-      if (typeof window !== 'undefined') {
-        (window as any).__contributeConfettiCleanup = cleanup;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create mention');
@@ -731,7 +749,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
       <div className="h-full bg-gray-50 overflow-y-auto scrollbar-hide" style={{ width: '100%', height: '100%' }}>
         {/* Header */}
         <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
-          <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="max-w-2xl mx-auto px-4 py-2 flex items-center justify-between">
             <div className="flex items-center">
               <Image
                 src="/logo.png"
@@ -754,7 +772,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
           </div>
         </header>
 
-        <div className="max-w-2xl mx-auto px-4 py-6 pb-32 space-y-4">
+        <div className="max-w-2xl mx-auto px-4 py-3 pb-32 space-y-3">
           {isSuccessScreen ? (
             <div className="h-[calc(100vh-200px)] flex items-center justify-center">
               <div className="max-w-md w-full">
@@ -798,7 +816,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                   <button
                     type="button"
                     onClick={() => setShowCollectionAccordion(!showCollectionAccordion)}
-                    className="w-full p-3 flex items-center gap-3 hover:bg-gray-50 transition-colors"
+                    className="w-full p-2 flex items-center gap-2 hover:bg-gray-50 transition-colors"
                   >
                     <ProfilePhoto account={account} size="sm" />
                     <div className="flex-1 min-w-0 text-left">
@@ -828,7 +846,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                   </button>
                   
                   {showCollectionAccordion && (
-                    <div className="border-t border-gray-200 p-3 space-y-2 max-h-64 overflow-y-auto">
+                    <div className="border-t border-gray-200 p-2 space-y-1.5 max-h-64 overflow-y-auto">
                       {loadingCollections ? (
                         <div className="text-xs text-gray-500 py-4 text-center">Loading collections...</div>
                       ) : collections.length === 0 ? (
@@ -840,7 +858,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                           <button
                             type="button"
                             onClick={() => setSelectedCollectionId(null)}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded-md transition-colors ${
                               !selectedCollectionId
                                 ? 'bg-gray-100 text-gray-900'
                                 : 'hover:bg-gray-50 text-gray-900'
@@ -857,7 +875,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                               key={collection.id}
                               type="button"
                               onClick={() => setSelectedCollectionId(collection.id)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-md transition-colors ${
+                              className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded-md transition-colors ${
                                 selectedCollectionId === collection.id
                                   ? 'bg-gray-100 text-gray-900'
                                   : 'hover:bg-gray-50 text-gray-900'
@@ -876,8 +894,8 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                   )}
                 </div>
               ) : (
-                <div className="bg-white rounded-md border border-gray-200 p-4">
-                  <div className="flex items-center gap-3">
+                <div className="bg-white rounded-md border border-gray-200 p-2">
+                  <div className="flex items-center gap-2">
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
                       <UserIcon className="w-5 h-5 text-gray-400" />
                     </div>
@@ -888,7 +906,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                     <button
                       type="button"
                       onClick={() => openWelcome()}
-                      className="px-4 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex-shrink-0"
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors flex-shrink-0"
                     >
                       Sign In
                     </button>
@@ -899,7 +917,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
               {/* Mention Type */}
               <div>
                 {selectedTypeId ? (
-                  <div className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-md">
+                  <div className="inline-flex items-center gap-2 px-2 py-1.5 bg-white border border-gray-200 rounded-md">
                     <span className="text-lg">
                       {mentionTypes.find(t => t.id === selectedTypeId)?.emoji}
                     </span>
@@ -919,7 +937,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                   <button
                     type="button"
                     onClick={() => setShowMentionTypesModal(true)}
-                    className="relative flex items-center gap-2 px-3 py-2 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
+                    className="relative flex items-center gap-2 px-2 py-1.5 rounded-md transition-all hover:bg-gray-50 active:bg-gray-100 group touch-manipulation"
                     title="Add tag (required)"
                   >
                     <span className="text-xl font-bold text-gray-400 group-hover:text-gray-600 transition-colors">
@@ -935,7 +953,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
               
               {/* Location Map */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   Location <span className="text-red-500">*</span>
                 </label>
                 <div className="relative w-full aspect-[3/2] rounded-md border border-gray-200 overflow-hidden bg-gray-50">
@@ -944,30 +962,140 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                     lng={lng || undefined}
                     onLocationSelect={handleLocationSelect}
                     onOpenFullscreen={handleOpenFullscreenMap}
-                    initialZoom={10}
-                    hideMarker={true}
+                    initialZoom={12}
+                    hideMarker={false}
+                    onZoomChange={setMapZoom}
                   />
                 </div>
                 {(lat && lng) && (
-                  <div className="mt-1">
-                    {isReverseGeocoding ? (
-                      <p className="text-[10px] text-gray-400">Loading address...</p>
-                    ) : fullAddress ? (
-                      <p className="text-[10px] text-gray-600">{fullAddress}</p>
-                    ) : null}
+                  <div className="mt-1 flex items-start justify-between gap-2">
+                    {/* Left side: Address and Zoom */}
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      {isReverseGeocoding ? (
+                        <p className="text-[10px] text-gray-400">Loading address...</p>
+                      ) : fullAddress ? (
+                        <p className="text-[10px] text-gray-600">{fullAddress}</p>
+                      ) : null}
+                      {mapZoom !== null && (
+                        <p className="text-[10px] text-gray-400">Zoom: {mapZoom.toFixed(1)}</p>
+                      )}
+                    </div>
+                    
+                    {/* Right side: Map Meta */}
+                    {mapMeta && !isReverseGeocoding && (() => {
+                      const feature = mapMeta.feature;
+                      const placeType = feature?.place_type?.[0] || '';
+                      const text = feature?.text || mapMeta.text || '';
+                      const context = feature?.context || mapMeta.context || [];
+                      const emoji = feature?.icon || '📍';
+                      
+                      // Determine display name
+                      let displayName = text || mapMeta.place_name?.split(',')[0] || 'Location';
+                      if (placeType) {
+                        const typeLabels: Record<string, string> = {
+                          'poi': 'Point of Interest',
+                          'address': 'Address',
+                          'neighborhood': 'Neighborhood',
+                          'locality': 'City',
+                          'place': 'Place',
+                        };
+                        displayName = typeLabels[placeType] || displayName;
+                      }
+                      
+                      // Determine category label
+                      const props = feature?.properties || {};
+                      let categoryLabel = feature?.category && feature.category !== 'unknown' 
+                        ? feature.category.replace(/_/g, ' ')
+                        : null;
+                      
+                      if (!categoryLabel || categoryLabel === 'unknown') {
+                        if (props.type) {
+                          categoryLabel = String(props.type).replace(/_/g, ' ');
+                        } else if (props.class) {
+                          categoryLabel = String(props.class).replace(/_/g, ' ');
+                        } else if (feature?.sourceLayer) {
+                          categoryLabel = feature.sourceLayer.replace(/_/g, ' ');
+                        } else if (feature?.layerId) {
+                          const layerId = feature.layerId.toLowerCase();
+                          if (layerId.includes('poi')) categoryLabel = 'Point of Interest';
+                          else if (layerId.includes('building')) categoryLabel = 'Building';
+                          else if (layerId.includes('road') || layerId.includes('highway')) categoryLabel = 'Road';
+                          else if (layerId.includes('water')) categoryLabel = 'Water';
+                          else categoryLabel = feature.layerId.replace(/-/g, ' ').replace(/_/g, ' ');
+                        }
+                      }
+                      
+                      const singleLineLabel = categoryLabel && categoryLabel !== displayName
+                        ? `${displayName} • ${categoryLabel}`
+                        : displayName;
+                      
+                      // Build description from place_name or context
+                      let description = mapMeta.place_name || '';
+                      if (!description && context && Array.isArray(context)) {
+                        const parts: string[] = [];
+                        const neighborhood = context.find((c: any) => c.id?.startsWith('neighborhood'));
+                        const locality = context.find((c: any) => c.id?.startsWith('locality'));
+                        const district = context.find((c: any) => c.id?.startsWith('district'));
+                        const postcode = context.find((c: any) => c.id?.startsWith('postcode'));
+                        const region = context.find((c: any) => c.id?.startsWith('region'));
+                        
+                        if (neighborhood) parts.push(neighborhood.text);
+                        if (locality) parts.push(locality.text);
+                        if (district) parts.push(district.text);
+                        if (postcode) parts.push(postcode.text);
+                        if (region) parts.push(region.text);
+                        
+                        description = parts.join(', ');
+                      }
+                      
+                      return (
+                        <div className="relative flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowMapMetaInfo(!showMapMetaInfo);
+                            }}
+                            onMouseEnter={() => setShowMapMetaInfo(true)}
+                            onMouseLeave={() => setShowMapMetaInfo(false)}
+                            className="flex items-center gap-1 px-1.5 py-0.5 border rounded border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+                            aria-label="Map metadata information"
+                          >
+                            {emoji && emoji !== '📍' && (
+                              <span className="text-[9px] flex-shrink-0 leading-none">{emoji}</span>
+                            )}
+                            <span className="text-[9px] font-medium text-gray-700 truncate max-w-[100px] leading-tight">
+                              {singleLineLabel}
+                            </span>
+                          </button>
+                          
+                          {showMapMetaInfo && description && (
+                            <div
+                              ref={mapMetaInfoRef}
+                              className="absolute top-full right-0 mt-1 z-50 border rounded-md shadow-lg p-2 bg-white border-gray-200 min-w-[180px] max-w-[240px]"
+                              onMouseEnter={() => setShowMapMetaInfo(true)}
+                              onMouseLeave={() => setShowMapMetaInfo(false)}
+                            >
+                              <p className="text-[10px] text-gray-700 leading-relaxed">
+                                {description}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
 
-              <form id="mention-form" onSubmit={handleSubmit} className="space-y-4">
+              <form id="mention-form" onSubmit={handleSubmit} className="space-y-3">
                 {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                  <div className="bg-red-50 border border-red-200 rounded-md p-2">
                     <p className="text-xs text-red-600">{error}</p>
                   </div>
                 )}
 
                 {/* Description */}
-                <div className="pt-5">
+                <div className="pt-3">
                   <textarea
                     id="description"
                     value={description}
@@ -979,7 +1107,7 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                     required
                   />
 
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-3 pt-3 border-t border-gray-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2 pt-2 border-t border-gray-100">
                     <div className="flex items-center gap-2 sm:gap-1.5 flex-1">
                       <div className="relative">
                         <button
@@ -1046,146 +1174,32 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                     </div>
                   </div>
 
-                  {/* Map Metadata Display */}
-                  {mapMeta && !isReverseGeocoding && (() => {
-                    const feature = mapMeta.feature;
-                    const placeType = feature?.place_type?.[0] || '';
-                    const text = feature?.text || mapMeta.text || '';
-                    const context = mapMeta.context || [];
-                    
-                    let emoji = '📍';
-                    if (placeType === 'poi') emoji = '🏢';
-                    else if (placeType === 'address') emoji = '🏠';
-                    else if (placeType === 'neighborhood') emoji = '🏘️';
-                    else if (placeType === 'locality') emoji = '🏙️';
-                    else if (placeType === 'district') emoji = '🏛️';
-                    else if (placeType === 'postcode') emoji = '📮';
-                    else if (placeType === 'region') emoji = '🗺️';
-                    else if (placeType === 'country') emoji = '🌍';
-                    
-                    let displayName = text || mapMeta.place_name?.split(',')[0] || 'Location';
-                    
-                    let categoryLabel = null;
-                    if (context.length > 0) {
-                      const neighborhood = context.find((c: any) => c.id?.startsWith('neighborhood'));
-                      const locality = context.find((c: any) => c.id?.startsWith('locality'));
-                      const district = context.find((c: any) => c.id?.startsWith('district'));
-                      
-                      if (neighborhood) categoryLabel = neighborhood.text;
-                      else if (locality) categoryLabel = locality.text;
-                      else if (district) categoryLabel = district.text;
-                    }
-                    
-                    const singleLineLabel = categoryLabel && categoryLabel !== displayName
-                      ? `${displayName} • ${categoryLabel}`
-                      : displayName;
-                    
-                    return (
-                      <div className="relative mt-2">
-                        <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50 border-gray-200">
-                          {emoji && emoji !== '📍' && (
-                            <span className="text-xs flex-shrink-0">{emoji}</span>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold truncate text-gray-900">
-                              {singleLineLabel}
-                            </div>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowMapMetaInfo(!showMapMetaInfo);
-                            }}
-                            className="flex-shrink-0 p-0.5 transition-colors text-gray-400 hover:text-gray-600"
-                            aria-label="Map metadata information"
-                          >
-                            <InformationCircleIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        
-                        {showMapMetaInfo && (
-                          <div
-                            ref={mapMetaInfoRef}
-                            className="absolute top-full left-0 right-0 mt-1 z-50 border rounded-md shadow-lg p-2 bg-white border-gray-200"
-                          >
-                            <div className="space-y-1.5">
-                              {context && Array.isArray(context) && (
-                                <>
-                                  {context.find((c: any) => c.id?.startsWith('neighborhood')) && (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-gray-400">Neighborhood:</span>
-                                      <span className="text-[10px] text-gray-700 font-medium">
-                                        {context.find((c: any) => c.id?.startsWith('neighborhood'))?.text}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {context.find((c: any) => c.id?.startsWith('locality')) && (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-gray-400">City:</span>
-                                      <span className="text-[10px] text-gray-700 font-medium">
-                                        {context.find((c: any) => c.id?.startsWith('locality'))?.text}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {context.find((c: any) => c.id?.startsWith('district')) && (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-gray-400">District:</span>
-                                      <span className="text-[10px] text-gray-700 font-medium">
-                                        {context.find((c: any) => c.id?.startsWith('district'))?.text}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {context.find((c: any) => c.id?.startsWith('postcode')) && (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-gray-400">ZIP:</span>
-                                      <span className="text-[10px] text-gray-700 font-medium">
-                                        {context.find((c: any) => c.id?.startsWith('postcode'))?.text}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {context.find((c: any) => c.id?.startsWith('region')) && (
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-gray-400">State:</span>
-                                      <span className="text-[10px] text-gray-700 font-medium">
-                                        {context.find((c: any) => c.id?.startsWith('region'))?.text}
-                                      </span>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-
                   {/* Status Indicators */}
                   {(selectedTypeId || selectedCollectionId || taggedAccounts.length > 0 || mediaPreview) && (
-                    <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-gray-100">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5 pt-1.5 border-t border-gray-100">
                       {selectedTypeId && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 rounded-md border border-green-200">
                           <span className="text-[10px] text-green-700 font-medium">
                             {mentionTypes.find(t => t.id === selectedTypeId)?.emoji} {mentionTypes.find(t => t.id === selectedTypeId)?.name}
                           </span>
                         </div>
                       )}
                       {selectedCollectionId && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 rounded-md border border-green-200">
                           <span className="text-[10px] text-green-700 font-medium">
                             {collections.find(c => c.id === selectedCollectionId)?.emoji} {collections.find(c => c.id === selectedCollectionId)?.title}
                           </span>
                         </div>
                       )}
                       {taggedAccounts.length > 0 && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 rounded-md border border-green-200">
                           <span className="text-[10px] text-green-700 font-medium">
                             @{taggedAccounts.length} user{taggedAccounts.length > 1 ? 's' : ''}
                           </span>
                         </div>
                       )}
                       {mediaPreview && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 rounded-md border border-green-200">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 bg-green-50 rounded-md border border-green-200">
                           <span className="text-[10px] text-green-700 font-medium">
                             {mediaType === 'video' ? '🎥 Video' : '📷 Photo'}
                           </span>
@@ -1195,44 +1209,28 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                   )}
 
                   {!selectedTypeId && description.trim().length > 0 && (
-                    <div className="mt-2 flex items-center gap-1.5 px-2 py-1 bg-red-50 rounded-md border border-red-200">
+                    <div className="mt-1.5 flex items-center gap-1 px-1.5 py-0.5 bg-red-50 rounded-md border border-red-200">
                       <span className="text-[10px] text-red-700 font-medium">
                         ⚠️ Select a mention type to continue
                       </span>
                     </div>
                   )}
+
+                  {/* Submit Button */}
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      type="submit"
+                      disabled={!user || !activeAccountId || isSubmitting || isUploadingMedia || !selectedTypeId || !description.trim() || !lat || !lng}
+                      className="w-full px-4 py-2.5 text-sm font-medium bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {!user || !activeAccountId ? 'Sign In to Post' : (isSubmitting ? (isUploadingMedia ? 'Uploading media...' : 'Creating...') : 'Drop Pin')}
+                    </button>
+                  </div>
                 </div>
               </form>
             </>
           )}
         </div>
-
-        {/* Footer */}
-        {!isSuccessScreen && (
-          <div 
-            className="relative bg-white border-t border-gray-200 shadow-lg"
-            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
-            <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
-              >
-                <ChevronLeftIcon className="w-4 h-4" />
-                Back
-              </button>
-              <button
-                type="submit"
-                form="mention-form"
-                disabled={!user || !activeAccountId || isSubmitting || isUploadingMedia || !selectedTypeId || !description.trim() || !lat || !lng}
-                className="px-4 py-2 text-xs font-medium bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {!user || !activeAccountId ? 'Sign In to Post' : (isSubmitting ? (isUploadingMedia ? 'Uploading media...' : 'Creating...') : 'Create Mention')}
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Tag Modal - Simplified version */}
         {showTagModal && (
@@ -1606,11 +1604,6 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug }: C
                           </p>
                         </div>
                       </div>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                      <p className="text-[10px] text-blue-800">
-                        Supported formats: JPG, PNG, GIF, WebP, MP4, WebM, QuickTime
-                      </p>
                     </div>
                   </div>
                 )}

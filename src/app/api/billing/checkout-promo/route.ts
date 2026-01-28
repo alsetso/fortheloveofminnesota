@@ -37,14 +37,15 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        // CRITICAL: Verify user is authenticated before any operations
-        // The security middleware should have already checked this, but we verify again
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user || user.id !== userId) {
+        // userId is guaranteed from security middleware
+        // We need to get user email for Stripe, but userId is already validated
+        // Get user email from Supabase auth (we still need the email, but don't need to verify auth)
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError || !user) {
           return NextResponse.json(
-            { error: 'Unauthorized - Authentication required' },
-            { status: 401 }
+            { error: 'Failed to fetch user data' },
+            { status: 500 }
           );
         }
 

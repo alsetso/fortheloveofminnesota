@@ -10,6 +10,7 @@ import PaymentMethodsSidebar from '@/components/billing/PaymentMethodsSidebar';
 import BillingSetup from '@/components/billing/BillingSetup';
 import PlansKanbanView from '@/components/billing/PlansKanbanView';
 import PlanPaymentModal from '@/components/billing/PlanPaymentModal';
+import ViewsUsageSection from '@/components/billing/ViewsUsageSection';
 import { useAuthStateSafe } from '@/features/auth';
 import { useToast } from '@/features/ui/hooks/useToast';
 import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
@@ -245,6 +246,11 @@ export default function BillingPageClient({ initialPlans, initialSelectedPlan, i
                 showCarousel={false}
                 initialPlans={initialPlans}
               />
+            </div>
+
+            {/* Views & Usage Section */}
+            <div className="mb-6">
+              <ViewsUsageSection accountId={account?.id || null} />
             </div>
           </div>
         </div>

@@ -8,15 +8,24 @@ import SidebarHeader from '@/components/layout/SidebarHeader';
 
 interface MapPostsProps {
   mapId: string;
+  mapSlug?: string | null;
   onClose?: () => void;
 }
 
-export default function MapPosts({ mapId, onClose }: MapPostsProps) {
+export default function MapPosts({ mapId, mapSlug, onClose }: MapPostsProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Only allow posts on live map - posts removed from custom maps
+  const isLiveMap = mapSlug === 'live' || mapId === 'live';
+
   const fetchPosts = useCallback(async () => {
+    if (!isLiveMap) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -36,13 +45,15 @@ export default function MapPosts({ mapId, onClose }: MapPostsProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [mapId]);
+  }, [mapId, isLiveMap]);
 
   useEffect(() => {
-    if (mapId) {
+    if (mapId && isLiveMap) {
       fetchPosts();
+    } else {
+      setIsLoading(false);
     }
-  }, [mapId, fetchPosts]);
+  }, [mapId, isLiveMap, fetchPosts]);
 
   const handlePostCreated = () => {
     fetchPosts();

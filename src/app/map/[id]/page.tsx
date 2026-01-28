@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import toast, { Toaster } from 'react-hot-toast';
+import confetti from 'canvas-confetti';
+import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import type { Mention } from '@/types/mention';
 import PageWrapper from '@/components/layout/PageWrapper';
 import MapSearchInput from '@/components/layout/MapSearchInput';
 import SearchResults from '@/components/layout/SearchResults';
@@ -22,10 +25,12 @@ import { useMapAccess } from './hooks/useMapAccess';
 import { useContributeOverlay } from './hooks/useContributeOverlay';
 import { useMapSidebarHandlers } from './hooks/useMapSidebarHandlers';
 import { useEntitySidebar } from './hooks/useEntitySidebar';
+import { useViewAsRole } from './hooks/useViewAsRole';
 import { shouldNormalizeUrl, getMapUrl } from '@/lib/maps/urls';
 import type { PlanLevel } from '@/lib/maps/permissions';
 import MapActionUpgradePrompt from '@/components/maps/MapActionUpgradePrompt';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
+import ViewAsSelector from './components/ViewAsSelector';
 import type { MapData } from '@/types/map';
 
 // Lazy load ContributeOverlay - only needed when #contribute hash is present
@@ -68,13 +73,17 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   // Membership check (consolidated) - must come before useMapPermissions
   const { isOwner, showMembers, isMember, isManager, loading: membershipLoading, userRole } = useMapMembership(mapId, mapData?.account_id || null, initialMembers);
 
+  // View As role selector (only for owners)
+  const { viewAsRole, setViewAsRole } = useViewAsRole(isOwner);
+
   // Unified access hook - consolidates all access checks and computed flags
-  const { currentAccountId, computedUserRole, access } = useMapAccess({
+  const { currentAccountId, computedUserRole, access, effectiveIsOwner, effectiveIsManager, effectiveIsMember } = useMapAccess({
     isOwner,
     isMember,
     isManager,
     userRole: userRole || null,
     showMembers,
+    viewAsRole: isOwner ? viewAsRole : undefined,
   });
 
   // Unified permissions hook (replaces 3 duplicate handlers + upgrade prompt state)
@@ -83,6 +92,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     account,
     isOwner,
     userRole: userRole || null,
+    viewAsRole: isOwner ? viewAsRole : undefined,
   });
 
   // Determine if filter icon should be shown
@@ -175,8 +185,13 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   }, [mapId]);
 
   // Check if this is the live map
+  // Posts are only available on the live map, not custom maps
   const isLiveMap = useMemo(() => {
-    return mapData?.slug === 'live' || mapId === 'live';
+    if (!mapData && !mapId) return false;
+    // Check both slug and mapId to handle cases where data might not be loaded yet
+    const slugIsLive = mapData?.slug === 'live';
+    const idIsLive = mapId === 'live';
+    return slugIsLive || idIsLive;
   }, [mapData?.slug, mapId]);
 
   // Check for pending membership requests
@@ -239,10 +254,14 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   const popupAddress = locationSelectPopup.address;
 
   // Consolidated sidebar handlers
-  const sidebarHandlers = useMapSidebarHandlers({ toggleSidebar });
+  const sidebarHandlers = useMapSidebarHandlers({ toggleSidebar, isLiveMap });
 
   // Entity sidebar state (mentions, pins, areas)
   const entitySidebar = useEntitySidebar();
+  
+  // Success modal state for pin creation
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdMention, setCreatedMention] = useState<Mention | null>(null);
 
   // Auto-open sidebar when entity is selected
   useEffect(() => {
@@ -260,11 +279,13 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   }, [entitySidebar.selectedMentionId, entitySidebar.selectedEntityId, activeSidebar]);
 
   // Sidebar configurations (extracted to hook)
+  // Use effective role flags when owner is viewing as different role
   const sidebarConfigs = useMapSidebarConfigs({
     mapData,
-    isOwner,
-    isMember,
-    isManager,
+    mapId,
+    isOwner: effectiveIsOwner,
+    isMember: effectiveIsMember,
+    isManager: effectiveIsManager,
     showMembers,
     currentAccountId,
     permissionsLoading: membershipLoading,
@@ -296,7 +317,101 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
 
   // Contribute overlay management
   const { showOverlay: showContributeOverlay, openOverlay, closeOverlay: handleCloseContribute } = useContributeOverlay();
+  
+  // Track remove click marker function from MapIDBox
+  const removeClickMarkerRef = useRef<(() => void) | null>(null);
+  
+  // Remove click marker when contribute overlay opens
+  useEffect(() => {
+    if (showContributeOverlay && removeClickMarkerRef.current) {
+      removeClickMarkerRef.current();
+    }
+  }, [showContributeOverlay]);
 
+  // Handle mention creation: fly to pin, show modal, select pin
+  const handleMentionCreated = useCallback((mention: Mention) => {
+    // Close overlay
+    handleCloseContribute();
+    
+    // Wait a bit for overlay to close, then fly to location
+    setTimeout(() => {
+      if (mapInstanceRef.current && mention.lat && mention.lng) {
+        mapInstanceRef.current.flyTo({
+          center: [mention.lng, mention.lat],
+          zoom: 15,
+          duration: 1500,
+        });
+      }
+      
+      // Select the new pin - dispatch mention-click event so sidebar opens
+      window.dispatchEvent(new CustomEvent('mention-click', {
+        detail: { mention }
+      }));
+      
+      // Show success modal with confetti
+      setCreatedMention(mention);
+      setShowSuccessModal(true);
+      
+      // Trigger confetti
+      const duration = 3000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+      const interval = setInterval(() => {
+        const timeLeft = animationEnd - Date.now();
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          return;
+        }
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+        });
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+        });
+      }, 250);
+      
+      // Cleanup after duration
+      setTimeout(() => clearInterval(interval), duration);
+    }, 300);
+  }, [handleCloseContribute, entitySidebar]);
+
+  // Handle #people hash parameter - open members sidebar if user has permission
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkHash = () => {
+      const hash = window.location.hash;
+      if (hash === '#people' && access.canViewMembers) {
+        // Open members sidebar if user has permission
+        openSidebar('members');
+      }
+      // Note: We don't force-close the sidebar when hash is removed
+      // User can close it manually or via the button
+    };
+
+    // Initial check
+    checkHash();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', checkHash);
+    
+    // Also listen for popstate for browser back/forward
+    const handlePopState = () => {
+      setTimeout(checkHash, 0);
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('hashchange', checkHash);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [access.canViewMembers, openSidebar]);
 
   // URL normalization: automatically redirect ID URLs to slug URLs when available
   // This ensures canonical URLs (slug preferred) while ID remains source of truth internally
@@ -336,15 +451,39 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
         }}
       />
       <PageWrapper
+        mapSettings={mapData?.settings ? {
+          ...mapData.settings,
+          colors: {
+            owner: mapData.settings.colors?.owner || 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
+            manager: mapData.settings.colors?.manager || '#000000',
+            editor: mapData.settings.colors?.editor || '#000000',
+            'non-member': mapData.settings.colors?.['non-member'] || '#000000',
+          },
+        } : null}
+        viewAsRole={isOwner ? viewAsRole : undefined}
+        mapMembership={{
+          isMember: effectiveIsMember,
+          isOwner: effectiveIsOwner,
+          onJoinClick: sidebarHandlers.handleJoinClick,
+          mapData: mapData ? {
+            id: mapData.id,
+            name: mapData.name,
+            description: mapData.description,
+            visibility: mapData.visibility,
+            auto_approve_members: mapData.auto_approve_members || false,
+            membership_questions: mapData.membership_questions || [],
+            membership_rules: mapData.membership_rules || null,
+            settings: mapData.settings || undefined,
+          } : null,
+          onJoinSuccess: () => {
+            // Membership will refresh automatically via useMapMembership hook
+          },
+        }}
         headerContent={
           <MapPageHeaderButtons
             onSettingsClick={sidebarHandlers.handleSettingsClick}
             onFilterClick={sidebarHandlers.handleFilterClick}
-            onMembersClick={sidebarHandlers.handleMembersClick}
-            onPostsClick={sidebarHandlers.handlePostsClick}
             showSettings={access.canViewSettings}
-            showMembers={access.canViewMembers}
-            showPosts={access.canViewPosts}
             showFilter={shouldShowFilterIcon}
           />
         }
@@ -398,6 +537,26 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
           {mapData && !loading && (
             <>
               <div className={`relative ${isLiveMap ? 'h-screen' : 'h-full'} overflow-hidden`}>
+                {/* View As Selector - Only show for owners */}
+                {isOwner && (
+                  <div className="absolute top-4 right-4 z-40 pointer-events-none">
+                    <div className="pointer-events-auto">
+                      <ViewAsSelector
+                        currentRole={viewAsRole}
+                        onRoleChange={setViewAsRole}
+                        viewAsRole={viewAsRole}
+                        mapSettings={mapData?.settings ? {
+                          colors: {
+                            owner: mapData.settings.colors?.owner || 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
+                            manager: mapData.settings.colors?.manager || '#000000',
+                            editor: mapData.settings.colors?.editor || '#000000',
+                            'non-member': mapData.settings.colors?.['non-member'] || '#000000',
+                          },
+                        } : null}
+                      />
+                    </div>
+                  </div>
+                )}
                 <MapPageLayout
                   activeSidebar={activeSidebar}
                   onSidebarClose={closeSidebar}
@@ -406,7 +565,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                   <MapIDBox 
                     mapStyle={mapData.settings?.appearance?.map_style || 'street'}
                     mapId={mapData.id}
-                    isOwner={isOwner}
+                    isOwner={effectiveIsOwner}
                     meta={mapData.settings?.appearance?.meta}
                     showDistricts={showDistricts}
                     showCTU={showCTU}
@@ -436,6 +595,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                     membership_questions={mapData.membership_questions || []}
                     membership_rules={mapData.membership_rules || null}
                     isMember={isMember}
+                    effectiveIsMember={effectiveIsMember}
                     onJoinClick={sidebarHandlers.handleJoinClick}
                     activeSidebar={activeSidebar}
                     mapSettings={mapData.settings || null}
@@ -445,6 +605,18 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                     onLocationPopupChange={setLocationSelectPopup}
                     onMapLoad={handleMapLoad}
                     onMapUpdate={updateMapData}
+                    viewAsRole={isOwner ? viewAsRole : undefined}
+                    onOpenContributeOverlay={(coordinates, mapMeta, fullAddress) => {
+                      // Remove click marker before opening overlay
+                      if (removeClickMarkerRef.current) {
+                        removeClickMarkerRef.current();
+                      }
+                      // Open contribute overlay with location, mapMeta, and address (same as location selected)
+                      openOverlay(coordinates, undefined, mapMeta || null, fullAddress || null);
+                    }}
+                    onRemoveClickMarker={(removeFn) => {
+                      removeClickMarkerRef.current = removeFn;
+                    }}
                   />
                 </MapPageLayout>
                 
@@ -456,6 +628,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                       onClose={handleCloseContribute}
                       mapId={mapData.id}
                       mapSlug={mapData.slug}
+                      onMentionCreated={handleMentionCreated}
                     />
                   </Suspense>
                 )}
@@ -465,6 +638,47 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
           )}
         </div>
       </PageWrapper>
+
+      {/* Success Modal */}
+      {showSuccessModal && createdMention && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg border border-gray-200 p-8 max-w-md w-full mx-4 text-center space-y-6">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircleIcon className="w-10 h-10 text-green-600" />
+            </div>
+            
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-gray-900">Pin Created!</h2>
+              <p className="text-sm text-gray-600">Your pin has been added to the map</p>
+            </div>
+            
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                setCreatedMention(null);
+                // Reset URL parameters (remove any contribute overlay params and hash)
+                if (typeof window !== 'undefined') {
+                  const url = window.location.pathname;
+                  window.history.replaceState(null, '', url);
+                  // Also clear any sessionStorage data keys that might have been set
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const dataKey = urlParams.get('data_key');
+                  if (dataKey) {
+                    try {
+                      sessionStorage.removeItem(dataKey);
+                    } catch (e) {
+                      // Ignore storage errors
+                    }
+                  }
+                }
+              }}
+              className="w-full px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Upgrade Prompt */}
       <MapActionUpgradePrompt
@@ -483,7 +697,13 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
         lng={locationSelectPopup.lng}
         address={popupAddress}
         mapMeta={locationSelectPopup.mapMeta}
+        allowPins={mapData?.settings?.collaboration?.allow_pins ?? false}
+        isOwner={effectiveIsOwner}
         onAddToMap={(coordinates, mapMeta, mentionTypeId) => {
+          // Remove click marker before opening overlay
+          if (removeClickMarkerRef.current) {
+            removeClickMarkerRef.current();
+          }
           // Open contribute overlay with location, mention type, and mapMeta
           openOverlay(coordinates, mentionTypeId || undefined, mapMeta || null, popupAddress || null);
         }}

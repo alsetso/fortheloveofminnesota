@@ -1,20 +1,20 @@
 'use client';
 
-import { ReactNode, useState, useEffect, useMemo } from 'react';
+import { ReactNode, useState, useEffect, useMemo, useCallback } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
 import { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
-import HamburgerMenu from './HamburgerMenu';
 import ContentTypeFilters from './ContentTypeFilters';
 import { usePageView } from '@/hooks/usePageView';
 import { useNativeIOSApp } from '@/hooks/useNativeIOSApp';
 import { supabase } from '@/lib/supabase';
-import MapDetailsModal from './MapDetailsModal';
+import { useAuthStateSafe } from '@/features/auth';
 import MapsSelectorDropdown from './MapsSelectorDropdown';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
-import { XCircleIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { XCircleIcon, EyeIcon, ChatBubbleLeftIcon, UserPlusIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { 
@@ -22,8 +22,6 @@ import {
   MapIcon, 
   UsersIcon,
   SparklesIcon,
-  Bars3Icon,
-  PlusIcon,
   CreditCardIcon
 } from '@heroicons/react/24/outline';
 import { 
@@ -31,8 +29,6 @@ import {
   MapIcon as MapIconSolid, 
   UsersIcon as UsersIconSolid,
   SparklesIcon as SparklesIconSolid,
-  Bars3Icon as Bars3IconSolid,
-  PlusIcon as PlusIconSolid,
   CreditCardIcon as CreditCardIconSolid
 } from '@heroicons/react/24/solid';
 
@@ -51,6 +47,62 @@ interface PageWrapperProps {
   className?: string;
   /** Enable automatic page view tracking. Default: true */
   trackPageView?: boolean;
+  /** View As role - when provided, gradient only shows if role is 'owner' */
+  viewAsRole?: 'owner' | 'manager' | 'editor' | 'non-member';
+  /** Map settings - used to get role-based colors */
+  mapSettings?: {
+    colors?: {
+      owner?: string;
+      manager?: string;
+      editor?: string;
+      'non-member'?: string;
+    };
+  } | null;
+  /** Initial auth data from server (optional - avoids blocking) */
+  initialAuth?: {
+    userId: string | null;
+    accountId: string | null;
+    role: 'general' | 'admin' | null;
+    name: string | null;
+  } | null;
+  /** Initial billing data from server (optional - avoids blocking) */
+  initialBilling?: {
+    accountId: string | null;
+    features: Array<{
+      slug: string;
+      name: string;
+      limit_value: number | null;
+      limit_type: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null;
+      is_unlimited: boolean;
+      category: string | null;
+    }>;
+  } | null;
+  /** Map membership info (for non-member join experience) */
+  mapMembership?: {
+    isMember: boolean;
+    isOwner: boolean;
+    onJoinClick?: () => void;
+    mapData?: {
+      id: string;
+      name: string;
+      description?: string | null;
+      visibility?: 'public' | 'private' | 'shared';
+      auto_approve_members?: boolean;
+      membership_questions?: Array<{ id: number; question: string }>;
+      membership_rules?: string | null;
+      settings?: {
+        collaboration?: {
+          allow_pins?: boolean;
+          allow_areas?: boolean;
+          allow_posts?: boolean;
+          pin_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+          area_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+          post_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+        };
+      };
+    } | null;
+    onJoinSuccess?: () => void;
+  } | null;
 }
 
 // Default empty handlers to reduce prop boilerplate
@@ -58,6 +110,277 @@ const defaultAccountDropdownProps: AccountDropdownProps = {
   onAccountClick: () => {},
   onSignInClick: () => {},
 };
+
+/**
+ * Inline join form component for non-members
+ * Embedded directly in the expanded map info panel
+ */
+function JoinFormInline({ 
+  mapData, 
+  onJoinSuccess 
+}: { 
+  mapData: {
+    id: string;
+    name: string;
+    description?: string | null;
+    visibility?: 'public' | 'private' | 'shared';
+    auto_approve_members?: boolean;
+    membership_questions?: Array<{ id: number; question: string }>;
+    membership_rules?: string | null;
+    settings?: {
+      collaboration?: {
+        allow_pins?: boolean;
+        allow_areas?: boolean;
+        allow_posts?: boolean;
+        pin_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+        area_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+        post_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+      };
+    };
+  };
+  onJoinSuccess?: () => void;
+}) {
+  const { account, activeAccountId } = useAuthStateSafe();
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [isCheckingRequest, setIsCheckingRequest] = useState(true);
+
+  const currentAccountId = activeAccountId || account?.id || null;
+  const autoApproveMembers = mapData.auto_approve_members || false;
+  const membershipQuestions = mapData.membership_questions || [];
+  const membershipRules = mapData.membership_rules;
+  const allowPins = mapData.settings?.collaboration?.allow_pins || false;
+  const allowAreas = mapData.settings?.collaboration?.allow_areas || false;
+  const allowPosts = mapData.settings?.collaboration?.allow_posts || false;
+  const pinPermissions = mapData.settings?.collaboration?.pin_permissions || null;
+  const areaPermissions = mapData.settings?.collaboration?.area_permissions || null;
+  const postPermissions = mapData.settings?.collaboration?.post_permissions || null;
+
+  // Check for pending request
+  useEffect(() => {
+    if (!mapData.id || !currentAccountId) {
+      setHasPendingRequest(false);
+      setIsCheckingRequest(false);
+      return;
+    }
+
+    const checkPendingRequest = async () => {
+      setIsCheckingRequest(true);
+      try {
+        const response = await fetch(`/api/maps/${mapData.id}/membership-requests/my-request`);
+        if (response.ok) {
+          const data = await response.json();
+          setHasPendingRequest(!!data.request);
+        } else {
+          setHasPendingRequest(false);
+        }
+      } catch (err) {
+        setHasPendingRequest(false);
+      } finally {
+        setIsCheckingRequest(false);
+      }
+    };
+
+    checkPendingRequest();
+  }, [mapData.id, currentAccountId]);
+
+  const handleSubmit = async () => {
+    if (!currentAccountId) {
+      setError('Please sign in to join this map');
+      return;
+    }
+
+    const missingAnswers = membershipQuestions.filter(q => !answers[q.id]?.trim());
+    if (missingAnswers.length > 0) {
+      setError('Please answer all required questions');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const answersArray = membershipQuestions
+        .map(q => ({
+          question_id: q.id,
+          answer: answers[q.id] || '',
+        }))
+        .filter(a => a.answer.trim());
+
+      const response = await fetch(`/api/maps/${mapData.id}/membership-requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: answersArray }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to join map');
+      }
+
+      const data = await response.json();
+      
+      if (data.auto_approved) {
+        toast.success(`You joined ${mapData.name}`, { duration: 3000 });
+        if (onJoinSuccess) onJoinSuccess();
+        // Refresh page to update membership state
+        window.location.reload();
+      } else {
+        setHasPendingRequest(true);
+        toast.success('Membership request submitted', { duration: 3000 });
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to join map');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isCheckingRequest) {
+    return (
+      <div className="space-y-1.5 pt-2 border-t border-white/10">
+        <div className="text-center py-4">
+          <div className="w-4 h-4 border-2 border-white/40 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-xs text-white/70">Checking request status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (hasPendingRequest) {
+    return (
+      <div className="space-y-1.5 pt-2 border-t border-white/10">
+        <div className="bg-yellow-500/20 border border-yellow-400/30 rounded-md p-[10px]">
+          <p className="text-xs font-medium text-white mb-1">Request is pending</p>
+          <p className="text-xs text-white/80">
+            Your membership request is being reviewed by the map owner.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 pt-2 border-t border-white/10">
+      {/* Header Message */}
+      <div className="bg-indigo-500/20 border border-indigo-400/30 rounded-md p-[10px]">
+        <p className="text-xs text-white">
+          {autoApproveMembers 
+            ? 'Join this map to collaborate and contribute.'
+            : 'Request to join this map. Your request will be reviewed by the map owner.'}
+        </p>
+      </div>
+
+      {/* Collaboration Tools Preview */}
+      {(allowPins || allowAreas || allowPosts) && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-medium text-white/70">Available Tools</div>
+          <div className="bg-white/10 border border-white/20 rounded-md p-[10px]">
+            <div className="flex items-center gap-2 flex-wrap">
+              {allowPins && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 rounded-md border border-white/20">
+                  <MapPinIcon className="w-3.5 h-3.5 text-white/70" />
+                  <span className="text-xs font-medium text-white">Pins</span>
+                  {pinPermissions?.required_plan && (
+                    <span className="text-[10px] text-white/60 font-medium">
+                      ({pinPermissions.required_plan}+)
+                    </span>
+                  )}
+                </div>
+              )}
+              {allowAreas && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 rounded-md border border-white/20">
+                  <Square3Stack3DIcon className="w-3.5 h-3.5 text-white/70" />
+                  <span className="text-xs font-medium text-white">Areas</span>
+                  {areaPermissions?.required_plan && (
+                    <span className="text-[10px] text-white/60 font-medium">
+                      ({areaPermissions.required_plan}+)
+                    </span>
+                  )}
+                </div>
+              )}
+              {allowPosts && (
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 rounded-md border border-white/20">
+                  <DocumentTextIcon className="w-3.5 h-3.5 text-white/70" />
+                  <span className="text-xs font-medium text-white">Posts</span>
+                  {postPermissions?.required_plan && (
+                    <span className="text-[10px] text-white/60 font-medium">
+                      ({postPermissions.required_plan}+)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Membership Rules */}
+      {membershipRules && (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-medium text-white/70">Membership Rules</div>
+          <div className="bg-white/10 border border-white/20 rounded-md p-[10px]">
+            <div className="text-xs text-white/90 whitespace-pre-wrap break-words">{membershipRules}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Questions */}
+      {membershipQuestions.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-[10px] font-medium text-white/70">Questions</div>
+          {membershipQuestions.map((question) => (
+            <div key={question.id} className="space-y-1.5">
+              <label className="text-xs font-medium text-white">
+                {question.question}
+              </label>
+              <textarea
+                value={answers[question.id] || ''}
+                onChange={(e) =>
+                  setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))
+                }
+                placeholder="Your answer..."
+                rows={3}
+                className="w-full px-2.5 py-1.5 text-xs bg-white/10 border border-white/20 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 text-white placeholder:text-white/50 resize-none"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="p-2 bg-red-500/20 border border-red-400/30 rounded-md">
+          <p className="text-xs text-white">{error}</p>
+        </div>
+      )}
+
+      {/* Submit Button */}
+      {currentAccountId ? (
+        <button
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <UserPlusIcon className="w-3 h-3" />
+          <span>
+            {isSubmitting 
+              ? 'Submitting...' 
+              : autoApproveMembers 
+              ? 'Join Map' 
+              : 'Request to Join'}
+          </span>
+        </button>
+      ) : (
+        <div className="text-center">
+          <p className="text-xs text-white/70 mb-2">Please sign in to join this map</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * Global page wrapper with 10vh header and 90vh content area
@@ -73,7 +396,12 @@ export default function PageWrapper({
   accountDropdownProps = defaultAccountDropdownProps, 
   searchResultsComponent, 
   className = '',
-  trackPageView = true
+  trackPageView = true,
+  viewAsRole,
+  mapSettings,
+  initialAuth,
+  initialBilling,
+  mapMembership
 }: PageWrapperProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -81,8 +409,8 @@ export default function PageWrapper({
   // Initialize as false to avoid hydration mismatch - will be set correctly on client mount
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isNativeIOSApp = useNativeIOSApp();
+  const { account, activeAccountId } = useAuthStateSafe();
   
   // Check if we're on a custom map page (/map/[id] or /map/[slug])
   // Exclude /map/new (create page) and /maps (list page)
@@ -97,19 +425,51 @@ export default function PageWrapper({
     name: string; 
     emoji: string;
     id?: string;
+    account_id?: string;
     description?: string | null;
     account?: any;
     viewCount?: number | null;
+    pinCount?: number | null;
+    memberCount?: number | null;
     visibility?: string;
     created_at?: string;
     updated_at?: string;
     hideCreator?: boolean;
   } | null>(null);
-  const [isMapDetailsModalOpen, setIsMapDetailsModalOpen] = useState(false);
+  const [expandedPanel, setExpandedPanel] = useState<'map-info' | 'chat' | null>(null);
   
   // Fetch selected mention types from URL parameters (for header display)
   const [selectedMentionTypes, setSelectedMentionTypes] = useState<Array<{ id: string; name: string; emoji: string; slug: string }>>([]);
   
+  // Determine if user is non-member (for forced open state)
+  const isNonMember = useMemo(() => {
+    return mapMembership && !mapMembership.isMember && !mapMembership.isOwner;
+  }, [mapMembership]);
+  
+  // Auto-open for non-members, close for members when map changes
+  useEffect(() => {
+    if (isNonMember) {
+      // Non-members: always keep open
+      setExpandedPanel('map-info');
+    } else {
+      // Members: reset to closed
+      setExpandedPanel(null);
+    }
+  }, [mapIdOrSlug, isNonMember]);
+  
+  // Ensure non-members can't close the panel
+  const handlePanelToggle = useCallback((panel: 'map-info' | 'chat' | null) => {
+    if (isNonMember && panel === null) {
+      // Prevent closing for non-members
+      return;
+    }
+    if (isNonMember && expandedPanel === 'map-info' && panel === 'map-info') {
+      // Prevent toggling closed for non-members
+      return;
+    }
+    setExpandedPanel(panel);
+  }, [isNonMember, expandedPanel]);
+
   useEffect(() => {
     if (!isMapPage || !mapIdOrSlug || !mounted) {
       setMapInfo(null);
@@ -119,37 +479,29 @@ export default function PageWrapper({
     
     const fetchMapInfo = async () => {
       try {
-        // Check if it's a UUID or custom slug
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(mapIdOrSlug);
+        // Use API endpoint instead of direct Supabase query to handle auth/RLS properly
+        const response = await fetch(`/api/maps/${mapIdOrSlug}`);
         
-        // Use public client (works for both authenticated and unauthenticated users)
-        // RLS policies will handle visibility (public maps visible to all, private to owners)
-        let query = supabase
-          .from('map')
-          .select('id, title, description, visibility, created_at, updated_at, hide_creator, meta, account:accounts(id, username, first_name, last_name, image_url)');
-        
-        if (isUUID) {
-          query = query.eq('id', mapIdOrSlug);
-        } else {
-          query = query.eq('custom_slug', mapIdOrSlug);
-        }
-        
-        const { data, error } = await query.single();
-        
-        if (error || !data) {
+        if (!response.ok) {
           setMapInfo(null);
           return;
         }
         
-        // If map is not public and user is not authenticated, don't show info
-        // (RLS should handle this, but double-check for better UX)
-        if (data.visibility !== 'public') {
-          // For non-public maps, we'd need auth check, but RLS should block access anyway
-          // Continue - if RLS blocked it, data would be null
+        const result = await response.json();
+        
+        // API returns map directly, not wrapped in { map: ... }
+        const data = result;
+        
+        if (!data || !data.id) {
+          setMapInfo(null);
+          return;
         }
         
-        // Fetch view count from API
+        // Fetch view count, pin count, and member count from API
         let viewCount: number | null = null;
+        let pinCount: number | null = null;
+        let memberCount: number | null = null;
+        
         try {
           const statsResponse = await fetch(`/api/maps/${data.id}/stats`);
           if (statsResponse.ok) {
@@ -160,18 +512,46 @@ export default function PageWrapper({
           // View count not available, continue without it
         }
         
-        const emoji = (data.meta as any)?.emoji || '🗺️';
+        // Fetch pin count
+        try {
+          const pinsResponse = await fetch(`/api/maps/${data.id}/pins`);
+          if (pinsResponse.ok) {
+            const pinsData = await pinsResponse.json();
+            pinCount = pinsData.pins?.length || 0;
+          }
+        } catch {
+          // Pin count not available, continue without it
+        }
+        
+        // Get member count from map data or fetch separately
+        memberCount = data.member_count || null;
+        if (memberCount === null) {
+          try {
+            const membersResponse = await fetch(`/api/maps/${data.id}/members`);
+            if (membersResponse.ok) {
+              const membersData = await membersResponse.json();
+              memberCount = membersData.members?.length || 0;
+            }
+          } catch {
+            // Member count not available, continue without it
+          }
+        }
+        
+        const emoji = (data.settings as any)?.meta?.emoji || (data.meta as any)?.emoji || '🗺️';
         setMapInfo({ 
-          name: data.title || 'Map', 
+          name: data.name || data.title || 'Map', 
           emoji,
           id: data.id,
+          account_id: data.account_id,
           description: data.description,
           account: data.account,
           viewCount,
+          pinCount,
+          memberCount,
           visibility: data.visibility,
           created_at: data.created_at,
           updated_at: data.updated_at,
-          hideCreator: data.hide_creator || false,
+          hideCreator: (data.settings as any)?.presentation?.hide_creator || data.hide_creator || false,
         });
       } catch (err) {
         setMapInfo(null);
@@ -279,6 +659,23 @@ export default function PageWrapper({
     }
   }, [pathname]);
 
+  // Track current hash for active state (only after mount to avoid hydration mismatch)
+  const [currentHash, setCurrentHash] = useState<string>('');
+  
+  // Update hash state after mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentHash(window.location.hash);
+      
+      const handleHashChange = () => {
+        setCurrentHash(window.location.hash);
+      };
+      
+      window.addEventListener('hashchange', handleHashChange);
+      return () => window.removeEventListener('hashchange', handleHashChange);
+    }
+  }, []);
+
   // Memoize navItems to prevent recreation on every render
   // Only show "Add" button on map pages
   const navItems = useMemo(() => {
@@ -288,35 +685,33 @@ export default function PageWrapper({
       icon: typeof HomeIcon;
       iconSolid: typeof HomeIconSolid;
       onClick?: (e: React.MouseEvent) => void;
-      isButton?: boolean;
     }> = [
       { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
       { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
-      { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
     ];
     
-    // Only add the "Add" button when on a map page
-    // Use hash parameter to show contribute overlay (no page refresh)
+    // Only show "People" link when on a map page
+    // Links to current map page with #people hash to show members sidebar
     if (isMapPage && mapIdOrSlug) {
-      items.push({ 
-        label: 'Add', 
-        href: `#contribute`, 
-        icon: PlusIcon, 
-        iconSolid: PlusIconSolid,
+      items.push({
+        label: 'People',
+        href: `#people`,
+        icon: UsersIcon,
+        iconSolid: UsersIconSolid,
         onClick: (e: React.MouseEvent) => {
           e.preventDefault();
           if (typeof window !== 'undefined') {
-            window.location.hash = 'contribute';
+            window.location.hash = 'people';
             window.dispatchEvent(new HashChangeEvent('hashchange'));
           }
         }
       });
     }
     
-    items.push(
-      { label: 'Plans', href: '/plans', icon: CreditCardIcon, iconSolid: CreditCardIconSolid },
-      { label: 'More', href: null, icon: Bars3Icon, iconSolid: Bars3IconSolid, isButton: true }
-    );
+    // Hide Plans icon on custom map pages
+    if (!isMapPage) {
+      items.push({ label: 'Plans', href: '/plans', icon: CreditCardIcon, iconSolid: CreditCardIconSolid });
+    }
     
     return items;
   }, [isMapPage, mapIdOrSlug]);
@@ -356,6 +751,62 @@ export default function PageWrapper({
     }
   }, [pathname]);
 
+  // Check if user owns the current map
+  const currentAccountId = activeAccountId || account?.id || null;
+  const isOwnedMap = useMemo(() => {
+    if (!isMapPage || !currentAccountId || !mapInfo) return false;
+    // Check both account_id directly and account.id (fallback)
+    const mapAccountId = mapInfo.account_id || mapInfo.account?.id;
+    return mapAccountId === currentAccountId;
+  }, [isMapPage, mapInfo?.account_id, mapInfo?.account?.id, currentAccountId]);
+
+  // Determine background color based on viewAsRole and mapSettings
+  // Priority: mapSettings.colors[role] > default gradient (owner) / black (others)
+  const backgroundStyle = useMemo(() => {
+    // If we have mapSettings and viewAsRole, use the color from settings
+    if (mapSettings?.colors && viewAsRole !== undefined) {
+      const roleColor = mapSettings.colors[viewAsRole];
+      // Check if roleColor exists and is not empty string
+      if (roleColor && roleColor.trim() !== '') {
+        return {
+          background: roleColor,
+          backgroundColor: roleColor.startsWith('linear-gradient') ? 'transparent' : roleColor,
+        };
+      }
+    }
+    
+    // Fallback to default behavior: gradient for owned maps when viewing as owner
+    if (isOwnedMap) {
+      if (viewAsRole === undefined || viewAsRole === 'owner') {
+        return {
+          background: 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
+          backgroundColor: 'transparent',
+        };
+      }
+    }
+    
+    // Default: black background
+    return { 
+      background: '#000000',
+      backgroundColor: '#000000' 
+    };
+  }, [isOwnedMap, viewAsRole, mapSettings]);
+
+  // Apply background color to body element
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
+    const bgColor = backgroundStyle.background;
+    document.body.style.background = bgColor;
+    document.documentElement.style.background = bgColor;
+
+    return () => {
+      // Reset on unmount or when condition changes
+      document.body.style.background = '';
+      document.documentElement.style.background = '';
+    };
+  }, [backgroundStyle]);
+
   return (
     <>
       {/* Global Toast System - react-hot-toast (same as admin billing page) */}
@@ -390,13 +841,13 @@ export default function PageWrapper({
           maxWidth: '100vw', 
           maxHeight: '100vh',
           overflow: 'hidden',
-          backgroundColor: '#000000' 
+          ...backgroundStyle
         }}
       >
       {/* Header - Flexible height based on content, black background */}
       <header 
         className="flex flex-col flex-shrink-0 border-b border-white/5"
-        style={{ backgroundColor: '#000000' }}
+        style={backgroundStyle}
       >
         {/* Notification window placeholder - 30px height, only on iOS native app */}
         {!isSearchMode && isNativeIOSApp && (
@@ -410,17 +861,11 @@ export default function PageWrapper({
             {/* 1st Column: Logo & Map Name & Search (Aligns with left sidebar) - Hide search when type param exists */}
             <div className="hidden lg:flex lg:col-span-3 items-center gap-3 min-w-0">
           <div className="flex-shrink-0">
-            <button
-              onClick={() => setIsMenuOpen(true)}
-              className="flex items-center justify-center hover:opacity-80 transition-opacity"
-              aria-label="Open menu"
-            >
-              <img
-                src="/white-logo.png"
-                alt="For the Love of Minnesota"
-                    className="w-7 h-7"
-              />
-            </button>
+            <img
+              src="/white-logo.png"
+              alt="For the Love of Minnesota"
+              className="w-7 h-7"
+            />
           </div>
           
           {/* Maps Selector or Search Input - Show maps selector on /map or /maps routes */}
@@ -439,12 +884,7 @@ export default function PageWrapper({
             <div className="lg:hidden col-span-12 flex items-center justify-between gap-2 px-1">
               <div className="flex items-center gap-2">
                 <div className="flex-shrink-0">
-                  <button
-                    onClick={() => setIsMenuOpen(true)}
-                    aria-label="Open menu"
-                  >
-                    <img src="/white-logo.png" alt="Logo" className="w-6 h-6" />
-                  </button>
+                  <img src="/white-logo.png" alt="Logo" className="w-6 h-6" />
                 </div>
                 {/* Maps Selector - shown on /map or /maps routes, next to logo */}
                 {(isMapsPage || isMapPage) && (
@@ -474,24 +914,12 @@ export default function PageWrapper({
               <div className="flex items-center justify-around w-full max-w-[800px]">
                 {/* Show nav icons on all pages, including map pages */}
                 {navItems.map((item) => {
-                  // Hash-based items (like #contribute) are active when hash matches
+                  // Hash-based items (like #people) are active when hash matches
+                  // Use currentHash state to avoid hydration mismatch (only set after mount)
                   const isActive = item.href?.startsWith('#')
-                    ? (typeof window !== 'undefined' && window.location.hash === item.href)
+                    ? (mounted && currentHash === item.href)
                     : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
                   const Icon = isActive ? item.iconSolid : item.icon;
-                  
-                  // Handle button type (e.g., "More" hamburger menu)
-                  if (item.isButton || !item.href) {
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={() => setIsMenuOpen(true)}
-                        className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
-                      >
-                        <Icon className="w-5 h-5 text-white/50" />
-                      </button>
-                    );
-                  }
                   
                   // Handle items with onClick (e.g., hash-based navigation)
                   if ((item as any).onClick) {
@@ -568,17 +996,11 @@ export default function PageWrapper({
             <div className="flex items-center gap-2">
               {/* Logo - Left of search input */}
               <div className="flex-shrink-0">
-                <button
-                  onClick={() => setIsMenuOpen(true)}
-                  className="flex items-center justify-center hover:opacity-80 transition-opacity"
-                  aria-label="Open menu"
-                >
-                  <img
-                    src="/white-logo.png"
-                    alt="For the Love of Minnesota"
-                    className="w-7 h-7"
-                  />
-                </button>
+                <img
+                  src="/white-logo.png"
+                  alt="For the Love of Minnesota"
+                  className="w-7 h-7"
+                />
               </div>
               {/* Label area - shows selected content type */}
               {selectedLabel && (
@@ -626,65 +1048,245 @@ export default function PageWrapper({
         </div>
       </div>
 
-      {/* Floating Mobile Nav (Visible only on mobile) */}
+      {/* Floating Map Info Card (Mobile + Desktop for non-members) */}
       {!isSearchMode && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
-          <div className="backdrop-blur-lg border-t border-white/10 rounded-t-2xl shadow-2xl px-2 py-1" style={{ backgroundColor: '#000000', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className={`fixed bottom-0 left-0 right-0 z-50 ${
+          // Show on mobile always, show on desktop only for non-members
+          mapMembership && !mapMembership.isMember && !mapMembership.isOwner ? '' : 'lg:hidden'
+        }`}>
+          <div 
+            className={`backdrop-blur-lg border-t border-white/10 rounded-t-2xl shadow-2xl px-2 py-1 transition-all duration-300 flex flex-col ${
+              expandedPanel === 'map-info' ? 'h-[80vh]' : ''
+            }`}
+            style={{ ...backgroundStyle, paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
             {isMapPage && mapInfo ? (
-              <div className="flex flex-col gap-2 px-2 py-1.5">
-                {/* Map Card Info - Similar to MapInfoCard collapsed state */}
-                <button
-                  onClick={() => setIsMapDetailsModalOpen(true)}
-                  className="w-full flex items-center gap-2 px-2 py-2 hover:bg-white/5 rounded-lg transition-colors"
-                >
-                  {/* Owner Avatar */}
-                  {mapInfo.account && !mapInfo.hideCreator && (
-                    <div className="flex-shrink-0">
-                      {mapInfo.account.image_url ? (
-                        <Image
-                          src={mapInfo.account.image_url}
-                          alt={mapInfo.account.username || mapInfo.account.first_name || 'User'}
-                          width={32}
-                          height={32}
-                          className="w-8 h-8 rounded-full object-cover border border-white/20"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                          <span className="text-xs text-white/70 font-medium">
-                            {(mapInfo.account.first_name?.[0] || mapInfo.account.username?.[0] || 'U').toUpperCase()}
+              <div className="flex flex-col gap-2 px-2 py-1.5 h-full">
+                {/* Map Card Info and Chat Button Row */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Map Card Info - Accordion trigger */}
+                  <button
+                    onClick={() => handlePanelToggle(expandedPanel === 'map-info' ? null : 'map-info')}
+                    disabled={isNonMember && expandedPanel === 'map-info'}
+                    className={`flex-1 flex items-center gap-2 px-2 py-2 hover:bg-white/5 rounded-lg transition-colors ${
+                      expandedPanel === 'map-info' ? 'bg-white/5' : ''
+                    } ${isNonMember && expandedPanel === 'map-info' ? 'cursor-default' : ''}`}
+                  >
+                    {/* Owner Avatar */}
+                    {mapInfo.account && !mapInfo.hideCreator && (
+                      <div className="flex-shrink-0">
+                        {mapInfo.account.image_url ? (
+                          <Image
+                            src={mapInfo.account.image_url}
+                            alt={mapInfo.account.username || mapInfo.account.first_name || 'User'}
+                            width={32}
+                            height={32}
+                            className="w-8 h-8 rounded-full object-cover border border-white/20"
+                            unoptimized
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
+                            <span className="text-xs text-white/70 font-medium">
+                              {(mapInfo.account.first_name?.[0] || mapInfo.account.username?.[0] || 'U').toUpperCase()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Title & Owner */}
+                    <div className="flex-1 min-w-0 text-left">
+                      {mapInfo.name && (
+                        <div className="text-xs font-semibold text-white truncate">
+                          {mapInfo.name}
+                        </div>
+                      )}
+                      {mapInfo.account && !mapInfo.hideCreator && (
+                        <div className="text-[10px] text-white/70 truncate">
+                          {mapInfo.account.username 
+                            ? `@${mapInfo.account.username}`
+                            : mapInfo.account.first_name && mapInfo.account.last_name
+                            ? `${mapInfo.account.first_name} ${mapInfo.account.last_name}`
+                            : mapInfo.account.first_name || 'User'}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* View Count */}
+                    {mapInfo.viewCount !== null && mapInfo.viewCount !== undefined && (
+                      <div className="flex items-center gap-1 text-[10px] text-white/70 flex-shrink-0">
+                        <EyeIcon className="w-3.5 h-3.5" />
+                        <span>{mapInfo.viewCount.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Chat Button - Hide for non-members */}
+                  {!isNonMember && (
+                    <button
+                      onClick={() => handlePanelToggle(expandedPanel === 'chat' ? null : 'chat')}
+                      className={`flex-shrink-0 p-2 hover:bg-white/5 rounded-lg transition-colors ${
+                        expandedPanel === 'chat' ? 'bg-white/5' : ''
+                      }`}
+                      aria-label="Open chat"
+                    >
+                      <ChatBubbleLeftIcon className={`w-5 h-5 ${expandedPanel === 'chat' ? 'text-white' : 'text-white/70'}`} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Expanded Map Details Content - 80vh max height, scrollable */}
+                {expandedPanel === 'map-info' && mapInfo && (
+                  <div className="flex-1 overflow-y-auto px-2 pt-1 pb-2 space-y-2 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200 min-h-0">
+                    {/* Title - Inline */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium text-white/70">Title:</span>
+                      <span className="text-xs font-medium text-white">{mapInfo.name}</span>
+                    </div>
+                    
+                    {/* Description - Inline */}
+                    {mapInfo.description && (
+                      <div className="flex items-start gap-2">
+                        <span className="text-[10px] font-medium text-white/70 flex-shrink-0">Description:</span>
+                        <span className="text-xs text-white/90 whitespace-pre-wrap break-words flex-1">{mapInfo.description}</span>
+                      </div>
+                    )}
+                    
+                    {/* Owner - Inline */}
+                    {mapInfo.account && !mapInfo.hideCreator && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-white/70 flex-shrink-0">Owner:</span>
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                          {mapInfo.account.image_url ? (
+                            <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0 border border-white/20">
+                              <Image
+                                src={mapInfo.account.image_url}
+                                alt={mapInfo.account.username || mapInfo.account.first_name || 'User'}
+                                width={16}
+                                height={16}
+                                className="w-full h-full object-cover"
+                                unoptimized
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/20">
+                              <span className="text-[8px] text-white/70">
+                                {(mapInfo.account.first_name?.[0] || mapInfo.account.username?.[0] || 'U').toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-xs font-medium text-white truncate">
+                            {mapInfo.account.username 
+                              ? `@${mapInfo.account.username}`
+                              : mapInfo.account.first_name && mapInfo.account.last_name
+                              ? `${mapInfo.account.first_name} ${mapInfo.account.last_name}`
+                              : mapInfo.account.first_name || 'User'}
+                          </span>
+                          {account && mapInfo.account && account.id === mapInfo.account.id && (
+                            <span className="text-[10px] font-medium text-white/70 bg-white/10 px-1.5 py-0.5 rounded flex-shrink-0">
+                              Owner
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Settings - Inline */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium text-white/70">Visibility:</span>
+                      <span className="text-xs font-medium text-white capitalize">{mapInfo.visibility || 'private'}</span>
+                    </div>
+                    
+                    {/* Statistics - Inline */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {mapInfo.viewCount !== null && mapInfo.viewCount !== undefined && (
+                        <div className="flex items-center gap-1.5">
+                          <EyeIcon className="w-3.5 h-3.5 text-white/70" />
+                          <span className="text-[10px] font-medium text-white/70">Views:</span>
+                          <span className="text-xs font-medium text-white">
+                            {mapInfo.viewCount.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {mapInfo.pinCount !== null && mapInfo.pinCount !== undefined && (
+                        <div className="flex items-center gap-1.5">
+                          <MapPinIcon className="w-3.5 h-3.5 text-white/70" />
+                          <span className="text-[10px] font-medium text-white/70">Pins:</span>
+                          <span className="text-xs font-medium text-white">
+                            {mapInfo.pinCount.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {mapInfo.memberCount !== null && mapInfo.memberCount !== undefined && (
+                        <div className="flex items-center gap-1.5">
+                          <UsersIcon className="w-3.5 h-3.5 text-white/70" />
+                          <span className="text-[10px] font-medium text-white/70">Members:</span>
+                          <span className="text-xs font-medium text-white">
+                            {mapInfo.memberCount.toLocaleString()}
                           </span>
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {/* Title & Owner */}
-                  <div className="flex-1 min-w-0 text-left">
-                    {mapInfo.name && (
-                      <div className="text-xs font-semibold text-white truncate">
-                        {mapInfo.name}
+                    
+                    {/* Timestamps - Inline */}
+                    {(mapInfo.created_at || mapInfo.updated_at) && (
+                      <div className="flex flex-col gap-1">
+                        {mapInfo.created_at && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-medium text-white/70">Created:</span>
+                            <span className="text-xs text-white/80">
+                              {new Date(mapInfo.created_at).toLocaleDateString()} {new Date(mapInfo.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        )}
+                        {mapInfo.updated_at && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-medium text-white/70">Updated:</span>
+                            <span className="text-xs text-white/80">
+                              {new Date(mapInfo.updated_at).toLocaleDateString()} {new Date(mapInfo.updated_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
-                    {mapInfo.account && !mapInfo.hideCreator && (
-                      <div className="text-[10px] text-white/70 truncate">
-                        {mapInfo.account.username 
-                          ? `@${mapInfo.account.username}`
-                          : mapInfo.account.first_name && mapInfo.account.last_name
-                          ? `${mapInfo.account.first_name} ${mapInfo.account.last_name}`
-                          : mapInfo.account.first_name || 'User'}
-                      </div>
+
+                    {/* Inline Join Form for Non-Members */}
+                    {mapMembership && !mapMembership.isMember && !mapMembership.isOwner && mapMembership.mapData && (
+                      <JoinFormInline
+                        mapData={mapMembership.mapData}
+                        onJoinSuccess={() => {
+                          mapMembership.onJoinSuccess?.();
+                          // Panel will auto-close when membership updates
+                        }}
+                      />
                     )}
                   </div>
+                )}
 
-                  {/* View Count */}
-                  {mapInfo.viewCount !== null && mapInfo.viewCount !== undefined && (
-                    <div className="flex items-center gap-1 text-[10px] text-white/70 flex-shrink-0">
-                      <EyeIcon className="w-3.5 h-3.5" />
-                      <span>{mapInfo.viewCount.toLocaleString()}</span>
-                    </div>
-                  )}
-                </button>
+                {/* Expanded Chat Feed Skeleton */}
+                {expandedPanel === 'chat' && (
+                  <div className="px-2 pt-1 pb-2 space-y-3 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="text-xs font-semibold text-white mb-2">Chat</div>
+                    {/* Skeleton feed items */}
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-start gap-2 p-[10px] bg-white/10 border border-white/20 rounded-md">
+                        {/* Avatar skeleton */}
+                        <div className="w-6 h-6 rounded-full bg-white/10 flex-shrink-0 animate-pulse" />
+                        {/* Content skeleton */}
+                        <div className="flex-1 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 w-16 bg-white/10 rounded animate-pulse" />
+                            <div className="h-2 w-12 bg-white/10 rounded animate-pulse" />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="h-3 w-full bg-white/10 rounded animate-pulse" />
+                            <div className="h-3 w-3/4 bg-white/10 rounded animate-pulse" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 {/* Mention Type Filters */}
                 {selectedMentionTypes.length > 0 && (
@@ -715,21 +1317,11 @@ export default function PageWrapper({
             ) : (
               <div className="flex items-center justify-around">
                 {navItems.map((item) => {
-                  const isActive = item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href)));
+                  // Hash-based items use currentHash state to avoid hydration mismatch
+                  const isActive = item.href?.startsWith('#')
+                    ? (mounted && currentHash === item.href)
+                    : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
                   const Icon = isActive ? item.iconSolid : item.icon;
-                  
-                  // Handle button type (e.g., "More" hamburger menu)
-                  if (item.isButton) {
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={() => setIsMenuOpen(true)}
-                        className="flex items-center justify-center flex-1 h-9 transition-colors hover:bg-white/10 rounded-xl"
-                      >
-                        <Icon className="w-5 h-5 text-white/60" />
-                      </button>
-                    );
-                  }
                   
                   // Handle items with onClick (e.g., hash-based navigation)
                   if ((item as any).onClick) {
@@ -760,34 +1352,7 @@ export default function PageWrapper({
         </div>
       )}
 
-      {/* Map Details Modal */}
-      {mapInfo && mapInfo.id && (
-        <MapDetailsModal
-          isOpen={isMapDetailsModalOpen}
-          onClose={() => setIsMapDetailsModalOpen(false)}
-          mapInfo={{
-            id: mapInfo.id,
-            name: mapInfo.name,
-            emoji: mapInfo.emoji,
-            description: mapInfo.description || null,
-            account: mapInfo.account ? {
-              id: mapInfo.account.id,
-              username: mapInfo.account.username,
-              first_name: mapInfo.account.first_name,
-              last_name: mapInfo.account.last_name,
-              image_url: mapInfo.account.image_url,
-            } : null,
-            viewCount: mapInfo.viewCount || null,
-            visibility: (mapInfo.visibility as 'public' | 'private' | 'shared') || 'public',
-            created_at: mapInfo.created_at || new Date().toISOString(),
-            updated_at: mapInfo.updated_at || new Date().toISOString(),
-            hideCreator: mapInfo.hideCreator || false,
-          }}
-        />
-      )}
 
-      {/* Full Screen Menu */}
-      <HamburgerMenu isOpen={isMenuOpen} onOpenChange={setIsMenuOpen} />
     </div>
     </>
   );

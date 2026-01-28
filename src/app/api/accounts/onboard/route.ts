@@ -20,60 +20,37 @@ export async function POST(request: NextRequest) {
       try {
         const supabase = await createServerClientWithAuth(cookies());
         
-        // userId is guaranteed from security middleware
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user || user.id !== userId) {
+        // userId and accountId are guaranteed from security middleware
+        // Use accountId from context if available, otherwise get from cookie
+        const finalAccountId = accountId || request.cookies.get('active_account_id')?.value || null;
+
+        if (!finalAccountId) {
           return NextResponse.json(
-            { error: 'Authentication required' },
-            { status: 401 }
+            { error: 'Account not found', message: 'No active account selected' },
+            { status: 404 }
           );
         }
 
-    // Get active account ID from cookie (same logic as middleware and other server code)
-    const activeAccountIdCookie = request.cookies.get('active_account_id');
-    const activeAccountId = activeAccountIdCookie?.value || null;
+        // Verify the account belongs to this user
+        const { data: account, error: accountError } = await supabase
+          .from('accounts')
+          .select('id')
+          .eq('id', finalAccountId)
+          .eq('user_id', userId)
+          .maybeSingle();
 
-    let account, accountError;
-    
-    if (activeAccountId) {
-      // Verify the active account belongs to this user before using it
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('id', activeAccountId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      account = data;
-      accountError = error;
-    } else {
-      // Fallback to first account if no active account ID in cookie
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-      account = data;
-      accountError = error;
-    }
-
-    if (accountError || !account) {
-      console.error('[Onboard API] Account lookup error:', accountError);
-      return NextResponse.json(
-        { error: 'Account not found' },
-        { status: 404 }
-      );
-    }
-
-        // Type assertion for account
-        const finalAccountId = (account as { id: string }).id;
+        if (accountError || !account) {
+          console.error('[Onboard API] Account lookup error:', accountError);
+          return NextResponse.json(
+            { error: 'Account not found' },
+            { status: 404 }
+          );
+        }
 
         if (process.env.NODE_ENV === 'development') {
           console.log('[Onboard API] Updating account:', {
             accountId: finalAccountId,
-            activeAccountIdFromCookie: activeAccountId,
-            userId: user.id,
+            userId,
           });
         }
 

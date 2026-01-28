@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MagnifyingGlassIcon, PlusIcon, MapIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, PlusIcon, MapIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 import PageWrapper from '@/components/layout/PageWrapper';
@@ -17,7 +17,6 @@ import type { MapItem } from './types';
 import { MAP_FEATURE_SLUG, calculateMapLimitState } from '@/lib/billing/mapLimits';
 
 type ViewType = 'featured' | 'community' | 'my-maps';
-type ViewAsRole = 'non-member' | 'member' | 'owner';
 
 export default function MapsPage() {
   const router = useRouter();
@@ -53,26 +52,7 @@ export default function MapsPage() {
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [loadingMyMaps, setLoadingMyMaps] = useState(false);
   
-  // View As role state
-  const [viewAsRole, setViewAsRole] = useState<ViewAsRole>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem('maps_view_as_role') as ViewAsRole | null;
-      if (stored && ['non-member', 'member', 'owner'].includes(stored)) {
-        return stored;
-      }
-    }
-    return 'non-member';
-  });
-  const [isViewAsOpen, setIsViewAsOpen] = useState(false);
-  
   const { activeSidebar } = useUnifiedSidebar();
-  
-  // Persist viewAsRole to sessionStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('maps_view_as_role', viewAsRole);
-    }
-  }, [viewAsRole]);
 
   // Update view type when URL changes
   useEffect(() => {
@@ -447,53 +427,6 @@ export default function MapsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* View As Selector */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setIsViewAsOpen(!isViewAsOpen)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-                      title="View maps as different role"
-                    >
-                      <span className="text-[10px] text-gray-500 uppercase tracking-wide">View As:</span>
-                      <span className="capitalize">{viewAsRole === 'non-member' ? 'Non Member' : viewAsRole}</span>
-                      <ChevronDownIcon 
-                        className={`w-3 h-3 transition-transform duration-200 ${isViewAsOpen ? 'rotate-180' : ''}`} 
-                      />
-                    </button>
-
-                    {isViewAsOpen && (
-                      <>
-                        <div
-                          className="fixed inset-0 z-10"
-                          onClick={() => setIsViewAsOpen(false)}
-                          aria-hidden="true"
-                        />
-                        <div className="absolute top-full right-0 mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg min-w-[140px]">
-                          {[
-                            { value: 'non-member' as ViewAsRole, label: 'Non Member' },
-                            { value: 'member' as ViewAsRole, label: 'Member' },
-                            { value: 'owner' as ViewAsRole, label: 'Owner' },
-                          ].map((role) => (
-                            <button
-                              key={role.value}
-                              onClick={() => {
-                                setViewAsRole(role.value);
-                                setIsViewAsOpen(false);
-                              }}
-                              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition-colors ${
-                                viewAsRole === role.value
-                                  ? 'bg-indigo-50 text-indigo-900 font-medium'
-                                  : 'text-gray-900'
-                              }`}
-                            >
-                              {role.label}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  
                   {/* Search */}
                   <div className="relative">
                     <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500" />
@@ -563,7 +496,6 @@ export default function MapsPage() {
                         map={map}
                         account={account}
                         showRoleIcon={false}
-                        viewAsRole={viewAsRole}
                       />
                     ))}
                   </div>
@@ -635,7 +567,6 @@ export default function MapsPage() {
                           map={map}
                           account={account}
                           showRoleIcon={true}
-                          viewAsRole={viewAsRole}
                         />
                       ))}
                     </div>
@@ -652,7 +583,6 @@ export default function MapsPage() {
                             map={map}
                             account={account}
                             showRoleIcon={true}
-                            viewAsRole={viewAsRole}
                           />
                         ))}
                       </div>
@@ -670,7 +600,6 @@ export default function MapsPage() {
                             map={map}
                             account={account}
                             showRoleIcon={true}
-                            viewAsRole={viewAsRole}
                           />
                         ))}
                       </div>
@@ -698,7 +627,6 @@ export default function MapsPage() {
                       map={map}
                       account={account}
                       showRoleIcon={false}
-                      viewAsRole={viewAsRole}
                     />
                   ))}
                 </div>

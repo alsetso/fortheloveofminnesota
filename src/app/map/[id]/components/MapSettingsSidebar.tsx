@@ -965,7 +965,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                           triggerRef={emojiButtonRef as React.RefObject<HTMLElement>}
                         />
                       )}
-                      {formData.emoji && isEditing && !isSaving && (
+                      {formData.emoji && canManage && !isSaving && (
                         <button
                           type="button"
                           onClick={() => {

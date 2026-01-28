@@ -348,7 +348,7 @@ export default function HomeMapsSidebar() {
             <div className="flex items-center">
               <span className="text-xs text-gray-600">
                 {limitDisplay.isAtLimit && mapFeature?.limit_value !== null
-                  ? `${ownedMapsCount} / ${mapFeature.limit_value} maps`
+                  ? `${ownedMapsCount} / ${mapFeature?.limit_value} maps`
                   : limitDisplay.text}
               </span>
             </div>

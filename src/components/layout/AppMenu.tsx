@@ -920,6 +920,17 @@ function AppMenuSubPageContent({
     );
   }
   if (subPage === 'my-pins') {
+    // Redirect non-authenticated users back to main menu
+    if (!account?.id) {
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-400">
+            Sign in to view and manage your pins on the live map.
+          </p>
+        </div>
+      );
+    }
+
     const formatDate = (s: string) => {
       try {
         const d = new Date(s);
@@ -1369,15 +1380,23 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
                   Pin Display
                   <ChevronRightIcon className="w-4 h-4 text-gray-500 ml-auto" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setSubPage('my-pins')}
-                  className="w-full flex items-center gap-2 rounded-md py-2 px-[10px] text-sm text-white hover:bg-white/5 transition-colors text-left"
-                >
-                  <UserIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                  My Pins
-                  <ChevronRightIcon className="w-4 h-4 text-gray-500 ml-auto" />
-                </button>
+                {account?.id ? (
+                  <button
+                    type="button"
+                    onClick={() => setSubPage('my-pins')}
+                    className="w-full flex items-center gap-2 rounded-md py-2 px-[10px] text-sm text-white hover:bg-white/5 transition-colors text-left"
+                  >
+                    <UserIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    My Pins
+                    <ChevronRightIcon className="w-4 h-4 text-gray-500 ml-auto" />
+                  </button>
+                ) : (
+                  <div className="w-full flex items-center gap-2 rounded-md py-2 px-[10px] text-sm text-white/60">
+                    <UserIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <span>My Pins</span>
+                    <span className="text-xs text-gray-500 ml-auto">Sign in required</span>
+                  </div>
+                )}
               </div>
             </div>
           </>

@@ -482,6 +482,7 @@ export class MentionService {
         collection_emoji: (mention as any).collections?.emoji || null,
         account_image_url: (mention as any).accounts?.image_url || null,
         account_plan: (mention as any).accounts?.plan || null, // Include plan for gold border on map pins
+        account_username: mention.account?.username || (mention as any).accounts?.username || null, // Include username for fast click reporting
       };
       
       // Include description if it exists

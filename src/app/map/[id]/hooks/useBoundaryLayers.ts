@@ -12,7 +12,8 @@ interface BoundaryLayersState {
 
 /**
  * Hook to manage boundary layer visibility state
- * Syncs with persisted map_layers settings
+ * Boundary layers are NOT loaded automatically - they only load when user explicitly toggles them on
+ * This prevents unnecessary API calls and improves initial page load performance
  */
 export function useBoundaryLayers(mapData: MapData | null) {
   const [layers, setLayers] = useState<BoundaryLayersState>({
@@ -22,7 +23,8 @@ export function useBoundaryLayers(mapData: MapData | null) {
     showCountyBoundaries: false,
   });
 
-  // Keep boundary toggles in sync with persisted map_layers
+  // Initialize with all layers disabled - do NOT read from persisted settings
+  // Layers will only be enabled when user explicitly toggles them on
   useEffect(() => {
     if (!mapData) {
       setLayers({
@@ -34,14 +36,15 @@ export function useBoundaryLayers(mapData: MapData | null) {
       return;
     }
 
-    const mapLayers = mapData.settings?.appearance?.map_layers || {};
+    // Always start with all layers disabled, regardless of saved settings
+    // User must explicitly toggle them on
     setLayers({
-      showDistricts: Boolean(mapLayers.congressional_districts),
-      showCTU: Boolean(mapLayers.ctu_boundaries),
-      showStateBoundary: Boolean(mapLayers.state_boundary),
-      showCountyBoundaries: Boolean(mapLayers.county_boundaries),
+      showDistricts: false,
+      showCTU: false,
+      showStateBoundary: false,
+      showCountyBoundaries: false,
     });
-  }, [mapData?.settings?.appearance?.map_layers]);
+  }, [mapData?.id]); // Only reset when map changes, not when settings change
 
   // Sync boundary state with map via events
   useEffect(() => {

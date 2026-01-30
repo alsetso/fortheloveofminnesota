@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
+import MentionMapLabel from '@/components/shared/MentionMapLabel';
 
 type MentionType = { id: string; emoji: string; name: string };
 
@@ -62,7 +62,7 @@ export default function HeaderMentionTypeCards() {
       <div className="flex-shrink-0 px-2 pb-2">
         <div className="flex gap-2 overflow-hidden">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[30px] w-20 bg-gray-100 rounded-md animate-pulse flex-shrink-0" />
+            <div key={i} className="h-[28px] w-24 bg-gray-100 rounded-full animate-pulse flex-shrink-0" />
           ))}
         </div>
       </div>
@@ -80,17 +80,14 @@ export default function HeaderMentionTypeCards() {
     return (
       <div className="flex-shrink-0 px-2 pb-2">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          <button
-            type="button"
+          <MentionMapLabel
+            emoji={selectedType.emoji}
+            name={selectedType.name}
+            isSelected={true}
             onClick={() => handleChipClick(slug)}
-            className="inline-flex items-center gap-1.5 h-[30px] px-2 rounded-md border border-gray-300 bg-white text-gray-900 text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors hover:bg-gray-50 opacity-100"
-            aria-pressed
-            aria-label={`${selectedType.name} (selected), clear filter`}
-          >
-            <span className="text-sm">{selectedType.emoji}</span>
-            <span className="truncate max-w-[80px]">{selectedType.name}</span>
-            <XMarkIcon className="w-3.5 h-3.5 flex-shrink-0 text-gray-500" aria-hidden />
-          </button>
+            onClear={() => handleChipClick(slug)}
+            maxWidth="max-w-[100px]"
+          />
         </div>
       </div>
     );
@@ -102,17 +99,14 @@ export default function HeaderMentionTypeCards() {
         {mentionTypes.map((type) => {
           const slug = mentionTypeNameToSlug(type.name);
           return (
-            <button
+            <MentionMapLabel
               key={type.id}
-              type="button"
+              emoji={type.emoji}
+              name={type.name}
+              isSelected={false}
               onClick={() => handleChipClick(slug)}
-              className="inline-flex items-center gap-1.5 h-[30px] px-2 rounded-md border border-gray-200 bg-white text-gray-900 text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors opacity-100 hover:bg-gray-50"
-              aria-pressed={false}
-              aria-label={`Filter by ${type.name}`}
-            >
-              <span className="text-sm">{type.emoji}</span>
-              <span className="truncate max-w-[80px]">{type.name}</span>
-            </button>
+              maxWidth="max-w-[100px]"
+            />
           );
         })}
       </div>

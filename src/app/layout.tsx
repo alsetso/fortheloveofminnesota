@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com'),
   title: 'For the Love of Minnesota',
-  description: "For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.",
+  description: 'A living map built on love for Minnesota.',
   keywords: 'Minnesota, Minnesota residents, Minnesota neighbors, Minnesota community, Minnesota locations, Minnesota cities, Minnesota counties, archive Minnesota, Minnesota memories, Minnesota stories',
   authors: [{ name: 'For the Love of Minnesota' }],
   creator: 'For the Love of Minnesota',
@@ -46,12 +46,12 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'For the Love of Minnesota',
-    description: "For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.",
+    description: 'A living map and social network built on love for Minnesota — its people, places, and stories.',
     url: 'https://fortheloveofminnesota.com',
     siteName: 'For the Love of Minnesota',
     images: [
       {
-        url: '/seo_share_public_image.png',
+        url: '/og/lomn-share.png',
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -64,8 +64,8 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'For the Love of Minnesota',
-    description: "For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.",
-    images: ['/seo_share_public_image.png'],
+    description: 'A living map built on love for Minnesota.',
+    images: ['/og/lomn-share.png'],
     creator: '@fortheloveofmn',
   },
   alternates: {

@@ -1,6 +1,8 @@
 'use client';
 
 import { MapIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 export interface MapInfoLocation {
   lat: number;
@@ -108,7 +110,36 @@ function getEmptyLabel(zoom: number | undefined, explicitEmptyLabel: string | un
   return 'Tap the map to select a location';
 }
 
+export function MapInfoSkeleton({ onClose }: { onClose?: () => void }) {
+  return (
+    <div className="p-3 space-y-3" data-container="map-info-skeleton" aria-label="Loading map info">
+      <div className="flex items-center justify-between gap-2">
+        <div className="h-4 w-32 rounded bg-gray-200 animate-pulse" aria-hidden />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
+            aria-label="Close"
+          >
+            <XMarkIcon className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <div className="space-y-1">
+        <div className="h-2.5 w-20 rounded bg-gray-200 animate-pulse" aria-hidden />
+        <div className="h-3.5 w-full max-w-[200px] rounded bg-gray-100 animate-pulse" aria-hidden />
+        <div className="h-2.5 w-24 rounded bg-gray-100 animate-pulse" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
 export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentionType, onClose }: MapInfoProps) {
+  const { account, activeAccountId } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
+  const isAuthenticated = Boolean(account || activeAccountId);
+
   if (!location) {
     const label = getEmptyLabel(zoom, emptyLabel);
     return (
@@ -188,16 +219,28 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
             <span className="text-xs font-medium text-gray-900 truncate">{mentionType.name}</span>
           </div>
         )}
-        {zoom !== undefined && zoom >= ZOOM_FOR_PINS && onAddToMap && (
-          <button
-            type="button"
-            onClick={() => onAddToMap({ ...location, lat, lng }, mentionType?.id)}
-            className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-            aria-label={mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
-          >
-            <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-            {mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
-          </button>
+        {zoom !== undefined && zoom >= ZOOM_FOR_PINS && (
+          isAuthenticated && onAddToMap ? (
+            <button
+              type="button"
+              onClick={() => onAddToMap({ ...location, lat, lng }, mentionType?.id)}
+              className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+              aria-label={mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
+            >
+              <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+              {mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
+            </button>
+          ) : !isAuthenticated ? (
+            <button
+              type="button"
+              onClick={openWelcome}
+              className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+              aria-label="Sign in to add to map"
+            >
+              <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+              Sign in to add to map
+            </button>
+          ) : null
         )}
       </div>
     </div>

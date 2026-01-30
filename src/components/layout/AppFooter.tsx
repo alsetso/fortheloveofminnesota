@@ -31,26 +31,30 @@ export default function AppFooter({ children, headerLabel = 'Footer', isOpen: co
       aria-label="App footer"
     >
       {/* Header always at bottom (click toggles accordion) */}
-      <button
-        type="button"
-        onClick={() => hasContent && setIsOpen(!isOpen)}
-        className="flex-shrink-0 flex items-center justify-between gap-2 w-full px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors text-left disabled:opacity-50 disabled:cursor-default"
-        data-container="app-footer-header"
-        aria-label={isOpen ? 'Close footer' : 'Open footer'}
-        aria-expanded={isOpen}
-        disabled={!hasContent}
-      >
-        <span>{headerLabel}</span>
-        {hasContent && (
-          <span className="flex-shrink-0 transition-transform" aria-hidden>
-            {isOpen ? (
-              <ChevronDownIcon className="w-4 h-4" />
-            ) : (
-              <ChevronUpIcon className="w-4 h-4" />
-            )}
-          </span>
-        )}
-      </button>
+      <div className="flex-shrink-0 flex flex-col">
+        <button
+          type="button"
+          onClick={() => hasContent && setIsOpen(!isOpen)}
+          className="flex-shrink-0 flex items-center justify-between gap-2 w-full px-3 h-[50px] min-h-[50px] max-h-[50px] text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors text-left disabled:opacity-50 disabled:cursor-default"
+          data-container="app-footer-header"
+          aria-label={isOpen ? 'Close footer' : 'Open footer'}
+          aria-expanded={isOpen}
+          disabled={!hasContent}
+        >
+          <span>{headerLabel}</span>
+          {hasContent && (
+            <span className="flex-shrink-0 transition-transform" aria-hidden>
+              {isOpen ? (
+                <ChevronDownIcon className="w-4 h-4" />
+              ) : (
+                <ChevronUpIcon className="w-4 h-4" />
+              )}
+            </span>
+          )}
+        </button>
+        {/* 25px spacer always visible */}
+        <div className="h-[25px] flex-shrink-0" aria-hidden />
+      </div>
       {/* Accordion content (above header when open) */}
       {hasContent && isOpen && (
         <div

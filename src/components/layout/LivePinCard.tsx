@@ -89,6 +89,12 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
     currentAccountId != null &&
     String(pin.account_id) === String(currentAccountId);
 
+  // If pin has no description/content, hide the card (don't show skeleton or card)
+  if (pin && !pin.description && !pin.caption && !pin.emoji && !pin.image_url && !pin.video_url) {
+    return null;
+  }
+
+  // If loading, show skeleton
   if (loading) {
     return <PinCardSkeleton onClose={onClose} />;
   }

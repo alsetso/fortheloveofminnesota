@@ -61,6 +61,10 @@ interface UnifiedMapClickHandlerOptions {
   onBoundaryClick?: (feature: { layer?: { id: string }; properties?: Record<string, unknown>; geometry?: unknown }) => void;
   /** When true, show "Not minnesota" error toast when user clicks outside Minnesota (e.g. on /live). */
   isLiveMap?: boolean;
+  /** Called when any item is clicked (for live map footer status). Passes clicked item info. */
+  onLiveClickReport?: (clickedItem: { type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null } | null) => void;
+  /** Optional: initial pins data for fast lookup (includes account data if available) */
+  initialPins?: Array<{ id?: string; account?: { username?: string | null } | null }>;
 }
 
 interface LocationSelectPopup {
@@ -99,6 +103,8 @@ export function useUnifiedMapClickHandler({
   onMapClick,
   onBoundaryClick,
   isLiveMap = false,
+  onLiveClickReport,
+  initialPins = [],
 }: UnifiedMapClickHandlerOptions) {
   const router = useRouter();
   const { addToast } = useToastContext();
@@ -120,6 +126,8 @@ export function useUnifiedMapClickHandler({
   const onMentionClickRef = useRef(onMentionClick);
   const onMapClickRef = useRef(onMapClick);
   const onBoundaryClickRef = useRef(onBoundaryClick);
+  const onLiveClickReportRef = useRef(onLiveClickReport);
+  const initialPinsRef = useRef(initialPins);
 
   // Update refs when values change
   useEffect(() => { mapInstanceRef.current = map; }, [map]);
@@ -136,6 +144,8 @@ export function useUnifiedMapClickHandler({
   useEffect(() => { onMentionClickRef.current = onMentionClick; }, [onMentionClick]);
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
   useEffect(() => { onBoundaryClickRef.current = onBoundaryClick; }, [onBoundaryClick]);
+  useEffect(() => { onLiveClickReportRef.current = onLiveClickReport; }, [onLiveClickReport]);
+  useEffect(() => { initialPinsRef.current = initialPins; }, [initialPins]);
 
   // Location select popup state
   const [locationSelectPopup, setLocationSelectPopup] = useState<LocationSelectPopup>({
@@ -453,6 +463,31 @@ export function useUnifiedMapClickHandler({
           if (feature && onBoundaryClickRef.current) {
             removeClickMarkerRef.current();
             setClickedCoordinates(null);
+            // Extract coordinates from feature geometry if available
+            let boundaryLat = lat;
+            let boundaryLng = lng;
+            if (feature.geometry?.type === 'Point' && feature.geometry.coordinates) {
+              boundaryLng = feature.geometry.coordinates[0];
+              boundaryLat = feature.geometry.coordinates[1];
+            } else if (feature.geometry?.type === 'Polygon' && feature.geometry.coordinates?.[0]?.[0]) {
+              const coords = feature.geometry.coordinates[0][0];
+              boundaryLng = coords[0];
+              boundaryLat = coords[1];
+            }
+            const boundaryId = entityId || feature.properties?.id || feature.properties?.entity_id || undefined;
+            // Extract layer type from layerId (e.g., 'state-boundary-fill' -> 'state', 'county-boundaries-fill' -> 'county')
+            const layerId = clickResult.layerId || '';
+            let boundaryLayer: 'state' | 'county' | 'district' | 'ctu' | undefined;
+            if (layerId.includes('state-boundary')) {
+              boundaryLayer = 'state';
+            } else if (layerId.includes('county-boundaries')) {
+              boundaryLayer = 'county';
+            } else if (layerId.includes('ctu-boundaries')) {
+              boundaryLayer = 'ctu';
+            } else if (layerId.includes('congressional-districts') || layerId.includes('district')) {
+              boundaryLayer = 'district';
+            }
+            onLiveClickReportRef.current?.({ type: 'boundary', id: boundaryId, lat: boundaryLat, lng: boundaryLng, layer: boundaryLayer });
             onBoundaryClickRef.current(feature);
           }
           return;
@@ -470,6 +505,70 @@ export function useUnifiedMapClickHandler({
               mapMeta: null,
             });
             setClickedCoordinates(null);
+            // Extract coordinates from feature if available, otherwise use click coordinates
+            let pinLat = lat;
+            let pinLng = lng;
+            if (feature?.geometry?.type === 'Point' && feature.geometry.coordinates) {
+              pinLng = feature.geometry.coordinates[0];
+              pinLat = feature.geometry.coordinates[1];
+            }
+            // Ensure entityId is a string
+            const pinId = entityId != null ? String(entityId) : undefined;
+            
+            // Optimistic update: report immediately with available data, then enhance with username
+            if (onLiveClickReportRef.current && pinId) {
+              // Check if username is available from feature properties (for mentions)
+              const featureUsername = feature?.properties?.account_username as string | undefined;
+              
+              // Check if pin is in initialPins cache (for custom map pins)
+              const cachedPin = initialPinsRef.current.find((p: any) => p.id === pinId);
+              const cachedUsername = cachedPin?.account?.username;
+              
+              // Use available username immediately (from feature or cache)
+              const immediateUsername = featureUsername || cachedUsername || null;
+              
+              // Report click immediately with available data
+              onLiveClickReportRef.current?.({ 
+                type: 'pin', 
+                id: pinId, 
+                lat: pinLat, 
+                lng: pinLng,
+                username: immediateUsername
+              });
+              
+              // If username not available, fetch in background and update
+              if (!immediateUsername) {
+                const currentMapData = mapDataRef.current;
+                const mapIdForFetch = currentMapData?.id;
+                if (mapIdForFetch) {
+                  // Fetch pin data to get username (non-blocking)
+                  fetch(`/api/maps/${mapIdForFetch}/pins/${pinId}`)
+                    .then((response) => {
+                      if (response.ok) {
+                        return response.json();
+                      }
+                      return null;
+                    })
+                    .then((pinData: any) => {
+                      const username = pinData?.account?.username || null;
+                      // Update with username if found (this will trigger a re-render with updated data)
+                      if (username && onLiveClickReportRef.current) {
+                        onLiveClickReportRef.current?.({ 
+                          type: 'pin', 
+                          id: pinId, 
+                          lat: pinLat, 
+                          lng: pinLng,
+                          username 
+                        });
+                      }
+                    })
+                    .catch(() => {
+                      // Silently fail - we already reported without username
+                    });
+                }
+              }
+            }
+            
             onPinClickRef.current(entityId);
           }
           return;
@@ -487,6 +586,18 @@ export function useUnifiedMapClickHandler({
               mapMeta: null,
             });
             setClickedCoordinates(null);
+            // Extract coordinates from feature if available, otherwise use click coordinates
+            let areaLat = lat;
+            let areaLng = lng;
+            if (feature?.geometry?.type === 'Polygon' && feature.geometry.coordinates?.[0]?.[0]) {
+              const coords = feature.geometry.coordinates[0][0];
+              areaLng = coords[0];
+              areaLat = coords[1];
+            } else if (feature?.geometry?.type === 'Point' && feature.geometry.coordinates) {
+              areaLng = feature.geometry.coordinates[0];
+              areaLat = feature.geometry.coordinates[1];
+            }
+            onLiveClickReportRef.current?.({ type: 'area', id: entityId, lat: areaLat, lng: areaLng });
             onAreaClickRef.current(entityId);
           }
           return;
@@ -504,6 +615,70 @@ export function useUnifiedMapClickHandler({
               mapMeta: null,
             });
             setClickedCoordinates(null);
+            // Extract coordinates from feature if available, otherwise use click coordinates
+            let mentionLat = lat;
+            let mentionLng = lng;
+            if (feature?.geometry?.type === 'Point' && feature.geometry.coordinates) {
+              mentionLng = feature.geometry.coordinates[0];
+              mentionLat = feature.geometry.coordinates[1];
+            }
+            // Ensure entityId is a string
+            const mentionId = entityId != null ? String(entityId) : undefined;
+            
+            // Optimistic update: report immediately with available data, then enhance with username
+            if (onLiveClickReportRef.current && mentionId) {
+              // Check if username is available from feature properties (mentions often have this)
+              const featureUsername = feature?.properties?.account_username as string | undefined;
+              
+              // Check if pin is in initialPins cache
+              const cachedPin = initialPinsRef.current.find((p: any) => p.id === mentionId);
+              const cachedUsername = cachedPin?.account?.username;
+              
+              // Use available username immediately (from feature or cache)
+              const immediateUsername = featureUsername || cachedUsername || null;
+              
+              // Report click immediately with available data
+              onLiveClickReportRef.current?.({ 
+                type: 'pin', 
+                id: mentionId, 
+                lat: mentionLat, 
+                lng: mentionLng,
+                username: immediateUsername
+              });
+              
+              // If username not available, fetch in background and update
+              if (!immediateUsername) {
+                const currentMapData = mapDataRef.current;
+                const mapIdForFetch = currentMapData?.id;
+                if (mapIdForFetch) {
+                  // Fetch pin data to get username (non-blocking)
+                  fetch(`/api/maps/${mapIdForFetch}/pins/${mentionId}`)
+                    .then((response) => {
+                      if (response.ok) {
+                        return response.json();
+                      }
+                      return null;
+                    })
+                    .then((pinData: any) => {
+                      const username = pinData?.account?.username || null;
+                      // Update with username if found
+                      if (username && onLiveClickReportRef.current) {
+                        onLiveClickReportRef.current?.({ 
+                          type: 'pin', 
+                          id: mentionId, 
+                          lat: mentionLat, 
+                          lng: mentionLng,
+                          username 
+                        });
+                      }
+                    })
+                    .catch(() => {
+                      // Silently fail - we already reported without username
+                    });
+                }
+              }
+            }
+            
             onMentionClickRef.current(entityId);
           }
           return;
@@ -530,6 +705,8 @@ export function useUnifiedMapClickHandler({
             }
             break;
           }
+          // Report map click
+          onLiveClickReportRef.current?.({ type: 'map', lat, lng });
           // Map click - handle based on mode and permissions
           handleMapClickTarget({
             mapboxMap,

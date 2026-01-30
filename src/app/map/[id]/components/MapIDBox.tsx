@@ -160,6 +160,8 @@ interface MapIDBoxProps {
   onZoomChange?: (zoom: number) => void;
   /** When set (e.g. on /live), pin clicks call this with pin data; used to show pin in app footer. */
   onLivePinSelect?: (pinId: string, pinData?: Record<string, unknown> | null) => void;
+  /** Called when any item is clicked (for live map footer status). Passes clicked item info. */
+  onLiveClickReport?: (clickedItem: { type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null } | null) => void;
   /** When false, show all pins unclustered. When true (default), cluster pins on the live map. */
   pinDisplayGrouping?: boolean;
   /** When true on /live, show only current account's pins. Default false. */
@@ -266,6 +268,7 @@ export default function MapIDBox({
   onBoundarySelect,
   onZoomChange,
   onLivePinSelect,
+  onLiveClickReport,
   pinDisplayGrouping = true,
   showOnlyMyPins = false,
   timeFilter: timeFilterProp,
@@ -413,11 +416,24 @@ export default function MapIDBox({
     showAreaDrawModal,
     onPinClick: async (pinId) => {
       if (onLivePinSelect) {
+        // Check if pin data is already in initialPins (fastest path - no fetch needed)
+        const cachedPin = initialPins.find((p: any) => p.id === pinId) as any;
+        if (cachedPin && cachedPin.account?.image_url) {
+          // We have complete pin data, use it immediately
+          onLivePinSelect(pinId, cachedPin as unknown as Record<string, unknown>);
+          return;
+        }
+        
+        // Call immediately with pinId (no data) to show skeleton instantly
+        onLivePinSelect(pinId, undefined);
+        
+        // Fetch in background and update with data when ready
         setLoadingEntity(true);
         try {
           const response = await fetch(`/api/maps/${mapId}/pins/${pinId}`);
           if (response.ok) {
             const pinData = await response.json();
+            // Update with fetched data
             onLivePinSelect(pinId, pinData);
           } else {
             onLivePinSelect(pinId, null);
@@ -488,6 +504,8 @@ export default function MapIDBox({
         setLoadingEntity(false);
       }
     },
+    onLiveClickReport: onLiveClickReport,
+    initialPins: pins, // Pass current pins state for fast username lookup
     onMapClick: async (coordinates, mapMeta) => {
       // Handle pin creation when in pin mode - use contribute overlay
       if (!pinMode || showAreaDrawModal) return;

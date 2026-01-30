@@ -39,10 +39,13 @@ export default function BoundaryLayersManager({
   onLayerLoadChange,
   onBoundarySelect,
 }: BoundaryLayersManagerProps) {
-  // Preload all boundary data when live map is active so zoom transitions never wait on network
+  // Preload boundary data ONLY when layers are actually visible and live map is active
+  // Do NOT preload on initial load - wait for user to toggle layers on
   useEffect(() => {
-    if (liveMapBoundaryZoom && mapLoaded) preloadAll();
-  }, [liveMapBoundaryZoom, mapLoaded]);
+    if (liveMapBoundaryZoom && mapLoaded && (showDistricts || showCTU || showStateBoundary || showCountyBoundaries)) {
+      preloadAll();
+    }
+  }, [liveMapBoundaryZoom, mapLoaded, showDistricts, showCTU, showStateBoundary, showCountyBoundaries]);
 
   const zoomRange = (layer: 'state' | 'county' | 'district' | 'ctu') =>
     liveMapBoundaryZoom ? getLiveBoundaryZoomRange(layer) : {};

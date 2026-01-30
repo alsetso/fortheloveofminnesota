@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { UserIcon, MapPinIcon, EyeIcon, FolderIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { getMapUrl, getMapUrlWithPin } from '@/lib/maps/urls';
@@ -142,8 +143,8 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
 
   return (
     <div className="space-y-3">
-      {/* Feed from: maps as list cards */}
-      <div className="space-y-2">
+      {/* Feed from: maps as list cards - shown on mobile only (desktop shows in sidebar) */}
+      <div className="lg:hidden space-y-2">
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Feed from</p>
         {maps.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">
@@ -167,7 +168,12 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
         )}
       </div>
 
-      {showWhatYouCanPost && <MentionTypeCards isAdmin={isAdmin} />}
+      {/* What you can post - shown on mobile only (desktop shows in sidebar) */}
+      {showWhatYouCanPost && (
+        <div className="lg:hidden">
+          <MentionTypeCards isAdmin={isAdmin} />
+        </div>
+      )}
 
       {/* Personal Collections */}
       {showPersonalCollections && (
@@ -308,7 +314,7 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
 
       {/* Map pins list */}
       <div className="space-y-2">
-        <SectionHeaderWithAdd title="Map Pins" addHref="/map/live#contribute" />
+        <SectionHeaderWithAdd title="Map Pins" addHref="/contribute" />
         {activity.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">
             <p className="text-xs text-gray-500">No pin activity yet on your maps.</p>
@@ -355,7 +361,9 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
   const displayName = item.account?.username ?? 'Someone';
   const relativeTime = getRelativeTime(item.created_at);
   const snippet = item.description ?? item.caption ?? item.emoji ?? null;
+  const hasImage = !!(item.image_url && item.media_type !== 'video');
   const hasVideo = !!(item.video_url || item.media_type === 'video');
+  const hasMedia = hasImage || hasVideo;
 
   const handleCardClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) return;
@@ -449,6 +457,18 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
             </Link>
           </div>
         </div>
+        {/* Compact media thumbnail */}
+        {hasMedia && item.image_url && (
+          <div className="flex-shrink-0 w-12 h-12 rounded-md overflow-hidden border border-gray-200 bg-gray-100 relative">
+            <Image
+              src={item.image_url}
+              alt=""
+              fill
+              className="object-cover"
+              unoptimized={item.image_url.includes('supabase.co')}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

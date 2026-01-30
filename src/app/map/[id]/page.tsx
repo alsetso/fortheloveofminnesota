@@ -83,7 +83,9 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   useEffect(() => {
     params.then(({ id }) => {
       // Redirect /map/live to /live (preserving query params)
-      if (id === 'live') {
+      // Only redirect when NOT skipPageWrapper (i.e., when visiting /map/live directly)
+      // When skipPageWrapper is true (called from /live page), allow it to render
+      if (id === 'live' && !skipPageWrapper) {
         const queryString = searchParams.toString();
         const redirectUrl = queryString ? `/live?${queryString}` : '/live';
         router.replace(redirectUrl);
@@ -91,7 +93,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
       }
       setMapId(id);
     });
-  }, [params, router, searchParams]);
+  }, [params, router, searchParams, skipPageWrapper]);
 
   // Consolidated map page data (mapData, loading, error, viewCount, initialPins/Areas/Members)
   const {
@@ -371,6 +373,41 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     });
   }, []);
 
+  // Track clicked items for live map footer status (array to append each click)
+  const [clickedItems, setClickedItems] = useState<{ type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null }[]>([]);
+
+  // Handle click reporting for live map footer - append each click to the array
+  // Limit to 100 items to prevent memory issues
+  // Supports updating existing items with username when it becomes available
+  const handleLiveClickReport = useCallback((clickedItem: { type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null } | null) => {
+    if (skipPageWrapper && clickedItem) {
+      setClickedItems((prev) => {
+        // If this is an update (same id exists), update the existing item
+        if (clickedItem.id) {
+          const existingIndex = prev.findIndex(item => item.id === clickedItem.id && item.type === clickedItem.type);
+          if (existingIndex >= 0) {
+            // Update existing item (e.g., with username)
+            const updated = [...prev];
+            updated[existingIndex] = { ...updated[existingIndex], ...clickedItem };
+            return updated.slice(-100);
+          }
+        }
+        // Otherwise, append new item
+        const updated = [...prev, clickedItem];
+        // Keep only the last 100 items
+        return updated.slice(-100);
+      });
+    }
+  }, [skipPageWrapper]);
+
+  // Clear clicked items when selection is cleared (for live map)
+  useEffect(() => {
+    if (!skipPageWrapper || !onRegisterClearSelection) return;
+    onRegisterClearSelection(() => {
+      setClickedItems([]);
+    });
+  }, [skipPageWrapper, onRegisterClearSelection]);
+
   // Report live map status for footer status strip (skipPageWrapper = /live)
   useEffect(() => {
     if (!skipPageWrapper || !onLiveStatusChange) return;
@@ -384,8 +421,9 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
       loadingCTUBoundaries,
       currentZoom: liveMapZoom,
       selectedBoundaries,
+      clickedItems,
     });
-  }, [skipPageWrapper, onLiveStatusChange, loading, mapLoaded, loadingPins, loadingStateBoundary, loadingCountyBoundaries, loadingCongressionalDistricts, loadingCTUBoundaries, liveMapZoom, selectedBoundaries]);
+  }, [skipPageWrapper, onLiveStatusChange, loading, mapLoaded, loadingPins, loadingStateBoundary, loadingCountyBoundaries, loadingCongressionalDistricts, loadingCTUBoundaries, liveMapZoom, selectedBoundaries, clickedItems]);
 
   // Location select popup state (managed by MapIDBox's unified handler)
   const [locationSelectPopup, setLocationSelectPopup] = useState({
@@ -706,6 +744,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     isOwner={effectiveIsOwner}
                     isLiveMap={isLiveMap}
                     onLivePinSelect={skipPageWrapper ? onLivePinSelect : undefined}
+                    onLiveClickReport={skipPageWrapper ? handleLiveClickReport : undefined}
                     // For custom maps, always use map's own settings. For live map, use liveBoundaryLayer override
                     meta={skipPageWrapper ? undefined : mapData.settings?.appearance?.meta}
                     showDistricts={skipPageWrapper && liveBoundaryLayer === 'district' ? true : showDistricts}

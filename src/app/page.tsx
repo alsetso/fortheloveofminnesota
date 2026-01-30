@@ -43,7 +43,7 @@ export default function Home() {
         rightSidebarConfigs={rightSidebarConfigs}
       >
         <div className="h-full overflow-y-auto scrollbar-hide">
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+          <div className="w-full py-6">
             <HomeFeedContent />
           </div>
         </div>

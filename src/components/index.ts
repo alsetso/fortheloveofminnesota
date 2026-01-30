@@ -28,6 +28,8 @@ export { default as LocalStorageCleanup } from './utils/LocalStorageCleanup';
 // Shared Components
 export { default as ProfilePhoto } from './shared/ProfilePhoto';
 export { default as BaseNav } from './shared/BaseNav';
+export { default as MentionMapLabel } from './shared/MentionMapLabel';
+export type { MentionMapLabelProps } from './shared/MentionMapLabel';
 
 // UI Components (re-export from ui folder)
 export * from './ui';

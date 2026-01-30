@@ -5,6 +5,7 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import MapSearchInput from '@/components/layout/MapSearchInput';
 import SearchResults from '@/components/layout/SearchResults';
 import MentionDetailClient from '@/features/mentions/components/MentionDetailClient';
+import MentionDetailGate from './MentionDetailGate';
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -203,12 +204,19 @@ export default async function MentionPage({ params }: Props) {
     notFound();
   }
 
+  // Check authentication - require sign-in for viewing mentions
+  const isAuthenticated = Boolean(user);
+
   return (
     <PageWrapper
       searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
       searchResultsComponent={<SearchResults />}
     >
-      <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />
+      {isAuthenticated ? (
+        <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />
+      ) : (
+        <MentionDetailGate mention={mentionData as any} />
+      )}
     </PageWrapper>
   );
 }

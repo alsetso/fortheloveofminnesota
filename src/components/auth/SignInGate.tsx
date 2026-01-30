@@ -57,7 +57,7 @@ export default function SignInGate({
   }
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center bg-gray-50">
+    <div className="min-h-[60vh] flex items-center justify-center bg-white">
       <div className="max-w-md w-full mx-auto px-4">
         <div className="bg-white rounded-md border border-gray-200 p-6 text-center space-y-4">
           <div className="space-y-2">

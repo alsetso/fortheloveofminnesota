@@ -1,7 +1,6 @@
 'use client';
 
-import { ReactNode, useState } from 'react';
-import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ReactNode } from 'react';
 import ProfileCard from './ProfileCard';
 import type { ProfileAccount } from '@/types/profile';
 
@@ -16,48 +15,24 @@ export default function ProfileLayout({
   isOwnProfile,
   children,
 }: ProfileLayoutProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
+  // Public visitors see 600px max width, own profile keeps full width
+  const maxWidthClass = isOwnProfile ? 'max-w-7xl' : 'max-w-[600px]';
+  
   return (
-    <div className="flex-1 flex flex-col lg:flex-row gap-6 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="lg:hidden flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
-        >
-          {isMobileMenuOpen ? (
-            <>
-              <XMarkIcon className="w-5 h-5" />
-              <span>Close Menu</span>
-            </>
-          ) : (
-            <>
-              <Bars3Icon className="w-5 h-5" />
-              <span>Menu</span>
-            </>
-          )}
-        </button>
-
-        {/* Left Sidebar - Profile Card & Navigation */}
-        <aside
-          className={`${
-            isMobileMenuOpen ? 'block' : 'hidden'
-          } lg:block w-full lg:w-64 flex-shrink-0`}
-        >
-          <div className="lg:sticky lg:top-6">
-            {/* Profile Card */}
-            <ProfileCard
-              account={account}
-              isOwnProfile={isOwnProfile}
-              showViewProfile={false}
-            />
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <main className="flex-1 min-w-0">
-          {children}
-        </main>
+    <div className={`flex-1 flex flex-col gap-6 px-4 sm:px-6 lg:px-8 py-6 ${maxWidthClass} mx-auto w-full`}>
+      {/* Profile Card - Stacked above content on both desktop and mobile */}
+      <div className="w-full">
+        <ProfileCard
+          account={account}
+          isOwnProfile={isOwnProfile}
+          showViewProfile={false}
+        />
       </div>
+
+      {/* Main Content Area */}
+      <main className="flex-1 min-w-0 w-full">
+        {children}
+      </main>
+    </div>
   );
 }

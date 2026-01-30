@@ -8,6 +8,7 @@ import ProfileLayout from '@/features/profiles/components/ProfileLayout';
 import ProfileMentionsList from '@/features/profiles/components/ProfileMentionsList';
 import HomeDashboardContent from '@/features/homepage/components/HomeDashboardContent';
 import UsernamePageShell from './UsernamePageShell';
+import SignInGate from '@/components/auth/SignInGate';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,7 @@ export default async function UsernamePage({ params, searchParams }: Props) {
 
   const { data: { user } } = await supabase.auth.getUser();
   const isOwnProfile = !!(user && accountData.user_id === user.id);
+  const isAuthenticated = Boolean(user);
 
   const profileAccountData: ProfileAccount = {
     id: accountData.id,
@@ -136,38 +138,26 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     .order('created_at', { ascending: false });
   const collections: Collection[] = (collectionsData || []) as Collection[];
 
-  // Maps the profile account owns or is a member of (for profile pins: all pins this account posted on any of these maps)
-  const { data: ownedMaps } = await supabase
-    .from('map')
-    .select('id')
+  // Always fetch public mentions for this account (even without auth)
+  // For visitors, we'll show skeleton loaders that prompt signup
+  const { data: mentionsData, error: mentionsError } = await supabase
+    .from('map_pins')
+    .select(`
+      id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
+      image_url, video_url, media_type, view_count, created_at, updated_at,
+      collections (id, emoji, title),
+      mention_type:mention_types (id, emoji, name),
+      map:map (id, slug)
+    `)
     .eq('account_id', accountData.id)
-    .eq('is_active', true);
-  const { data: memberRows } = await supabase
-    .from('map_members')
-    .select('map_id')
-    .eq('account_id', accountData.id);
-  const ownedIds = (ownedMaps || []).map((m: { id: string }) => m.id);
-  const memberIds = (memberRows || []).map((m: { map_id: string }) => m.map_id);
-  const profileMapIds = Array.from(new Set([...ownedIds, ...memberIds]));
+    .eq('archived', false)
+    .eq('is_active', true)
+    .eq('visibility', 'public')
+    .order('created_at', { ascending: false });
 
-  let mentionsData: any[] | null = null;
-  if (profileMapIds.length > 0) {
-    const { data } = await supabase
-      .from('map_pins')
-      .select(`
-        id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
-        image_url, video_url, media_type, view_count, created_at, updated_at,
-        collections (id, emoji, title),
-        mention_type:mention_types (id, emoji, name),
-        map:map (id, slug)
-      `)
-      .eq('account_id', accountData.id)
-      .in('map_id', profileMapIds)
-      .eq('archived', false)
-      .eq('is_active', true)
-      .eq('visibility', 'public')
-      .order('created_at', { ascending: false });
-    mentionsData = data;
+  // Log error in development for debugging
+  if (mentionsError && process.env.NODE_ENV === 'development') {
+    console.error('[UsernamePage] Error fetching mentions:', mentionsError);
   }
 
   const mentionIds = (mentionsData || []).map((m: any) => m.id);
@@ -182,7 +172,8 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     });
   }
 
-  const mentions: ProfilePin[] = (mentionsData || []).map((mention: any) => ({
+  // Handle case where mentionsData might be null or empty
+  const mentions: ProfilePin[] = (mentionsData && Array.isArray(mentionsData) ? mentionsData : []).map((mention: any) => ({
     id: mention.id,
     lat: mention.lat,
     lng: mention.lng,
@@ -207,10 +198,19 @@ export default async function UsernamePage({ params, searchParams }: Props) {
       <div className="space-y-6">
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Mentions</h2>
+            <h2 className="text-sm font-semibold text-gray-900">Mentions</h2>
           </div>
-          <ProfileMentionsList pins={mentions} isOwnProfile={false} />
+          <ProfileMentionsList pins={mentions} isOwnProfile={isOwnProfile} />
         </div>
+        
+        {/* Sign in prompt for non-authenticated visitors */}
+        {!isAuthenticated && (
+          <SignInGate
+            title={`Sign in to view ${profileAccountData.username || profileAccountData.first_name || 'this user'}'s profile`}
+            description={`See full mentions, like posts, and connect with ${profileAccountData.username || profileAccountData.first_name || 'the community'}.`}
+            subtle={false}
+          />
+        )}
       </div>
     </ProfileLayout>
   );

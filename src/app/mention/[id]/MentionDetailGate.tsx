@@ -3,13 +3,16 @@
 import SignInGate from '@/components/auth/SignInGate';
 import { MapPinIcon, HeartIcon, UserPlusIcon, EyeIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { MultiImageGrid, type MultiImage } from '@/components/shared/MultiImageGrid';
 
 interface MentionDetailGateProps {
   mention: {
     id: string;
     description: string | null;
     image_url: string | null;
+    image_urls?: string[] | null;
     accounts?: {
       username: string | null;
       first_name: string | null;
@@ -58,9 +61,12 @@ export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
               <div className="flex-1">
                 <div className="text-sm font-medium text-gray-900">{accountName}</div>
                 {mention.accounts.username && (
-                  <div className="text-xs text-gray-500">
+                  <Link
+                    href={`/${mention.accounts.username}`}
+                    className="text-xs text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                  >
                     @{mention.accounts.username}
-                  </div>
+                  </Link>
                 )}
               </div>
               {mention.mention_type && (
@@ -72,27 +78,42 @@ export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
             </div>
           )}
 
-          {/* Image Preview (blurred/teaser) */}
-          {mention.image_url && (
-            <div 
-              className="mb-4 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 relative cursor-pointer"
-              onClick={openWelcome}
-            >
-              <div className="absolute inset-0 flex items-center justify-center z-10">
-                <div className="bg-white/90 backdrop-blur-sm rounded-md px-4 py-2 border border-gray-200 hover:bg-white transition-colors">
-                  <p className="text-xs font-medium text-gray-700">Sign in to view full image</p>
+          {/* Image Preview (blurred/teaser) - use MultiImageGrid for single or multiple images */}
+          {(() => {
+            // Build images array: use image_urls if available, otherwise fall back to image_url
+            const images: MultiImage[] = [];
+            
+            if (mention.image_urls && Array.isArray(mention.image_urls) && mention.image_urls.length > 0) {
+              // Multiple images from image_urls array
+              images.push(...mention.image_urls.map(url => ({ url, alt: mention.description ?? undefined })));
+            } else if (mention.image_url) {
+              // Single image from image_url
+              images.push({ url: mention.image_url, alt: mention.description ?? undefined });
+            }
+            
+            if (images.length > 0) {
+              return (
+                <div 
+                  className="mb-4 relative cursor-pointer"
+                  onClick={openWelcome}
+                >
+                  <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                    <div className="bg-white/90 backdrop-blur-sm rounded-md px-4 py-2 border border-gray-200">
+                      <p className="text-xs font-medium text-gray-700">Sign in to view full images</p>
+                    </div>
+                  </div>
+                  <div className="opacity-30 blur-sm pointer-events-none">
+                    <MultiImageGrid
+                      images={images}
+                      postHref={`/mention/${mention.id}`}
+                      className="rounded-lg overflow-hidden"
+                    />
+                  </div>
                 </div>
-              </div>
-              <Image
-                src={mention.image_url}
-                alt=""
-                width={600}
-                height={400}
-                className="w-full h-auto opacity-30 blur-sm"
-                unoptimized={mention.image_url.includes('supabase.co')}
-              />
-            </div>
-          )}
+              );
+            }
+            return null;
+          })()}
 
           {/* Description Preview */}
           {previewDescription && (

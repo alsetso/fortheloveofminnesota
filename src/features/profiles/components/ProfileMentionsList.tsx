@@ -6,11 +6,61 @@ import { formatPinDate } from '@/types/profile';
 import type { ProfilePin } from '@/types/profile';
 import { EyeIcon, HeartIcon, MapPinIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import { getMapUrlWithPin } from '@/lib/maps/urls';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface ProfileMentionsListProps {
   pins: ProfilePin[];
   isOwnProfile?: boolean;
   onViewMap?: () => void;
+}
+
+function PinSkeleton({ onClick, isLast, hasImage }: { onClick?: () => void; isLast?: boolean; hasImage?: boolean }) {
+  return (
+    <div 
+      className="relative flex gap-3 pb-4 last:pb-0 cursor-pointer hover:bg-gray-50 transition-colors rounded-md p-2 -m-2"
+      onClick={onClick}
+    >
+      {/* Timeline Circle and Line */}
+      <div className="flex flex-col items-center flex-shrink-0">
+        <div className="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0 mt-1.5 animate-pulse" />
+        {!isLast && (
+          <div className="w-px h-full bg-gray-200 flex-1 min-h-[60px] mt-1" />
+        )}
+      </div>
+
+      {/* Content Skeleton */}
+      <div className="flex-1 min-w-0 space-y-2">
+        {/* Description skeleton */}
+        <div className="space-y-1.5">
+          <div className="h-3 w-full max-w-md bg-gray-200 rounded animate-pulse" />
+          <div className="h-3 w-3/4 max-w-sm bg-gray-200 rounded animate-pulse" />
+        </div>
+
+        {/* Image skeleton - only show if pin has an image */}
+        {hasImage && (
+          <div className="w-full max-w-xs h-48 bg-gray-200 rounded-md animate-pulse" />
+        )}
+
+        {/* Metadata skeleton */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+          <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+          <div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
+        </div>
+
+        {/* Timestamp skeleton */}
+        <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+
+        {/* Sign in prompt */}
+        <div className="pt-2">
+          <button className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline">
+            Sign in to view details
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function getViewOnMapHref(pin: ProfilePin): string {
@@ -23,9 +73,40 @@ function getViewOnMapHref(pin: ProfilePin): string {
 }
 
 export default function ProfileMentionsList({ pins, isOwnProfile = false, onViewMap }: ProfileMentionsListProps) {
+  const { account } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
+  const isAuthenticated = Boolean(account);
+  
   // Only show pins the profile account has posted: owner sees all, visitor sees only public
   const filteredPins = pins.filter(pin => isOwnProfile || pin.visibility === 'public');
   
+  // For non-authenticated visitors, show skeletons that prompt signup
+  if (!isAuthenticated && !isOwnProfile) {
+    if (filteredPins.length === 0) {
+      return (
+        <div className="p-6">
+          <p className="text-sm text-gray-500 text-center py-8">No mentions found</p>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <div className="p-6">
+          <div className="relative">
+            {filteredPins.map((pin, index) => (
+              <PinSkeleton 
+                key={pin.id} 
+                onClick={openWelcome} 
+                isLast={index === filteredPins.length - 1}
+                hasImage={Boolean(pin.image_url || pin.video_url)}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (filteredPins.length === 0) {
     return (
       <div className="p-6">

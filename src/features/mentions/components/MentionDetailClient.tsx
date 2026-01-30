@@ -11,6 +11,8 @@ import { usePageView } from '@/hooks/usePageView';
 import { useAuthStateSafe } from '@/features/auth';
 import LikeButton from '@/components/mentions/LikeButton';
 import { getMapUrlWithPin } from '@/lib/maps/urls';
+import { type MultiImage } from '@/components/shared/MultiImageGrid';
+import ImageOverlay from './ImageOverlay';
 
 interface MentionDetailClientProps {
   mention: {
@@ -20,6 +22,7 @@ interface MentionDetailClientProps {
     description: string | null;
     visibility: 'public' | 'only_me';
     image_url: string | null;
+    image_urls?: string[] | null;
     video_url: string | null;
     media_type: 'image' | 'video' | 'none' | null;
     full_address: string | null;
@@ -70,6 +73,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
   const [isLiked, setIsLiked] = useState(mention.is_liked || false);
   const [showMenu, setShowMenu] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -402,25 +406,84 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               />
             </div>
           )}
-          {mention.image_url && mention.media_type !== 'video' && (
-            <div className="mb-4 rounded-lg overflow-hidden border border-gray-200">
-              <Image
-                src={mention.image_url}
-                alt={mention.description ?? 'Mention'}
-                width={600}
-                height={400}
-                className="w-full h-auto"
-                unoptimized={mention.image_url.includes('supabase.co')}
-              />
+
+          {/* Description - moved above images */}
+          {mention.description && (
+            <div className="mb-4">
+              <p className="text-base font-semibold text-gray-900 leading-relaxed">{mention.description}</p>
             </div>
           )}
 
-          {/* Description */}
-          {mention.description && (
-            <div className="mb-4">
-              <p className="text-sm text-gray-900 leading-relaxed">{mention.description}</p>
-            </div>
-          )}
+          {/* Images - use MultiImageGrid for single or multiple images */}
+          {mention.media_type !== 'video' && (() => {
+            // Build images array: use image_urls if available, otherwise fall back to image_url
+            const images: MultiImage[] = [];
+            
+            if (mention.image_urls && Array.isArray(mention.image_urls) && mention.image_urls.length > 0) {
+              // Multiple images from image_urls array
+              images.push(...mention.image_urls.map(url => ({ url, alt: mention.description ?? undefined })));
+            } else if (mention.image_url) {
+              // Single image from image_url
+              images.push({ url: mention.image_url, alt: mention.description ?? undefined });
+            }
+            
+            if (images.length > 0) {
+              return (
+                <>
+                  <div className="mb-4">
+                    <div className="rounded-lg overflow-hidden">
+                      {images.length === 1 ? (
+                        <button
+                          onClick={() => setSelectedImageIndex(0)}
+                          className="block relative w-full aspect-[4/3] rounded-md overflow-hidden border border-gray-200 bg-gray-100 hover:opacity-90 transition-opacity cursor-pointer"
+                          aria-label="View full image"
+                        >
+                          <img 
+                            src={images[0].url} 
+                            alt={images[0].alt || 'Mention image'} 
+                            className="w-full h-full object-cover" 
+                          />
+                        </button>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {images.slice(0, 4).map((image, index) => (
+                            <button
+                              key={`${image.url}-${index}`}
+                              onClick={() => setSelectedImageIndex(index)}
+                              className="relative w-full aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-100 hover:opacity-90 transition-opacity cursor-pointer"
+                              aria-label={`View image ${index + 1}`}
+                            >
+                              <img 
+                                src={image.url} 
+                                alt={image.alt || `Mention image ${index + 1}`} 
+                                className="w-full h-full object-cover" 
+                              />
+                              {images.length > 4 && index === 3 && (
+                                <div className="absolute inset-0 bg-gray-900/60 flex items-center justify-center">
+                                  <div className="text-xs font-medium text-white">+{images.length - 3} more</div>
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Full-screen image overlay */}
+                  {selectedImageIndex !== null && (
+                    <ImageOverlay
+                      images={images}
+                      currentIndex={selectedImageIndex}
+                      onClose={() => setSelectedImageIndex(null)}
+                      onNavigate={(index) => setSelectedImageIndex(index)}
+                    />
+                  )}
+                </>
+              );
+            }
+            return null;
+          })()}
 
 
           {/* Location */}

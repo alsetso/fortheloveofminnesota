@@ -349,11 +349,11 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               />
             </div>
           )}
-          {mention.media_type === 'image' && mention.image_url && (
+          {mention.image_url && mention.media_type !== 'video' && (
             <div className="mb-4 rounded-lg overflow-hidden border border-gray-200">
               <Image
                 src={mention.image_url}
-                alt="Mention"
+                alt={mention.description ?? 'Mention'}
                 width={600}
                 height={400}
                 className="w-full h-auto"

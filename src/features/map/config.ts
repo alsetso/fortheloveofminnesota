@@ -105,6 +105,9 @@ export type LiveBoundaryLayerId = (typeof LIVE_BOUNDARY_ZOOM_LAYERS)[number]['la
 /** Zoom level at which pins can be dropped on live map (same as top of CTU range). */
 export const LIVE_ZOOM_FOR_PINS = 12;
 
+/** Max zoom at which pins are clustered; above this zoom individual pins show. Grouping is by data (radius/count), not zoom. */
+export const MENTIONS_CLUSTER_MAX_ZOOM = 18;
+
 /** Get the layer label for a zoom level when no boundary is selected (e.g. footer header). */
 export function getLiveLayerTitleByZoom(zoom: number | undefined): string {
   if (zoom === undefined) return 'Location';

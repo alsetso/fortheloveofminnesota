@@ -634,7 +634,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   const mainContent = (
     <div className={`relative w-full ${isLiveMap ? 'h-auto min-h-full' : 'h-full'}`} style={{ minHeight: 0, width: '100%' }}>
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50" style={{ height: isLiveMap ? '100vh' : '100%' }}>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50" style={{ height: isLiveMap ? '100dvh' : '100%' }}>
               <div className="text-center">
                 <div className="w-6 h-6 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                 <p className="text-xs text-gray-600">Loading map...</p>
@@ -643,7 +643,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
           )}
 
           {error && !loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 p-[10px] z-50" style={{ height: isLiveMap ? '100vh' : '100%' }}>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 p-[10px] z-50" style={{ height: isLiveMap ? '100dvh' : '100%' }}>
               <div className="bg-white border border-red-200 rounded-md p-[10px] max-w-md w-full">
                 <h2 className="text-sm font-semibold text-gray-900 mb-2">Access Denied</h2>
                 <p className="text-xs text-gray-600 mb-3">{error}</p>
@@ -659,7 +659,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
 
           {mapData && !loading && (
             <>
-              <div className={`relative ${isLiveMap ? 'h-screen' : 'h-full'} overflow-hidden`}>
+              <div className={`relative ${isLiveMap ? 'h-[100dvh]' : 'h-full'} overflow-hidden`}>
                 {/* View As Selector - Only show for owners */}
                 {isOwner && (
                   <div className="absolute top-4 right-4 z-40 pointer-events-none">
@@ -742,13 +742,11 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     }}
                     useDefaultAppearance={!mapData?.settings?.colors}
                     showCollaborationTools={!skipPageWrapper}
+                    showPins={!(isLiveMap && liveBoundaryLayer != null)}
                     allowPinsLoad={
                       !onLiveStatusChange ||
-                      liveBoundaryLayer == null ||
-                      (liveBoundaryLayer === 'state' && loadingStateBoundary === false) ||
-                      (liveBoundaryLayer === 'county' && loadingCountyBoundaries === false) ||
-                      (liveBoundaryLayer === 'district' && loadingCongressionalDistricts === false) ||
-                      (liveBoundaryLayer === 'ctu' && loadingCTUBoundaries === false)
+                      !isLiveMap ||
+                      liveBoundaryLayer == null
                     }
                     onMentionsLoadingChange={onLiveStatusChange ? setLoadingPins : undefined}
                     onBoundaryLayerLoadChange={onLiveStatusChange ? handleBoundaryLayerLoadChange : undefined}

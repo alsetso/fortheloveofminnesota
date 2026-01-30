@@ -3,8 +3,8 @@
 import { ReactNode } from 'react';
 
 /**
- * Full-viewport app wrapper that provides the map background container (100vw × 100vh).
- * Used on /live to render map content without the PageWrapper header/nav layout.
+ * Full-viewport app wrapper (100% × 100dvh). Used on /live for no-scroll app-like experience.
+ * 100dvh = dynamic viewport height (mobile address bar show/hide); 100% width avoids scrollbar overflow.
  */
 interface AppContainerProps {
   children: ReactNode;
@@ -13,8 +13,8 @@ interface AppContainerProps {
 export default function AppContainer({ children }: AppContainerProps) {
   return (
     <div
-      className="fixed inset-0 w-[100vw] h-[100vh] relative"
-      style={{ width: '100vw', height: '100vh' }}
+      className="fixed inset-0 w-full relative"
+      style={{ width: '100%', height: '100dvh' }}
       data-container="map-background"
       aria-label="Map background"
     >

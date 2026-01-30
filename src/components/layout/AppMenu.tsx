@@ -1022,7 +1022,7 @@ function AppMenuSubPageContent({
 
 /**
  * Full-height menu panel over the app container. Slides in from the left (open) and out to the left (close).
- * Max width 500px, 100vh, black background. Used on /live when user clicks the account image.
+ * Max width 500px, 100dvh, black background. Used on /live when user clicks the account image.
  */
 const SUBPAGE_TITLES: Record<AppMenuSubPage, string> = {
   profile: 'Your Profile',
@@ -1241,10 +1241,10 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
       <aside
         aria-hidden={!open}
         aria-label="App menu"
-        className={`fixed left-0 top-0 z-30 h-[100vh] w-full max-w-[500px] bg-black flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed left-0 top-0 z-30 w-full max-w-[500px] bg-black flex flex-col transition-transform duration-200 ease-out ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
-        style={{ height: '100vh' }}
+        style={{ height: '100dvh' }}
       >
         {/* Header: same size whether menu or sub-page */}
         <div className="flex-shrink-0 grid grid-cols-[1fr_auto_1fr] items-center gap-2 p-2 border-b border-white/10 min-h-[44px]">

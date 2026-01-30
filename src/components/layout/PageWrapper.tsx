@@ -829,7 +829,7 @@ export default function PageWrapper({
           className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex flex-col items-stretch"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className="backdrop-blur-lg rounded-t-2xl shadow-2xl border-t border-white/10 flex-shrink-0 min-h-0 py-0">
+          <div className="bg-[#F2F2F7] border-t border-gray-200 flex-shrink-0 min-h-0 py-0">
             <div className="flex items-center justify-around h-9 min-h-9 max-h-9">
                 {navItems.map((item) => {
                   // Hash-based items use currentHash state to avoid hydration mismatch

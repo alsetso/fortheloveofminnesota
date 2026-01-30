@@ -12,7 +12,7 @@ interface ProfileMentionsListProps {
 }
 
 export default function ProfileMentionsList({ pins, isOwnProfile = false, onViewMap }: ProfileMentionsListProps) {
-  // Filter pins based on visibility
+  // Only show pins the profile account has posted: owner sees all, visitor sees only public
   const filteredPins = pins.filter(pin => isOwnProfile || pin.visibility === 'public');
   
   if (filteredPins.length === 0) {

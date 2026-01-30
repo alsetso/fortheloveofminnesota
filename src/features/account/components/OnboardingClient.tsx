@@ -4,15 +4,16 @@ import { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEv
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
-import { AccountService, Account, useAuth, useAuthStateSafe } from '@/features/auth';
+import { AccountService, Account, useAuth, useAuthStateSafe, type AccountTrait } from '@/features/auth';
 import { ArrowRightIcon, ArrowLeftIcon, CheckCircleIcon, UserIcon, PhotoIcon, MapIcon, UserPlusIcon, ArrowUpTrayIcon, MagnifyingGlassIcon, ShareIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getPaidPlanBorderClasses } from '@/lib/billing/planHelpers';
 import type { OnboardingClientProps } from '../types';
 import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
+import { TRAIT_OPTIONS, type TraitId } from '@/types/profile';
 
-type OnboardingStep = 'welcome' | 'plans' | 'name' | 'maps' | 'profile' | 'location';
+type OnboardingStep = 'welcome' | 'plans' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'maps' | 'profile' | 'location';
 
 type PlanWithFeatures = BillingPlan & {
   features: (BillingFeature & {
@@ -58,6 +59,10 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     last_name: '',
     bio: '',
     city_id: '',
+    traits: [] as string[],
+    owns_business: null as boolean | null,
+    email: '',
+    phone: '',
   });
   const [citySearchQuery, setCitySearchQuery] = useState('');
   const [citySearchResults, setCitySearchResults] = useState<Array<{ id: string; name: string; ctu_class?: string }>>([]);
@@ -71,14 +76,18 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   const [onboardingPlans, setOnboardingPlans] = useState<PlanWithFeatures[]>([]);
   const [onboardingPlansLoading, setOnboardingPlansLoading] = useState(false);
 
-  const totalSteps = 5;
+  const totalSteps = 9;
   const stepIndexMap: Record<OnboardingStep, number> = {
     welcome: 0,
     plans: 1,
     name: 2,
-    maps: 3,
-    profile: 4,
-    location: 5,
+    bio: 3,
+    traits: 4,
+    owns_business: 5,
+    contact: 6,
+    maps: 7,
+    profile: 8,
+    location: 9,
   };
   const stepIndex = stepIndexMap[currentStep];
 
@@ -94,6 +103,10 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
         last_name: initialAccount.last_name || '',
         bio: initialAccount.bio || '',
         city_id: initialAccount.city_id || '',
+        traits: initialAccount.traits ?? [],
+        owns_business: initialAccount.owns_business ?? null,
+        email: initialAccount.email || '',
+        phone: initialAccount.phone || '',
       });
       // Fetch city name if city_id exists
       if (initialAccount.city_id) {
@@ -123,6 +136,10 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
             last_name: accountData.last_name || '',
             bio: accountData.bio || '',
             city_id: accountData.city_id || '',
+            traits: accountData.traits ?? [],
+            owns_business: accountData.owns_business ?? null,
+            email: accountData.email || '',
+            phone: accountData.phone || '',
           });
         }
       } catch (error) {
@@ -456,10 +473,16 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
     }
 
     try {
-      // Update account using AccountService (handles auth, validation, error handling)
-      // Ensure username is lowercase
+      // Update account with profile card details (username, name, bio, traits, contact)
       await AccountService.updateCurrentAccount({
         username: formData.username.trim().toLowerCase(),
+        first_name: formData.first_name || null,
+        last_name: formData.last_name || null,
+        bio: formData.bio || null,
+        traits: formData.traits.length > 0 ? (formData.traits as AccountTrait[]) : null,
+        owns_business: formData.owns_business,
+        email: formData.email?.trim() || null,
+        phone: formData.phone?.trim() || null,
       });
 
       // Set onboarded flag (use existing account.id if available, otherwise fetch)
@@ -536,21 +559,28 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
   };
 
   const handleFormChange = (field: keyof typeof formData, value: string | string[] | null) => {
+    if (field === 'traits') {
+      setFormData(prev => ({ ...prev, traits: Array.isArray(value) ? value : [] }));
+      return;
+    }
     let normalizedValue = Array.isArray(value) ? value[0] || '' : value || '';
-    
-    // Convert username to lowercase
     if (field === 'username') {
       normalizedValue = normalizedValue.toLowerCase();
     }
-    
-    setFormData(prev => ({
-      ...prev,
-      [field]: normalizedValue
-    }));
+    setFormData(prev => ({ ...prev, [field]: normalizedValue }));
     setError('');
     if (field === 'username') {
       setUsernameAvailable(null);
     }
+  };
+
+  const toggleTrait = (traitId: TraitId) => {
+    setFormData(prev => ({
+      ...prev,
+      traits: prev.traits.includes(traitId)
+        ? prev.traits.filter(t => t !== traitId)
+        : [...prev.traits, traitId],
+    }));
   };
 
   const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -699,7 +729,7 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
   };
 
   const handleNext = () => {
-    const stepOrder: OnboardingStep[] = ['welcome', 'plans', 'name', 'maps', 'profile'];
+    const stepOrder: OnboardingStep[] = ['welcome', 'plans', 'name', 'bio', 'traits', 'owns_business', 'contact', 'maps', 'profile'];
     const currentIndex = stepOrder.indexOf(currentStep);
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1]);
@@ -707,7 +737,7 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
   };
 
   const handleBack = () => {
-    const stepOrder: OnboardingStep[] = ['welcome', 'plans', 'name', 'maps', 'profile'];
+    const stepOrder: OnboardingStep[] = ['welcome', 'plans', 'name', 'bio', 'traits', 'owns_business', 'contact', 'maps', 'profile'];
     const currentIndex = stepOrder.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1]);
@@ -1096,6 +1126,125 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
         </div>
       )}
 
+      {currentStep === 'bio' && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-900">Bio</h2>
+          <p className="text-xs text-gray-600">A short bio helps others get to know you. Optional.</p>
+          <div>
+            <label htmlFor="onboarding-bio" className="block text-xs font-medium text-gray-500 mb-0.5">
+              About you
+            </label>
+            <textarea
+              id="onboarding-bio"
+              value={formData.bio}
+              onChange={(e) => handleFormChange('bio', e.target.value.slice(0, 240))}
+              className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-transparent resize-none"
+              placeholder="Tell other Minnesotans about yourself..."
+              rows={3}
+              maxLength={240}
+            />
+            <p className="text-[10px] text-gray-500 mt-1">{formData.bio.length}/240</p>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 'traits' && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-900">Traits</h2>
+          <p className="text-xs text-gray-600">Pick traits that describe you. Optional.</p>
+          <div className="flex flex-wrap gap-1 max-h-[280px] overflow-y-auto">
+            {TRAIT_OPTIONS.map((trait) => {
+              const isSelected = formData.traits.includes(trait.id);
+              return (
+                <button
+                  key={trait.id}
+                  type="button"
+                  onClick={() => toggleTrait(trait.id as TraitId)}
+                  className={`px-2 py-1 text-[10px] rounded border transition-colors ${
+                    isSelected
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {trait.label}
+                </button>
+              );
+            })}
+          </div>
+          {formData.traits.length > 0 && (
+            <p className="text-[10px] text-gray-500">{formData.traits.length} selected</p>
+          )}
+        </div>
+      )}
+
+      {currentStep === 'owns_business' && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-900">Do you own a business?</h2>
+          <p className="text-xs text-gray-600">Optional.</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, owns_business: true }))}
+              className={`flex-1 px-2 py-1.5 rounded border text-xs font-medium transition-colors ${
+                formData.owns_business === true
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData(prev => ({ ...prev, owns_business: false }))}
+              className={`flex-1 px-2 py-1.5 rounded border text-xs font-medium transition-colors ${
+                formData.owns_business === false
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              No
+            </button>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 'contact' && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-900">Contact information</h2>
+          <p className="text-xs text-gray-600">Phone and email from your account. Optional.</p>
+          <div className="space-y-2">
+            <div>
+              <label htmlFor="onboarding-email" className="block text-xs font-medium text-gray-500 mb-0.5">
+                Email
+              </label>
+              <input
+                id="onboarding-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleFormChange('email', e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-transparent"
+                placeholder="you@example.com"
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label htmlFor="onboarding-phone" className="block text-xs font-medium text-gray-500 mb-0.5">
+                Phone
+              </label>
+              <input
+                id="onboarding-phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleFormChange('phone', e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition-colors bg-transparent"
+                placeholder="+1 (555) 000-0000"
+                autoComplete="tel"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {currentStep === 'maps' && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-900">Live Map vs. Custom Maps</h2>
@@ -1300,6 +1449,7 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
             !account?.stripe_customer_id
           }
           plansStepButtonLabel={ensureCustomerLoading ? 'Setting up billing...' : 'Continue'}
+          traitsStepContinueDisabled={formData.traits.length === 0}
         />
       </div>
     </div>
@@ -1318,6 +1468,7 @@ function OnboardingFooter({
   profileFormId,
   plansStepContinueDisabled,
   plansStepButtonLabel,
+  traitsStepContinueDisabled,
 }: {
   currentStep: OnboardingStep;
   onNext: () => void;
@@ -1330,6 +1481,7 @@ function OnboardingFooter({
   profileFormId: string;
   plansStepContinueDisabled?: boolean;
   plansStepButtonLabel?: string;
+  traitsStepContinueDisabled?: boolean;
 }) {
   if (currentStep === 'welcome') {
     if (!isStreamingComplete) return null;
@@ -1383,7 +1535,8 @@ function OnboardingFooter({
     );
   }
 
-  if (currentStep === 'name' || currentStep === 'maps') {
+  if (currentStep === 'name' || currentStep === 'bio' || currentStep === 'traits' || currentStep === 'owns_business' || currentStep === 'contact' || currentStep === 'maps') {
+    const traitsBlocked = currentStep === 'traits' && (traitsStepContinueDisabled ?? false);
     return (
       <footer className="pt-2">
         <div className="flex items-center gap-2 justify-between">
@@ -1398,7 +1551,8 @@ function OnboardingFooter({
           <button
             type="button"
             onClick={onNext}
-            className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 transition-colors"
+            disabled={traitsBlocked}
+            className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Continue
             <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">

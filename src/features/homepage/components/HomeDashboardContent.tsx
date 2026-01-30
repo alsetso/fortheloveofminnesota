@@ -29,7 +29,10 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
     const fetchFeed = async () => {
       setFeedLoading(true);
       try {
-        const res = await fetch('/api/feed/pin-activity', { credentials: 'include' });
+        const res = await fetch(
+          `/api/feed/pin-activity?account_id=${encodeURIComponent(account.id)}`,
+          { credentials: 'include' }
+        );
         if (!res.ok) {
           setFeedMaps([]);
           setFeedActivity([]);

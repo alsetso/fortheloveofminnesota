@@ -148,6 +148,8 @@ interface MapIDBoxProps {
   isLiveMap?: boolean;
   /** When false (e.g. on /live until boundaries done), pins fetch is deferred. Omit/true = load pins when map ready. */
   allowPinsLoad?: boolean;
+  /** When false (e.g. on /live when a boundary layer is on), pins layer is hidden. Default true. */
+  showPins?: boolean;
   /** Called when mentions/pins layer loading state changes (e.g. for /live footer status). */
   onMentionsLoadingChange?: (loading: boolean) => void;
   /** Called when a boundary layer load starts/finishes (state, county, ctu). For Review accordion on /live. */
@@ -258,6 +260,7 @@ export default function MapIDBox({
   showCollaborationTools = true,
   isLiveMap = false,
   allowPinsLoad,
+  showPins = true,
   onMentionsLoadingChange,
   onBoundaryLayerLoadChange,
   onBoundarySelect,
@@ -1512,9 +1515,8 @@ export default function MapIDBox({
             />
           )}
           
-          {/* Mentions Layer - Render mentions as pins on map */}
-          {/* Always render for public maps, conditionally for private/shared maps */}
-          {mapLoaded && mapInstance && (visibility === 'public' || visibility === 'shared' || isOwner) && (
+          {/* Mentions Layer - Render mentions as pins on map when visible (hidden on /live when boundary layer on) */}
+          {mapLoaded && mapInstance && showPins && (visibility === 'public' || visibility === 'shared' || isOwner) && (
             <MentionsLayer 
               map={mapInstance} 
               mapLoaded={mapLoaded}

@@ -129,34 +129,38 @@ export default async function UsernamePage({ params }: Props) {
     .order('created_at', { ascending: false });
   const collections: Collection[] = (collectionsData || []) as Collection[];
 
-  const { data: liveMap } = await supabase
+  // Maps the profile account owns or is a member of (for profile pins: all pins this account posted on any of these maps)
+  const { data: ownedMaps } = await supabase
     .from('map')
     .select('id')
-    .eq('slug', 'live')
-    .eq('is_active', true)
-    .single();
-
-  if (!liveMap || typeof liveMap !== 'object' || !('id' in liveMap)) {
-    notFound();
-  }
-  const liveMapId = (liveMap as { id: string }).id;
-
-  const mentionsQuery = supabase
-    .from('map_pins')
-    .select(`
-      id, lat, lng, description, visibility, city_id, collection_id, mention_type_id,
-      image_url, video_url, media_type, view_count, created_at, updated_at,
-      collections (id, emoji, title),
-      mention_type:mention_types (id, emoji, name)
-    `)
-    .eq('map_id', liveMapId)
     .eq('account_id', accountData.id)
-    .eq('archived', false)
-    .eq('is_active', true)
-    .eq('visibility', 'public')
-    .order('created_at', { ascending: false });
+    .eq('is_active', true);
+  const { data: memberRows } = await supabase
+    .from('map_members')
+    .select('map_id')
+    .eq('account_id', accountData.id);
+  const ownedIds = (ownedMaps || []).map((m: { id: string }) => m.id);
+  const memberIds = (memberRows || []).map((m: { map_id: string }) => m.map_id);
+  const profileMapIds = Array.from(new Set([...ownedIds, ...memberIds]));
 
-  const { data: mentionsData } = await mentionsQuery;
+  let mentionsData: any[] | null = null;
+  if (profileMapIds.length > 0) {
+    const { data } = await supabase
+      .from('map_pins')
+      .select(`
+        id, lat, lng, description, visibility, city_id, collection_id, mention_type_id,
+        image_url, video_url, media_type, view_count, created_at, updated_at,
+        collections (id, emoji, title),
+        mention_type:mention_types (id, emoji, name)
+      `)
+      .eq('account_id', accountData.id)
+      .in('map_id', profileMapIds)
+      .eq('archived', false)
+      .eq('is_active', true)
+      .eq('visibility', 'public')
+      .order('created_at', { ascending: false });
+    mentionsData = data;
+  }
 
   const mentionIds = (mentionsData || []).map((m: any) => m.id);
   const likesCounts = new Map<string, number>();

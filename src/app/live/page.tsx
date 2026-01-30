@@ -13,7 +13,7 @@ import LiveMapFooterStatus, { type LiveMapFooterStatusState } from '@/components
 import LivePinCard, { type LivePinData } from '@/components/layout/LivePinCard';
 import MentionTypeInfoCard from '@/components/layout/MentionTypeInfoCard';
 import { useAuthStateSafe } from '@/features/auth';
-import { getLiveLayerLabel, getLiveLayerTitleByZoom, type LiveBoundaryLayerId } from '@/features/map/config';
+import { getLiveLayerLabel, type LiveBoundaryLayerId } from '@/features/map/config';
 import { preloadAll, resolveBoundaryByLayerId } from '@/features/map/services/liveBoundaryCache';
 import MapPage from '../map/[id]/page';
 
@@ -32,17 +32,14 @@ function LiveHeaderThemeSync({ children }: { children: ReactNode }) {
   );
 }
 
-function getFooterHeaderLabel(
-  selectedLocation: MapInfoLocation | null,
-  currentZoom: number | undefined
-): string {
+function getFooterHeaderLabel(selectedLocation: MapInfoLocation | null): string {
   const boundaryLayer = selectedLocation?.mapMeta?.boundaryLayer as LiveBoundaryLayerId | undefined;
   const boundaryName = selectedLocation?.mapMeta?.boundaryName as string | undefined;
   if (boundaryLayer && boundaryName) {
     const title = getLiveLayerLabel(boundaryLayer);
     return `${title}: ${boundaryName}`;
   }
-  return getLiveLayerTitleByZoom(currentZoom);
+  return 'Location';
 }
 
 /**
@@ -67,8 +64,8 @@ export default function LivePage() {
   const [footerOpen, setFooterOpen] = useState(false);
   /** Single boundary layer visible on live map; only one at a time. Toggled from main menu Live map section. */
   const [liveBoundaryLayer, setLiveBoundaryLayer] = useState<LiveBoundaryLayerId | null>(null);
-  /** Pin display grouping: when true (default) cluster pins; when false show all pins. */
-  const [pinDisplayGrouping, setPinDisplayGrouping] = useState(true);
+  /** Pin display grouping: when true cluster pins; when false (default) show all pins. */
+  const [pinDisplayGrouping, setPinDisplayGrouping] = useState(false);
   /** Show only current account's pins on the live map. */
   const [showOnlyMyPins, setShowOnlyMyPins] = useState(false);
   /** Time filter for pins on the live map: 24h, 7d, or null = all time. */
@@ -82,6 +79,16 @@ export default function LivePage() {
   // Start boundary fetches as soon as live page mounts so they run in parallel with map load
   useEffect(() => {
     preloadAll();
+  }, []);
+
+  // Lock viewport: no scroll, 100dvh/100vw app-like experience (desktop + mobile, any browser)
+  useEffect(() => {
+    document.documentElement.classList.add('live-map-page');
+    document.body.classList.add('live-map-page');
+    return () => {
+      document.documentElement.classList.remove('live-map-page');
+      document.body.classList.remove('live-map-page');
+    };
   }, []);
 
   const pinIdFromUrl = searchParams.get('pin');
@@ -270,8 +277,8 @@ export default function LivePage() {
     () =>
       pinIdFromUrl
         ? 'Pin'
-        : getFooterHeaderLabel(selectedLocation, liveStatus.currentZoom),
-    [pinIdFromUrl, selectedLocation, liveStatus.currentZoom]
+        : getFooterHeaderLabel(selectedLocation),
+    [pinIdFromUrl, selectedLocation]
   );
 
   const footerContent = useMemo(() => {

@@ -189,6 +189,12 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
               )}
               {timeAgo}
             </p>
+            <Link
+              href={`/mention/${pin.id}`}
+              className="inline-block text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline mt-1"
+            >
+              View More
+            </Link>
           </div>
         </div>
         <button

@@ -10,7 +10,6 @@ import { useToastContext } from '@/features/ui/contexts/ToastContext';
 import { createToast } from '@/features/ui/services/toast';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import type { MapData } from '@/types/map';
-import { ZOOM_SCALE_REFERENCE } from '@/features/map/config';
 
 /**
  * Click target priority order (highest to lowest):
@@ -27,7 +26,7 @@ import { ZOOM_SCALE_REFERENCE } from '@/features/map/config';
  * - Map click (empty): flyTo(center, zoom = max(current+2, 15)); set locationSelectPopup (lat/lng, no boundary).
  *   Live page clears layer/id from URL, shows MapInfo with coordinates.
  */
-type ClickTarget = 'pin' | 'area' | 'mention' | 'boundary' | 'map' | null;
+type ClickTarget = 'pin' | 'area' | 'mention' | 'cluster' | 'boundary' | 'map' | null;
 
 interface ClickResult {
   target: ClickTarget;
@@ -271,7 +270,7 @@ export function useUnifiedMapClickHandler({
       // Continue to next priority
     }
 
-    // Priority 3: Check for mentions (on live map)
+    // Priority 3: Check for mentions (individual pins on live map)
     const mentionLayers = ['map-mentions-point', 'map-mentions-point-label'];
     try {
       const existingMentionLayers = mentionLayers.filter(layerId => {
@@ -301,7 +300,39 @@ export function useUnifiedMapClickHandler({
       // Continue to next priority
     }
 
-    // Priority 4: Boundary layers (state, county, CTU) – layer’s handler sets footer; we skip so we don’t overwrite
+    // Priority 4: Check for cluster (group icon + count on live map)
+    const clusterLayers = ['map-mentions-cluster-circle', 'map-mentions-cluster-count'];
+    try {
+      const existingClusterLayers = clusterLayers.filter(layerId => {
+        try {
+          return mapboxMap.getLayer(layerId) !== undefined;
+        } catch {
+          return false;
+        }
+      });
+      if (existingClusterLayers.length > 0) {
+        const clusterFeatures = mapboxMap.queryRenderedFeatures(box, {
+          layers: existingClusterLayers,
+        });
+        if (clusterFeatures.length > 0) {
+          const feature = clusterFeatures[0];
+          const clusterId = feature.properties?.cluster_id;
+          const coordinates = feature.geometry?.coordinates?.slice() as [number, number] | undefined;
+          if (clusterId != null && coordinates) {
+            return {
+              target: 'cluster',
+              feature,
+              layerId: feature.layer?.id,
+              entityId: String(clusterId),
+            };
+          }
+        }
+      }
+    } catch {
+      // Continue to next priority
+    }
+
+    // Priority 5: Boundary layers (state, county, CTU) – layer’s handler sets footer; we skip so we don’t overwrite
     const boundaryLayers = ['state-boundary-fill', 'county-boundaries-fill', 'ctu-boundaries-fill'];
     try {
       const existingBoundaryLayers = boundaryLayers.filter((layerId) => {
@@ -327,7 +358,7 @@ export function useUnifiedMapClickHandler({
       // Continue to next priority
     }
 
-    // Priority 5: Map click (empty space)
+    // Priority 6: Map click (empty space)
     if (process.env.NODE_ENV === 'development') {
       console.debug('[UnifiedMapClickHandler] onclick: target=map (empty space)');
     }
@@ -476,6 +507,20 @@ export function useUnifiedMapClickHandler({
             onMentionClickRef.current(entityId);
           }
           return;
+
+        case 'cluster': {
+          // Fly to cluster at expansion zoom so pins render individually
+          if (!feature?.geometry?.coordinates || feature.properties?.cluster_id == null) break;
+          const coordinates = feature.geometry.coordinates.slice() as [number, number];
+          const source = mapboxMap.getSource('map-mentions') as { getClusterExpansionZoom?: (id: number) => Promise<number> } | undefined;
+          if (source?.getClusterExpansionZoom) {
+            e.originalEvent?.stopPropagation?.();
+            source.getClusterExpansionZoom(feature.properties.cluster_id).then((zoom: number) => {
+              mapboxMap.flyTo({ center: coordinates, zoom, duration: 400 });
+            }).catch(() => {});
+          }
+          return;
+        }
 
         case 'map': {
           // On live map, show red toast when clicking outside Minnesota
@@ -634,13 +679,7 @@ async function handleMapClickTarget({
     }
   }
 
-  // Don't show placemarker or open location popup until zoom >= 12 (pins load at 12px)
-  const zoom = typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 12;
-  if (zoom < ZOOM_SCALE_REFERENCE.CITY) {
-    return;
-  }
-
-  // Set click marker
+  // Set click marker and zoom in at any zoom level
   setClickMarker({ lat, lng });
 
   // Fly to location

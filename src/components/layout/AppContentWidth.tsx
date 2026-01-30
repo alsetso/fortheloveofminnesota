@@ -23,7 +23,7 @@ interface AppContentWidthProps {
 }
 
 /**
- * Overlay container (max-width 500px, 100vh) over the map.
+ * Overlay container (max-width 500px, 100dvh) over the map.
  * Holds: appHeader (account + search), map interaction area (pass-through), app footer (header at bottom + dynamic popup).
  * When #search, LiveSearch overlay covers everything below the header.
  */
@@ -39,8 +39,8 @@ export default function AppContentWidth({
 
   return (
     <div
-      className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-full max-w-[500px] h-[100vh] flex flex-col pointer-events-none z-10"
-      style={{ maxWidth: '500px', height: '100vh' }}
+      className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-full max-w-[500px] flex flex-col pointer-events-none z-10"
+      style={{ maxWidth: '500px', height: '100dvh' }}
       data-container="app-content-width"
       aria-label="App content width"
     >

@@ -16,7 +16,7 @@ import {
   buildMentionsIconLayout,
   mentionsLayerStyles,
 } from '@/features/map/config/layerStyles';
-import { ZOOM_SCALE_REFERENCE } from '@/features/map/config';
+import { MENTIONS_CLUSTER_MAX_ZOOM } from '@/features/map/config';
 import { moveMentionsLayersToTop } from '@/features/map/utils/layerOrder';
 
 interface MentionsLayerProps {
@@ -31,7 +31,7 @@ interface MentionsLayerProps {
   skipClickHandlers?: boolean;
   /** When false (e.g. on /live until boundaries are done), defer fetching pins until it becomes true. */
   startPinsLoad?: boolean;
-  /** When false, show all pins unclustered at every zoom. When true (default), cluster below pinsMinZoom. */
+  /** When false, show all pins unclustered. When true (default), cluster by data up to MENTIONS_CLUSTER_MAX_ZOOM. */
   clusterPins?: boolean;
   /** When true on /live, show only current account's pins. Default false. */
   showOnlyMyPins?: boolean;
@@ -54,8 +54,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   const pointLabelLayerId = 'map-mentions-point-label';
   const highlightLayerId = 'map-mentions-highlight';
   const highlightSourceId = 'map-mentions-highlight-source';
-  /** Show cluster groups below this zoom; show individual pins at this zoom and above */
-  const pinsMinZoom = ZOOM_SCALE_REFERENCE.CITY; // 12
+  /** Cluster by data (radius/count) up to this zoom; individual pins above. Not zoom-driven. */
+  const clusterMaxZoom = MENTIONS_CLUSTER_MAX_ZOOM;
   
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -578,7 +578,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               type: 'geojson',
               data: geoJSON,
               ...(clusterPins
-                ? { cluster: true, clusterMaxZoom: pinsMinZoom - 1, clusterRadius: 40 }
+                ? { cluster: true, clusterMaxZoom, clusterRadius: 40 }
                 : { cluster: false }),
             });
           } else {
@@ -594,7 +594,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         }
 
         if (clusterPins) {
-          // Cluster circle layer: pin groups visible at all zoom levels below pinsMinZoom
+          // Cluster circle layer: pin groups visible at all zoom levels below clusterMaxZoom
           try {
             if (!mapboxMap.getLayer(clusterCircleLayerId)) {
               mapboxMap.addLayer({
@@ -602,7 +602,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 type: 'circle',
                 source: sourceId,
                 filter: ['has', 'point_count'],
-                maxzoom: pinsMinZoom,
+                maxzoom: clusterMaxZoom,
                 paint: {
                   'circle-color': ['step', ['get', 'point_count'], '#93c5fd', 10, '#60a5fa', 30, '#3b82f6', 100, '#2563eb'],
                   'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 30, 22, 100, 26],
@@ -617,7 +617,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             }
           }
 
-          // Cluster count layer: count label on each group, visible below pinsMinZoom
+          // Cluster count layer: count label on each group, visible below clusterMaxZoom
           try {
             if (!mapboxMap.getLayer(clusterCountLayerId)) {
               mapboxMap.addLayer({
@@ -625,7 +625,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 type: 'symbol',
                 source: sourceId,
                 filter: ['has', 'point_count'],
-                maxzoom: pinsMinZoom,
+                maxzoom: clusterMaxZoom,
                 layout: {
                   'text-field': ['get', 'point_count_abbreviated'],
                   'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
@@ -931,7 +931,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               type: 'symbol',
               source: sourceId,
               filter: ['!', ['has', 'point_count']],
-              minzoom: clusterPins ? pinsMinZoom : 0,
+              minzoom: clusterPins ? clusterMaxZoom : 0,
               layout: {
                 ...iconLayout,
                 'icon-image': iconExpression,
@@ -959,7 +959,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               type: 'symbol',
               source: sourceId,
               filter: ['!', ['has', 'point_count']],
-              minzoom: clusterPins ? pinsMinZoom : 0,
+              minzoom: clusterPins ? clusterMaxZoom : 0,
               layout: buildMentionsLabelLayout(),
               paint: buildMentionsLabelPaint(),
             });
@@ -1032,7 +1032,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                     id: highlightLayerId,
                     type: 'circle',
                     source: highlightSourceId,
-                    minzoom: pinsMinZoom,
+                    minzoom: clusterMaxZoom,
                     paint: {
                       'circle-radius': [
                         'interpolate',

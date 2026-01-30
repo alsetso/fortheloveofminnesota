@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { UserIcon, MapPinIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { getMapUrl, getMapUrlWithPin } from '@/lib/maps/urls';
 import type { FeedMap, FeedPinActivity } from '@/app/api/feed/pin-activity/route';
+import { useAuthStateSafe } from '@/features/auth';
 import MentionTypeCards from './MentionTypeCards';
 
 function getRelativeTime(date: string): string {
@@ -27,6 +28,9 @@ interface PinActivityFeedProps {
 }
 
 export default function PinActivityFeed({ maps, activity, loading }: PinActivityFeedProps) {
+  const { account } = useAuthStateSafe();
+  const isAdmin = account?.role === 'admin';
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -68,7 +72,7 @@ export default function PinActivityFeed({ maps, activity, loading }: PinActivity
       </div>
 
       {/* What you can post - mention type cards */}
-      <MentionTypeCards />
+      <MentionTypeCards isAdmin={isAdmin} />
 
       {/* Map pins list */}
       <div className="space-y-2">
@@ -119,10 +123,11 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
   const displayName = item.account?.username ?? 'Someone';
   const relativeTime = getRelativeTime(item.created_at);
   const snippet = item.description ?? item.caption ?? item.emoji ?? null;
+  const hasVideo = !!(item.video_url || item.media_type === 'video');
 
   const handleCardClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('a')) return;
-    router.push(cardHref);
+    if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) return;
+    router.push(`/mention/${item.id}`);
   };
 
   return (
@@ -133,27 +138,29 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          if (!(e.target as HTMLElement).closest('a')) router.push(cardHref);
+          if (!(e.target as HTMLElement).closest('a') && !(e.target as HTMLElement).closest('button')) {
+            router.push(`/mention/${item.id}`);
+          }
         }
       }}
-      className="block bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors cursor-pointer"
+      className="block bg-white border border-gray-200 rounded-md p-3 hover:bg-gray-50 transition-colors cursor-pointer"
     >
-      <div className="flex gap-2">
+      <div className="flex gap-1.5">
         <div className="flex-shrink-0">
           {item.account?.image_url ? (
             <img
               src={item.account.image_url}
               alt=""
-              className="w-8 h-8 rounded-full object-cover"
+              className="w-7 h-7 rounded-full object-cover"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-              <UserIcon className="w-4 h-4 text-gray-500" />
+            <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center">
+              <UserIcon className="w-3 h-3 text-gray-500" />
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-xs text-gray-900">
+        <div className="min-w-0 flex-1 min-h-0 self-start">
+          <p className="text-xs text-gray-900 leading-tight">
             {item.account?.username ? (
               <Link
                 href={`/${encodeURIComponent(item.account.username)}`}
@@ -181,8 +188,34 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
             <span className="text-gray-500">{relativeTime}</span>
           </p>
           {snippet && (
-            <p className="text-xs text-gray-600 truncate">{snippet}</p>
+            <p className="text-xs text-gray-600 truncate mt-0.5 leading-tight">{snippet}</p>
           )}
+          {/* Row: mention type · video · View (no wrap) - below description */}
+          <div className="flex flex-nowrap items-baseline gap-x-1.5 mt-0.5 leading-none text-[10px] min-w-0">
+            {item.mention_type && (
+              <span className="text-gray-600 shrink-0">
+                <span>{item.mention_type.emoji}</span>
+                <span className="ml-0.5">{item.mention_type.name}</span>
+              </span>
+            )}
+            {item.mention_type && hasVideo && (
+              <span className="text-gray-300 shrink-0">·</span>
+            )}
+            {hasVideo && (
+              <span className="text-gray-600 shrink-0 whitespace-nowrap">+ video</span>
+            )}
+            {(item.mention_type || hasVideo) && (
+              <span className="text-gray-300 shrink-0">·</span>
+            )}
+            <Link
+              href={item.map && isLiveMap(item.map) ? `/live?pin=${encodeURIComponent(item.id)}` : cardHref}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 font-medium inline-flex items-center gap-0.5 whitespace-nowrap text-gray-600 hover:text-gray-900 transition-colors leading-none py-0"
+            >
+              <EyeIcon className="w-2.5 h-2.5" />
+              View on Map
+            </Link>
+          </div>
         </div>
       </div>
     </div>

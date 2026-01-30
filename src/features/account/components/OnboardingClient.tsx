@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import confetti from 'canvas-confetti';
@@ -10,8 +10,17 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getPaidPlanBorderClasses } from '@/lib/billing/planHelpers';
 import type { OnboardingClientProps } from '../types';
+import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
 
-type OnboardingStep = 'welcome' | 'name' | 'maps' | 'profile' | 'location';
+type OnboardingStep = 'welcome' | 'plans' | 'name' | 'maps' | 'profile' | 'location';
+
+type PlanWithFeatures = BillingPlan & {
+  features: (BillingFeature & {
+    isInherited: boolean;
+    limit_value?: number | null;
+    limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null;
+  })[];
+};
 
 export default function OnboardingClient({ initialAccount, redirectTo, onComplete, onWelcomeShown }: OnboardingClientProps) {
   const router = useRouter();
@@ -57,14 +66,19 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   const [selectedCityName, setSelectedCityName] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [usernameEditing, setUsernameEditing] = useState(false);
+  const [ensureCustomerLoading, setEnsureCustomerLoading] = useState(false);
+  const [ensureCustomerError, setEnsureCustomerError] = useState<string | null>(null);
+  const [onboardingPlans, setOnboardingPlans] = useState<PlanWithFeatures[]>([]);
+  const [onboardingPlansLoading, setOnboardingPlansLoading] = useState(false);
 
-  const totalSteps = 4;
+  const totalSteps = 5;
   const stepIndexMap: Record<OnboardingStep, number> = {
     welcome: 0,
-    name: 1,
-    maps: 2,
-    profile: 3,
-    location: 4,
+    plans: 1,
+    name: 2,
+    maps: 3,
+    profile: 4,
+    location: 5,
   };
   const stepIndex = stepIndexMap[currentStep];
 
@@ -227,6 +241,59 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
     if (currentStep !== 'profile') setUsernameEditing(false);
   }, [currentStep]);
 
+  const ensureBilling = useCallback(async () => {
+    if (!account?.id) return;
+    setEnsureCustomerError(null);
+    setEnsureCustomerLoading(true);
+    try {
+      const response = await fetch('/api/billing/ensure-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setEnsureCustomerError(data.error || 'Failed to set up billing');
+        return;
+      }
+      if (data.customerId && refreshAccount) {
+        await refreshAccount();
+        const updated = await AccountService.getCurrentAccount();
+        if (updated) setAccount(updated);
+      }
+    } catch (err) {
+      setEnsureCustomerError(err instanceof Error ? err.message : 'Failed to set up billing');
+    } finally {
+      setEnsureCustomerLoading(false);
+    }
+  }, [account?.id, refreshAccount]);
+
+  // Ensure Stripe customer when entering plans step (for billing setup)
+  useEffect(() => {
+    if (currentStep !== 'plans' || !account?.id) return;
+    if (account.stripe_customer_id) {
+      setEnsureCustomerError(null);
+      return;
+    }
+    ensureBilling();
+  }, [currentStep, account?.id, account?.stripe_customer_id, ensureBilling]);
+
+  // Fetch Hobby and Contributor plans for step two
+  useEffect(() => {
+    if (currentStep !== 'plans') return;
+    setOnboardingPlansLoading(true);
+    fetch('/api/billing/plans')
+      .then((res) => (res.ok ? res.json() : { plans: [] }))
+      .then((data: { plans?: PlanWithFeatures[] }) => {
+        const plans = data.plans || [];
+        const hobbyAndContributor = plans.filter(
+          (p) => p.slug?.toLowerCase() === 'hobby' || p.slug?.toLowerCase() === 'contributor'
+        );
+        setOnboardingPlans(hobbyAndContributor);
+      })
+      .catch(() => setOnboardingPlans([]))
+      .finally(() => setOnboardingPlansLoading(false));
+  }, [currentStep]);
+
   // Fuzzy search for cities/townships
   useEffect(() => {
     if (currentStep !== 'location') return;
@@ -352,8 +419,13 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
     return () => clearTimeout(timer);
   }, [formData.username]);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Only submit when user explicitly clicks the Complete button, not on Enter key
+    const submitEvent = e.nativeEvent as SubmitEvent;
+    if (submitEvent.submitter == null) {
+      return;
+    }
     setSaving(true);
     setError('');
 
@@ -427,15 +499,22 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
         setAccount(updatedAccount);
       }
 
-      // Mark onboarding as complete and show welcome screen
-      setOnboardingComplete(true);
-      setShowWelcome(true);
       setSaving(false);
-      
-      // Notify parent that welcome screen is shown
-      if (onWelcomeShown) {
-        onWelcomeShown();
+
+      // Go right to the homepage (skip welcome screen)
+      if (refreshAccount) {
+        await refreshAccount();
       }
+      const latestAccount = await AccountService.getCurrentAccount();
+      if (latestAccount) {
+        setAccount(latestAccount);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (onComplete) {
+        await onComplete();
+      }
+      router.push(redirectTo || '/');
+      router.refresh();
     } catch (error) {
       console.error('Error saving account:', error);
       
@@ -620,7 +699,7 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
   };
 
   const handleNext = () => {
-    const stepOrder: OnboardingStep[] = ['welcome', 'name', 'maps', 'profile'];
+    const stepOrder: OnboardingStep[] = ['welcome', 'plans', 'name', 'maps', 'profile'];
     const currentIndex = stepOrder.indexOf(currentStep);
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1]);
@@ -628,7 +707,7 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
   };
 
   const handleBack = () => {
-    const stepOrder: OnboardingStep[] = ['welcome', 'name', 'maps', 'profile'];
+    const stepOrder: OnboardingStep[] = ['welcome', 'plans', 'name', 'maps', 'profile'];
     const currentIndex = stepOrder.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1]);
@@ -866,6 +945,120 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
         </div>
       )}
 
+      {currentStep === 'plans' && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-gray-900">Review our plans and features</h2>
+          <p className="text-xs text-gray-600 leading-snug">
+            Hobby is free. Contributor unlocks custom maps, advanced analytics, and more. Upgrade anytime from your account.
+          </p>
+          {ensureCustomerLoading && (
+            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+              <span className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+              Setting up billing...
+            </p>
+          )}
+          {ensureCustomerError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700">
+              {ensureCustomerError}
+            </div>
+          )}
+          <p className="text-xs font-medium text-gray-700">
+            {account?.stripe_customer_id ? (
+              <span className="text-green-600">Billing is set up.</span>
+            ) : (
+              <span className="text-gray-500">
+                Billing is not set up.{' '}
+                <button
+                  type="button"
+                  onClick={ensureBilling}
+                  disabled={ensureCustomerLoading}
+                  className="text-[#007AFF] hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                >
+                  Setup billing
+                </button>
+              </span>
+            )}
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {onboardingPlansLoading ? (
+              <>
+                <div className="border border-gray-200 rounded-md p-2 bg-gray-50 animate-pulse h-24" />
+                <div className="border border-gray-200 rounded-md p-2 bg-gray-50 animate-pulse h-24" />
+              </>
+            ) : (
+              onboardingPlans.map((plan) => {
+                const priceDisplay =
+                  plan.price_monthly_cents === 0
+                    ? 'Free'
+                    : `$${(plan.price_monthly_cents / 100).toFixed(0)}/mo`;
+                const directFeatures = plan.features.filter((f) => !f.isInherited);
+                const isContributor = plan.slug?.toLowerCase() === 'contributor';
+                return (
+                  <div
+                    key={plan.id}
+                    className="border border-gray-200 rounded-md p-2 bg-white flex flex-col"
+                  >
+                    <h3 className="text-xs font-semibold text-gray-900">{plan.name}</h3>
+                    <p className="text-[10px] font-medium text-gray-700 mb-1">{priceDisplay}</p>
+                    {isContributor && (
+                      <div className="rounded border border-gray-200 p-1.5 bg-gray-50 flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-semibold text-gray-900">7 Day Free Trial</span>
+                        <span className="text-[10px] font-medium text-gray-600">Due today $0</span>
+                      </div>
+                    )}
+                    {plan.description && (
+                      <p className="text-[10px] text-gray-600 leading-snug mb-1 line-clamp-2">
+                        {plan.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-1 mt-auto">
+                      {directFeatures
+                        .filter((f) => !f.limit_type || f.limit_type === 'boolean')
+                        .slice(0, 4)
+                        .map((feature) => (
+                          <span
+                            key={feature.id}
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[10px] text-gray-700"
+                          >
+                            {feature.emoji && <span>{feature.emoji}</span>}
+                            {feature.name}
+                          </span>
+                        ))}
+                      {directFeatures
+                        .filter(
+                          (f) =>
+                            f.limit_type &&
+                            f.limit_type !== 'boolean'
+                        )
+                        .slice(0, 2)
+                        .map((feature) => {
+                          const label =
+                            feature.limit_type === 'unlimited'
+                              ? `Unlimited ${feature.name}`
+                              : feature.limit_type === 'count' && feature.limit_value != null
+                                ? `${feature.limit_value} ${feature.name}`
+                                : feature.limit_type === 'storage_mb' && feature.limit_value != null
+                                  ? `${feature.limit_value}MB ${feature.name}`
+                                  : feature.name;
+                          return (
+                            <span
+                              key={feature.id}
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-[10px] text-gray-700"
+                            >
+                              {feature.emoji && <span>{feature.emoji}</span>}
+                              {label}
+                            </span>
+                          );
+                        })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
       {currentStep === 'name' && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-900">Your name</h2>
@@ -1092,16 +1285,22 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
       {/* OnboardingFooter — fixed to bottom of viewport */}
       <div className="fixed bottom-0 left-0 right-0 z-40 w-full pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] bg-white border-t border-gray-200 px-4">
         <OnboardingFooter
-        currentStep={currentStep}
-        onNext={handleNext}
-        onBack={handleBack}
-        isStreamingComplete={isStreamingComplete}
-        showContinueButton={showContinueButton}
-        saving={saving}
-        usernameAvailable={usernameAvailable}
-        checkingUsername={checkingUsername}
-        profileFormId="onboarding-profile-form"
-      />
+          currentStep={currentStep}
+          onNext={handleNext}
+          onBack={handleBack}
+          isStreamingComplete={isStreamingComplete}
+          showContinueButton={showContinueButton}
+          saving={saving}
+          usernameAvailable={usernameAvailable}
+          checkingUsername={checkingUsername}
+          profileFormId="onboarding-profile-form"
+          plansStepContinueDisabled={
+            ensureCustomerLoading ||
+            !!ensureCustomerError ||
+            !account?.stripe_customer_id
+          }
+          plansStepButtonLabel={ensureCustomerLoading ? 'Setting up billing...' : 'Continue'}
+        />
       </div>
     </div>
   );
@@ -1117,6 +1316,8 @@ function OnboardingFooter({
   usernameAvailable,
   checkingUsername,
   profileFormId,
+  plansStepContinueDisabled,
+  plansStepButtonLabel,
 }: {
   currentStep: OnboardingStep;
   onNext: () => void;
@@ -1127,6 +1328,8 @@ function OnboardingFooter({
   usernameAvailable: boolean | null;
   checkingUsername: boolean;
   profileFormId: string;
+  plansStepContinueDisabled?: boolean;
+  plansStepButtonLabel?: string;
 }) {
   if (currentStep === 'welcome') {
     if (!isStreamingComplete) return null;
@@ -1139,6 +1342,37 @@ function OnboardingFooter({
             className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 transition-colors"
           >
             Continue
+            <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">
+              <span className="min-w-[6px] flex-shrink-0" />
+              <ArrowRightIcon className="w-3 h-3 flex-shrink-0" />
+            </span>
+          </button>
+        </div>
+      </footer>
+    );
+  }
+
+  if (currentStep === 'plans') {
+    const disabled = plansStepContinueDisabled ?? false;
+    const label = plansStepButtonLabel ?? 'Continue';
+    return (
+      <footer className="pt-2">
+        <div className="flex items-center gap-2 justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex justify-center items-center gap-1.5 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 transition-colors"
+          >
+            <ArrowLeftIcon className="w-3 h-3" />
+            Back
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            disabled={disabled}
+            className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {label}
             <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">
               <span className="min-w-[6px] flex-shrink-0" />
               <ArrowRightIcon className="w-3 h-3 flex-shrink-0" />
@@ -1192,6 +1426,7 @@ function OnboardingFooter({
           <button
             type="submit"
             form={profileFormId}
+            id="onboarding-complete-button"
             disabled={saving || usernameAvailable === false || checkingUsername}
             className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -1202,7 +1437,7 @@ function OnboardingFooter({
               </>
             ) : (
               <>
-                Save & Continue
+                Complete
                 <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">
                   <span className="min-w-[6px] flex-shrink-0" />
                   <ArrowRightIcon className="w-3 h-3 flex-shrink-0" />

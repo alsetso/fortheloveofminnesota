@@ -1127,12 +1127,11 @@ export default function MapIDBox({
         return;
       }
 
-      // Add layer (only visible at zoom 12+)
+      // Add layer (visible at all zoom levels so pins are clickable on live map)
       mapboxMap.addLayer({
         id: PINS_LAYER_ID,
         type: 'circle',
         source: PINS_SOURCE_ID,
-        minzoom: 12,
         paint: {
           'circle-radius': 8,
           'circle-color': '#ef4444',

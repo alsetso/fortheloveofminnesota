@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import PinActivityFeed from './PinActivityFeed';
+import MentionTypeCards from './MentionTypeCards';
 import HeroSection from '@/components/landing/HeroSection';
 import { useAuthStateSafe } from '@/features/auth';
 import type { FeedMap, FeedPinActivity } from '@/app/api/feed/pin-activity/route';
@@ -29,6 +30,7 @@ interface LiveMention {
 
 export default function HomeFeedContent() {
   const { account } = useAuthStateSafe();
+  const isAdmin = account?.role === 'admin';
   const [feedMaps, setFeedMaps] = useState<FeedMap[]>([]);
   const [feedActivity, setFeedActivity] = useState<FeedPinActivity[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
@@ -136,6 +138,8 @@ export default function HomeFeedContent() {
       <div className="max-w-md mx-auto space-y-3 px-4">
         {/* Show hero section for all users */}
         <HeroSection />
+        {/* What you can post section - shown above map pins */}
+        <MentionTypeCards isAdmin={isAdmin} />
         <PinActivityFeed 
           maps={feedMaps} 
           activity={feedActivity} 

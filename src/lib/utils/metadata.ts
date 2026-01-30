@@ -10,7 +10,7 @@ const BASE_METADATA = {
   locale: 'en_US' as const,
   type: 'website' as const,
   defaultImage: {
-    url: '/logo.png',
+    url: '/seo_share_public_image.png',
     width: 1200,
     height: 630,
     type: 'image/png' as const,
@@ -76,7 +76,7 @@ export function generateExploreMetadata(cityCount: number, countyCount: number):
       card: 'summary_large_image',
       title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN',
       description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities.`,
-      images: ['/logo.png'],
+      images: ['/seo_share_public_image.png'],
     },
     alternates: {
       canonical: `${BASE_URL}/explore`,
@@ -111,7 +111,7 @@ export function generateCitiesMetadata(cityCount: number): Metadata {
       card: 'summary_large_image',
       title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
       description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location.`,
-      images: ['/logo.png'],
+      images: ['/seo_share_public_image.png'],
     },
     alternates: {
       canonical: `${BASE_URL}/explore/cities`,
@@ -146,7 +146,7 @@ export function generateCountiesMetadata(countyCount: number): Metadata {
       card: 'summary_large_image',
       title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
       description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area.`,
-      images: ['/logo.png'],
+      images: ['/seo_share_public_image.png'],
     },
     alternates: {
       canonical: `${BASE_URL}/explore/counties`,

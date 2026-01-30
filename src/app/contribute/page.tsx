@@ -19,6 +19,16 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       url,
       siteName: 'For the Love of Minnesota',
+      images: [
+        {
+          url: '/seo_share_public_image.png',
+          width: 1200,
+          height: 630,
+          type: 'image/png',
+          alt: 'Contribute to For the Love of Minnesota',
+        },
+      ],
+      locale: 'en_US',
       type: 'website',
     },
     alternates: {

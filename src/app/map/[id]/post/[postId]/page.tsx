@@ -56,12 +56,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${accountName}'s Post - Love of Minnesota`,
       description: description.slice(0, 160),
+      images: [
+        {
+          url: '/seo_share_public_image.png',
+          width: 1200,
+          height: 630,
+          type: 'image/png',
+          alt: `${accountName}'s Post`,
+        },
+      ],
       type: 'website',
     },
     twitter: {
-      card: 'summary',
+      card: 'summary_large_image',
       title: `${accountName}'s Post - Love of Minnesota`,
       description: description.slice(0, 160),
+      images: ['/seo_share_public_image.png'],
     },
   };
 }

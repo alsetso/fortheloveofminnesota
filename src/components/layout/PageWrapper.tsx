@@ -22,16 +22,14 @@ import {
   MapIcon, 
   UsersIcon,
   UserCircleIcon,
-  SparklesIcon,
-  Cog6ToothIcon
+  SparklesIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
   MapIcon as MapIconSolid, 
   UsersIcon as UsersIconSolid,
   UserCircleIcon as UserCircleIconSolid,
-  SparklesIcon as SparklesIconSolid,
-  Cog6ToothIcon as Cog6ToothIconSolid
+  SparklesIcon as SparklesIconSolid
 } from '@heroicons/react/24/solid';
 
 /** @deprecated No longer used; account control links directly to /settings. Kept for backward compatibility. */
@@ -43,6 +41,10 @@ interface AccountDropdownProps {
 interface PageWrapperProps {
   children: ReactNode;
   headerContent?: ReactNode;
+  /** When set with headerTitle, mobile header shows Back link + centered title */
+  headerBackHref?: string;
+  /** Centered page title (used with headerBackHref on subpages) */
+  headerTitle?: string;
   searchComponent?: ReactNode;
   showAccountDropdown?: boolean;
   accountDropdownProps?: AccountDropdownProps;
@@ -120,6 +122,8 @@ const CONTENT_INSET_DESKTOP = '10px';
 export default function PageWrapper({ 
   children, 
   headerContent, 
+  headerBackHref,
+  headerTitle,
   searchComponent, 
   showAccountDropdown = true, 
   accountDropdownProps: _accountDropdownProps,
@@ -427,9 +431,6 @@ export default function PageWrapper({
       });
     }
 
-    // Settings: link to settings page
-    items.push({ label: 'Settings', href: '/settings', icon: Cog6ToothIcon, iconSolid: Cog6ToothIconSolid });
-
     return items;
   }, [isMapPage, mapIdOrSlug, account?.username]);
 
@@ -644,6 +645,40 @@ export default function PageWrapper({
           
             {/* Mobile Header Layout (Page name or back/onboarding, Maps Selector, Search, Header Content, Account) */}
             <div className="lg:hidden col-span-12 flex items-center justify-between gap-2 px-1">
+              {headerBackHref && headerTitle ? (
+                <>
+                  <Link
+                    href={headerBackHref}
+                    className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors flex-shrink-0`}
+                    aria-label="Go back"
+                  >
+                    <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
+                  </Link>
+                  <h1 className={`flex-1 text-center text-sm font-semibold truncate px-2 ${headerText}`}>
+                    {headerTitle}
+                  </h1>
+                  {showAccountDropdown && !isOnboardingPage ? (
+                    <Link
+                      href="/settings"
+                      className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm flex-shrink-0 ${
+                        isDefaultLightBg
+                          ? 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
+                          : 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
+                      }`}
+                      aria-label="Account settings"
+                    >
+                      {account ? (
+                        <ProfilePhoto account={account} size="sm" editable={false} />
+                      ) : (
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDefaultLightBg ? 'bg-gray-200' : 'bg-white/20'}`}>
+                          <UserIcon className={`w-3 h-3 ${isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white/90'}`} />
+                        </div>
+                      )}
+                    </Link>
+                  ) : <div className="w-8 flex-shrink-0" />}
+                </>
+              ) : (
+                <>
               <div className="flex items-center gap-2">
                 <div className="flex-shrink-0">
                   {isMapPage ? (
@@ -689,6 +724,8 @@ export default function PageWrapper({
                   </Link>
                 )}
               </div>
+                </>
+              )}
             </div>
             
             {/* 2nd Column: Nav Icons or Mention Type Filters (Aligns with center feed, max-width 800px) */}
@@ -862,8 +899,14 @@ export default function PageWrapper({
           className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex flex-col items-stretch"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className="bg-[#F2F2F7] border-t border-gray-200 flex-shrink-0 min-h-0 py-0">
-            <div className="flex items-center justify-around h-9 min-h-9 max-h-9">
+          <div 
+            className="border-t flex-shrink-0 min-h-0 pt-0 pb-[10px]"
+            style={{
+              ...backgroundStyle,
+              borderColor: isDefaultLightBg ? '#E5E7EB' : 'rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            <div className="flex items-center justify-around h-[50px] min-h-[50px] max-h-[50px]">
                 {navItems.map((item) => {
                   // Hash-based items use currentHash state to avoid hydration mismatch
                   const isActive = item.href?.startsWith('#')
@@ -877,9 +920,11 @@ export default function PageWrapper({
                       <button
                         key={item.label}
                         onClick={(item as any).onClick}
-                        className={`flex items-center justify-center flex-1 h-9 transition-colors ${headerHover} rounded-xl`}
+                        className="group flex items-center justify-center flex-1 h-full min-h-[50px] transition-colors rounded-xl"
                       >
-                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                        <span className={`rounded-full p-2 transition-colors ${isDefaultLightBg ? 'group-hover:bg-black/5' : 'group-hover:bg-white/10'}`}>
+                          <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                        </span>
                       </button>
                     );
                   }
@@ -888,9 +933,11 @@ export default function PageWrapper({
                     <Link
                       key={item.label}
                       href={item.href!}
-                      className={`flex items-center justify-center flex-1 h-9 transition-colors ${headerHover} rounded-xl`}
+                      className="group flex items-center justify-center flex-1 h-full min-h-[50px] transition-colors rounded-xl"
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                      <span className={`rounded-full p-2 transition-colors ${isDefaultLightBg ? 'group-hover:bg-black/5' : 'group-hover:bg-white/10'}`}>
+                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                      </span>
                     </Link>
                   );
                 })}

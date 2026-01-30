@@ -82,9 +82,16 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   const [mapId, setMapId] = useState<string | null>(null);
   useEffect(() => {
     params.then(({ id }) => {
+      // Redirect /map/live to /live (preserving query params)
+      if (id === 'live') {
+        const queryString = searchParams.toString();
+        const redirectUrl = queryString ? `/live?${queryString}` : '/live';
+        router.replace(redirectUrl);
+        return;
+      }
       setMapId(id);
     });
-  }, [params]);
+  }, [params, router, searchParams]);
 
   // Consolidated map page data (mapData, loading, error, viewCount, initialPins/Areas/Members)
   const {
@@ -99,6 +106,8 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   } = useMapPageData({ mapId });
 
   // Boundary layers state (consolidated)
+  // For custom maps, boundary layers come from mapData.settings.appearance.map_layers (source of truth)
+  // For live map, boundary layers can be overridden by liveBoundaryLayer prop
   const { showDistricts, showCTU, showStateBoundary, showCountyBoundaries } = useBoundaryLayers(mapData);
 
   // Other state
@@ -218,15 +227,20 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     membershipToastShownRef.current = false;
   }, [mapId]);
 
-  // Check if this is the live map
+  // Check if this is the live map (only when skipPageWrapper is true, meaning called from /live page)
   // Posts are only available on the live map, not custom maps
+  // IMPORTANT: For custom maps (skipPageWrapper = false), isLiveMap is always false
+  // This ensures custom maps always use their own settings from mapData.settings as the source of truth
   const isLiveMap = useMemo(() => {
+    // Only consider it live map if skipPageWrapper is true (called from /live page)
+    // Custom maps (skipPageWrapper = false) always return false to ensure independence
+    if (!skipPageWrapper) return false;
     if (!mapData && !mapId) return false;
     // Check both slug and mapId to handle cases where data might not be loaded yet
     const slugIsLive = mapData?.slug === 'live';
     const idIsLive = mapId === 'live';
     return slugIsLive || idIsLive;
-  }, [mapData?.slug, mapId]);
+  }, [skipPageWrapper, mapData?.slug, mapId]);
 
   // Check for pending membership requests
   useEffect(() => {
@@ -632,9 +646,9 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   }, [skipPageWrapper, mapData, mapId, loading, router]);
 
   const mainContent = (
-    <div className={`relative w-full ${isLiveMap ? 'h-auto min-h-full' : 'h-full'}`} style={{ minHeight: 0, width: '100%' }}>
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50" style={{ height: isLiveMap ? '100dvh' : '100%' }}>
+    <div className={`relative w-full ${skipPageWrapper ? 'h-auto min-h-full' : 'h-full'}`} style={{ minHeight: 0, width: '100%' }}>
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50" style={{ height: skipPageWrapper ? '100dvh' : '100%' }}>
               <div className="text-center">
                 <div className="w-6 h-6 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                 <p className="text-xs text-gray-600">Loading map...</p>
@@ -642,8 +656,8 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
             </div>
           )}
 
-          {error && !loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 p-[10px] z-50" style={{ height: isLiveMap ? '100dvh' : '100%' }}>
+      {error && !loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 p-[10px] z-50" style={{ height: skipPageWrapper ? '100dvh' : '100%' }}>
               <div className="bg-white border border-red-200 rounded-md p-[10px] max-w-md w-full">
                 <h2 className="text-sm font-semibold text-gray-900 mb-2">Access Denied</h2>
                 <p className="text-xs text-gray-600 mb-3">{error}</p>
@@ -659,7 +673,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
 
           {mapData && !loading && (
             <>
-              <div className={`relative ${isLiveMap ? 'h-[100dvh]' : 'h-full'} overflow-hidden`}>
+              <div className={`relative ${skipPageWrapper ? 'h-[100dvh]' : 'h-full'} overflow-hidden`}>
                 {/* View As Selector - Only show for owners */}
                 {isOwner && (
                   <div className="absolute top-4 right-4 z-40 pointer-events-none">
@@ -691,12 +705,13 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     mapId={mapData.id}
                     isOwner={effectiveIsOwner}
                     isLiveMap={isLiveMap}
-                    onLivePinSelect={onLivePinSelect}
-                    meta={isLiveMap ? undefined : mapData.settings?.appearance?.meta}
-                    showDistricts={isLiveMap && liveBoundaryLayer === 'district' ? true : showDistricts}
-                    showCTU={isLiveMap && liveBoundaryLayer === 'ctu' ? true : showCTU}
-                    showStateBoundary={isLiveMap && liveBoundaryLayer === 'state' ? true : showStateBoundary}
-                    showCountyBoundaries={isLiveMap && liveBoundaryLayer === 'county' ? true : showCountyBoundaries}
+                    onLivePinSelect={skipPageWrapper ? onLivePinSelect : undefined}
+                    // For custom maps, always use map's own settings. For live map, use liveBoundaryLayer override
+                    meta={skipPageWrapper ? undefined : mapData.settings?.appearance?.meta}
+                    showDistricts={skipPageWrapper && liveBoundaryLayer === 'district' ? true : showDistricts}
+                    showCTU={skipPageWrapper && liveBoundaryLayer === 'ctu' ? true : showCTU}
+                    showStateBoundary={skipPageWrapper && liveBoundaryLayer === 'state' ? true : showStateBoundary}
+                    showCountyBoundaries={skipPageWrapper && liveBoundaryLayer === 'county' ? true : showCountyBoundaries}
                     title={mapData.name}
                     description={mapData.description}
                     visibility={mapData.visibility}
@@ -742,11 +757,10 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     }}
                     useDefaultAppearance={!mapData?.settings?.colors}
                     showCollaborationTools={!skipPageWrapper}
-                    showPins={!(isLiveMap && liveBoundaryLayer != null)}
+                    // For custom maps, always show pins. For live map, hide when boundary layer is active
+                    showPins={skipPageWrapper && liveBoundaryLayer != null ? false : true}
                     allowPinsLoad={
-                      !onLiveStatusChange ||
-                      !isLiveMap ||
-                      liveBoundaryLayer == null
+                      skipPageWrapper && onLiveStatusChange && liveBoundaryLayer != null ? false : true
                     }
                     onMentionsLoadingChange={onLiveStatusChange ? setLoadingPins : undefined}
                     onBoundaryLayerLoadChange={onLiveStatusChange ? handleBoundaryLayerLoadChange : undefined}

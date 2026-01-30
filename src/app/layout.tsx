@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     siteName: 'For the Love of Minnesota',
     images: [
       {
-        url: '/logo.png',
+        url: '/seo_share_public_image.png',
         width: 1200,
         height: 630,
         type: 'image/png',
@@ -65,7 +65,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'For the Love of Minnesota',
     description: "For the Love of Minnesota connects residents, neighbors, and professionals across the state. Drop a pin to archive a special part of your life in Minnesota.",
-    images: ['/logo.png'],
+    images: ['/seo_share_public_image.png'],
     creator: '@fortheloveofmn',
   },
   alternates: {

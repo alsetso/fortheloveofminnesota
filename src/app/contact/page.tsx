@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     siteName: 'For the Love of Minnesota',
     images: [
       {
-        url: '/logo.png',
+        url: '/seo_share_public_image.png',
         width: 1200,
         height: 630,
         type: 'image/png',

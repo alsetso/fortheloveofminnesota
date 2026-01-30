@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreditCardIcon } from '@heroicons/react/24/outline';
+import { CreditCardIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import DraggableBottomSheet from '@/components/ui/DraggableBottomSheet';
 import BusinessSetupForm from '@/features/upgrade/components/BusinessSetupForm';
 import GovernmentSetupForm from '@/features/upgrade/components/GovernmentSetupForm';
@@ -90,6 +91,17 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
     <div className="h-full overflow-y-auto scrollbar-hide">
       <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-3">
+          <div className="bg-white border border-gray-200 rounded-md p-[10px] flex flex-col gap-1.5">
+            <p className="text-xs text-gray-600">Signed in as {userEmail || '—'}</p>
+            {account.username && (
+              <Link
+                href={`/${encodeURIComponent(account.username)}`}
+                className="text-xs font-medium text-gray-900 hover:underline"
+              >
+                View profile →
+              </Link>
+            )}
+          </div>
           <AccountSettingsForm
             initialAccount={account}
             userEmail={userEmail}
@@ -221,25 +233,27 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
 
       {/* Sign Out Confirmation Modal */}
       {showSignOutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signout-title"
+          onKeyDown={(e) => e.key === 'Escape' && handleSignOutCancel()}
+        >
           <div className="bg-white rounded-md border border-gray-200 w-full max-w-md mx-4">
             <div className="p-[10px]">
               <div className="flex items-center mb-3">
                 <div className="flex-shrink-0 w-8 h-8 mx-auto bg-red-100 rounded-md flex items-center justify-center">
-                  <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
+                  <ArrowRightOnRectangleIcon className="w-4 h-4 text-red-600" aria-hidden />
                 </div>
               </div>
-              
               <div className="text-center">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1.5">
+                <h3 id="signout-title" className="text-sm font-semibold text-gray-900 mb-1.5">
                   Sign out of your account?
                 </h3>
                 <p className="text-xs text-gray-600 mb-3">
                   You&apos;ll need to sign in again to access your account.
                 </p>
-                
                 <div className="flex gap-2">
                   <button
                     onClick={handleSignOutCancel}

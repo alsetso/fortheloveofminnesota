@@ -16,6 +16,7 @@ import { useAuthStateSafe } from '@/features/auth';
 import { getLiveLayerLabel, type LiveBoundaryLayerId } from '@/features/map/config';
 import { preloadAll, resolveBoundaryByLayerId } from '@/features/map/services/liveBoundaryCache';
 import MapPage from '../map/[id]/page';
+import { generateUUID } from '@/lib/utils/uuid';
 
 function LiveHeaderThemeSync({ children }: { children: ReactNode }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -75,6 +76,41 @@ export default function LivePage() {
     mapLoaded: false,
     loadingPins: false,
   });
+
+  // Track page view for analytics
+  useEffect(() => {
+    // Record view for live map - fetch map data using 'live' slug
+    let sessionId: string | null = null;
+    if (typeof window !== 'undefined') {
+      sessionId = localStorage.getItem('analytics_device_id') || generateUUID();
+      if (!localStorage.getItem('analytics_device_id')) {
+        localStorage.setItem('analytics_device_id', sessionId);
+      }
+    }
+
+    // Fetch live map data to get the map ID, then record view
+    fetch('/api/maps/live')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.id) {
+          fetch('/api/analytics/map-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              map_id: data.id,
+              referrer_url: typeof window !== 'undefined' ? document.referrer || null : null,
+              session_id: sessionId,
+              user_agent: typeof window !== 'undefined' ? navigator.userAgent : null,
+            }),
+          }).catch(() => {
+            // Silently fail - view recording is not critical
+          });
+        }
+      })
+      .catch(() => {
+        // Silently fail if live map lookup fails
+      });
+  }, []);
 
   // Start boundary fetches as soon as live page mounts so they run in parallel with map load
   useEffect(() => {

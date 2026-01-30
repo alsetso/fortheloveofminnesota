@@ -125,9 +125,26 @@ export function BillingEntitlementsProvider({ children }: { children: React.Reac
     // Use activeAccountId if available, fallback to account.id
     const targetAccountId = activeAccountId || account?.id;
     
-    if (!user || !targetAccountId) {
+    if (!user) {
       setAccountId(null);
       setFeatures([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+    // Auth not yet hydrated (account/activeAccountId still null) — keep server initialData if present
+    if (!targetAccountId) {
+      if (initialData?.accountId && initialData?.features?.length) {
+        setAccountId(initialData.accountId);
+        setFeatures(initialData.features);
+        featuresCache.current.set(initialData.accountId, {
+          features: initialData.features,
+          timestamp: Date.now(),
+        });
+      } else {
+        setAccountId(null);
+        setFeatures([]);
+      }
       setError(null);
       setIsLoading(false);
       return;

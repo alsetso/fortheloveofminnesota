@@ -24,7 +24,7 @@ export default function LandingPage() {
   };
 
   const handleExploreMap = () => {
-    router.push('/map/live');
+    router.push('/map/live'); // Live map uses slug 'live'
   };
 
   const handleProfileClick = () => {

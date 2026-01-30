@@ -62,9 +62,11 @@ interface PinActivityFeedProps {
   loading?: boolean;
   /** When false, hide "What you can post" section (e.g. on /username dashboard). Default true. */
   showWhatYouCanPost?: boolean;
+  /** When false, hide "Personal Collections" section (e.g. on homepage). Default true. */
+  showPersonalCollections?: boolean;
 }
 
-export default function PinActivityFeed({ maps, activity, loading, showWhatYouCanPost = true }: PinActivityFeedProps) {
+export default function PinActivityFeed({ maps, activity, loading, showWhatYouCanPost = true, showPersonalCollections = true }: PinActivityFeedProps) {
   const { account } = useAuthStateSafe();
   const isAdmin = account?.role === 'admin';
   const { success, error: showError } = useToast();
@@ -168,6 +170,7 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
       {showWhatYouCanPost && <MentionTypeCards isAdmin={isAdmin} />}
 
       {/* Personal Collections */}
+      {showPersonalCollections && (
       <div className="space-y-2">
         <SectionHeaderWithAdd title="Personal Collections" onAddClick={openCreateModal} />
         {collectionsLoading ? (
@@ -208,6 +211,7 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
           </div>
         )}
       </div>
+      )}
 
       {/* Create collection modal — portaled to body, above page wrapper and mobile nav */}
       {createModalOpen &&

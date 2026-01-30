@@ -58,14 +58,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${accountName}'s Mention - Love of Minnesota`,
       description: description.slice(0, 160),
-      images: mentionData.image_url ? [mentionData.image_url] : [],
+      images: mentionData.image_url ? [mentionData.image_url] : ['/seo_share_public_image.png'],
       type: 'website',
     },
     twitter: {
       card: 'summary_large_image',
       title: `${accountName}'s Mention - Love of Minnesota`,
       description: description.slice(0, 160),
-      images: mentionData.image_url ? [mentionData.image_url] : [],
+      images: mentionData.image_url ? [mentionData.image_url] : ['/seo_share_public_image.png'],
     },
   };
 }

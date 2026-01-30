@@ -34,7 +34,7 @@ export default function HomeFeedContent() {
 
   return (
     <div className="max-w-md mx-auto space-y-3">
-      <PinActivityFeed maps={feedMaps} activity={feedActivity} loading={feedLoading} />
+      <PinActivityFeed maps={feedMaps} activity={feedActivity} loading={feedLoading} showPersonalCollections={false} />
     </div>
   );
 }

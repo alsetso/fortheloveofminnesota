@@ -184,9 +184,6 @@ export async function middleware(req: NextRequest) {
   if (pathname === '/maps' || pathname === '/plan' || pathname === '/plans' || pathname === '/billing') {
     return NextResponse.redirect(new URL('/live', req.url));
   }
-  if (pathname.startsWith('/map/') && pathname !== '/map') {
-    return NextResponse.redirect(new URL('/live', req.url));
-  }
   // Profile pages removed — canonical URL is /:username; redirect /profile and /profile/* to /:username or /
   if (pathname === '/profile') {
     return NextResponse.redirect(new URL('/', req.url));

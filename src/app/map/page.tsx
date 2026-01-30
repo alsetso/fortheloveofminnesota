@@ -1,4 +1,6 @@
+import { redirect } from 'next/navigation';
+
 export default function MapPage() {
-  return null;
+  redirect('/map/live');
 }
 

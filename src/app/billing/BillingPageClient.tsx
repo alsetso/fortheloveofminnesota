@@ -239,7 +239,8 @@ export default function BillingPageClient({ initialPlans, initialSelectedPlan, i
             
             {/* Plans Comparison Table */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Compare Plans</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Compare Plans</h2>
+              <p className="text-xs text-gray-500 mb-4">May take 24 hours for your account to reflect upgrades.</p>
               <PlansKanbanView 
                 onViewDetails={handleViewDetails} 
                 currentPlanSlug={account?.plan}

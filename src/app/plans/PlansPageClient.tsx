@@ -37,7 +37,8 @@ export default function PlansPageClient({ initialPlans }: PlansPageClientProps) 
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <h1 className="text-xl font-bold text-gray-900 mb-6">Compare Plans</h1>
+      <h1 className="text-xl font-bold text-gray-900 mb-1">Compare Plans</h1>
+      <p className="text-xs text-gray-500 mb-6">May take 24 hours for your account to reflect upgrades.</p>
       <PlansKanbanView 
         onViewDetails={handleViewDetails} 
         currentPlanSlug={account?.plan}

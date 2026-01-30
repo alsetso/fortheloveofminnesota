@@ -109,11 +109,6 @@ export default async function MentionPage({ params }: Props) {
         id,
         emoji,
         name
-      ),
-      collection:collections (
-        id,
-        emoji,
-        title
       )
     `)
     .eq('id', id)
@@ -149,20 +144,9 @@ export default async function MentionPage({ params }: Props) {
     delete mentionData.mention_types;
   }
   
-  // Transform collection relationship (Supabase returns it as an object when using alias)
-  // Since we're using collection:collections(...), it should already be an object, not an array
-  if (mentionData.collection && Array.isArray(mentionData.collection)) {
-    // If it's an array (legacy format), take the first item
-    mentionData.collection = mentionData.collection.length > 0 ? mentionData.collection[0] : null;
-  } else if (!mentionData.collection) {
-    // If collection is missing, set it to null
-    mentionData.collection = null;
-  }
-  
-  // Clean up any legacy collections array if it exists
-  if (mentionData.collections) {
-    delete mentionData.collections;
-  }
+  // Collection data is not fetched due to RLS restrictions for anonymous users
+  // Set collection to null - it can be fetched separately if needed
+  mentionData.collection = null;
 
   // Transform map relationship
   if (mentionData.map && Array.isArray(mentionData.map)) {

@@ -5,7 +5,6 @@ import PageWrapper from '@/components/layout/PageWrapper';
 import MapSearchInput from '@/components/layout/MapSearchInput';
 import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import LandingPage from '@/components/landing/LandingPage';
 import { useAuthStateSafe } from '@/features/auth';
 import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
 import HomePageLayout from './HomePageLayout';
@@ -17,10 +16,6 @@ export default function Home() {
   const { closeSidebar: closeLeftSidebar } = useUnifiedSidebar();
   const leftSidebarConfigs = useMemo(() => [], []);
   const rightSidebarConfigs = useMemo(() => [], []);
-
-  if (!authAccount) {
-    return <LandingPage />;
-  }
 
   return (
     <PageWrapper

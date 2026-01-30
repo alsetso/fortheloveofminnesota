@@ -81,9 +81,24 @@ export async function GET(request: NextRequest) {
         return createErrorResponse('Failed to fetch member maps', 500);
       }
 
+      // Always include live map for authenticated users
+      const { data: liveMap } = await supabase
+        .from('map')
+        .select('id, name, slug')
+        .eq('slug', 'live')
+        .eq('is_active', true)
+        .maybeSingle();
+
       const ownedIds = (ownedMaps || []).map((m: { id: string }) => m.id);
       const memberIds = (memberRows || []).map((m: { map_id: string }) => m.map_id);
-      const mapIds = Array.from(new Set([...ownedIds, ...memberIds]));
+      const liveMapId = liveMap && typeof liveMap === 'object' && 'id' in liveMap ? (liveMap as { id: string }).id : null;
+      
+      // Combine all map IDs (owned + member + live)
+      const allMapIds = new Set([...ownedIds, ...memberIds]);
+      if (liveMapId) {
+        allMapIds.add(liveMapId);
+      }
+      const mapIds = Array.from(allMapIds);
 
       if (mapIds.length === 0) {
         return createSuccessResponse({
@@ -104,11 +119,29 @@ export async function GET(request: NextRequest) {
         return createErrorResponse('Failed to fetch maps list', 500);
       }
 
-      const maps: FeedMap[] = (mapsData || []).map((m: { id: string; name: string; slug: string | null }) => ({
-        id: m.id,
-        name: m.name ?? '',
-        slug: m.slug ?? null,
-      }));
+      // Build maps list, ensuring live map is included
+      const mapsMap = new Map<string, FeedMap>();
+      (mapsData || []).forEach((m: { id: string; name: string; slug: string | null }) => {
+        mapsMap.set(m.id, {
+          id: m.id,
+          name: m.name ?? '',
+          slug: m.slug ?? null,
+        });
+      });
+      
+      // Ensure live map is in the list
+      if (liveMap && typeof liveMap === 'object' && 'id' in liveMap) {
+        const typedLiveMap = liveMap as { id: string; name: string | null; slug: string | null };
+        mapsMap.set(typedLiveMap.id, {
+          id: typedLiveMap.id,
+          name: typedLiveMap.name ?? 'Live Map',
+          slug: typedLiveMap.slug ?? 'live',
+        });
+      }
+      
+      const maps: FeedMap[] = Array.from(mapsMap.values()).sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
 
       // Optional: filter pins to a specific account (only allowed for the logged-in account)
       const { searchParams } = new URL(request.url);

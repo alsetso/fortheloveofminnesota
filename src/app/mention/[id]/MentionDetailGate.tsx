@@ -3,6 +3,7 @@
 import SignInGate from '@/components/auth/SignInGate';
 import { MapPinIcon, HeartIcon, UserPlusIcon, EyeIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface MentionDetailGateProps {
   mention: {
@@ -22,9 +23,12 @@ interface MentionDetailGateProps {
 }
 
 export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
+  const { openWelcome } = useAppModalContextSafe();
   const accountName = mention.accounts?.first_name || mention.accounts?.username || 'Someone';
+  
+  // Truncate description to 10 characters with "..."
   const previewDescription = mention.description 
-    ? (mention.description.length > 150 ? `${mention.description.slice(0, 150)}...` : mention.description)
+    ? (mention.description.length > 10 ? `${mention.description.slice(0, 10)}...` : mention.description)
     : null;
 
   return (
@@ -70,9 +74,12 @@ export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
 
           {/* Image Preview (blurred/teaser) */}
           {mention.image_url && (
-            <div className="mb-4 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 relative">
+            <div 
+              className="mb-4 rounded-lg overflow-hidden border border-gray-200 bg-gray-100 relative cursor-pointer"
+              onClick={openWelcome}
+            >
               <div className="absolute inset-0 flex items-center justify-center z-10">
-                <div className="bg-white/90 backdrop-blur-sm rounded-md px-4 py-2 border border-gray-200">
+                <div className="bg-white/90 backdrop-blur-sm rounded-md px-4 py-2 border border-gray-200 hover:bg-white transition-colors">
                   <p className="text-xs font-medium text-gray-700">Sign in to view full image</p>
                 </div>
               </div>
@@ -91,8 +98,13 @@ export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
           {previewDescription && (
             <div className="mb-4">
               <p className="text-sm text-gray-900 leading-relaxed">{previewDescription}</p>
-              {mention.description && mention.description.length > 150 && (
-                <p className="text-xs text-gray-500 mt-2">Sign in to read more...</p>
+              {mention.description && mention.description.length > 10 && (
+                <button
+                  onClick={openWelcome}
+                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline mt-2 font-medium"
+                >
+                  Sign in to read more...
+                </button>
               )}
             </div>
           )}

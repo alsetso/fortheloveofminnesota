@@ -71,7 +71,7 @@ const getCachedLiveMentions = cache(async () => {
       created_at,
       updated_at,
       view_count,
-      accounts!inner(
+      accounts(
         image_url
       ),
       mention_type:mention_types(

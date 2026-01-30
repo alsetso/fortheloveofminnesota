@@ -13,6 +13,7 @@ import LikeButton from '@/components/mentions/LikeButton';
 import { getMapUrlWithPin } from '@/lib/maps/urls';
 import { type MultiImage } from '@/components/shared/MultiImageGrid';
 import ImageOverlay from './ImageOverlay';
+import { mentionTypeNameToSlug } from '../utils/mentionTypeHelpers';
 
 interface MentionDetailClientProps {
   mention: {
@@ -368,10 +369,13 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               {/* Labels: Mention Type and Collection */}
               <div className="flex items-center gap-2">
                 {mention.mention_type && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200">
+                  <Link
+                    href={`/live?type=${encodeURIComponent(mentionTypeNameToSlug(mention.mention_type.name))}`}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
+                  >
                     <span className="text-sm">{mention.mention_type.emoji}</span>
                     <span className="text-xs font-medium text-gray-700">{mention.mention_type.name}</span>
-                  </div>
+                  </Link>
                 )}
                 {mention.collection && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200">

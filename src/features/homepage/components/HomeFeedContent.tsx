@@ -134,8 +134,8 @@ export default function HomeFeedContent() {
     <div className="w-full">
       {/* Main Content - Centered */}
       <div className="max-w-md mx-auto space-y-3 px-4">
-        {/* Show hero section only when logged out */}
-        {!account && <HeroSection />}
+        {/* Show hero section for all users */}
+        <HeroSection />
         <PinActivityFeed 
           maps={feedMaps} 
           activity={feedActivity} 

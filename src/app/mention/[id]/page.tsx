@@ -94,8 +94,6 @@ export default async function MentionPage({ params }: Props) {
       created_at,
       updated_at,
       post_date,
-      city_id,
-      county_id,
       tagged_account_ids,
       map_meta,
       account_id,
@@ -180,32 +178,6 @@ export default async function MentionPage({ params }: Props) {
     if (tagged_accounts.length === 0) tagged_accounts = null;
   }
   mentionData.tagged_accounts = tagged_accounts;
-
-  // Resolve city and county names
-  let cityName: string | null = null;
-  let countyName: string | null = null;
-  if (mentionData.city_id) {
-    const { data: cityData } = await supabase
-      .from('cities')
-      .select('name')
-      .eq('id', mentionData.city_id)
-      .maybeSingle();
-    cityName = cityData && typeof cityData === 'object' && 'name' in cityData 
-      ? (cityData as { name: string }).name 
-      : null;
-  }
-  if (mentionData.county_id) {
-    const { data: countyData } = await supabase
-      .from('counties')
-      .select('name')
-      .eq('id', mentionData.county_id)
-      .maybeSingle();
-    countyName = countyData && typeof countyData === 'object' && 'name' in countyData
-      ? (countyData as { name: string }).name
-      : null;
-  }
-  mentionData.city_name = cityName;
-  mentionData.county_name = countyName;
   
   // Debug: Log the transformed data
   if (process.env.NODE_ENV === 'development') {
@@ -216,8 +188,6 @@ export default async function MentionPage({ params }: Props) {
       has_mention_type: !!mentionData.mention_type,
       has_collection: !!mentionData.collection,
       tagged_accounts: mentionData.tagged_accounts?.length || 0,
-      city_name: mentionData.city_name,
-      county_name: mentionData.county_name,
     });
   }
 

@@ -29,8 +29,6 @@ interface MentionDetailClientProps {
     created_at: string;
     updated_at: string;
     post_date?: string | null;
-    city_name?: string | null;
-    county_name?: string | null;
     map_meta?: Record<string, any> | null;
     tagged_accounts?: { id: string; username: string | null }[] | null;
     account_id: string | null;
@@ -431,18 +429,6 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               <div className="flex items-start gap-2 text-xs text-gray-600">
                 <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                 <span>{mention.full_address}</span>
-              </div>
-            )}
-            
-            {/* City/County */}
-            {(mention.city_name || mention.county_name) && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span>
-                  {mention.city_name && mention.county_name
-                    ? `${mention.city_name}, ${mention.county_name}`
-                    : mention.city_name || mention.county_name}
-                </span>
               </div>
             )}
             

@@ -116,11 +116,6 @@ export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
               <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
               <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
             </div>
-            {/* City/County skeleton */}
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-            </div>
             {/* Coordinates skeleton */}
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />

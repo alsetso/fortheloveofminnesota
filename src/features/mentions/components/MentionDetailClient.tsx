@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon, ShareIcon, CheckIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon, ShareIcon, CheckIcon, UserPlusIcon, CalendarIcon, ClockIcon, UserGroupIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '../services/mentionService';
 import { LikeService } from '../services/likeService';
 import { useRouter } from 'next/navigation';
@@ -28,6 +28,11 @@ interface MentionDetailClientProps {
     is_liked?: boolean;
     created_at: string;
     updated_at: string;
+    post_date?: string | null;
+    city_name?: string | null;
+    county_name?: string | null;
+    map_meta?: Record<string, any> | null;
+    tagged_accounts?: { id: string; username: string | null }[] | null;
     account_id: string | null;
     accounts?: {
       id: string;
@@ -46,7 +51,7 @@ interface MentionDetailClientProps {
       emoji: string;
       title: string;
     } | null;
-    map?: { id: string; slug: string | null } | null;
+    map?: { id: string; name?: string | null; slug: string | null } | null;
   };
   isOwner: boolean;
 }
@@ -106,6 +111,46 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
     day: 'numeric',
     year: 'numeric',
   });
+  
+  // Event date (post_date) - show if different from created_at
+  const eventDate = mention.post_date 
+    ? new Date(mention.post_date).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+  const showEventDate = eventDate && eventDate !== createdDate;
+  
+  // Updated date - show if different from created_at
+  const updatedDate = new Date(mention.updated_at).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const showUpdatedDate = updatedDate !== createdDate;
+  
+  // Format coordinates
+  const coordinates = Number.isFinite(mention.lat) && Number.isFinite(mention.lng)
+    ? `${mention.lat.toFixed(6)}, ${mention.lng.toFixed(6)}`
+    : null;
+  
+  // Extract place name from map_meta if available
+  const placeName = mention.map_meta?.place_name || mention.map_meta?.name || null;
+  
+  // Copy coordinates handler
+  const handleCopyCoordinates = async () => {
+    if (!coordinates) return;
+    try {
+      await navigator.clipboard.writeText(coordinates);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[MentionDetailClient] Error copying coordinates:', error);
+      }
+    }
+  };
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this mention?')) {
@@ -381,16 +426,91 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
 
 
           {/* Location */}
-          {mention.full_address && (
-            <div className="mb-4 flex items-start gap-2 text-xs text-gray-600">
-              <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-              <span>{mention.full_address}</span>
+          <div className="mb-4 space-y-2">
+            {mention.full_address && (
+              <div className="flex items-start gap-2 text-xs text-gray-600">
+                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <span>{mention.full_address}</span>
+              </div>
+            )}
+            
+            {/* City/County */}
+            {(mention.city_name || mention.county_name) && (
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <span>
+                  {mention.city_name && mention.county_name
+                    ? `${mention.city_name}, ${mention.county_name}`
+                    : mention.city_name || mention.county_name}
+                </span>
+              </div>
+            )}
+            
+            {/* Place Name from map_meta */}
+            {placeName && (
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <span>{placeName}</span>
+              </div>
+            )}
+            
+            {/* Coordinates */}
+            {coordinates && (
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <button
+                  onClick={handleCopyCoordinates}
+                  className="flex items-center gap-1 hover:text-gray-900 transition-colors"
+                  title="Click to copy coordinates"
+                >
+                  <span className="font-mono">{coordinates}</span>
+                  <ClipboardDocumentIcon className="w-3 h-3 text-gray-400" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Tagged Users */}
+          {mention.tagged_accounts && mention.tagged_accounts.length > 0 && (
+            <div className="mb-4 flex items-center gap-2 text-xs text-gray-600">
+              <UserGroupIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-gray-500">Tagged:</span>
+                {mention.tagged_accounts.map((tagged, idx) => (
+                  <span key={tagged.id}>
+                    {tagged.username ? (
+                      <Link
+                        href={`/${encodeURIComponent(tagged.username)}`}
+                        className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                      >
+                        @{tagged.username}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-500">Unknown</span>
+                    )}
+                    {idx < mention.tagged_accounts!.length - 1 && <span className="text-gray-400">,</span>}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
 
+          {/* Map Name */}
+          {mention.map?.name && (
+            <div className="mb-4 flex items-center gap-2 text-xs text-gray-600">
+              <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="text-gray-500">Map:</span>
+              <Link
+                href={mention.map.slug === 'live' ? '/live' : `/map/${mention.map.slug || mention.map.id}`}
+                className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+              >
+                {mention.map.name}
+              </Link>
+            </div>
+          )}
 
           {/* Meta Info */}
-          <div className="flex items-center gap-4 text-xs text-gray-500 mb-6 pb-6 border-b border-gray-200">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 mb-6 pb-6 border-b border-gray-200">
             <div className="flex items-center gap-1">
               <EyeIcon className="w-4 h-4" />
               <span>{viewCount} views</span>
@@ -408,9 +528,22 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                 showCount={true}
               />
             )}
-            <div>
-              <span>{createdDate}</span>
+            <div className="flex items-center gap-1">
+              <CalendarIcon className="w-4 h-4" />
+              <span>Posted {createdDate}</span>
             </div>
+            {showEventDate && (
+              <div className="flex items-center gap-1">
+                <CalendarIcon className="w-4 h-4" />
+                <span>Happened {eventDate}</span>
+              </div>
+            )}
+            {showUpdatedDate && (
+              <div className="flex items-center gap-1">
+                <ClockIcon className="w-4 h-4" />
+                <span>Updated {updatedDate}</span>
+              </div>
+            )}
           </div>
 
           <div className="pt-4">

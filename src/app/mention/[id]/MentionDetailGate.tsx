@@ -108,6 +108,32 @@ export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
               )}
             </div>
           )}
+
+          {/* Loading Skeletons for Hidden Data */}
+          <div className="mb-4 space-y-2">
+            {/* Location skeleton */}
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
+            </div>
+            {/* City/County skeleton */}
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+            </div>
+            {/* Coordinates skeleton */}
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
+              <div className="h-4 w-40 bg-gray-200 rounded animate-pulse" />
+            </div>
+          </div>
+
+          {/* Meta info skeleton */}
+          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
+            <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+          </div>
         </div>
       </div>
 

@@ -1,8 +1,10 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Suspense } from 'react';
-import ContributeOverlay from '@/app/map/[id]/components/ContributeOverlay';
+import PageWrapper from '@/components/layout/PageWrapper';
+import MapSearchInput from '@/components/layout/MapSearchInput';
+import SearchResults from '@/components/layout/SearchResults';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import ContributePageContent from './ContributePageContent';
 
 interface ContributePageClientProps {
   mapId: string;
@@ -10,29 +12,19 @@ interface ContributePageClientProps {
 }
 
 export default function ContributePageClient({ mapId, mapSlug }: ContributePageClientProps) {
-  const router = useRouter();
-
-  const handleClose = () => {
-    // Navigate back or to home
-    if (window.history.length > 1) {
-      router.back();
-    } else {
-      router.push('/');
-    }
-  };
-
-  const handleMentionCreated = () => {
-    // After creating mention, redirect to live map to see it
-    router.push('/live');
-  };
+  const { openWelcome } = useAppModalContextSafe();
 
   return (
-    <ContributeOverlay
-      isOpen={true}
-      onClose={handleClose}
-      mapId={mapId}
-      mapSlug={mapSlug}
-      onMentionCreated={handleMentionCreated}
-    />
+    <PageWrapper
+      headerContent={null}
+      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
+      accountDropdownProps={{
+        onAccountClick: () => {},
+        onSignInClick: openWelcome,
+      }}
+      searchResultsComponent={<SearchResults />}
+    >
+      <ContributePageContent mapId={mapId} mapSlug={mapSlug} />
+    </PageWrapper>
   );
 }

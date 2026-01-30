@@ -22,14 +22,16 @@ import {
   MapIcon, 
   UsersIcon,
   UserCircleIcon,
-  SparklesIcon
+  SparklesIcon,
+  PlusCircleIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
   MapIcon as MapIconSolid, 
   UsersIcon as UsersIconSolid,
   UserCircleIcon as UserCircleIconSolid,
-  SparklesIcon as SparklesIconSolid
+  SparklesIcon as SparklesIconSolid,
+  PlusCircleIcon as PlusCircleIconSolid
 } from '@heroicons/react/24/solid';
 
 /** @deprecated No longer used; account control links directly to /settings. Kept for backward compatibility. */
@@ -401,6 +403,7 @@ export default function PageWrapper({
     }> = [
       { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
       { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
+      { label: 'Contribute', href: '/contribute', icon: PlusCircleIcon, iconSolid: PlusCircleIconSolid },
     ];
     
     // Only show "People" link when on a map page

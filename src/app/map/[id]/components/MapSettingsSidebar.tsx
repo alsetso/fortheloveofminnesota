@@ -28,6 +28,7 @@ import type { BillingPlan } from '@/lib/billing/types';
 import { getMapUrl } from '@/lib/maps/urls';
 import { useRouter } from 'next/navigation';
 import { useDebounce } from '@/features/profiles/hooks/useDebounce';
+import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 
 type BoundaryLayerKey = 'congressional_districts' | 'ctu_boundaries' | 'state_boundary' | 'county_boundaries';
 
@@ -135,6 +136,7 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
         area_permissions: initialMap.settings?.collaboration?.area_permissions || { required_plan: null },
         post_permissions: initialMap.settings?.collaboration?.post_permissions || { required_plan: null },
         click_permissions: initialMap.settings?.collaboration?.click_permissions || { required_plan: null },
+        allowed_mention_types: initialMap.settings?.collaboration?.allowed_mention_types || null,
       },
       presentation: {
         hide_creator: initialMap.settings?.presentation?.hide_creator || false,
@@ -168,6 +170,11 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
   const [categories, setCategories] = useState<MapCategory[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  
+  // Mention types state
+  const supabase = useSupabaseClient();
+  const [mentionTypes, setMentionTypes] = useState<Array<{ id: string; emoji: string; name: string }>>([]);
+  const [loadingMentionTypes, setLoadingMentionTypes] = useState(false);
   
   // Auto-save state
   const [isSaving, setIsSaving] = useState(false);
@@ -417,6 +424,31 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
       saveTimeoutRef.current.clear();
     };
   }, []);
+
+  // Fetch mention types
+  useEffect(() => {
+    const fetchMentionTypes = async () => {
+      setLoadingMentionTypes(true);
+      try {
+        const { data, error } = await (supabase as any)
+          .from('mention_types')
+          .select('id, emoji, name')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) throw error;
+        setMentionTypes((data || []) as Array<{ id: string; emoji: string; name: string }>);
+      } catch (error) {
+        console.error('Failed to fetch mention types:', error);
+      } finally {
+        setLoadingMentionTypes(false);
+      }
+    };
+
+    if (canManage) {
+      fetchMentionTypes();
+    }
+  }, [supabase, canManage]);
 
   // Helper to get selected boundary layer
   const getSelectedBoundaryLayer = (): BoundaryLayerKey | null => {
@@ -1824,6 +1856,99 @@ export default function MapSettingsSidebar({ initialMap, onUpdated, onClose, isO
                           </select>
                         </div>
                       )}
+
+                      {/* Allowed Mention Types */}
+                      <div className="pt-2 border-t border-gray-200 space-y-1.5">
+                        <label className="text-[10px] font-medium text-gray-500">
+                          Allowed mention types
+                        </label>
+                        <p className="text-[10px] text-gray-400 mb-1.5">
+                          {formData.settings.collaboration.allowed_mention_types === null || 
+                           formData.settings.collaboration.allowed_mention_types === undefined ||
+                           formData.settings.collaboration.allowed_mention_types.length === 0
+                            ? 'All mention types are allowed'
+                            : `${formData.settings.collaboration.allowed_mention_types.length} type(s) selected`}
+                        </p>
+                        {loadingMentionTypes ? (
+                          <p className="text-[10px] text-gray-400">Loading mention types...</p>
+                        ) : (
+                          <>
+                            <div className="max-h-48 overflow-y-auto space-y-1 border border-gray-200 rounded-md p-1.5">
+                              {mentionTypes.map((type) => {
+                                const isSelected = formData.settings.collaboration.allowed_mention_types?.includes(type.id) ?? false;
+                                return (
+                                  <label
+                                    key={type.id}
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        const current = formData.settings.collaboration.allowed_mention_types || [];
+                                        const newValue = e.target.checked
+                                          ? [...current, type.id]
+                                          : current.filter(id => id !== type.id);
+                                        const finalValue = newValue.length === 0 ? null : newValue;
+                                        setFormData({
+                                          ...formData,
+                                          settings: {
+                                            ...formData.settings,
+                                            collaboration: {
+                                              ...formData.settings.collaboration,
+                                              allowed_mention_types: finalValue,
+                                            },
+                                          },
+                                        });
+                                        immediateAutoSave({
+                                          settings: {
+                                            collaboration: {
+                                              allowed_mention_types: finalValue,
+                                            },
+                                          },
+                                        }, 'allowed_mention_types');
+                                      }}
+                                      className="w-3 h-3 text-gray-900 border-gray-300 rounded focus:ring-gray-900"
+                                      disabled={!canManage || isSaving}
+                                    />
+                                    <span className="text-xs text-gray-700">{type.emoji} {type.name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            {formData.settings.collaboration.allowed_mention_types !== null &&
+                             formData.settings.collaboration.allowed_mention_types !== undefined &&
+                             formData.settings.collaboration.allowed_mention_types.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData({
+                                    ...formData,
+                                    settings: {
+                                      ...formData.settings,
+                                      collaboration: {
+                                        ...formData.settings.collaboration,
+                                        allowed_mention_types: null,
+                                      },
+                                    },
+                                  });
+                                  immediateAutoSave({
+                                    settings: {
+                                      collaboration: {
+                                        allowed_mention_types: null,
+                                      },
+                                    },
+                                  }, 'allowed_mention_types');
+                                }}
+                                className="text-[10px] text-gray-500 hover:text-gray-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!canManage || isSaving}
+                              >
+                                Allow all types
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
               </div>
             )}

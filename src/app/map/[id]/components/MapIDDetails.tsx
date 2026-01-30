@@ -51,14 +51,14 @@ export default function MapIDDetails({
       {/* Title */}
       <div className="space-y-1.5">
         <h2 className="text-sm font-semibold text-gray-900">Map Details</h2>
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
+        <div className="bg-white border border-gray-200 rounded-md p-3 space-y-2 shadow-sm">
           <div>
-            <div className="text-[10px] font-medium text-gray-500 mb-0.5">Title</div>
+            <div className="text-[10px] font-medium text-gray-500 mb-1">Title</div>
             <div className="text-xs text-gray-900">{title}</div>
           </div>
           {description && (
             <div>
-              <div className="text-[10px] font-medium text-gray-500 mb-0.5">Description</div>
+              <div className="text-[10px] font-medium text-gray-500 mb-1">Description</div>
               <div className="text-xs text-gray-600">{description}</div>
             </div>
           )}
@@ -69,8 +69,8 @@ export default function MapIDDetails({
       {account && !hideCreator && (
         <div className="space-y-1.5">
           <div className="text-[10px] font-medium text-gray-500">Owner</div>
-          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-            <div className="flex items-center gap-1.5">
+          <div className="bg-white border border-gray-200 rounded-md p-3 shadow-sm">
+            <div className="flex items-center gap-2">
               {account.image_url ? (
                 <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 border border-gray-200">
                   <Image
@@ -89,11 +89,11 @@ export default function MapIDDetails({
                   </span>
                 </div>
               )}
-              <span className="text-xs font-medium text-gray-900 truncate">
+              <span className="text-xs font-medium text-gray-900 truncate flex-1">
                 {displayName}
               </span>
               {isOwner && (
-                <span className="ml-auto text-[10px] font-medium text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
                   Owner
                 </span>
               )}
@@ -105,12 +105,12 @@ export default function MapIDDetails({
       {/* Map Settings */}
       <div className="space-y-1.5">
         <div className="text-[10px] font-medium text-gray-500">Settings</div>
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <div className="flex items-center justify-between">
+        <div className="bg-white border border-gray-200 rounded-md p-3 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between py-0.5">
             <span className="text-xs text-gray-600">Style</span>
             <span className="text-xs font-medium text-gray-900 capitalize">{map_style}</span>
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between py-0.5">
             <span className="text-xs text-gray-600">Visibility</span>
             <span className="text-xs font-medium text-gray-900 capitalize">{visibility}</span>
           </div>
@@ -121,9 +121,9 @@ export default function MapIDDetails({
       {viewCount !== null && (
         <div className="space-y-1.5">
           <div className="text-[10px] font-medium text-gray-500">Statistics</div>
-          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-            <div className="flex items-center gap-1.5">
-              <EyeIcon className="w-4 h-4 text-gray-500" />
+          <div className="bg-white border border-gray-200 rounded-md p-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <EyeIcon className="w-4 h-4 text-gray-500 flex-shrink-0" />
               <div className="flex-1">
                 <div className="text-xs font-medium text-gray-900">
                   {viewCount.toLocaleString()} {viewCount === 1 ? 'view' : 'views'}
@@ -138,10 +138,10 @@ export default function MapIDDetails({
       {(created_at || updated_at) && (
         <div className="space-y-1.5">
           <div className="text-[10px] font-medium text-gray-500">Timestamps</div>
-          <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1">
+          <div className="bg-white border border-gray-200 rounded-md p-3 space-y-2 shadow-sm">
             {created_at && (
               <div>
-                <div className="text-[10px] text-gray-500">Created</div>
+                <div className="text-[10px] text-gray-500 mb-0.5">Created</div>
                 <div className="text-xs text-gray-600">
                   {new Date(created_at).toLocaleDateString()} {new Date(created_at).toLocaleTimeString()}
                 </div>
@@ -149,7 +149,7 @@ export default function MapIDDetails({
             )}
             {updated_at && (
               <div>
-                <div className="text-[10px] text-gray-500">Updated</div>
+                <div className="text-[10px] text-gray-500 mb-0.5">Updated</div>
                 <div className="text-xs text-gray-600">
                   {new Date(updated_at).toLocaleDateString()} {new Date(updated_at).toLocaleTimeString()}
                 </div>

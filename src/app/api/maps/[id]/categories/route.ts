@@ -136,7 +136,6 @@ export async function POST(
         const { category } = validation.data;
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id');
@@ -153,7 +152,7 @@ export async function POST(
         }
 
         const mapData = map as { account_id: string; id: string };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: member } = await supabase
@@ -264,7 +263,6 @@ export async function DELETE(
         const validCategory = categoryValidation.data;
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id');
@@ -281,7 +279,7 @@ export async function DELETE(
         }
 
         const mapData = map as { account_id: string; id: string };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: member } = await supabase

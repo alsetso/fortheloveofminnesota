@@ -38,6 +38,19 @@ export function getMapUrl(map: MapIdentifier): string {
 }
 
 /**
+ * Get map URL with lat/lng query params for zoom-to-pin
+ */
+export function getMapUrlWithPin(
+  map: MapIdentifier,
+  lat: number,
+  lng: number
+): string {
+  const base = getMapUrl(map);
+  const params = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+  return `${base}?${params.toString()}`;
+}
+
+/**
  * Get map post URL
  * 
  * @example

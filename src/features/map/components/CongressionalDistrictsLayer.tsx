@@ -2,12 +2,28 @@
 
 import { useEffect, useState, useRef } from 'react';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { getCongressionalDistricts, hasDistrictsCached } from '@/features/map/services/liveBoundaryCache';
+import { moveMentionsLayersToTop } from '@/features/map/utils/layerOrder';
+
+export type BoundarySelectItem = {
+  layer: 'state' | 'county' | 'district' | 'ctu';
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  details?: Record<string, unknown>;
+};
 
 interface CongressionalDistrictsLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
   visible: boolean;
   onDistrictHover?: (district: any) => void;
+  /** When set (e.g. /live), layer only visible at zoom >= minzoom and < maxzoom. */
+  minzoom?: number;
+  maxzoom?: number;
+  onLoadChange?: (loading: boolean) => void;
+  onBoundarySelect?: (item: BoundarySelectItem) => void;
 }
 
 /**
@@ -19,27 +35,41 @@ export default function CongressionalDistrictsLayer({
   mapLoaded,
   visible,
   onDistrictHover,
+  minzoom,
+  maxzoom,
+  onLoadChange,
+  onBoundarySelect,
 }: CongressionalDistrictsLayerProps) {
   const [districts, setDistricts] = useState<any[]>([]);
   const [hoveredDistrict, setHoveredDistrict] = useState<any | null>(null);
   const isAddingLayersRef = useRef(false);
+  const onLoadChangeRef = useRef(onLoadChange);
+  onLoadChangeRef.current = onLoadChange;
 
-  // Fetch congressional districts
+  // Fetch congressional districts (cached; one API call per session)
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      onLoadChangeRef.current?.(false);
+      return;
+    }
+    const loading = !hasDistrictsCached();
+    if (loading) onLoadChangeRef.current?.(true);
 
-    const fetchDistricts = async () => {
-      try {
-        const response = await fetch('/api/civic/congressional-districts');
-        if (!response.ok) throw new Error('Failed to fetch districts');
-        const data = await response.json();
-        setDistricts(data);
-      } catch (error) {
-        console.error('[CongressionalDistrictsLayer] Failed to fetch districts:', error);
-      }
+    let cancelled = false;
+    getCongressionalDistricts()
+      .then((data) => {
+        if (!cancelled) setDistricts(data);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('[CongressionalDistrictsLayer] Failed to fetch districts:', error);
+      })
+      .finally(() => {
+        if (!cancelled) onLoadChangeRef.current?.(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
-
-    fetchDistricts();
   }, [visible]);
 
   // Render congressional districts on map
@@ -129,6 +159,8 @@ export default function CongressionalDistrictsLayer({
         id: fillLayerId,
         type: 'fill',
         source: sourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
           'fill-color': color,
           'fill-opacity': 0.2, // Semi-transparent
@@ -140,6 +172,8 @@ export default function CongressionalDistrictsLayer({
         id: outlineLayerId,
         type: 'line',
         source: sourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
           'line-color': color,
           'line-width': 2,
@@ -169,6 +203,8 @@ export default function CongressionalDistrictsLayer({
           id: highlightFillLayerId,
           type: 'fill',
           source: highlightSourceId,
+          ...(minzoom != null && { minzoom }),
+          ...(maxzoom != null && { maxzoom }),
           paint: {
             'fill-color': color,
             'fill-opacity': 0.5, // More opaque than regular districts
@@ -182,6 +218,8 @@ export default function CongressionalDistrictsLayer({
           id: highlightOutlineLayerId,
           type: 'line',
           source: highlightSourceId,
+          ...(minzoom != null && { minzoom }),
+          ...(maxzoom != null && { maxzoom }),
           paint: {
             'line-color': color,
             'line-width': 3,
@@ -292,10 +330,42 @@ export default function CongressionalDistrictsLayer({
         });
       };
 
-      // Use mousemove on fill layer to detect hover
+      // Use mousemove and mouseleave on fill layer (same as state, county, CTU)
       mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
       mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
     });
+
+    // Single map-level click handler for all district layers (same pattern as state/county/CTU: one handler, query layer)
+    const districtFillLayerIds = districts.map((d) => `congressional-district-${d.district_number}-fill`);
+    const handleDistrictClick = (e: any) => {
+      const features = mapboxMap.queryRenderedFeatures(e.point, { layers: districtFillLayerIds });
+      if (features.length === 0) return;
+      const feature = features[0];
+      const layerId = feature?.layer?.id;
+      const match = typeof layerId === 'string' && layerId.match(/^congressional-district-(\d+)-fill$/);
+      if (!match) return;
+      const districtNum = parseInt(match[1], 10);
+      const district = districts.find((d) => d.district_number === districtNum);
+      if (!district) return;
+      const lngLat = e.lngLat;
+      const lng = typeof lngLat?.lng === 'number' ? lngLat.lng : (Array.isArray(lngLat) ? lngLat[0] : 0);
+      const lat = typeof lngLat?.lat === 'number' ? lngLat.lat : (Array.isArray(lngLat) ? lngLat[1] : 0);
+      const name = district.name ?? `Congressional District ${districtNum}`;
+      const entityId = (district as { id?: string }).id ?? String(districtNum);
+      const item: BoundarySelectItem = {
+        layer: 'district',
+        id: entityId,
+        name,
+        lat,
+        lng,
+        details: district ? { ...district, geometry: undefined } : undefined,
+      };
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[LiveBoundary] district click', { layer: item.layer, id: item.id, name: item.name, hasOnBoundarySelect: !!onBoundarySelect });
+      }
+      onBoundarySelect?.(item);
+    };
+    mapboxMap.on('click', handleDistrictClick);
 
     isAddingLayersRef.current = false;
 
@@ -303,6 +373,11 @@ export default function CongressionalDistrictsLayer({
     return () => {
       if (!map) return;
       const mapboxMap = map as any;
+      try {
+        mapboxMap.off('click', handleDistrictClick);
+      } catch (e) {
+        // ignore
+      }
       districts.forEach((district) => {
         const districtNum = district.district_number;
         const fillLayerId = `congressional-district-${districtNum}-fill`;
@@ -313,7 +388,7 @@ export default function CongressionalDistrictsLayer({
         const highlightSourceId = `congressional-district-${districtNum}-highlight-source`;
 
         try {
-          // Remove event listeners
+          // Remove event listeners (mousemove, mouseleave only; click is single handler above)
           mapboxMap.off('mousemove', fillLayerId);
           mapboxMap.off('mouseleave', fillLayerId);
 
@@ -329,7 +404,7 @@ export default function CongressionalDistrictsLayer({
         }
       });
     };
-  }, [map, mapLoaded, districts, visible, onDistrictHover]);
+  }, [map, mapLoaded, districts, visible, onDistrictHover, minzoom, maxzoom, onLoadChange, onBoundarySelect]);
 
   return null; // This component doesn't render any UI
 }

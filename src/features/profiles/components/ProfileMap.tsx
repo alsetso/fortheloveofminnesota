@@ -476,7 +476,7 @@ export default function ProfileMap({
 
             const createPopupContent = (viewCount: number | null = null) => {
               const profileSlug = accountUsername;
-              const profileUrl = profileSlug ? `/profile/${encodeURIComponent(profileSlug)}` : null;
+              const profileUrl = profileSlug ? `/${encodeURIComponent(profileSlug)}` : null;
               const displayName = accountUsername || 'User';
               
               return `

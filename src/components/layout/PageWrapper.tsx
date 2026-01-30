@@ -5,31 +5,33 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
 import { Toaster } from 'react-hot-toast';
-import toast from 'react-hot-toast';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import ContentTypeFilters from './ContentTypeFilters';
 import { usePageView } from '@/hooks/usePageView';
 import { useNativeIOSApp } from '@/hooks/useNativeIOSApp';
 import { supabase } from '@/lib/supabase';
 import { useAuthStateSafe } from '@/features/auth';
+import { HeaderThemeProvider } from '@/contexts/HeaderThemeContext';
 import MapsSelectorDropdown from './MapsSelectorDropdown';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
-import { XCircleIcon, EyeIcon, ChatBubbleLeftIcon, UserPlusIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { XCircleIcon, EyeIcon, UserPlusIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { 
   HomeIcon, 
   MapIcon, 
   UsersIcon,
+  UserCircleIcon,
   SparklesIcon,
-  CreditCardIcon
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
   MapIcon as MapIconSolid, 
   UsersIcon as UsersIconSolid,
+  UserCircleIcon as UserCircleIconSolid,
   SparklesIcon as SparklesIconSolid,
-  CreditCardIcon as CreditCardIconSolid
+  Cog6ToothIcon as Cog6ToothIconSolid
 } from '@heroicons/react/24/solid';
 
 interface AccountDropdownProps {
@@ -111,280 +113,12 @@ const defaultAccountDropdownProps: AccountDropdownProps = {
   onSignInClick: () => {},
 };
 
-/**
- * Inline join form component for non-members
- * Embedded directly in the expanded map info panel
- */
-function JoinFormInline({ 
-  mapData, 
-  onJoinSuccess 
-}: { 
-  mapData: {
-    id: string;
-    name: string;
-    description?: string | null;
-    visibility?: 'public' | 'private' | 'shared';
-    auto_approve_members?: boolean;
-    membership_questions?: Array<{ id: number; question: string }>;
-    membership_rules?: string | null;
-    settings?: {
-      collaboration?: {
-        allow_pins?: boolean;
-        allow_areas?: boolean;
-        allow_posts?: boolean;
-        pin_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
-        area_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
-        post_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
-      };
-    };
-  };
-  onJoinSuccess?: () => void;
-}) {
-  const { account, activeAccountId } = useAuthStateSafe();
-  const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasPendingRequest, setHasPendingRequest] = useState(false);
-  const [isCheckingRequest, setIsCheckingRequest] = useState(true);
-
-  const currentAccountId = activeAccountId || account?.id || null;
-  const autoApproveMembers = mapData.auto_approve_members || false;
-  const membershipQuestions = mapData.membership_questions || [];
-  const membershipRules = mapData.membership_rules;
-  const allowPins = mapData.settings?.collaboration?.allow_pins || false;
-  const allowAreas = mapData.settings?.collaboration?.allow_areas || false;
-  const allowPosts = mapData.settings?.collaboration?.allow_posts || false;
-  const pinPermissions = mapData.settings?.collaboration?.pin_permissions || null;
-  const areaPermissions = mapData.settings?.collaboration?.area_permissions || null;
-  const postPermissions = mapData.settings?.collaboration?.post_permissions || null;
-
-  // Check for pending request
-  useEffect(() => {
-    if (!mapData.id || !currentAccountId) {
-      setHasPendingRequest(false);
-      setIsCheckingRequest(false);
-      return;
-    }
-
-    const checkPendingRequest = async () => {
-      setIsCheckingRequest(true);
-      try {
-        const response = await fetch(`/api/maps/${mapData.id}/membership-requests/my-request`);
-        if (response.ok) {
-          const data = await response.json();
-          setHasPendingRequest(!!data.request);
-        } else {
-          setHasPendingRequest(false);
-        }
-      } catch (err) {
-        setHasPendingRequest(false);
-      } finally {
-        setIsCheckingRequest(false);
-      }
-    };
-
-    checkPendingRequest();
-  }, [mapData.id, currentAccountId]);
-
-  const handleSubmit = async () => {
-    if (!currentAccountId) {
-      setError('Please sign in to join this map');
-      return;
-    }
-
-    const missingAnswers = membershipQuestions.filter(q => !answers[q.id]?.trim());
-    if (missingAnswers.length > 0) {
-      setError('Please answer all required questions');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const answersArray = membershipQuestions
-        .map(q => ({
-          question_id: q.id,
-          answer: answers[q.id] || '',
-        }))
-        .filter(a => a.answer.trim());
-
-      const response = await fetch(`/api/maps/${mapData.id}/membership-requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: answersArray }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to join map');
-      }
-
-      const data = await response.json();
-      
-      if (data.auto_approved) {
-        toast.success(`You joined ${mapData.name}`, { duration: 3000 });
-        if (onJoinSuccess) onJoinSuccess();
-        // Refresh page to update membership state
-        window.location.reload();
-      } else {
-        setHasPendingRequest(true);
-        toast.success('Membership request submitted', { duration: 3000 });
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to join map');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  if (isCheckingRequest) {
-    return (
-      <div className="space-y-1.5 pt-2 border-t border-white/10">
-        <div className="text-center py-4">
-          <div className="w-4 h-4 border-2 border-white/40 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-xs text-white/70">Checking request status...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (hasPendingRequest) {
-    return (
-      <div className="space-y-1.5 pt-2 border-t border-white/10">
-        <div className="bg-yellow-500/20 border border-yellow-400/30 rounded-md p-[10px]">
-          <p className="text-xs font-medium text-white mb-1">Request is pending</p>
-          <p className="text-xs text-white/80">
-            Your membership request is being reviewed by the map owner.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3 pt-2 border-t border-white/10">
-      {/* Header Message */}
-      <div className="bg-indigo-500/20 border border-indigo-400/30 rounded-md p-[10px]">
-        <p className="text-xs text-white">
-          {autoApproveMembers 
-            ? 'Join this map to collaborate and contribute.'
-            : 'Request to join this map. Your request will be reviewed by the map owner.'}
-        </p>
-      </div>
-
-      {/* Collaboration Tools Preview */}
-      {(allowPins || allowAreas || allowPosts) && (
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-medium text-white/70">Available Tools</div>
-          <div className="bg-white/10 border border-white/20 rounded-md p-[10px]">
-            <div className="flex items-center gap-2 flex-wrap">
-              {allowPins && (
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 rounded-md border border-white/20">
-                  <MapPinIcon className="w-3.5 h-3.5 text-white/70" />
-                  <span className="text-xs font-medium text-white">Pins</span>
-                  {pinPermissions?.required_plan && (
-                    <span className="text-[10px] text-white/60 font-medium">
-                      ({pinPermissions.required_plan}+)
-                    </span>
-                  )}
-                </div>
-              )}
-              {allowAreas && (
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 rounded-md border border-white/20">
-                  <Square3Stack3DIcon className="w-3.5 h-3.5 text-white/70" />
-                  <span className="text-xs font-medium text-white">Areas</span>
-                  {areaPermissions?.required_plan && (
-                    <span className="text-[10px] text-white/60 font-medium">
-                      ({areaPermissions.required_plan}+)
-                    </span>
-                  )}
-                </div>
-              )}
-              {allowPosts && (
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 rounded-md border border-white/20">
-                  <DocumentTextIcon className="w-3.5 h-3.5 text-white/70" />
-                  <span className="text-xs font-medium text-white">Posts</span>
-                  {postPermissions?.required_plan && (
-                    <span className="text-[10px] text-white/60 font-medium">
-                      ({postPermissions.required_plan}+)
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Membership Rules */}
-      {membershipRules && (
-        <div className="space-y-1.5">
-          <div className="text-[10px] font-medium text-white/70">Membership Rules</div>
-          <div className="bg-white/10 border border-white/20 rounded-md p-[10px]">
-            <div className="text-xs text-white/90 whitespace-pre-wrap break-words">{membershipRules}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Questions */}
-      {membershipQuestions.length > 0 && (
-        <div className="space-y-3">
-          <div className="text-[10px] font-medium text-white/70">Questions</div>
-          {membershipQuestions.map((question) => (
-            <div key={question.id} className="space-y-1.5">
-              <label className="text-xs font-medium text-white">
-                {question.question}
-              </label>
-              <textarea
-                value={answers[question.id] || ''}
-                onChange={(e) =>
-                  setAnswers(prev => ({ ...prev, [question.id]: e.target.value }))
-                }
-                placeholder="Your answer..."
-                rows={3}
-                className="w-full px-2.5 py-1.5 text-xs bg-white/10 border border-white/20 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 text-white placeholder:text-white/50 resize-none"
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="p-2 bg-red-500/20 border border-red-400/30 rounded-md">
-          <p className="text-xs text-white">{error}</p>
-        </div>
-      )}
-
-      {/* Submit Button */}
-      {currentAccountId ? (
-        <button
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <UserPlusIcon className="w-3 h-3" />
-          <span>
-            {isSubmitting 
-              ? 'Submitting...' 
-              : autoApproveMembers 
-              ? 'Join Map' 
-              : 'Request to Join'}
-          </span>
-        </button>
-      ) : (
-        <div className="text-center">
-          <p className="text-xs text-white/70 mb-2">Please sign in to join this map</p>
-        </div>
-      )}
-    </div>
-  );
-}
+/** Desktop horizontal inset for main content; sidebars, popups, and header use this to align. */
+const CONTENT_INSET_DESKTOP = '10px';
 
 /**
  * Global page wrapper with 10vh header and 90vh content area
- * - Header: 10vh, black background (or 20vh when #search is active)
+ * - Header: 10vh, default iOS light gray background (or 20vh when #search is active; custom map overrides via mapSettings.colors)
  * - Content: 90vh, white background, rounded top corners, scrollable (or 80vh when #search is active)
  * - When #search is active: Header expands to 20vh with full-width search and mention type filters
  */
@@ -412,10 +146,21 @@ export default function PageWrapper({
   const isNativeIOSApp = useNativeIOSApp();
   const { account, activeAccountId } = useAuthStateSafe();
   
+  // Check if we're on localhost (only after mount to avoid hydration issues)
+  const [isLocalhost, setIsLocalhost] = useState(false);
+  
+  useEffect(() => {
+    setIsLocalhost(
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1'
+    );
+  }, []);
+  
   // Check if we're on a custom map page (/map/[id] or /map/[slug])
   // Exclude /map/new (create page) and /maps (list page)
   const isMapPage = pathname?.startsWith('/map/') && pathname !== '/map/new' && pathname !== '/maps';
   const isMapsPage = pathname === '/maps' || pathname === '/map';
+  const isOnboardingPage = pathname === '/onboarding';
   
   // Extract map ID/slug from pathname
   const mapIdOrSlug = isMapPage ? pathname.replace('/map/', '').split('/')[0] : null;
@@ -436,39 +181,7 @@ export default function PageWrapper({
     updated_at?: string;
     hideCreator?: boolean;
   } | null>(null);
-  const [expandedPanel, setExpandedPanel] = useState<'map-info' | 'chat' | null>(null);
-  
-  // Fetch selected mention types from URL parameters (for header display)
   const [selectedMentionTypes, setSelectedMentionTypes] = useState<Array<{ id: string; name: string; emoji: string; slug: string }>>([]);
-  
-  // Determine if user is non-member (for forced open state)
-  const isNonMember = useMemo(() => {
-    return mapMembership && !mapMembership.isMember && !mapMembership.isOwner;
-  }, [mapMembership]);
-  
-  // Auto-open for non-members, close for members when map changes
-  useEffect(() => {
-    if (isNonMember) {
-      // Non-members: always keep open
-      setExpandedPanel('map-info');
-    } else {
-      // Members: reset to closed
-      setExpandedPanel(null);
-    }
-  }, [mapIdOrSlug, isNonMember]);
-  
-  // Ensure non-members can't close the panel
-  const handlePanelToggle = useCallback((panel: 'map-info' | 'chat' | null) => {
-    if (isNonMember && panel === null) {
-      // Prevent closing for non-members
-      return;
-    }
-    if (isNonMember && expandedPanel === 'map-info' && panel === 'map-info') {
-      // Prevent toggling closed for non-members
-      return;
-    }
-    setExpandedPanel(panel);
-  }, [isNonMember, expandedPanel]);
 
   useEffect(() => {
     if (!isMapPage || !mapIdOrSlug || !mounted) {
@@ -708,14 +421,22 @@ export default function PageWrapper({
         }
       });
     }
-    
-    // Hide Plans icon on custom map pages
-    if (!isMapPage) {
-      items.push({ label: 'Plans', href: '/plans', icon: CreditCardIcon, iconSolid: CreditCardIconSolid });
+
+    // Profile: link to /:username when username is set
+    if (account?.username) {
+      items.push({
+        label: 'Profile',
+        href: `/${encodeURIComponent(account.username)}`,
+        icon: UserCircleIcon,
+        iconSolid: UserCircleIconSolid,
+      });
     }
-    
+
+    // Settings: link to settings page
+    items.push({ label: 'Settings', href: '/settings', icon: Cog6ToothIcon, iconSolid: Cog6ToothIconSolid });
+
     return items;
-  }, [isMapPage, mapIdOrSlug]);
+  }, [isMapPage, mapIdOrSlug, account?.username]);
 
   // Set mounted flag on client side only
   useEffect(() => {
@@ -762,7 +483,7 @@ export default function PageWrapper({
   }, [isMapPage, mapInfo?.account_id, mapInfo?.account?.id, currentAccountId]);
 
   // Determine background color based on viewAsRole and mapSettings
-  // Priority: mapSettings.colors[role] > default gradient (owner) / black (others)
+  // Priority: mapSettings.colors[role] > default gradient (owner) > default iOS light gray (others)
   const backgroundStyle = useMemo(() => {
     // If we have mapSettings and viewAsRole, use the color from settings
     if (mapSettings?.colors && viewAsRole !== undefined) {
@@ -786,12 +507,24 @@ export default function PageWrapper({
       }
     }
     
-    // Default: black background
+    // Default: iOS light gray (overridden on custom map page by mapSettings.colors when set)
     return { 
-      background: '#000000',
-      backgroundColor: '#000000' 
+      background: '#F2F2F7',
+      backgroundColor: '#F2F2F7' 
     };
   }, [isOwnedMap, viewAsRole, mapSettings]);
+
+  const isDefaultLightBg = backgroundStyle.backgroundColor === '#F2F2F7';
+  const headerText = isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white';
+  const headerTextMuted = isDefaultLightBg ? 'text-[#3C3C43]/60' : 'text-white/60';
+  const headerIcon = isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white';
+  const headerIconMuted = isDefaultLightBg ? 'text-[#3C3C43]/60' : 'text-white/50';
+  const headerHover = isDefaultLightBg ? 'hover:bg-black/5' : 'hover:bg-white/10';
+  const headerBorder = isDefaultLightBg ? 'border-gray-200' : 'border-white/5';
+  const headerBorderStrong = isDefaultLightBg ? 'border-gray-300' : 'border-white/10';
+  const headerBgMuted = isDefaultLightBg ? 'bg-black/5' : 'bg-white/10';
+  const headerBgMutedBorder = isDefaultLightBg ? 'border-gray-300' : 'border-white/30';
+  const headerIconHover = isDefaultLightBg ? 'hover:text-[#3C3C43]' : 'hover:text-white';
 
   // Apply background color to body element
   useEffect(() => {
@@ -845,64 +578,91 @@ export default function PageWrapper({
           ...backgroundStyle
         }}
       >
-      {/* Header - Flexible height based on content, black background */}
+      {/* Header - Flexible height based on content, background from backgroundStyle (default iOS light gray) */}
       <header 
-        className="flex flex-col flex-shrink-0 border-b border-white/5"
+        className="flex flex-col flex-shrink-0"
         style={backgroundStyle}
       >
+        <HeaderThemeProvider value={{ isDefaultLightBg, isSearchActive: false }}>
         {/* Notification window placeholder - 30px height, only on iOS native app */}
         {!isSearchMode && isNativeIOSApp && (
           <div className="w-full" style={{ height: '30px' }} />
         )}
         
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
-          {/* Top Row: Logo, Search, Nav, Account - Hidden completely in search mode */}
+        <div className="w-full px-4 sm:px-6 lg:px-[10px]">
+          {/* Top Row: Logo, Search, Nav, Account - full width with horizontal padding */}
           {!isSearchMode && (
             <div className="grid grid-cols-12 gap-6 items-center transition-all duration-300 h-14">
             {/* 1st Column: Logo & Map Name & Search (Aligns with left sidebar) - Hide search when type param exists */}
             <div className="hidden lg:flex lg:col-span-3 items-center gap-3 min-w-0">
           <div className="flex-shrink-0">
-            <img
-              src="/white-logo.png"
-              alt="For the Love of Minnesota"
-              className="w-7 h-7"
-            />
+            {isMapPage ? (
+              <button
+                onClick={() => router.back()}
+                className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors`}
+                aria-label="Go back"
+              >
+                <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
+              </button>
+            ) : isOnboardingPage ? (
+              <span className={`text-sm font-semibold ${headerText}`}>Onboarding</span>
+            ) : (
+              <Image
+                src="/logo.png"
+                alt="For the Love of Minnesota"
+                width={28}
+                height={28}
+                className={`w-7 h-7 ${isDefaultLightBg ? '' : 'invert'}`}
+                priority
+                unoptimized
+              />
+            )}
           </div>
           
-          {/* Maps Selector or Search Input - Show maps selector on /map or /maps routes */}
-          {isMapsPage || isMapPage ? (
+          {/* Maps Selector - Show on /map or /maps routes only */}
+          {(isMapsPage || isMapPage) && (
             <div className="flex-1 max-w-[200px] sm:max-w-[250px] transition-all duration-300">
-              <MapsSelectorDropdown />
+              <MapsSelectorDropdown darkText={isDefaultLightBg} />
             </div>
-          ) : searchComponent ? (
-            <div className="flex-1 max-w-[180px] transition-all duration-300">
-              {searchComponent}
-            </div>
-          ) : null}
+          )}
             </div>
           
             {/* Mobile Header Layout (Logo, Maps Selector/Map Name, Search, Header Content, Account) */}
             <div className="lg:hidden col-span-12 flex items-center justify-between gap-2 px-1">
               <div className="flex items-center gap-2">
                 <div className="flex-shrink-0">
-                  <img src="/white-logo.png" alt="Logo" className="w-6 h-6" />
+                  {isMapPage ? (
+                    <button
+                      onClick={() => router.back()}
+                      className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors`}
+                      aria-label="Go back"
+                    >
+                      <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
+                    </button>
+                  ) : isOnboardingPage ? (
+                    <span className={`text-xs font-semibold ${headerText}`}>Onboarding</span>
+                  ) : (
+                    <Image
+                      src="/logo.png"
+                      alt="Logo"
+                      width={24}
+                      height={24}
+                      className={`w-6 h-6 ${isDefaultLightBg ? '' : 'invert'}`}
+                      priority
+                      unoptimized
+                    />
+                  )}
                 </div>
                 {/* Maps Selector - shown on /map or /maps routes, next to logo */}
                 {(isMapsPage || isMapPage) && (
-                  <MapsSelectorDropdown />
+                  <MapsSelectorDropdown darkText={isDefaultLightBg} />
                 )}
               </div>
-              {/* Search Input on mobile - Hidden when on maps page or custom map page */}
-              {!isMapsPage && !isMapPage && searchComponent && (
-                <div className="flex-1 flex justify-center px-2">
-                  <div className="w-full max-w-sm">{searchComponent}</div>
-                </div>
-              )}
               <div className="flex-shrink-0 flex items-center gap-1">
                 {headerContent}
-                {showAccountDropdown && (
+                {showAccountDropdown && !isOnboardingPage && (
                   <AccountDropdown 
-                    variant="dark"
+                    variant={isDefaultLightBg ? 'light' : 'dark'}
                     onAccountClick={accountDropdownProps?.onAccountClick}
                     onSignInClick={accountDropdownProps?.onSignInClick}
                   />
@@ -911,10 +671,11 @@ export default function PageWrapper({
             </div>
             
             {/* 2nd Column: Nav Icons or Mention Type Filters (Aligns with center feed, max-width 800px) */}
-            <div className="hidden lg:flex lg:col-span-6 justify-center px-4">
-              <div className="flex items-center justify-around w-full max-w-[800px]">
-                {/* Show nav icons on all pages, including map pages */}
-                {navItems.map((item) => {
+            {!isOnboardingPage && (
+              <div className="hidden lg:flex lg:col-span-6 justify-center px-4">
+                <div className="flex items-center justify-around w-full max-w-[800px]">
+                  {/* Show nav icons on all pages, including map pages */}
+                  {navItems.map((item) => {
                   // Hash-based items (like #people) are active when hash matches
                   // Use currentHash state to avoid hydration mismatch (only set after mount)
                   const isActive = item.href?.startsWith('#')
@@ -928,9 +689,9 @@ export default function PageWrapper({
                       <button
                         key={item.label}
                         onClick={(item as any).onClick}
-                        className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
+                        className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
                       >
-                        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/50'}`} />
+                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
                       </button>
                     );
                   }
@@ -939,14 +700,15 @@ export default function PageWrapper({
                     <Link
                       key={item.label}
                       href={item.href!}
-                      className="flex items-center justify-center w-full h-10 transition-colors hover:bg-white/10 rounded-md"
+                      className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/50'}`} />
+                      <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
                     </Link>
                   );
                 })}
               </div>
             </div>
+            )}
             
             {/* Mention Type Filters - Show below nav icons on map pages when types are selected */}
             {isMapPage && selectedMentionTypes.length > 0 && (
@@ -955,7 +717,7 @@ export default function PageWrapper({
                   {selectedMentionTypes.map((type) => (
                     <div
                       key={type.id}
-                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white/10 border-white/30 text-white"
+                      className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap ${headerBgMuted} ${headerBgMutedBorder} ${headerText}`}
                     >
                       <span className="text-base flex-shrink-0">{type.emoji}</span>
                       <span className="font-medium leading-none">{type.name}</span>
@@ -965,7 +727,7 @@ export default function PageWrapper({
                           e.stopPropagation();
                           handleRemoveType(type.slug);
                         }}
-                        className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-white"
+                        className={`hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 ${headerText}`}
                         aria-label={`Remove ${type.name} filter`}
                       >
                         <XCircleIcon className="w-4 h-4" />
@@ -979,9 +741,9 @@ export default function PageWrapper({
             {/* 3rd Column: Header Content, Account Dropdown (Aligns with right sidebar) */}
             <div className="hidden lg:flex lg:col-span-3 justify-end items-center gap-2">
               {headerContent}
-              {showAccountDropdown && (
+              {showAccountDropdown && !isOnboardingPage && (
                 <AccountDropdown 
-                  variant="dark"
+                  variant={isDefaultLightBg ? 'light' : 'dark'}
                   onAccountClick={accountDropdownProps?.onAccountClick}
                   onSignInClick={accountDropdownProps?.onSignInClick}
                 />
@@ -991,25 +753,35 @@ export default function PageWrapper({
           )}
         </div>
 
-        {/* Search Mode Header (Transitions in when isSearchMode is true) */}
+        {/* Search Mode Header: logo + full-width search; same horizontal inset as main content */}
         {isSearchMode && (
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300 pt-1">
-            <div className="flex items-center gap-2">
-              {/* Logo - Left of search input */}
+          <div className="w-full px-4 sm:px-6 lg:px-[10px] flex flex-col animate-in fade-in slide-in-from-top-2 duration-300 pt-1">
+            {/* Row 1: Logo + full-width search input (+ Cancel on mobile) */}
+            <div className="flex items-center gap-2 h-14">
               <div className="flex-shrink-0">
-                <img
-                  src="/white-logo.png"
-                  alt="For the Love of Minnesota"
-                  className="w-7 h-7"
-                />
+                {isMapPage ? (
+                  <button
+                    onClick={() => router.back()}
+                    className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors`}
+                    aria-label="Go back"
+                  >
+                    <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
+                  </button>
+                ) : isOnboardingPage ? (
+                  <span className={`text-sm font-semibold ${headerText}`}>Onboarding</span>
+                ) : (
+                  <Image
+                    src="/logo.png"
+                    alt="For the Love of Minnesota"
+                    width={28}
+                    height={28}
+                    className={`w-6 h-6 lg:w-7 lg:h-7 ${isDefaultLightBg ? '' : 'invert'}`}
+                    priority
+                    unoptimized
+                  />
+                )}
               </div>
-              {/* Label area - shows selected content type */}
-              {selectedLabel && (
-                <div className="flex-shrink-0 px-2 py-1 text-xs font-semibold text-white bg-white/10 rounded-md">
-                  {selectedLabel}
-                </div>
-              )}
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 {searchComponent}
               </div>
               <button
@@ -1018,305 +790,47 @@ export default function PageWrapper({
                   window.history.pushState({}, '', newUrl);
                   window.dispatchEvent(new HashChangeEvent('hashchange'));
                 }}
-                className="lg:hidden text-white/70 text-xs font-medium px-2 py-1"
+                className={`flex-shrink-0 lg:hidden ${headerTextMuted} text-xs font-medium px-2 py-1`}
               >
                 Cancel
               </button>
             </div>
-            
-            {/* Bottom Row: Content Type Filters */}
-            <div className="flex-shrink-0 px-2 pt-1 pb-1 flex justify-center border-t border-white/5">
+            {/* Row 2: Search tabs (Content Type Filters) - pushes main content down */}
+            <div className={`flex-shrink-0 px-2 pt-1 pb-1 flex justify-center border-t ${headerBorder}`}>
               <ContentTypeFilters />
             </div>
           </div>
         )}
+        </HeaderThemeProvider>
       </header>
 
-      {/* Main Content Area - Flex to fill remaining space, white background, rounded top corners */}
-      <div 
-        className="bg-white rounded-t-3xl flex-1 overflow-hidden relative flex flex-col"
-        style={{ minHeight: 0 }}
-      >
+      {/* Main Content Area - Source of truth for horizontal inset on desktop. Sidebars live inside this. */}
+      <div className="flex-1 flex flex-col min-h-0 lg:px-[10px]" data-content-inset-desktop={CONTENT_INSET_DESKTOP}>
+        <div 
+          className="bg-white rounded-t-3xl flex-1 overflow-hidden relative flex flex-col"
+          style={{ minHeight: 0 }}
+        >
         {/* Scrollable Content Container - Hidden scrollbar, with bottom padding on mobile for fixed nav */}
         {/* Disable scrolling for map pages (except live map) - map container handles its own scrolling */}
         <div 
           className={`flex-1 overflow-x-hidden scrollbar-hide lg:pb-0 ${
-            isMapPage ? 'overflow-hidden pb-0' : 'overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))]'
+            isMapPage ? 'overflow-hidden pb-0' : isOnboardingPage ? 'overflow-y-auto pb-0' : 'overflow-y-auto pb-[calc(2.5rem+env(safe-area-inset-bottom))]'
           }`}
           style={{ minHeight: 0 }}
         >
           {isSearchMode && searchResultsComponent ? searchResultsComponent : children}
         </div>
+        </div>
       </div>
 
-      {/* Floating Map Info Card (Mobile + Desktop for non-members) */}
-      {!isSearchMode && (
-        <div className={`fixed bottom-0 left-0 right-0 z-50 ${
-          // Show on mobile always, show on desktop only for non-members
-          mapMembership && !mapMembership.isMember && !mapMembership.isOwner ? '' : 'lg:hidden'
-        }`}>
-          <div 
-            className={`backdrop-blur-lg border-t border-white/10 rounded-t-2xl shadow-2xl px-2 py-1 transition-all duration-300 flex flex-col ${
-              expandedPanel === 'map-info' ? 'h-[80vh]' : ''
-            }`}
-            style={{ ...backgroundStyle, paddingBottom: 'env(safe-area-inset-bottom)' }}
-          >
-            {isMapPage && mapInfo ? (
-              <div className="flex flex-col gap-2 px-2 py-1.5 h-full">
-                {/* Map Card Info and Chat Button Row */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {/* Map Card Info - Accordion trigger */}
-                  <button
-                    onClick={() => handlePanelToggle(expandedPanel === 'map-info' ? null : 'map-info')}
-                    disabled={!!(isNonMember && expandedPanel === 'map-info')}
-                    className={`flex-1 flex items-center gap-2 px-2 py-2 hover:bg-white/5 rounded-lg transition-colors ${
-                      expandedPanel === 'map-info' ? 'bg-white/5' : ''
-                    } ${isNonMember && expandedPanel === 'map-info' ? 'cursor-default' : ''}`}
-                  >
-                    {/* Owner Avatar */}
-                    {mapInfo.account && !mapInfo.hideCreator && (
-                      <div className="flex-shrink-0">
-                        {mapInfo.account.image_url ? (
-                          <Image
-                            src={mapInfo.account.image_url}
-                            alt={mapInfo.account.username || mapInfo.account.first_name || 'User'}
-                            width={32}
-                            height={32}
-                            className="w-8 h-8 rounded-full object-cover border border-white/20"
-                            unoptimized
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border border-white/20">
-                            <span className="text-xs text-white/70 font-medium">
-                              {(mapInfo.account.first_name?.[0] || mapInfo.account.username?.[0] || 'U').toUpperCase()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Title & Owner */}
-                    <div className="flex-1 min-w-0 text-left">
-                      {mapInfo.name && (
-                        <div className="text-xs font-semibold text-white truncate">
-                          {mapInfo.name}
-                        </div>
-                      )}
-                      {mapInfo.account && !mapInfo.hideCreator && (
-                        <div className="text-[10px] text-white/70 truncate">
-                          {mapInfo.account.username 
-                            ? `@${mapInfo.account.username}`
-                            : mapInfo.account.first_name && mapInfo.account.last_name
-                            ? `${mapInfo.account.first_name} ${mapInfo.account.last_name}`
-                            : mapInfo.account.first_name || 'User'}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* View Count */}
-                    {mapInfo.viewCount !== null && mapInfo.viewCount !== undefined && (
-                      <div className="flex items-center gap-1 text-[10px] text-white/70 flex-shrink-0">
-                        <EyeIcon className="w-3.5 h-3.5" />
-                        <span>{mapInfo.viewCount.toLocaleString()}</span>
-                      </div>
-                    )}
-                  </button>
-
-                  {/* Chat Button - Hide for non-members */}
-                  {!isNonMember && (
-                    <button
-                      onClick={() => handlePanelToggle(expandedPanel === 'chat' ? null : 'chat')}
-                      className={`flex-shrink-0 p-2 hover:bg-white/5 rounded-lg transition-colors ${
-                        expandedPanel === 'chat' ? 'bg-white/5' : ''
-                      }`}
-                      aria-label="Open chat"
-                    >
-                      <ChatBubbleLeftIcon className={`w-5 h-5 ${expandedPanel === 'chat' ? 'text-white' : 'text-white/70'}`} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Expanded Map Details Content - 80vh max height, scrollable */}
-                {expandedPanel === 'map-info' && mapInfo && (
-                  <div className="flex-1 overflow-y-auto px-2 pt-1 pb-2 space-y-2 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200 min-h-0">
-                    {/* Title - Inline */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-medium text-white/70">Title:</span>
-                      <span className="text-xs font-medium text-white">{mapInfo.name}</span>
-                    </div>
-                    
-                    {/* Description - Inline */}
-                    {mapInfo.description && (
-                      <div className="flex items-start gap-2">
-                        <span className="text-[10px] font-medium text-white/70 flex-shrink-0">Description:</span>
-                        <span className="text-xs text-white/90 whitespace-pre-wrap break-words flex-1">{mapInfo.description}</span>
-                      </div>
-                    )}
-                    
-                    {/* Owner - Inline */}
-                    {mapInfo.account && !mapInfo.hideCreator && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium text-white/70 flex-shrink-0">Owner:</span>
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                          {mapInfo.account.image_url ? (
-                            <div className="w-4 h-4 rounded-full overflow-hidden flex-shrink-0 border border-white/20">
-                              <Image
-                                src={mapInfo.account.image_url}
-                                alt={mapInfo.account.username || mapInfo.account.first_name || 'User'}
-                                width={16}
-                                height={16}
-                                className="w-full h-full object-cover"
-                                unoptimized
-                              />
-                            </div>
-                          ) : (
-                            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 border border-white/20">
-                              <span className="text-[8px] text-white/70">
-                                {(mapInfo.account.first_name?.[0] || mapInfo.account.username?.[0] || 'U').toUpperCase()}
-                              </span>
-                            </div>
-                          )}
-                          <span className="text-xs font-medium text-white truncate">
-                            {mapInfo.account.username 
-                              ? `@${mapInfo.account.username}`
-                              : mapInfo.account.first_name && mapInfo.account.last_name
-                              ? `${mapInfo.account.first_name} ${mapInfo.account.last_name}`
-                              : mapInfo.account.first_name || 'User'}
-                          </span>
-                          {account && mapInfo.account && account.id === mapInfo.account.id && (
-                            <span className="text-[10px] font-medium text-white/70 bg-white/10 px-1.5 py-0.5 rounded flex-shrink-0">
-                              Owner
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Settings - Inline */}
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-medium text-white/70">Visibility:</span>
-                      <span className="text-xs font-medium text-white capitalize">{mapInfo.visibility || 'private'}</span>
-                    </div>
-                    
-                    {/* Statistics - Inline */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                      {mapInfo.viewCount !== null && mapInfo.viewCount !== undefined && (
-                        <div className="flex items-center gap-1.5">
-                          <EyeIcon className="w-3.5 h-3.5 text-white/70" />
-                          <span className="text-[10px] font-medium text-white/70">Views:</span>
-                          <span className="text-xs font-medium text-white">
-                            {mapInfo.viewCount.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      {mapInfo.pinCount !== null && mapInfo.pinCount !== undefined && (
-                        <div className="flex items-center gap-1.5">
-                          <MapPinIcon className="w-3.5 h-3.5 text-white/70" />
-                          <span className="text-[10px] font-medium text-white/70">Pins:</span>
-                          <span className="text-xs font-medium text-white">
-                            {mapInfo.pinCount.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                      {mapInfo.memberCount !== null && mapInfo.memberCount !== undefined && (
-                        <div className="flex items-center gap-1.5">
-                          <UsersIcon className="w-3.5 h-3.5 text-white/70" />
-                          <span className="text-[10px] font-medium text-white/70">Members:</span>
-                          <span className="text-xs font-medium text-white">
-                            {mapInfo.memberCount.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Timestamps - Inline */}
-                    {(mapInfo.created_at || mapInfo.updated_at) && (
-                      <div className="flex flex-col gap-1">
-                        {mapInfo.created_at && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-medium text-white/70">Created:</span>
-                            <span className="text-xs text-white/80">
-                              {new Date(mapInfo.created_at).toLocaleDateString()} {new Date(mapInfo.created_at).toLocaleTimeString()}
-                            </span>
-                          </div>
-                        )}
-                        {mapInfo.updated_at && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-medium text-white/70">Updated:</span>
-                            <span className="text-xs text-white/80">
-                              {new Date(mapInfo.updated_at).toLocaleDateString()} {new Date(mapInfo.updated_at).toLocaleTimeString()}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Inline Join Form for Non-Members */}
-                    {mapMembership && !mapMembership.isMember && !mapMembership.isOwner && mapMembership.mapData && (
-                      <JoinFormInline
-                        mapData={mapMembership.mapData}
-                        onJoinSuccess={() => {
-                          mapMembership.onJoinSuccess?.();
-                          // Panel will auto-close when membership updates
-                        }}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Expanded Chat Feed Skeleton */}
-                {expandedPanel === 'chat' && (
-                  <div className="px-2 pt-1 pb-2 space-y-3 border-t border-white/10 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="text-xs font-semibold text-white mb-2">Chat</div>
-                    {/* Skeleton feed items */}
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="flex items-start gap-2 p-[10px] bg-white/10 border border-white/20 rounded-md">
-                        {/* Avatar skeleton */}
-                        <div className="w-6 h-6 rounded-full bg-white/10 flex-shrink-0 animate-pulse" />
-                        {/* Content skeleton */}
-                        <div className="flex-1 space-y-1.5">
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 w-16 bg-white/10 rounded animate-pulse" />
-                            <div className="h-2 w-12 bg-white/10 rounded animate-pulse" />
-                          </div>
-                          <div className="space-y-1">
-                            <div className="h-3 w-full bg-white/10 rounded animate-pulse" />
-                            <div className="h-3 w-3/4 bg-white/10 rounded animate-pulse" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {/* Mention Type Filters */}
-                {selectedMentionTypes.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 justify-center pt-1 border-t border-white/10">
-                    {selectedMentionTypes.map((type) => (
-                      <div
-                        key={type.id}
-                        className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 rounded-md text-xs border whitespace-nowrap bg-white/10 border-white/30 text-white"
-                      >
-                        <span className="text-base flex-shrink-0">{type.emoji}</span>
-                        <span className="font-medium leading-none">{type.name}</span>
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleRemoveType(type.slug);
-                          }}
-                          className="hover:opacity-70 transition-opacity flex items-center justify-center flex-shrink-0 leading-none ml-0.5 text-white"
-                          aria-label={`Remove ${type.name} filter`}
-                        >
-                          <XCircleIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-around">
+      {/* Bottom nav (mobile) - height fits icon row only, no extra space above */}
+      {!isSearchMode && !isOnboardingPage && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex flex-col items-stretch"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="backdrop-blur-lg rounded-t-2xl shadow-2xl border-t border-white/10 flex-shrink-0 min-h-0 py-0">
+            <div className="flex items-center justify-around h-9 min-h-9 max-h-9">
                 {navItems.map((item) => {
                   // Hash-based items use currentHash state to avoid hydration mismatch
                   const isActive = item.href?.startsWith('#')
@@ -1330,9 +844,9 @@ export default function PageWrapper({
                       <button
                         key={item.label}
                         onClick={(item as any).onClick}
-                        className="flex items-center justify-center flex-1 h-9 transition-colors hover:bg-white/10 rounded-xl"
+                        className={`flex items-center justify-center flex-1 h-9 transition-colors ${headerHover} rounded-xl`}
                       >
-                        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/60'}`} />
+                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
                       </button>
                     );
                   }
@@ -1341,14 +855,13 @@ export default function PageWrapper({
                     <Link
                       key={item.label}
                       href={item.href!}
-                      className="flex items-center justify-center flex-1 h-9 transition-colors hover:bg-white/10 rounded-xl"
+                      className={`flex items-center justify-center flex-1 h-9 transition-colors ${headerHover} rounded-xl`}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-white/60'}`} />
+                      <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
                     </Link>
                   );
                 })}
               </div>
-            )}
           </div>
         </div>
       )}

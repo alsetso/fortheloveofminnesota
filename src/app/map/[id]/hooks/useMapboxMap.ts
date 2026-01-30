@@ -14,9 +14,11 @@ interface UseMapboxMapOptions {
     zoom?: number;
   } | null;
   onMapLoad?: (map: MapboxMapInstance) => void;
+  /** When false, omit maxBounds and allow minZoom 0 (e.g. /live map). Default true. */
+  restrictToMinnesota?: boolean;
 }
 
-export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad }: UseMapboxMapOptions) {
+export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, restrictToMinnesota = true }: UseMapboxMapOptions) {
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const hasInitializedRef = useRef(false);
@@ -90,18 +92,29 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad }: UseMap
         };
         const style = getStyleUrl();
 
+        const center = restrictToMinnesota
+          ? (meta?.center || MAP_CONFIG.DEFAULT_CENTER)
+          : (meta?.center ?? MAP_CONFIG.DEFAULT_CENTER);
+        const zoom = restrictToMinnesota
+          ? (meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM)
+          : (meta?.zoom ?? 4);
+        const pitch = restrictToMinnesota ? (meta?.pitch ?? 60) : (meta?.pitch ?? 0);
+
         const mapInstance = new mapbox.Map({
           container: containerRef.current,
           style,
-          center: meta?.center || MAP_CONFIG.DEFAULT_CENTER,
-          zoom: meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM,
-          pitch: meta?.pitch ?? 60,
+          center,
+          zoom,
+          pitch,
           bearing: 0,
+          minZoom: restrictToMinnesota ? undefined : MAP_CONFIG.MIN_ZOOM,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
-          maxBounds: [
-            [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
-            [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
-          ],
+          ...(restrictToMinnesota && {
+            maxBounds: [
+              [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+              [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+            ],
+          }),
         });
 
         mapInstanceRef.current = mapInstance as MapboxMapInstance;
@@ -112,16 +125,21 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad }: UseMap
             if (loadTimeoutId) {
               clearTimeout(loadTimeoutId);
             }
-            setTimeout(() => {
-              if (mapInstance && !(mapInstance as MapboxMapInstance)._removed) {
-                mapInstance.resize();
-              }
-            }, 100);
-            mapLoadedRef.current = true;
-            setMapLoaded(true);
-            if (onMapLoad) {
-              onMapLoad(mapInstance as MapboxMapInstance);
-            }
+            // Use double rAF so resize runs after layout; then mark loaded (faster than fixed 100ms)
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                if (mounted && mapInstance && !(mapInstance as MapboxMapInstance)._removed) {
+                  mapInstance.resize();
+                }
+                if (mounted) {
+                  mapLoadedRef.current = true;
+                  setMapLoaded(true);
+                  if (onMapLoad) {
+                    onMapLoad(mapInstance as MapboxMapInstance);
+                  }
+                }
+              });
+            });
           }
         });
 
@@ -177,7 +195,7 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad }: UseMap
       mapLoadedRef.current = false;
       setMapLoaded(false);
     };
-  }, [mapStyle, containerRef, meta, onMapLoad]);
+  }, [mapStyle, containerRef, meta, onMapLoad, restrictToMinnesota]);
 
   return {
     mapInstance: mapInstanceRef.current,

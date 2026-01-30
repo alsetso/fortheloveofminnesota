@@ -24,7 +24,7 @@ export default function MapProfileHeader({ isOwnProfile }: MapProfileHeaderProps
 
   const handleAccountImageClick = () => {
     if (account?.username) {
-      router.push(`/profile/${account.username}`);
+      router.push(`/${account.username}`);
     }
   };
 

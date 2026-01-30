@@ -93,8 +93,8 @@ export function AuthStateProvider({ children, initialAuth }: AuthStateProviderPr
   const [activeModal, setActiveModal] = useState<AuthModalType>('none');
   const [accountModalTab, setAccountModalTab] = useState<string | null>(null);
   
-  // Use AppModalContext for onboarding (separate from account modal)
-  const { openOnboarding } = useAppModalContextSafe();
+  // Onboarding is now handled via page redirect, not modal
+  // Removed: const { openOnboarding } = useAppModalContextSafe();
   
   // Track previous account ID to detect changes
   const previousAccountIdRef = useRef<string | null>(null);
@@ -331,7 +331,8 @@ export function AuthStateProvider({ children, initialAuth }: AuthStateProviderPr
             }
           }
           if (needsOnboarding) {
-            openOnboarding();
+            // Redirect to onboarding page instead of opening modal
+            router.push('/onboarding');
           }
         }
 
@@ -389,13 +390,6 @@ export function AuthStateProvider({ children, initialAuth }: AuthStateProviderPr
                 
                 // Navigate to the redirect URL
                 router.push(redirectParam);
-                return; // Exit early to avoid profile redirect
-              }
-              
-              // Default: Redirect to profile after login if account has username
-              // Only redirect if we're on the homepage (/) to avoid interrupting other flows
-              if (accountData.username && window.location.pathname === '/') {
-                router.push(`/profile/${accountData.username}`);
               }
             }
           }
@@ -405,7 +399,8 @@ export function AuthStateProvider({ children, initialAuth }: AuthStateProviderPr
       } catch (error) {
         console.error('[AuthStateContext] Error loading account:', error);
         setAccount(null);
-        openOnboarding();
+        // Redirect to onboarding page instead of opening modal
+        router.push('/onboarding');
       } finally {
         setIsAccountLoading(false);
       }
@@ -601,7 +596,7 @@ export function AuthStateProvider({ children, initialAuth }: AuthStateProviderPr
 
   // Helpers
   const getProfileUrl = () => {
-    if (account?.username) return `/profile/${account.username}`;
+    if (account?.username) return `/${account.username}`;
     return null;
   };
 

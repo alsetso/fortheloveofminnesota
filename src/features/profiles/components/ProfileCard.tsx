@@ -47,8 +47,8 @@ export default function ProfileCard({
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
   
-  // Hide "View Profile" button if we're already on the profile page
-  const isOnProfilePage = pathname?.startsWith('/profile/');
+  // Hide "View Profile" button if we're already on this account's profile page (/:username)
+  const isOnProfilePage = !!(account?.username && pathname === `/${account.username}`);
   
   const coverInputRef = useRef<HTMLInputElement>(null);
   const profileInputRef = useRef<HTMLInputElement>(null);
@@ -266,15 +266,7 @@ export default function ProfileCard({
               ))
             ) : (
               isOwnProfile ? (
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-[10px] text-gray-500">Let other Minnesotans know your vibe</span>
-                  <Link
-                    href="/settings"
-                    className="px-1.5 py-0.5 text-[10px] font-medium text-gray-900 hover:bg-gray-100 rounded transition-colors border border-gray-300"
-                  >
-                    +add traits
-                  </Link>
-                </div>
+                <span className="text-[10px] text-gray-500">Let other Minnesotans know your vibe</span>
               ) : (
                 <span className="text-[10px] text-gray-400">No traits selected</span>
               )
@@ -330,7 +322,7 @@ export default function ProfileCard({
             <div className="grid grid-cols-2 gap-2">
               {/* View Profile Button */}
               <Link
-                href={`/profile/${account.username}`}
+                href={`/${account.username}`}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
               >
                 <EyeIcon className="w-3 h-3" />
@@ -353,7 +345,7 @@ export default function ProfileCard({
         {showViewProfile && !isOwnProfile && account.username && !isOnProfilePage && (
           <div className="pt-3 mt-3 border-t border-gray-200">
             <Link
-              href={`/profile/${account.username}`}
+              href={`/${account.username}`}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors"
             >
               <span>View Profile</span>

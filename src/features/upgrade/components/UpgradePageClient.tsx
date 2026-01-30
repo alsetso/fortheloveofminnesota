@@ -103,7 +103,7 @@ export default function UpgradePageClient() {
                       onClick={() => {
                         setShowAccountDropdown(false);
                         if (account.username) {
-                          router.push(`/profile/${account.username}`);
+                          router.push(`/${account.username}`);
                         }
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"

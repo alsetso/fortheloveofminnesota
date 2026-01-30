@@ -57,13 +57,12 @@ export async function GET(
         if (isUUID(identifier)) {
           mapId = identifier;
         } else {
-          // Look up map by custom_slug
           const { data: map, error: mapError } = await supabase
             .from('map')
             .select('id')
-            .eq('custom_slug', identifier)
+            .eq('slug', identifier)
+            .eq('is_active', true)
             .single();
-          
           if (mapError || !map) {
             return createErrorResponse('Map not found', 404);
           }
@@ -257,7 +256,7 @@ export async function PUT(
 
 /**
  * DELETE /api/maps/[id]/pins/[pinId]
- * Delete a pin (map owner only)
+ * Delete a pin (map owner or pin author)
  * 
  * Security:
  * - Rate limited: 200 requests/minute (authenticated)
@@ -310,7 +309,7 @@ export async function DELETE(
         // Check if pin exists
         const { data: pin, error: pinError } = await supabase
           .from('map_pins')
-          .select('map_id')
+          .select('map_id, account_id')
           .eq('id', validatedPinId)
           .eq('map_id', mapId)
           .single();
@@ -319,7 +318,9 @@ export async function DELETE(
           return createErrorResponse('Pin not found', 404);
         }
 
-        // Check if user owns the map
+        const pinAccountId = (pin as any).account_id;
+
+        // Check if user owns the map or is the pin author (can delete own pin on any map)
         const { data: map, error: mapError } = await supabase
           .from('map')
           .select('account_id')
@@ -330,8 +331,9 @@ export async function DELETE(
           return createErrorResponse('Map not found', 404);
         }
 
-        if ((map as any).account_id !== accountId) {
-          return createErrorResponse('Forbidden - you do not own this map', 403);
+        const mapOwnerId = (map as any).account_id;
+        if (mapOwnerId !== accountId && pinAccountId !== accountId) {
+          return createErrorResponse('Forbidden - you do not own this map or this pin', 403);
         }
 
         // Delete pin

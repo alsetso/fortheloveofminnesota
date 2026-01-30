@@ -10,15 +10,24 @@ import { useToastContext } from '@/features/ui/contexts/ToastContext';
 import { createToast } from '@/features/ui/services/toast';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import type { MapData } from '@/types/map';
+import { ZOOM_SCALE_REFERENCE } from '@/features/map/config';
 
 /**
  * Click target priority order (highest to lowest):
  * 1. Pins (custom map pins)
  * 2. Areas (drawn areas)
  * 3. Mentions (user-generated content on live map)
- * 4. Map (empty space for location selection/pin creation)
+ * 4. Boundary layers (state/county/CTU – handled by layer’s own handler; we do not overwrite popup)
+ * 5. Map (empty space for location selection/pin creation)
+ *
+ * Zoom and URL/footer behavior:
+ * - Boundary click: Layer handler sets locationSelectPopup (mapMeta with boundaryLayer, boundaryEntityId).
+ *   No zoom here. Live page sets URL ?layer=&id= and shows MapInfo in app footer.
+ * - Pin click: onPinClick; live page sets URL ?pin= and shows LivePinCard. Map may fly to pin when pin in URL.
+ * - Map click (empty): flyTo(center, zoom = max(current+2, 15)); set locationSelectPopup (lat/lng, no boundary).
+ *   Live page clears layer/id from URL, shows MapInfo with coordinates.
  */
-type ClickTarget = 'pin' | 'area' | 'mention' | 'map' | null;
+type ClickTarget = 'pin' | 'area' | 'mention' | 'boundary' | 'map' | null;
 
 interface ClickResult {
   target: ClickTarget;
@@ -49,6 +58,10 @@ interface UnifiedMapClickHandlerOptions {
   onAreaClick?: (areaId: string) => void;
   onMentionClick?: (mentionId: string) => void;
   onMapClick?: (coordinates: { lat: number; lng: number }, mapMeta: Record<string, any> | null) => void;
+  /** Called when a boundary (state/county/CTU) is clicked. Use to set layer entity and open sidebar. */
+  onBoundaryClick?: (feature: { layer?: { id: string }; properties?: Record<string, unknown>; geometry?: unknown }) => void;
+  /** When true, show "Not minnesota" error toast when user clicks outside Minnesota (e.g. on /live). */
+  isLiveMap?: boolean;
 }
 
 interface LocationSelectPopup {
@@ -85,10 +98,14 @@ export function useUnifiedMapClickHandler({
   onAreaClick,
   onMentionClick,
   onMapClick,
+  onBoundaryClick,
+  isLiveMap = false,
 }: UnifiedMapClickHandlerOptions) {
   const router = useRouter();
   const { addToast } = useToastContext();
   const mapInstanceRef = useRef(map);
+  const isLiveMapRef = useRef(isLiveMap);
+  isLiveMapRef.current = isLiveMap;
   
   // Store frequently changing values in refs
   const mapDataRef = useRef(mapData);
@@ -103,7 +120,8 @@ export function useUnifiedMapClickHandler({
   const onAreaClickRef = useRef(onAreaClick);
   const onMentionClickRef = useRef(onMentionClick);
   const onMapClickRef = useRef(onMapClick);
-  
+  const onBoundaryClickRef = useRef(onBoundaryClick);
+
   // Update refs when values change
   useEffect(() => { mapInstanceRef.current = map; }, [map]);
   useEffect(() => { mapDataRef.current = mapData; }, [mapData]);
@@ -118,6 +136,7 @@ export function useUnifiedMapClickHandler({
   useEffect(() => { onAreaClickRef.current = onAreaClick; }, [onAreaClick]);
   useEffect(() => { onMentionClickRef.current = onMentionClick; }, [onMentionClick]);
   useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
+  useEffect(() => { onBoundaryClickRef.current = onBoundaryClick; }, [onBoundaryClick]);
 
   // Location select popup state
   const [locationSelectPopup, setLocationSelectPopup] = useState<LocationSelectPopup>({
@@ -282,7 +301,36 @@ export function useUnifiedMapClickHandler({
       // Continue to next priority
     }
 
-    // Priority 4: Map click (empty space)
+    // Priority 4: Boundary layers (state, county, CTU) – layer’s handler sets footer; we skip so we don’t overwrite
+    const boundaryLayers = ['state-boundary-fill', 'county-boundaries-fill', 'ctu-boundaries-fill'];
+    try {
+      const existingBoundaryLayers = boundaryLayers.filter((layerId) => {
+        try {
+          return mapboxMap.getLayer(layerId) !== undefined;
+        } catch {
+          return false;
+        }
+      });
+      if (existingBoundaryLayers.length > 0) {
+        const boundaryFeatures = mapboxMap.queryRenderedFeatures(box, {
+          layers: existingBoundaryLayers,
+        });
+        if (boundaryFeatures.length > 0) {
+          const feature = boundaryFeatures[0];
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('[UnifiedMapClickHandler] onclick: target=boundary', { layerId: feature.layer?.id });
+          }
+          return { target: 'boundary', feature, layerId: feature.layer?.id };
+        }
+      }
+    } catch {
+      // Continue to next priority
+    }
+
+    // Priority 5: Map click (empty space)
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[UnifiedMapClickHandler] onclick: target=map (empty space)');
+    }
     return { target: 'map' };
   }, []);
 
@@ -333,8 +381,15 @@ export function useUnifiedMapClickHandler({
       return;
     }
 
-    // Check if clicks should be rejected (non-member or collaboration tool disabled)
-    if (shouldRejectClick()) {
+    // Detect what was clicked first so we only reject for empty-map clicks (allow boundary/pin/area/mention for viewing)
+    const clickResult = detectClickTarget(mapboxMap, e.point);
+    const { target, entityId, feature } = clickResult;
+
+    const lng = e.lngLat.lng;
+    const lat = e.lngLat.lat;
+
+    // Reject only when clicking empty map. Never reject for entity/boundary clicks (viewing is always allowed).
+    if (target === 'map' && shouldRejectClick()) {
       addToast(createToast('error', 'Map clicks disabled', {
         message: 'You must be a member and the collaboration tool must be enabled to interact with the map.',
         duration: 3000,
@@ -343,29 +398,34 @@ export function useUnifiedMapClickHandler({
       return;
     }
 
-    // Stop event propagation to prevent other handlers from firing
-    if (e.originalEvent) {
+    // Only stop propagation when handling map click; allow boundary layer handlers (popup) to run
+    if (target === 'map' && e.originalEvent) {
       e.originalEvent.stopPropagation();
       e.originalEvent.preventDefault();
     }
 
-    // Get current values from refs
     const currentMapData = mapDataRef.current;
     const currentAccount = accountRef.current;
     const currentCheckPermission = checkPermissionRef.current;
     const currentPinMode = pinModeRef.current;
     const currentShowAreaDrawModal = showAreaDrawModalRef.current;
 
-    // Detect what was clicked
-    const clickResult = detectClickTarget(mapboxMap, e.point);
-    const { target, entityId } = clickResult;
-
-    const lng = e.lngLat.lng;
-    const lat = e.lngLat.lat;
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[UnifiedMapClickHandler] onclick: goal=', target === 'map' ? 'location-select-or-pin' : target === 'boundary' ? 'leave-footer-to-boundary-handler' : target);
+    }
 
     // Handle based on click target priority
     try {
       switch (target) {
+        case 'boundary':
+          // Layer handler (state/county/CTU/district) already set locationSelectPopup via onBoundarySelect; do not overwrite.
+          if (feature && onBoundaryClickRef.current) {
+            removeClickMarkerRef.current();
+            setClickedCoordinates(null);
+            onBoundaryClickRef.current(feature);
+          }
+          return;
+
         case 'pin':
           if (entityId && onPinClickRef.current) {
             // Remove click marker and close location popup when clicking on pin
@@ -417,7 +477,14 @@ export function useUnifiedMapClickHandler({
           }
           return;
 
-        case 'map':
+        case 'map': {
+          // On live map, show red toast when clicking outside Minnesota
+          if (!MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) {
+            if (isLiveMapRef.current) {
+              addToast(createToast('error', 'Not minnesota', { duration: 3000 }));
+            }
+            break;
+          }
           // Map click - handle based on mode and permissions
           handleMapClickTarget({
             mapboxMap,
@@ -436,6 +503,7 @@ export function useUnifiedMapClickHandler({
             onMapClick: onMapClickRef.current,
           });
           break;
+        }
       }
     } finally {
       // Always reset processing flag after handling
@@ -564,6 +632,12 @@ async function handleMapClickTarget({
     if (allowed === false) {
       return; // Permission denied
     }
+  }
+
+  // Don't show placemarker or open location popup until zoom >= 12 (pins load at 12px)
+  const zoom = typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 12;
+  if (zoom < ZOOM_SCALE_REFERENCE.CITY) {
+    return;
   }
 
   // Set click marker

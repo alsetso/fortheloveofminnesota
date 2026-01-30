@@ -285,7 +285,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
                   </button>
                   {post.account?.username && (
                     <Link
-                      href={`/profile/${post.account.username}`}
+                      href={`/${post.account.username}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -335,7 +335,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
           {/* Author Info */}
           {post.account && (
             <div className="flex items-center gap-3 mb-4">
-              <Link href={`/profile/${username}`}>
+              <Link href={`/${username}`}>
                 <ProfilePhoto 
                   account={post.account as unknown as Account} 
                   size="md" 
@@ -344,7 +344,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
               </Link>
               <div className="flex-1">
                 <Link 
-                  href={`/profile/${username}`}
+                  href={`/${username}`}
                   className="text-sm font-semibold text-gray-900 hover:opacity-80 transition-opacity"
                 >
                   @{username}
@@ -384,7 +384,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
           {/* Images - Filter out map screenshot if it exists in map_data */}
           {post.images && post.images.length > 0 && (() => {
             // Filter out map screenshot from images if it exists in map_data
-            const filteredImages = post.map_data!?.screenshot
+            const filteredImages = post.map_data?.screenshot
               ? post.images.filter(img => img.url !== post.map_data!.screenshot)
               : post.images;
             
@@ -432,7 +432,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
 
           {/* Image Modal */}
           {selectedImageIndex !== null && post.images && (() => {
-            const filteredImages = post.map_data!?.screenshot
+            const filteredImages = post.map_data?.screenshot
               ? post.images.filter(img => img.url !== post.map_data!.screenshot)
               : post.images;
             const image = filteredImages[selectedImageIndex];

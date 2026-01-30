@@ -53,7 +53,6 @@ export async function PUT(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id, settings, member_count');
@@ -70,7 +69,7 @@ export async function PUT(
         }
 
         const mapData = map as { account_id: string; id: string; settings: MapSettings; member_count: number };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: member } = await supabase
@@ -234,7 +233,6 @@ export async function DELETE(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id');
@@ -251,7 +249,7 @@ export async function DELETE(
         }
 
         const mapData = map as { account_id: string; id: string };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: member } = await supabase

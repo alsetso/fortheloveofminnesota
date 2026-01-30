@@ -130,8 +130,8 @@ export default function MobileNav({
   const useWhiteText = useBlurStyle && currentMapStyle === 'satellite';
   const useTransparentUI = useBlurStyle && currentMapStyle === 'satellite';
 
-  const profileHref = account?.username ? `/profile/${account.username}` : '/account/settings';
-  const isProfileActive = account?.username ? pathname === `/profile/${account.username}` : pathname?.startsWith('/account');
+  const profileHref = account?.username ? `/${account.username}` : '/account/settings';
+  const isProfileActive = account?.username ? pathname === `/${account.username}` : pathname?.startsWith('/account');
   const isNewsActive = pathname === '/news';
   
   const secondaryNavItems = getMobileNavItems(account);

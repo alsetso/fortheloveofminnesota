@@ -329,7 +329,7 @@ export default function MentionLocationSheet({
                 if (user && account.username) {
                   return (
                     <Link
-                      href={`/profile/${encodeURIComponent(account.username)}`}
+                      href={`/${encodeURIComponent(account.username)}`}
                       onClick={handleClose}
                       className="flex items-center gap-1.5"
                     >
@@ -406,7 +406,7 @@ export default function MentionLocationSheet({
                   )}
                   {((fullMention?.account || (selectedMention as any)?.account)?.username) && (
                     <Link
-                      href={`/profile/${encodeURIComponent((fullMention?.account || (selectedMention as any)?.account)!.username!)}`}
+                      href={`/${encodeURIComponent((fullMention?.account || (selectedMention as any)?.account)!.username!)}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-1.5 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >

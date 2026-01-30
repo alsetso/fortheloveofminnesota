@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import toast, { Toaster } from 'react-hot-toast';
@@ -36,8 +36,42 @@ import type { MapData } from '@/types/map';
 // Lazy load ContributeOverlay - only needed when #contribute hash is present
 const ContributeOverlay = lazy(() => import('./components/ContributeOverlay'));
 
-export default function MapPage({ params }: { params: Promise<{ id: string }> }) {
+export interface MapPageLocationSelect {
+  lat: number;
+  lng: number;
+  address: string | null;
+  isOpen: boolean;
+  mapMeta?: Record<string, any> | null;
+}
+
+import type { LiveMapFooterStatusState, BoundarySelectionItem } from '@/components/layout/LiveMapFooterStatus';
+import type { LiveBoundaryLayerId } from '@/features/map/config';
+
+interface MapPageProps {
+  params: Promise<{ id: string }>;
+  /** When true, render only map content (no PageWrapper). Used by /live with AppContainer. */
+  skipPageWrapper?: boolean;
+  /** Called when location selection changes (e.g. map click). Used by /live to show location in app footer. */
+  onLocationSelect?: (info: MapPageLocationSelect) => void;
+  /** Called when live map loading state changes (for /live footer status strip). */
+  onLiveStatusChange?: (status: LiveMapFooterStatusState) => void;
+  /** When set (e.g. on /live), pin clicks call this; pass pinData when resolved from URL or after fetch. */
+  onLivePinSelect?: (pinId: string, pinData?: Record<string, unknown> | null) => void;
+  /** When set (e.g. on /live), single boundary layer to show; only one at a time, toggled from main menu. */
+  liveBoundaryLayer?: LiveBoundaryLayerId | null;
+  /** When set (e.g. on /live), register a clear-selection function so footer close can sync map/status state. */
+  onRegisterClearSelection?: (clearFn: () => void) => void;
+  /** When false, show all pins unclustered on live map. When true (default), cluster pins. */
+  pinDisplayGrouping?: boolean;
+  /** When true on /live, show only current account's pins. Default false. */
+  showOnlyMyPins?: boolean;
+  /** When on /live: time filter for pins (24h, 7d, or null = all time). */
+  timeFilter?: '24h' | '7d' | null;
+}
+
+export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null }: MapPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const mapInstanceRef = useRef<any>(null);
@@ -225,12 +259,119 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
 
 
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [loadingPins, setLoadingPins] = useState(false);
+  const [loadingStateBoundary, setLoadingStateBoundary] = useState<boolean | undefined>(undefined);
+  const [loadingCountyBoundaries, setLoadingCountyBoundaries] = useState<boolean | undefined>(undefined);
+  const [loadingCongressionalDistricts, setLoadingCongressionalDistricts] = useState<boolean | undefined>(undefined);
+  const [loadingCTUBoundaries, setLoadingCTUBoundaries] = useState<boolean | undefined>(undefined);
+  const [liveMapZoom, setLiveMapZoom] = useState<number | undefined>(undefined);
 
   // Stable map load handler so Mapbox is only initialized once per mount
   const handleMapLoad = useCallback((map: any) => {
     mapInstanceRef.current = map;
     setMapLoaded(true);
   }, []);
+
+  // Zoom to pin when ?pin=id or ?lat=&lng= in URL (e.g. from homepage feed). Do not remove params — pin stays in URL until user closes footer. Re-apply zoom when pins load so we run after layers and avoid reset.
+  const urlPinFlownRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mapLoaded || !mapInstanceRef.current) return;
+
+    const pinId = searchParams.get('pin');
+    const latParam = searchParams.get('lat');
+    const lngParam = searchParams.get('lng');
+
+    let lat: number;
+    let lng: number;
+    let key: string;
+
+    if (pinId && initialPins.length > 0) {
+      const resolvedPin = initialPins.find((p: { id?: string }) => p.id === pinId);
+      if (!resolvedPin || typeof (resolvedPin as { lat?: number }).lat !== 'number' || typeof (resolvedPin as { lng?: number }).lng !== 'number') return;
+      lat = (resolvedPin as { lat: number }).lat;
+      lng = (resolvedPin as { lng: number }).lng;
+      key = `pin-${pinId}`;
+      onLivePinSelect?.(pinId, resolvedPin as Record<string, unknown>);
+    } else if (latParam != null && lngParam != null) {
+      const parsedLat = parseFloat(latParam);
+      const parsedLng = parseFloat(lngParam);
+      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLng)) return;
+      lat = parsedLat;
+      lng = parsedLng;
+      key = `ll-${lat}-${lng}`;
+    } else {
+      return;
+    }
+
+    if (urlPinFlownRef.current === key) return;
+    urlPinFlownRef.current = key;
+
+    const fly = () => {
+      if (!mapInstanceRef.current) return;
+      mapInstanceRef.current.flyTo({
+        center: [lng, lat],
+        zoom: 15,
+        duration: 800,
+      });
+    };
+
+    const t = setTimeout(fly, initialPins.length > 0 ? 400 : 150);
+    return () => clearTimeout(t);
+  }, [mapLoaded, searchParams, initialPins, onLivePinSelect]);
+
+  const handleBoundaryLayerLoadChange = useCallback((layerId: 'state' | 'county' | 'district' | 'ctu', loading: boolean) => {
+    if (layerId === 'state') setLoadingStateBoundary(loading);
+    else if (layerId === 'county') setLoadingCountyBoundaries(loading);
+    else if (layerId === 'district') setLoadingCongressionalDistricts(loading);
+    else setLoadingCTUBoundaries(loading);
+  }, []);
+
+  const [selectedBoundaries, setSelectedBoundaries] = useState<BoundarySelectionItem[]>([]);
+
+  const handleBoundarySelect = useCallback((item: BoundarySelectionItem & { details?: Record<string, unknown> }) => {
+    const lat = Number(item.lat);
+    const lng = Number(item.lng);
+    const entityId = (item.id != null && String(item.id).trim() !== '') ? String(item.id).trim() : '';
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[LiveBoundary] MapPage handleBoundarySelect', {
+        layer: item.layer,
+        id: item.id,
+        entityId,
+        name: item.name,
+        mapMetaBoundaryEntityId: entityId || (item.id != null ? String(item.id) : ''),
+      });
+    }
+    setSelectedBoundaries([{ layer: item.layer, id: entityId || (item.id != null ? String(item.id) : ''), name: item.name, lat: Number.isFinite(lat) ? lat : 0, lng: Number.isFinite(lng) ? lng : 0 }]);
+    setLocationSelectPopup({
+      isOpen: true,
+      lat: Number.isFinite(lat) ? lat : 0,
+      lng: Number.isFinite(lng) ? lng : 0,
+      address: null,
+      mapMeta: {
+        boundaryLayer: item.layer,
+        boundaryName: item.name,
+        boundaryEntityId: entityId || (item.id != null ? String(item.id) : ''),
+        feature: { name: item.name },
+        boundaryDetails: item.details ?? null,
+      },
+    });
+  }, []);
+
+  // Report live map status for footer status strip (skipPageWrapper = /live)
+  useEffect(() => {
+    if (!skipPageWrapper || !onLiveStatusChange) return;
+    onLiveStatusChange({
+      loadingData: loading,
+      mapLoaded,
+      loadingPins,
+      loadingStateBoundary,
+      loadingCountyBoundaries,
+      loadingCongressionalDistricts,
+      loadingCTUBoundaries,
+      currentZoom: liveMapZoom,
+      selectedBoundaries,
+    });
+  }, [skipPageWrapper, onLiveStatusChange, loading, mapLoaded, loadingPins, loadingStateBoundary, loadingCountyBoundaries, loadingCongressionalDistricts, loadingCTUBoundaries, liveMapZoom, selectedBoundaries]);
 
   // Location select popup state (managed by MapIDBox's unified handler)
   const [locationSelectPopup, setLocationSelectPopup] = useState({
@@ -240,7 +381,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
     address: null as string | null,
     mapMeta: null as Record<string, any> | null,
   });
-  
+
   const closePopup = useCallback(() => {
     setLocationSelectPopup({
       isOpen: false,
@@ -250,14 +391,45 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       mapMeta: null,
     });
   }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedBoundaries([]);
+    setLocationSelectPopup({
+      isOpen: false,
+      lat: 0,
+      lng: 0,
+      address: null,
+      mapMeta: null,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (skipPageWrapper && onRegisterClearSelection) {
+      onRegisterClearSelection(clearSelection);
+    }
+  }, [skipPageWrapper, onRegisterClearSelection, clearSelection]);
   
   const popupAddress = locationSelectPopup.address;
+
+  // Notify parent (e.g. /live) when location selection changes so it can show in app footer
+  useEffect(() => {
+    if (!skipPageWrapper || !onLocationSelect) return;
+    const lat = Number(locationSelectPopup.lat);
+    const lng = Number(locationSelectPopup.lng);
+    onLocationSelect({
+      lat: Number.isFinite(lat) ? lat : 0,
+      lng: Number.isFinite(lng) ? lng : 0,
+      address: locationSelectPopup.address ?? null,
+      isOpen: locationSelectPopup.isOpen,
+      mapMeta: locationSelectPopup.mapMeta ?? null,
+    });
+  }, [skipPageWrapper, onLocationSelect, locationSelectPopup.lat, locationSelectPopup.lng, locationSelectPopup.address, locationSelectPopup.isOpen, locationSelectPopup.mapMeta]);
 
   // Consolidated sidebar handlers
   const sidebarHandlers = useMapSidebarHandlers({ toggleSidebar, isLiveMap });
 
-  // Entity sidebar state (mentions, pins, areas)
-  const entitySidebar = useEntitySidebar();
+  // Entity sidebar state (mentions, pins, areas). On live page, do not open sidebar on pin/mention click (footer only).
+  const entitySidebar = useEntitySidebar({ disableForClicks: isLiveMap });
   
   // Success modal state for pin creation
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -327,6 +499,39 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       removeClickMarkerRef.current();
     }
   }, [showContributeOverlay]);
+
+  // Listen for open-contribute-overlay (e.g. from live page MapInfo "Add to map" button)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d && typeof d.lat === 'number' && typeof d.lng === 'number') {
+        openOverlay(
+          { lat: d.lat, lng: d.lng },
+          typeof d.mentionTypeId === 'string' ? d.mentionTypeId : undefined,
+          d.mapMeta ?? null,
+          d.address ?? null
+        );
+      }
+    };
+    window.addEventListener('open-contribute-overlay', handler as EventListener);
+    return () => window.removeEventListener('open-contribute-overlay', handler as EventListener);
+  }, [openOverlay]);
+
+  // Listen for live-search-pin-select (close #search and fly to pin on /live)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d && typeof d.lat === 'number' && typeof d.lng === 'number' && mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo({
+          center: [d.lng, d.lat],
+          zoom: 14,
+          duration: 500,
+        });
+      }
+    };
+    window.addEventListener('live-search-pin-select', handler as EventListener);
+    return () => window.removeEventListener('live-search-pin-select', handler as EventListener);
+  }, []);
 
   // Handle mention creation: fly to pin, show modal, select pin
   const handleMentionCreated = useCallback((mention: Mention) => {
@@ -414,9 +619,9 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
   }, [access.canViewMembers, openSidebar]);
 
   // URL normalization: automatically redirect ID URLs to slug URLs when available
-  // This ensures canonical URLs (slug preferred) while ID remains source of truth internally
+  // Skip when skipPageWrapper (e.g. /live) so we do not redirect off the current route
   useEffect(() => {
-    if (!mapData || !mapId || loading) return;
+    if (skipPageWrapper || !mapData || !mapId || loading) return;
     
     // Check if URL contains UUID but map has a slug/custom_slug
     if (shouldNormalizeUrl(mapId, mapData)) {
@@ -424,92 +629,10 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
       // Replace URL with canonical slug (no history entry, no scroll)
       router.replace(canonicalUrl, { scroll: false });
     }
-  }, [mapData, mapId, loading, router]);
+  }, [skipPageWrapper, mapData, mapId, loading, router]);
 
-  return (
-    <>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            fontSize: '12px',
-            padding: '10px',
-          },
-          success: {
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
-        }}
-      />
-      <PageWrapper
-        mapSettings={mapData?.settings ? {
-          ...mapData.settings,
-          colors: {
-            owner: mapData.settings.colors?.owner || 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
-            manager: mapData.settings.colors?.manager || '#000000',
-            editor: mapData.settings.colors?.editor || '#000000',
-            'non-member': mapData.settings.colors?.['non-member'] || '#000000',
-          },
-        } : null}
-        viewAsRole={isOwner ? viewAsRole : undefined}
-        mapMembership={{
-          isMember: effectiveIsMember,
-          isOwner: effectiveIsOwner,
-          onJoinClick: sidebarHandlers.handleJoinClick,
-          mapData: mapData ? {
-            id: mapData.id,
-            name: mapData.name,
-            description: mapData.description,
-            visibility: mapData.visibility,
-            auto_approve_members: mapData.auto_approve_members || false,
-            membership_questions: mapData.membership_questions || [],
-            membership_rules: mapData.membership_rules || null,
-            settings: mapData.settings || undefined,
-          } : null,
-          onJoinSuccess: () => {
-            // Membership will refresh automatically via useMapMembership hook
-          },
-        }}
-        headerContent={
-          <MapPageHeaderButtons
-            onSettingsClick={sidebarHandlers.handleSettingsClick}
-            onFilterClick={sidebarHandlers.handleFilterClick}
-            showSettings={access.canViewSettings}
-            showFilter={shouldShowFilterIcon}
-          />
-        }
-        searchComponent={
-          <MapSearchInput
-            map={mapInstanceRef.current}
-            onLocationSelect={(coordinates, placeName) => {
-              if (mapInstanceRef.current) {
-                mapInstanceRef.current.flyTo({
-                  center: [coordinates.lng, coordinates.lat],
-                  zoom: 15,
-                  duration: 1500,
-                });
-              }
-            }}
-          />
-        }
-        accountDropdownProps={{
-          onAccountClick: () => {
-            // Handle account click
-          },
-          onSignInClick: openWelcome,
-        }}
-        searchResultsComponent={<SearchResults />}
-      >
-        <div className={`relative w-full ${isLiveMap ? 'h-auto min-h-full' : 'h-full'}`} style={{ minHeight: 0, width: '100%' }}>
+  const mainContent = (
+    <div className={`relative w-full ${isLiveMap ? 'h-auto min-h-full' : 'h-full'}`} style={{ minHeight: 0, width: '100%' }}>
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50" style={{ height: isLiveMap ? '100vh' : '100%' }}>
               <div className="text-center">
@@ -553,6 +676,7 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                             'non-member': mapData.settings.colors?.['non-member'] || '#000000',
                           },
                         } : null}
+                        useDefaultAppearance={!mapData?.settings?.colors}
                       />
                     </div>
                   </div>
@@ -566,11 +690,13 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                     mapStyle={mapData.settings?.appearance?.map_style || 'street'}
                     mapId={mapData.id}
                     isOwner={effectiveIsOwner}
-                    meta={mapData.settings?.appearance?.meta}
-                    showDistricts={showDistricts}
-                    showCTU={showCTU}
-                    showStateBoundary={showStateBoundary}
-                    showCountyBoundaries={showCountyBoundaries}
+                    isLiveMap={isLiveMap}
+                    onLivePinSelect={onLivePinSelect}
+                    meta={isLiveMap ? undefined : mapData.settings?.appearance?.meta}
+                    showDistricts={isLiveMap && liveBoundaryLayer === 'district' ? true : showDistricts}
+                    showCTU={isLiveMap && liveBoundaryLayer === 'ctu' ? true : showCTU}
+                    showStateBoundary={isLiveMap && liveBoundaryLayer === 'state' ? true : showStateBoundary}
+                    showCountyBoundaries={isLiveMap && liveBoundaryLayer === 'county' ? true : showCountyBoundaries}
                     title={mapData.name}
                     description={mapData.description}
                     visibility={mapData.visibility}
@@ -614,9 +740,26 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
                       // Open contribute overlay with location, mapMeta, and address (same as location selected)
                       openOverlay(coordinates, undefined, mapMeta || null, fullAddress || null);
                     }}
+                    useDefaultAppearance={!mapData?.settings?.colors}
+                    showCollaborationTools={!skipPageWrapper}
+                    allowPinsLoad={
+                      !onLiveStatusChange ||
+                      liveBoundaryLayer == null ||
+                      (liveBoundaryLayer === 'state' && loadingStateBoundary === false) ||
+                      (liveBoundaryLayer === 'county' && loadingCountyBoundaries === false) ||
+                      (liveBoundaryLayer === 'district' && loadingCongressionalDistricts === false) ||
+                      (liveBoundaryLayer === 'ctu' && loadingCTUBoundaries === false)
+                    }
+                    onMentionsLoadingChange={onLiveStatusChange ? setLoadingPins : undefined}
+                    onBoundaryLayerLoadChange={onLiveStatusChange ? handleBoundaryLayerLoadChange : undefined}
+                    onBoundarySelect={handleBoundarySelect}
+                    onZoomChange={onLiveStatusChange ? setLiveMapZoom : undefined}
                     onRemoveClickMarker={(removeFn) => {
                       removeClickMarkerRef.current = removeFn;
                     }}
+                    pinDisplayGrouping={pinDisplayGrouping}
+                    showOnlyMyPins={showOnlyMyPins}
+                    timeFilter={timeFilter}
                   />
                 </MapPageLayout>
                 
@@ -637,7 +780,97 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
             </>
           )}
         </div>
-      </PageWrapper>
+  );
+
+  return (
+    <>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            fontSize: '12px',
+            padding: '10px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      {skipPageWrapper ? (
+        mainContent
+      ) : (
+        <PageWrapper
+          mapSettings={mapData?.settings ? {
+            ...mapData.settings,
+            colors: {
+              owner: mapData.settings.colors?.owner || 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
+              manager: mapData.settings.colors?.manager || '#000000',
+              editor: mapData.settings.colors?.editor || '#000000',
+              'non-member': mapData.settings.colors?.['non-member'] || '#000000',
+            },
+          } : null}
+          viewAsRole={isOwner ? viewAsRole : undefined}
+          mapMembership={{
+            isMember: effectiveIsMember,
+            isOwner: effectiveIsOwner,
+            onJoinClick: sidebarHandlers.handleJoinClick,
+            mapData: mapData ? {
+              id: mapData.id,
+              name: mapData.name,
+              description: mapData.description,
+              visibility: mapData.visibility,
+              auto_approve_members: mapData.auto_approve_members || false,
+              membership_questions: mapData.membership_questions || [],
+              membership_rules: mapData.membership_rules || null,
+              settings: mapData.settings || undefined,
+            } : null,
+            onJoinSuccess: () => {
+              // Membership will refresh automatically via useMapMembership hook
+            },
+          }}
+          headerContent={
+            <MapPageHeaderButtons
+              onSettingsClick={sidebarHandlers.handleSettingsClick}
+              onFilterClick={sidebarHandlers.handleFilterClick}
+              showSettings={access.canViewSettings}
+              showFilter={shouldShowFilterIcon}
+            />
+          }
+          searchComponent={
+            <MapSearchInput
+              map={mapInstanceRef.current}
+              onLocationSelect={(coordinates, placeName) => {
+                if (mapInstanceRef.current) {
+                  mapInstanceRef.current.flyTo({
+                    center: [coordinates.lng, coordinates.lat],
+                    zoom: 15,
+                    duration: 1500,
+                  });
+                }
+              }}
+            />
+          }
+          accountDropdownProps={{
+            onAccountClick: () => {
+              // Handle account click
+            },
+            onSignInClick: openWelcome,
+          }}
+          searchResultsComponent={<SearchResults />}
+        >
+          {mainContent}
+        </PageWrapper>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && createdMention && (
@@ -689,25 +922,27 @@ export default function MapPage({ params }: { params: Promise<{ id: string }> })
         currentPlan={upgradePrompt.currentPlan}
       />
 
-      {/* Location Select Popup */}
-      <LocationSelectPopup
-        isOpen={locationSelectPopup.isOpen}
-        onClose={closePopup}
-        lat={locationSelectPopup.lat}
-        lng={locationSelectPopup.lng}
-        address={popupAddress}
-        mapMeta={locationSelectPopup.mapMeta}
-        allowPins={mapData?.settings?.collaboration?.allow_pins ?? false}
-        isOwner={effectiveIsOwner}
-        onAddToMap={(coordinates, mapMeta, mentionTypeId) => {
-          // Remove click marker before opening overlay
-          if (removeClickMarkerRef.current) {
-            removeClickMarkerRef.current();
-          }
-          // Open contribute overlay with location, mention type, and mapMeta
-          openOverlay(coordinates, mentionTypeId || undefined, mapMeta || null, popupAddress || null);
-        }}
-      />
+      {/* Location Select Popup - hidden on /live (location shown in app footer instead) */}
+      {!skipPageWrapper && (
+        <LocationSelectPopup
+          isOpen={locationSelectPopup.isOpen}
+          onClose={closePopup}
+          lat={locationSelectPopup.lat}
+          lng={locationSelectPopup.lng}
+          address={popupAddress}
+          mapMeta={locationSelectPopup.mapMeta}
+          allowPins={mapData?.settings?.collaboration?.allow_pins ?? false}
+          isOwner={effectiveIsOwner}
+          onAddToMap={(coordinates, mapMeta, mentionTypeId) => {
+            // Remove click marker before opening overlay
+            if (removeClickMarkerRef.current) {
+              removeClickMarkerRef.current();
+            }
+            // Open contribute overlay with location, mention type, and mapMeta
+            openOverlay(coordinates, mentionTypeId || undefined, mapMeta || null, popupAddress || null);
+          }}
+        />
+      )}
     </>
   );
 }

@@ -238,7 +238,7 @@ export default function EntityDetailSidebar({
                   </div>
                   {pin.account.username && (
                     <Link
-                      href={`/profile/${pin.account.username}`}
+                      href={`/${pin.account.username}`}
                       className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
                     >
                       @{pin.account.username}

@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth, Account } from '@/features/auth';
 import { isAccountComplete as checkAccountComplete } from '@/lib/accountCompleteness';
 import { cleanAuthParams } from '@/lib/urlParams';
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+// Removed: import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+// Onboarding is now handled via page redirect, not modal
 import { checkOnboardingStatus } from '@/lib/onboardingCheck';
 
 export type HomepageModalState = 
@@ -35,7 +36,8 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { openOnboarding } = useAppModalContextSafe();
+  // Onboarding is now handled via page redirect, not modal
+  // Removed: const { openOnboarding } = useAppModalContextSafe();
   const [state, setState] = useState<HomepageState>({
     modalState: 'none',
     accountModalTab: null,
@@ -206,11 +208,11 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
       // Clean guest/account parameters from URL when user logs in
       cleanAuthParams(router);
       
-      // Check onboarding status and open modal if needed
+      // Check onboarding status and redirect to onboarding page if needed
       checkAccountCompleteness().then((result) => {
         if (result && !result.isComplete) {
-          // Account incomplete: open onboarding modal immediately
-          openOnboarding();
+          // Account incomplete: redirect to onboarding page
+          router.push('/onboarding');
         } else if (result && result.isComplete) {
           // Account complete: close welcome modal if open
           if (state.modalState === 'welcome') {
@@ -219,20 +221,20 @@ export function useHomepageState(options?: UseHomepageStateOptions) {
         }
       });
     }
-  }, [user, openWelcomeModal, closeAllModals, openAccountModal, closeWelcomeModal, checkAccountCompleteness, openOnboarding, state.modalState, router]);
+  }, [user, openWelcomeModal, closeAllModals, openAccountModal, closeWelcomeModal, checkAccountCompleteness, state.modalState, router]);
 
   // Check account completeness when user is authenticated and account not loaded
   // This handles cases where user was already authenticated on page load
   useEffect(() => {
     if (user && !state.account && !state.isCheckingAccount) {
       checkAccountCompleteness().then((result) => {
-        // If incomplete, open onboarding
+        // If incomplete, redirect to onboarding page
         if (result && !result.isComplete) {
-          openOnboarding();
+          router.push('/onboarding');
         }
       });
     }
-  }, [user, state.account, state.isCheckingAccount, checkAccountCompleteness, openOnboarding]);
+  }, [user, state.account, state.isCheckingAccount, checkAccountCompleteness, router]);
 
   return {
     // State

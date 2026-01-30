@@ -79,7 +79,7 @@ export default function HamburgerMenu({ isOpen: controlledIsOpen, onOpenChange }
   const filteredLinks = navLinks.map(link => {
     // For Profile, use the user's username if available
     if (link.href === '/profile' && account?.username) {
-      return { ...link, href: `/profile/${account.username}` };
+      return { ...link, href: `/${account.username}` };
     }
     return link;
   }).filter(link => {
@@ -120,7 +120,7 @@ export default function HamburgerMenu({ isOpen: controlledIsOpen, onOpenChange }
           <div className="flex-1 flex flex-col items-center justify-center gap-8 px-6">
             {filteredLinks.map((link) => {
               const isActive = pathname === link.href || 
-                (link.href.startsWith('/profile/') && pathname?.startsWith('/profile/'));
+                (link.href !== '/' && pathname === link.href);
               
               return (
                 <button

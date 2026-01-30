@@ -176,7 +176,7 @@ export default function MapInfoCard({
                   )}
                   {account && !hideCreator && (
                     <Link
-                      href={account.username ? `/profile/${account.username}` : '#'}
+                      href={account.username ? `/${account.username}` : '#'}
                       className="flex items-center gap-2 text-xs text-gray-600 hover:text-gray-900 transition-colors"
                     >
                       {account.image_url ? (

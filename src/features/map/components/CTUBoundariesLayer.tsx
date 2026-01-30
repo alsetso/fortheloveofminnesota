@@ -2,16 +2,22 @@
 
 import { useEffect, useState, useRef } from 'react';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-
-// Module-level cache to share CTU data across all component instances
-let ctuCache: any[] | null = null;
-let ctuFetchPromise: Promise<any[]> | null = null;
+import { getCTUBoundaries, hasCTUCached } from '@/features/map/services/liveBoundaryCache';
+import { moveMentionsLayersToTop } from '@/features/map/utils/layerOrder';
 
 interface CTUBoundariesLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
   visible: boolean;
   onCTUHover?: (ctu: any) => void;
+  /** When set, layer only visible at zoom >= this (e.g. 4). */
+  minzoom?: number;
+  /** When set, layer only visible at zoom < this (e.g. 10). */
+  maxzoom?: number;
+  /** Called when load starts (true) or finishes (false). For Review accordion on /live. */
+  onLoadChange?: (loading: boolean) => void;
+  /** Called when boundary is clicked (e.g. /live footer). */
+  onBoundarySelect?: (item: { layer: 'state' | 'county' | 'ctu'; id: string; name: string; lat: number; lng: number; details?: Record<string, unknown> }) => void;
 }
 
 /**
@@ -23,57 +29,41 @@ export default function CTUBoundariesLayer({
   mapLoaded,
   visible,
   onCTUHover,
+  minzoom,
+  maxzoom,
+  onLoadChange,
+  onBoundarySelect,
 }: CTUBoundariesLayerProps) {
   const [ctus, setCTUs] = useState<any[]>([]);
   const [hoveredCTU, setHoveredCTU] = useState<any | null>(null);
   const isAddingLayersRef = useRef(false);
+  const onLoadChangeRef = useRef(onLoadChange);
+  onLoadChangeRef.current = onLoadChange;
 
-  // Fetch CTU boundaries - only once across all component instances
+  // Fetch CTU boundaries (cached; one API call per session)
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      onLoadChangeRef.current?.(false);
+      return;
+    }
+    const loading = !hasCTUCached();
+    if (loading) onLoadChangeRef.current?.(true);
 
-    const fetchCTUs = async () => {
-      // If we have cached data, use it immediately
-      if (ctuCache) {
-        setCTUs(ctuCache);
-        return;
-      }
+    let cancelled = false;
+    getCTUBoundaries()
+      .then((data) => {
+        if (!cancelled) setCTUs(data);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('[CTUBoundariesLayer] Failed to fetch CTU boundaries:', error);
+      })
+      .finally(() => {
+        if (!cancelled) onLoadChangeRef.current?.(false);
+      });
 
-      // If a fetch is already in progress, wait for it
-      if (ctuFetchPromise) {
-        try {
-          const data = await ctuFetchPromise;
-          setCTUs(data);
-        } catch (error) {
-          console.error('[CTUBoundariesLayer] Failed to fetch CTU boundaries:', error);
-        }
-        return;
-      }
-
-      // Start a new fetch
-      ctuFetchPromise = (async () => {
-        try {
-          const response = await fetch('/api/civic/ctu-boundaries');
-          if (!response.ok) throw new Error('Failed to fetch CTU boundaries');
-          const data = await response.json();
-          ctuCache = data; // Cache the result
-          ctuFetchPromise = null; // Clear the promise
-          return data;
-        } catch (error) {
-          ctuFetchPromise = null; // Clear the promise on error
-          throw error;
-        }
-      })();
-
-      try {
-        const data = await ctuFetchPromise;
-        setCTUs(data);
-      } catch (error) {
-        console.error('[CTUBoundariesLayer] Failed to fetch CTU boundaries:', error);
-      }
+    return () => {
+      cancelled = true;
     };
-
-    fetchCTUs();
   }, [visible]);
 
   // Render CTU boundaries on map
@@ -178,6 +168,8 @@ export default function CTUBoundariesLayer({
       id: fillLayerId,
       type: 'fill',
       source: sourceId,
+      ...(minzoom != null && { minzoom }),
+      ...(maxzoom != null && { maxzoom }),
       paint: {
         'fill-color': [
           'match',
@@ -187,7 +179,7 @@ export default function CTUBoundariesLayer({
           'UNORGANIZED TERRITORY', colorMap['UNORGANIZED TERRITORY'],
           '#888888', // Default gray
         ],
-        'fill-opacity': 0.15, // Semi-transparent
+        'fill-opacity': 0.12,
       },
     }, beforeId);
 
@@ -196,6 +188,8 @@ export default function CTUBoundariesLayer({
       id: outlineLayerId,
       type: 'line',
       source: sourceId,
+      ...(minzoom != null && { minzoom }),
+      ...(maxzoom != null && { maxzoom }),
       paint: {
         'line-color': [
           'match',
@@ -205,8 +199,8 @@ export default function CTUBoundariesLayer({
           'UNORGANIZED TERRITORY', colorMap['UNORGANIZED TERRITORY'],
           '#888888', // Default gray
         ],
-        'line-width': 1,
-        'line-opacity': 0.6,
+        'line-width': 1.5,
+        'line-opacity': 0.7,
       },
     }, beforeId);
 
@@ -227,6 +221,8 @@ export default function CTUBoundariesLayer({
         id: highlightFillLayerId,
         type: 'fill',
         source: highlightSourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
           'fill-color': [
             'match',
@@ -247,6 +243,8 @@ export default function CTUBoundariesLayer({
         id: highlightOutlineLayerId,
         type: 'line',
         source: highlightSourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
           'line-color': [
             'match',
@@ -261,6 +259,8 @@ export default function CTUBoundariesLayer({
         },
       }, beforeId);
     }
+
+    moveMentionsLayersToTop(mapboxMap);
 
     // Add hover handlers
     const handleMouseMove = (e: any) => {
@@ -335,20 +335,44 @@ export default function CTUBoundariesLayer({
       // Restore all CTUs to normal opacity
       try {
         if (mapboxMap.getLayer(fillLayerId)) {
-          mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.15);
+          mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.12);
         }
         if (mapboxMap.getLayer(outlineLayerId)) {
-          mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.6);
+          mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.7);
         }
       } catch (e) {
         // Ignore errors
       }
     };
 
-    // Use mousemove on fill layer to detect hover
+    // Click: update footer/selection only (no map popup).
+    const handleClick = (e: any) => {
+      const features = mapboxMap.queryRenderedFeatures(e.point, { layers: [fillLayerId] });
+      if (features.length === 0) return;
+      const feature = features[0];
+      const properties = feature.properties || {};
+      const id = (properties.ctu_id as string) ?? '';
+      const name = (properties.feature_name as string) || 'CTU';
+      const ctuRecord = ctus.find((c) => c.id === id);
+      const geom = feature.geometry as any;
+      const c = geom?.coordinates;
+      const ring = c?.[0]?.[0] && typeof c[0][0][0] === 'number' ? c[0][0] : c?.[0];
+      const pt = ring?.[0];
+      if (!Array.isArray(pt) || pt.length < 2) return;
+      const [lng, lat] = pt;
+      const details = ctuRecord ? { ...ctuRecord, geometry: undefined } : undefined;
+      const item = { layer: 'ctu' as const, id: id || (ctuRecord?.id ?? ''), name, lat, lng, details };
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[LiveBoundary] ctu click', { layer: item.layer, id: item.id, name: item.name, hasOnBoundarySelect: !!onBoundarySelect });
+      }
+      onBoundarySelect?.(item);
+    };
+
     mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
     mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
+    mapboxMap.on('click', fillLayerId, handleClick);
 
+    onLoadChange?.(false);
     isAddingLayersRef.current = false;
 
     // Cleanup function
@@ -357,9 +381,9 @@ export default function CTUBoundariesLayer({
       const mapboxMap = map as any;
 
       try {
-        // Remove event listeners
         mapboxMap.off('mousemove', fillLayerId);
         mapboxMap.off('mouseleave', fillLayerId);
+        mapboxMap.off('click', fillLayerId, handleClick);
 
         // Remove layers and sources
         if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
@@ -372,7 +396,7 @@ export default function CTUBoundariesLayer({
         // Ignore cleanup errors
       }
     };
-  }, [map, mapLoaded, ctus, visible, onCTUHover]);
+  }, [map, mapLoaded, ctus, visible, onCTUHover, minzoom, maxzoom, onLoadChange, onBoundarySelect]);
 
   return null; // This component doesn't render any UI
 }

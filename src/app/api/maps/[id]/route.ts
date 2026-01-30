@@ -247,7 +247,6 @@ export async function PUT(
         const body = validation.data;
 
         // Resolve identifier to map_id (handle both UUID and slug)
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id, settings');
@@ -265,7 +264,7 @@ export async function PUT(
         }
 
         const mapData = map as { account_id: string; id: string; settings: any };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check member role (owner/manager can update, editor cannot)
         const { data: member } = await supabase
@@ -496,7 +495,6 @@ export async function DELETE(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id (handle both UUID and slug)
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('account_id, id');
@@ -514,7 +512,7 @@ export async function DELETE(
         }
 
         const mapDataDelete = map as { account_id: string; id: string };
-        mapId = mapDataDelete.id;
+        const mapId = mapDataDelete.id;
         
         // Only owner can delete (not manager)
         if (accountId !== mapDataDelete.account_id) {

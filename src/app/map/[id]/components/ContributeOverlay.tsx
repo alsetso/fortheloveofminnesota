@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useAuthStateSafe, AccountService } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useToast } from '@/features/ui';
@@ -18,6 +18,7 @@ import type { Mention } from '@/types/mention';
 import { CollectionService } from '@/features/collections/services/collectionService';
 import type { Collection } from '@/types/collection';
 import { getMapUrl } from '@/lib/maps/urls';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 
 type MentionType = { id: string; emoji: string; name: string };
 
@@ -31,6 +32,7 @@ interface ContributeOverlayProps {
 
 export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug, onMentionCreated }: ContributeOverlayProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, account, activeAccountId, isLoading, signOut } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -198,6 +200,32 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug, onM
       }
     }
   }, [isOpen, searchParams]);
+
+  // Sync mention type selection to URL so live map filter and footer card stay in sync
+  useEffect(() => {
+    if (!isOpen || !searchParams || mentionTypes.length === 0) return;
+    const params = new URLSearchParams(searchParams.toString());
+    const wantMentionTypeId = selectedTypeId || null;
+    const wantTypeSlug =
+      pathname === '/live' && selectedTypeId
+        ? mentionTypeNameToSlug(mentionTypes.find((t) => t.id === selectedTypeId)?.name ?? '')
+        : null;
+    const currentMentionTypeId = params.get('mention_type_id');
+    const currentTypeSlug = pathname === '/live' ? params.get('type') : null;
+    if (wantMentionTypeId === (currentMentionTypeId || null) && wantTypeSlug === (currentTypeSlug || null)) return;
+    if (wantMentionTypeId) {
+      params.set('mention_type_id', wantMentionTypeId);
+      if (wantTypeSlug) params.set('type', wantTypeSlug);
+      else if (pathname === '/live') params.delete('type');
+    } else {
+      params.delete('mention_type_id');
+      if (pathname === '/live') params.delete('type');
+    }
+    const qs = params.toString();
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const newUrl = pathname + (qs ? `?${qs}` : '') + hash;
+    router.replace(newUrl);
+  }, [isOpen, selectedTypeId, mentionTypes, pathname, router, searchParams]);
 
   // Reset form when overlay closes
   useEffect(() => {
@@ -731,12 +759,6 @@ export default function ContributeOverlay({ isOpen, onClose, mapId, mapSlug, onM
 
   const handleCloseSuccess = () => {
     setShowSuccessScreen(false);
-    // Remove hash using history API
-    if (typeof window !== 'undefined') {
-      const url = window.location.pathname + window.location.search;
-      window.history.replaceState(null, '', url);
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-    }
     onClose();
   };
 

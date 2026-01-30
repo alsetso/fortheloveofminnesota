@@ -157,7 +157,7 @@ export default function OnboardingDemo({ map, mapLoaded }: OnboardingDemoProps) 
 
       if (currentStepData.highlightSelector) {
         // Handle special case for Create button which can be "Create" or "Add"
-        let selector = currentStepData.highlightSelector;
+        const selector = currentStepData.highlightSelector;
         let element = document.querySelector(selector) as HTMLElement;
         
         // If looking for Create button, also try Add (for live page)

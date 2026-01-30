@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useHeaderTheme } from '@/contexts/HeaderThemeContext';
 
 /**
  * Content Type Filters Component
@@ -14,6 +15,7 @@ export default function ContentTypeFilters() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const { isDefaultLightBg } = useHeaderTheme();
 
   // Memoize contentTypes to prevent recreation on every render
   const contentTypes = useMemo(() => [
@@ -52,6 +54,13 @@ export default function ContentTypeFilters() {
     router.push(`${pathname}?${params.toString()}#search`);
   };
 
+  const selectedClass = isDefaultLightBg
+    ? 'text-[#3C3C43] bg-black/10 font-semibold'
+    : 'text-white bg-white/20 font-semibold';
+  const unselectedClass = isDefaultLightBg
+    ? 'text-[#3C3C43]/60 hover:text-[#3C3C43]/80 hover:bg-black/5'
+    : 'text-white opacity-50 hover:opacity-75 hover:bg-white/10';
+
   return (
     <div className="flex flex-wrap gap-4 items-center">
       {contentTypes.map((type) => {
@@ -61,9 +70,7 @@ export default function ContentTypeFilters() {
             key={type.id}
             onClick={() => handleTypeSelect(type.id)}
             className={`text-sm font-medium transition-all whitespace-nowrap px-2 py-1 rounded-md ${
-              isSelected
-                ? 'text-white bg-white/20 font-semibold'
-                : 'text-white opacity-50 hover:opacity-75 hover:bg-white/10'
+              isSelected ? selectedClass : unselectedClass
             }`}
           >
             {type.label}

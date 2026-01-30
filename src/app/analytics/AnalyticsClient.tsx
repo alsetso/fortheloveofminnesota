@@ -220,7 +220,7 @@ export default function AnalyticsClient({
     if (view.view_type === 'profile') {
       // Extract username from profile URL
       const profileMatch = view.url.match(/\/profile\/([^/?]+)/);
-      if (profileMatch) return `/profile/${profileMatch[1]}`;
+      if (profileMatch) return `/${profileMatch[1]}`;
       return null;
     }
     
@@ -235,7 +235,7 @@ export default function AnalyticsClient({
   };
 
   const filteredViews = useMemo(() => {
-    let views = filter === 'all' ? allViews : allViews.filter(view => view.view_type === filter);
+    const views = filter === 'all' ? allViews : allViews.filter(view => view.view_type === filter);
     return views.slice(0, displayLimit); // Production-ready: pagination
   }, [allViews, filter, displayLimit]);
 
@@ -550,7 +550,7 @@ export default function AnalyticsClient({
                                   <>
                                     {view.viewer_username ? (
                                       <Link
-                                        href={`/profile/${view.viewer_username}`}
+                                        href={`/${view.viewer_username}`}
                                         className="flex items-center gap-1.5 min-w-0 hover:opacity-80 transition-opacity group"
                                       >
                                         {view.viewer_image_url ? (

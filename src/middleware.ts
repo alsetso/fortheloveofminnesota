@@ -179,7 +179,25 @@ export async function middleware(req: NextRequest) {
   response.headers.set('Content-Security-Policy', csp);
 
   const pathname = req.nextUrl.pathname;
-  
+
+  // Redirect deprecated routes to /live
+  if (pathname === '/maps' || pathname === '/plan' || pathname === '/plans' || pathname === '/billing') {
+    return NextResponse.redirect(new URL('/live', req.url));
+  }
+  if (pathname.startsWith('/map/') && pathname !== '/map') {
+    return NextResponse.redirect(new URL('/live', req.url));
+  }
+  // Profile pages removed — canonical URL is /:username; redirect /profile and /profile/* to /:username or /
+  if (pathname === '/profile') {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+  if (pathname.startsWith('/profile/')) {
+    const slug = pathname.slice('/profile/'.length).split('/')[0];
+    if (slug) {
+      return NextResponse.redirect(new URL(`/${encodeURIComponent(slug)}`, req.url));
+    }
+  }
+
   // Redirect account pages to / with modal params
   if (pathname.startsWith('/account/')) {
     // Special handling for onboarding - separate modal
@@ -257,9 +275,23 @@ export async function middleware(req: NextRequest) {
   // This helps keep sessions alive across requests
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  // MIDDLEWARE ONLY HANDLES AUTHENTICATION, NOT ONBOARDING
-  // Onboarding checks are handled at the page level to prevent redirect loops
-  // This simplifies the flow and makes it easier to debug
+  // ONBOARDING CHECK: First priority for authenticated users
+  // Check onboarding status before any other checks
+  // Allow /onboarding route to be accessible (prevents redirect loops)
+  if (user && pathname !== '/onboarding') {
+    const accountData = await getUserAccountData(supabase, user.id, req);
+    
+    // If account is not onboarded (onboarded = false), redirect to onboarding page
+    if (accountData && accountData.onboarded === false) {
+      const redirectUrl = new URL('/onboarding', req.url);
+      // Preserve redirect parameter if present
+      const redirectParam = req.nextUrl.searchParams.get('redirect');
+      if (redirectParam) {
+        redirectUrl.searchParams.set('redirect', redirectParam);
+      }
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
 
   // No protection needed for this route
   if (!protection) {
@@ -291,20 +323,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Get account data if we need role check or onboarding check
+  // Get account data if we need role check
+  // Note: Onboarding check is handled above for all authenticated users
   let accountData: { role: AccountRole | null; onboarded: boolean | null; isComplete: boolean } | null = null;
   
   if (user && protection?.auth) {
     accountData = await getUserAccountData(supabase, user.id, req);
-    
-    // Check account completeness for protected routes
-    // Source of truth: isComplete checks actual data (username, first_name, last_name, image_url)
-    // Redirect to home with onboarding modal if account is incomplete
-    if (accountData && !accountData.isComplete) {
-      const redirectUrl = new URL('/', req.url);
-      redirectUrl.searchParams.set('modal', 'onboarding');
-      return NextResponse.redirect(redirectUrl);
-    }
   }
 
   // Check role requirement

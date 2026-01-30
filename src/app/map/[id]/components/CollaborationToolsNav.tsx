@@ -39,6 +39,8 @@ interface CollaborationToolsNavProps {
       'non-member'?: string;
     };
   } | null;
+  /** When true, use default iOS grey (matches PageWrapper). When false, use map settings colors. */
+  useDefaultAppearance?: boolean;
 }
 
 interface ToolConfig {
@@ -54,6 +56,9 @@ const OWNER_GRADIENT = 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)';
 const BLACK_BACKGROUND = '#000000';
 const GRADIENT_BORDER_COLOR = 'rgba(255, 183, 0, 0.4)'; // Matches gradient start color (#FFB700)
 const BLACK_BORDER_COLOR = 'rgba(255, 255, 255, 0.1)';
+/** Default iOS grey (matches PageWrapper when no custom map colors) */
+const DEFAULT_IOS_BG = '#F2F2F7';
+const DEFAULT_IOS_TEXT = '#3C3C43';
 
 const TOOL_CONFIGS: ToolConfig[] = [
   { 
@@ -92,6 +97,7 @@ export default function CollaborationToolsNav({
   viewAsRole,
   onJoinClick,
   mapSettings,
+  useDefaultAppearance = false,
 }: CollaborationToolsNavProps) {
   const [hoveredTool, setHoveredTool] = useState<ToolId | null>(null);
 
@@ -104,26 +110,25 @@ export default function CollaborationToolsNav({
     return false;
   }, [isOwner, isMember, viewAsRole]);
 
-  // Get background color based on viewAsRole and mapSettings
+  // Get background color: default iOS grey when useDefaultAppearance, else from mapSettings
   const backgroundColor = useMemo(() => {
+    if (useDefaultAppearance) return DEFAULT_IOS_BG;
     if (!viewAsRole) return BLACK_BACKGROUND;
     
-    // Get color from mapSettings if available
     const roleColor = mapSettings?.colors?.[viewAsRole];
     if (roleColor && roleColor.trim() !== '') {
       return roleColor;
     }
     
-    // Fallback to default: gradient for owner, black for others
     return viewAsRole === 'owner' ? OWNER_GRADIENT : BLACK_BACKGROUND;
-  }, [viewAsRole, mapSettings]);
+  }, [viewAsRole, mapSettings, useDefaultAppearance]);
 
   // Get border color based on background
   const borderColor = useMemo(() => {
-    // Use gradient border if the background is actually a gradient
+    if (useDefaultAppearance) return 'rgba(0, 0, 0, 0.1)';
     const isGradient = backgroundColor.includes('gradient');
     return isGradient ? GRADIENT_BORDER_COLOR : BLACK_BORDER_COLOR;
-  }, [backgroundColor]);
+  }, [backgroundColor, useDefaultAppearance]);
 
   const containerStyle = useMemo(
     () => ({
@@ -134,6 +139,8 @@ export default function CollaborationToolsNav({
     }),
     [backgroundColor, borderColor]
   );
+
+  const isLightAppearance = useDefaultAppearance || backgroundColor === DEFAULT_IOS_BG;
 
   const isFeatureEnabled = useCallback((tool: ToolConfig): boolean => {
     if (!map) return false;
@@ -239,7 +246,15 @@ export default function CollaborationToolsNav({
                   onMouseLeave={() => handleToolHover(null)}
                   disabled={!canClick}
                   className={`relative flex items-center justify-center w-8 h-8 rounded-md transition-all ${
-                    isNonMemberDisabled
+                    isLightAppearance
+                      ? isNonMemberDisabled
+                        ? 'opacity-60 cursor-pointer text-[#3C3C43]/60 hover:opacity-80 hover:text-[#3C3C43]/80'
+                        : isDisabled
+                        ? 'opacity-40 cursor-not-allowed text-[#3C3C43]/40'
+                        : isActive
+                        ? 'bg-black/10 text-[#3C3C43]'
+                        : 'text-[#3C3C43]/70 hover:text-[#3C3C43] hover:bg-black/5'
+                      : isNonMemberDisabled
                       ? 'opacity-60 cursor-pointer text-white/60 hover:opacity-80 hover:text-white/80'
                       : isDisabled
                       ? 'opacity-40 cursor-not-allowed text-white/40'
@@ -258,7 +273,7 @@ export default function CollaborationToolsNav({
                 >
                   <Icon className="w-4 h-4" />
                   {isOwnerOverride && !isNonMemberView && (
-                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full border border-white" />
+                    <div className={`absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full border ${isLightAppearance ? 'border-gray-200' : 'border-white'}`} />
                   )}
                 </button>
               );

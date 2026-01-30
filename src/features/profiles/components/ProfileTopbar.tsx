@@ -112,7 +112,7 @@ export default function ProfileTopbar({ profileUsername, isSidebarOpen = true, o
   );
 
   // Profile link
-  const profileLink = account?.username ? `/profile/${account.username}` : null;
+  const profileLink = account?.username ? `/${account.username}` : null;
 
   // Right section with profile link and account dropdown
   const rightSection = displayAccount ? (

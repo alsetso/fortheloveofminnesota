@@ -191,7 +191,7 @@ export default function MentionDetailSidebar({ mention, isOwner, permissionsLoad
               <div className="text-xs font-medium text-gray-900 truncate">{accountName}</div>
               {mention.account.username && (
                 <Link
-                  href={`/profile/${mention.account.username}`}
+                  href={`/${mention.account.username}`}
                   className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   @{mention.account.username}

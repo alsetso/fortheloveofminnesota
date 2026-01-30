@@ -149,7 +149,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       let q = supabase
         .from('url_visits')
         .select('*', { count: 'exact', head: true })
-        .like('url', `/profile/${username}%`)
+        .like('url', `/${username}%`)
         .or(nonSelfOrFilter);
       if (cutoffIso) q = q.gte('viewed_at', cutoffIso);
       const { count, error } = await q;
@@ -185,7 +185,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   ]);
 
   // Get all URL visits for this user's content
-  // Profile views: URLs like /profile/{username}
+  // Profile views: URLs like /{username}
   // Mention views: URLs with mention IDs in query params or path
   // Post views: URLs like /post/{id}
   
@@ -258,7 +258,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           image_url
         )
       `)
-      .like('url', `/profile/${username}%`)
+      .like('url', `/${username}%`)
       .order('viewed_at', { ascending: false })
       .limit(fetchLimit);
     if (cutoffIso) profileVisitsQuery = profileVisitsQuery.gte('viewed_at', cutoffIso);

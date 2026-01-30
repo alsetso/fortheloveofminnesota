@@ -359,7 +359,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
               {user && data.account.username ? (
                 // Authenticated with username: clickable link
                 <Link
-                  href={`/profile/${encodeURIComponent(data.account.username)}`}
+                  href={`/${encodeURIComponent(data.account.username)}`}
                   onClick={onClose}
                   className="flex items-center gap-2"
                 >
@@ -455,7 +455,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
                     )}
                     {data?.account?.username && (
                       <Link
-                        href={`/profile/${encodeURIComponent(data.account.username)}`}
+                        href={`/${encodeURIComponent(data.account.username)}`}
                         onClick={() => setShowMenu(false)}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
                           useTransparentUI

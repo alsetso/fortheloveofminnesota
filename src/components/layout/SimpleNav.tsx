@@ -32,21 +32,19 @@ export default function SimpleNav() {
     isLoading,
   } = useAuthStateSafe();
   
-  const { openWelcome, openOnboarding, openAccount, modal } = useAppModalContextSafe();
+  const { openWelcome, openAccount, modal } = useAppModalContextSafe();
   
-  // Check if user is authenticated but missing username - show onboarding overlay
+  // Check if user is authenticated but missing username - redirect to onboarding page
   useEffect(() => {
     // Only check when auth is loaded and user is authenticated
     if (isLoading) return;
     
     // If user is authenticated and account exists but username is missing
     if (user && account && !isAccountComplete(account)) {
-      // Onboarding is now part of LiveAccountModal
-      if (modal.type !== 'account') {
-        openOnboarding();
-      }
+      // Redirect to onboarding page instead of opening modal
+      router.push('/onboarding');
     }
-  }, [user, account, isLoading, modal.type, openOnboarding]);
+  }, [user, account, isLoading, router]);
 
   const handleSignOut = async () => {
     try {
@@ -65,7 +63,7 @@ export default function SimpleNav() {
   ];
 
   // Profile link
-  const profileLink = account?.username ? `/profile/${account.username}` : null;
+  const profileLink = account?.username ? `/${account.username}` : null;
 
   // Right section with profile link and account dropdown
   const rightSection = displayAccount ? (

@@ -87,11 +87,6 @@ export async function GET(request: NextRequest) {
             limit: 20,
           });
 
-          // Store raw data for reference
-          const rawData = {
-            invoices: invoices.data,
-          };
-
           for (const invoice of invoices.data) {
             // Get description from invoice
             let description = invoice.description || invoice.lines?.data?.[0]?.description || 'Invoice';
@@ -126,7 +121,6 @@ export async function GET(request: NextRequest) {
 
           return NextResponse.json({
             payments: limitedHistory,
-            raw: rawData,
           });
         } catch (stripeError: any) {
           // Always log errors, but don't expose sensitive details in production

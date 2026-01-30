@@ -62,7 +62,6 @@ export async function PUT(
         const { role } = validation.data;
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id');
@@ -79,7 +78,7 @@ export async function PUT(
         }
 
         const mapData = map as { account_id: string; id: string };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Only owner can update roles
         if (mapData.account_id !== accountId) {
@@ -181,7 +180,6 @@ export async function DELETE(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id');
@@ -198,7 +196,7 @@ export async function DELETE(
         }
 
         const mapData = map as { account_id: string; id: string };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: currentMember } = await supabase

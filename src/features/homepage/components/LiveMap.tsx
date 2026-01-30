@@ -368,7 +368,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   useEffect(() => {
     if (!user || !account || !mapLoaded || authLoading) return undefined;
 
-    let hideTimer: NodeJS.Timeout | null = null;
+    const hideTimer: NodeJS.Timeout | null = null;
     let showMicTimer: NodeJS.Timeout | null = null;
 
     // Start with microphone hidden
@@ -668,11 +668,8 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           center: MAP_CONFIG.DEFAULT_CENTER, // Center of Minnesota
           zoom: 7, // Zoomed out to show all of Minnesota
           pitch: 60, // Start at 60 degrees
+          minZoom: MAP_CONFIG.MIN_ZOOM,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
-          maxBounds: [
-            [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
-            [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
-          ],
           preserveDrawingBuffer: true, // REQUIRED for canvas.toDataURL() screenshot capture
         });
 

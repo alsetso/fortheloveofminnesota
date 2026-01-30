@@ -2,12 +2,22 @@
 
 import { useEffect, useState, useRef } from 'react';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { getCountyBoundaries, hasCountyCached } from '@/features/map/services/liveBoundaryCache';
+import { moveMentionsLayersToTop } from '@/features/map/utils/layerOrder';
 
 interface CountyBoundariesLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
   visible: boolean;
   onCountyHover?: (county: any) => void;
+  /** When set, layer only visible at zoom >= this (e.g. 4). */
+  minzoom?: number;
+  /** When set, layer only visible at zoom < this (e.g. 8). */
+  maxzoom?: number;
+  /** Called when load starts (true) or finishes (false). For Review accordion on /live. */
+  onLoadChange?: (loading: boolean) => void;
+  /** Called when boundary is clicked (e.g. /live footer). */
+  onBoundarySelect?: (item: { layer: 'state' | 'county' | 'ctu'; id: string; name: string; lat: number; lng: number; details?: Record<string, unknown> }) => void;
 }
 
 /**
@@ -19,26 +29,40 @@ export default function CountyBoundariesLayer({
   mapLoaded,
   visible,
   onCountyHover,
+  minzoom,
+  maxzoom,
+  onLoadChange,
+  onBoundarySelect,
 }: CountyBoundariesLayerProps) {
   const [counties, setCounties] = useState<any[]>([]);
   const isAddingLayersRef = useRef(false);
+  const onLoadChangeRef = useRef(onLoadChange);
+  onLoadChangeRef.current = onLoadChange;
 
-  // Fetch county boundaries
+  // Fetch county boundaries (cached; one API call per session)
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      onLoadChangeRef.current?.(false);
+      return;
+    }
+    const loading = !hasCountyCached();
+    if (loading) onLoadChangeRef.current?.(true);
 
-    const fetchCounties = async () => {
-      try {
-        const response = await fetch('/api/civic/county-boundaries');
-        if (!response.ok) throw new Error('Failed to fetch county boundaries');
-        const data = await response.json();
-        setCounties(data);
-      } catch (error) {
-        console.error('[CountyBoundariesLayer] Failed to fetch county boundaries:', error);
-      }
+    let cancelled = false;
+    getCountyBoundaries()
+      .then((data) => {
+        if (!cancelled) setCounties(data);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('[CountyBoundariesLayer] Failed to fetch county boundaries:', error);
+      })
+      .finally(() => {
+        if (!cancelled) onLoadChangeRef.current?.(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
-
-    fetchCounties();
   }, [visible]);
 
   // Render county boundaries on map
@@ -132,6 +156,8 @@ export default function CountyBoundariesLayer({
       id: fillLayerId,
       type: 'fill',
       source: sourceId,
+      ...(minzoom != null && { minzoom }),
+      ...(maxzoom != null && { maxzoom }),
       paint: {
         'fill-color': '#7ED321',
         'fill-opacity': 0.12,
@@ -143,6 +169,8 @@ export default function CountyBoundariesLayer({
       id: outlineLayerId,
       type: 'line',
       source: sourceId,
+      ...(minzoom != null && { minzoom }),
+      ...(maxzoom != null && { maxzoom }),
       paint: {
         'line-color': '#7ED321',
         'line-width': 1.5,
@@ -167,6 +195,8 @@ export default function CountyBoundariesLayer({
         id: highlightFillLayerId,
         type: 'fill',
         source: highlightSourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
           'fill-color': '#7ED321',
           'fill-opacity': 0.35,
@@ -180,6 +210,8 @@ export default function CountyBoundariesLayer({
         id: highlightOutlineLayerId,
         type: 'line',
         source: highlightSourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
           'line-color': '#7ED321',
           'line-width': 2.5,
@@ -187,6 +219,8 @@ export default function CountyBoundariesLayer({
         },
       }, beforeId);
     }
+
+    moveMentionsLayersToTop(mapboxMap);
 
     // Add hover handlers
     const handleMouseMove = (e: any) => {
@@ -269,10 +303,34 @@ export default function CountyBoundariesLayer({
       }
     };
 
-    // Use mousemove on fill layer to detect hover
+    // Click: update footer/selection only (no map popup).
+    const handleClick = (e: any) => {
+      const features = mapboxMap.queryRenderedFeatures(e.point, { layers: [fillLayerId] });
+      if (features.length === 0) return;
+      const feature = features[0];
+      const props = feature.properties || {};
+      const id = (props.county_id as string) ?? '';
+      const name = (props.county_name as string) || 'County';
+      const countyRecord = counties.find((c) => c.id === id);
+      const geom = feature.geometry as any;
+      const c = geom?.coordinates;
+      const ring = c?.[0]?.[0] && typeof c[0][0][0] === 'number' ? c[0][0] : c?.[0];
+      const pt = ring?.[0];
+      if (!Array.isArray(pt) || pt.length < 2) return;
+      const [lng, lat] = pt;
+      const details = countyRecord ? { ...countyRecord, geometry: undefined } : undefined;
+      const item = { layer: 'county' as const, id: id || (countyRecord?.id ?? ''), name, lat, lng, details };
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[LiveBoundary] county click', { layer: item.layer, id: item.id, name: item.name, hasOnBoundarySelect: !!onBoundarySelect });
+      }
+      onBoundarySelect?.(item);
+    };
+
     mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
     mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
+    mapboxMap.on('click', fillLayerId, handleClick);
 
+    onLoadChange?.(false);
     isAddingLayersRef.current = false;
 
     // Cleanup function
@@ -281,9 +339,9 @@ export default function CountyBoundariesLayer({
       const mapboxMap = map as any;
 
       try {
-        // Remove event listeners
         mapboxMap.off('mousemove', fillLayerId);
         mapboxMap.off('mouseleave', fillLayerId);
+        mapboxMap.off('click', fillLayerId, handleClick);
 
         // Remove layers and sources
         if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
@@ -296,7 +354,7 @@ export default function CountyBoundariesLayer({
         // Ignore cleanup errors
       }
     };
-  }, [map, mapLoaded, counties, visible, onCountyHover]);
+  }, [map, mapLoaded, counties, visible, onCountyHover, minzoom, maxzoom, onLoadChange, onBoundarySelect]);
 
   return null; // This component doesn't render any UI
 }

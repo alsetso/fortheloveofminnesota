@@ -45,7 +45,6 @@ export async function GET(
           : createServerClient();
 
         // Resolve identifier to map_id (handle both UUID and slug)
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select(`
@@ -101,7 +100,7 @@ export async function GET(
           return createErrorResponse('Map not found', 404);
         }
 
-        mapId = (map as any).id;
+        const mapId = (map as any).id;
         const mapAccountId = (map as any).account_id;
 
         // Check if user can view members (owner or member)

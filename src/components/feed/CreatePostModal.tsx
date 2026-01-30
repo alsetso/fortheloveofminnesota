@@ -502,7 +502,7 @@ export default function CreatePostModal({
             ) : (
               <>
                 <Link 
-                  href={`/profile/${account.username || account.id}`}
+                  href={`/${account.username || account.id}`}
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
                   <ProfilePhoto 

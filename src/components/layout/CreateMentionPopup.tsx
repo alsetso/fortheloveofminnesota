@@ -27,6 +27,7 @@ interface CreateMentionPopupProps {
     mention_type_id?: string | null;
     collection_id?: string | null;
   } | null;
+  allowedMentionTypes?: string[] | null; // Array of mention_type IDs that are allowed (null/undefined = all types allowed)
 }
 
 /**
@@ -45,6 +46,7 @@ export default function CreateMentionPopup({
   onMentionCreated,
   isEditMode = false,
   editData = null,
+  allowedMentionTypes = null,
 }: CreateMentionPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -98,7 +100,14 @@ export default function CreateMentionPopup({
           .order('name');
         
         if (error) throw error;
-        setMentionTypes((data || []) as Array<{ id: string; emoji: string; name: string }>);
+        
+        // Filter by allowed mention types if provided
+        let filteredTypes = (data || []) as Array<{ id: string; emoji: string; name: string }>;
+        if (allowedMentionTypes !== null && allowedMentionTypes !== undefined && allowedMentionTypes.length > 0) {
+          filteredTypes = filteredTypes.filter(type => allowedMentionTypes.includes(type.id));
+        }
+        
+        setMentionTypes(filteredTypes);
       } catch (error) {
         console.error('Failed to fetch mention types:', error);
       } finally {
@@ -107,7 +116,7 @@ export default function CreateMentionPopup({
     };
 
     fetchMentionTypes();
-  }, [isOpen]);
+  }, [isOpen, allowedMentionTypes]);
 
   // Reset step when popup closes
   useEffect(() => {

@@ -77,7 +77,7 @@ export default function HomepageProfileColumn() {
 
   const displayName = getDisplayName(profileAccount);
   const profileLink = profileAccount.username 
-    ? `/profile/${profileAccount.username}` 
+    ? `/${profileAccount.username}` 
     : null;
 
   return (

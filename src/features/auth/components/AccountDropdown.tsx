@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserIcon, Cog6ToothIcon, CreditCardIcon, ChartBarIcon, MapIcon, XMarkIcon, DocumentTextIcon, FolderIcon, UserGroupIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { UserIcon, Cog6ToothIcon, CreditCardIcon, ChartBarIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import BottomButtonsPopup from '@/components/layout/BottomButtonsPopup';
 
@@ -17,12 +16,15 @@ interface AccountDropdownProps {
   onAccountClick?: () => void;
   /** Callback when Sign In is clicked */
   onSignInClick?: () => void;
+  /** When set, trigger button calls this instead of toggling the dropdown (e.g. open AppMenu on /live) */
+  onTriggerClick?: () => void;
 }
 
 export default function AccountDropdown({
   variant = 'light',
   onAccountClick,
   onSignInClick,
+  onTriggerClick,
 }: AccountDropdownProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,6 +33,7 @@ export default function AccountDropdown({
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   
   const {
+    user,
     account,
     activeAccountId,
     isLoading,
@@ -38,58 +41,11 @@ export default function AccountDropdown({
     signOut,
     setActiveAccountId,
   } = useAuthStateSafe();
+  
+  // Plan & Limits: only via Settings → Billing/Analytics. Settings/Billing/Analytics in dropdown: Admin only.
+  const isAdmin = account?.role === 'admin';
 
   const { openWelcome, openAccount, openCreateAccount } = useAppModalContextSafe();
-  const { features, isLoading: featuresLoading, getFeature } = useBillingEntitlementsSafe();
-  
-  // Group and prioritize features for display
-  const displayFeatures = useMemo(() => {
-    // Key features to show (prioritize count-based limits)
-    // Use exact matching to avoid matching sub-features (e.g., 'map_analytics')
-    const keyFeatureSlugs = ['custom_maps', 'map', 'posts', 'collections', 'groups'];
-    const keyFeatures = features.filter(f => 
-      keyFeatureSlugs.includes(f.slug) && // Exact match, not includes()
-      (f.limit_type === 'count' || f.is_unlimited)
-    );
-    
-    // Show key features first, then other count-based features
-    return [
-      ...keyFeatures,
-      ...features.filter(f => !keyFeatures.includes(f) && f.limit_type === 'count')
-    ].slice(0, 6); // Limit to 6 most important features
-  }, [features]);
-  
-  const booleanFeatures = useMemo(() => {
-    return features.filter(f => 
-      f.limit_type === 'boolean' || 
-      (f.limit_type === null && !f.is_unlimited && f.limit_value === null)
-    ).slice(0, 4); // Show up to 4 boolean features
-  }, [features]);
-  
-  // Fetch current usage for all key features
-  const [usage, setUsage] = useState<Record<string, number>>({});
-  const [loadingUsage, setLoadingUsage] = useState(false);
-  
-  useEffect(() => {
-    if (!isOpen || !activeAccountId) return;
-    
-    const fetchUsage = async () => {
-      setLoadingUsage(true);
-      try {
-        const usageResponse = await fetch('/api/billing/usage', { credentials: 'include' });
-        if (usageResponse.ok) {
-          const usageData = await usageResponse.json();
-          setUsage(usageData.usage || {});
-        }
-      } catch (err) {
-        console.error('Error fetching usage:', err);
-      } finally {
-        setLoadingUsage(false);
-      }
-    };
-    
-    fetchUsage();
-  }, [isOpen, activeAccountId]);
 
   // Fetch all user accounts when dropdown opens
   useEffect(() => {
@@ -241,7 +197,7 @@ export default function AccountDropdown({
     );
   }
 
-  // Render dropdown content (shared between dropdown and popup)
+  // Rich content (email, plan labels, Settings/Billing/Analytics) only for admins; others get minimal switcher + Sign Out.
   const renderDropdownContent = () => (
     <>
       {isLoading ? (
@@ -250,12 +206,25 @@ export default function AccountDropdown({
         </div>
       ) : (
         <div className="space-y-0">
-          {/* All Accounts Section */}
+          {/* User email: admins only */}
+          {isAdmin && user?.email && (
+            <div className="border-b border-gray-200">
+              <div className="px-[10px] py-2">
+                <p className="text-xs text-gray-600 truncate" title={user.email}>
+                  {user.email}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Accounts: list for everyone; label + plan per account only for admins */}
           {account && (
             <div className="border-b border-gray-200">
-              <div className="px-[10px] py-1.5 text-[10px] font-medium text-gray-500 uppercase tracking-wide bg-gray-50">
-                Accounts
-              </div>
+              {isAdmin && (
+                <div className="px-[10px] py-1.5 text-[10px] font-medium text-gray-500 uppercase tracking-wide bg-gray-50">
+                  Accounts
+                </div>
+              )}
               {loadingAccounts ? (
                 <div className="flex items-center justify-center py-4">
                   <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
@@ -281,12 +250,14 @@ export default function AccountDropdown({
                           <p className="text-xs font-medium text-gray-900 truncate">
                             {AccountService.getDisplayName(acc)}
                           </p>
-                          <p className="text-[10px] text-gray-500">
-                            {acc.plan ? acc.plan.charAt(0).toUpperCase() + acc.plan.slice(1) : 'Account'}
-                          </p>
+                          {isAdmin && (
+                            <p className="text-[10px] text-gray-500">
+                              {acc.plan ? acc.plan.charAt(0).toUpperCase() + acc.plan.slice(1) : 'Account'}
+                            </p>
+                          )}
                         </div>
                         <div
-                          className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-300'}`}
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-green-500' : 'bg-gray-300'}`}
                           title={isActive ? 'Active' : 'Inactive'}
                         />
                       </button>
@@ -294,8 +265,6 @@ export default function AccountDropdown({
                   })}
                 </div>
               )}
-              
-              {/* Create New Account Button - Only for admins or pro plan users */}
               {(account.role === 'admin' || account.plan === 'contributor') && (
                 <div className="border-t border-gray-200">
                   <button
@@ -315,170 +284,44 @@ export default function AccountDropdown({
             </div>
           )}
 
-          {/* Plan & Limits Section - The Brain of the System */}
-          {account && (
-            <div className="border-t border-gray-200">
-              <div className="px-[10px] py-1.5 text-[10px] font-medium text-gray-500 uppercase tracking-wide bg-gray-50">
-                Plan & Limits
-              </div>
-              <div className="p-[10px] space-y-2">
-                {/* Plan Status */}
-                <div className="flex items-center justify-between pb-1.5 border-b border-gray-100">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-600">Plan</span>
-                    {account.subscription_status === 'active' && (
-                      <CheckCircleIcon className="w-3 h-3 text-green-500" title="Active subscription" />
-                    )}
-                    {account.subscription_status === 'trialing' && (
-                      <span className="text-[9px] px-1 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">Trial</span>
-                    )}
-                  </div>
-                  <span className="text-xs font-semibold text-gray-900">
-                    {account.plan ? account.plan.charAt(0).toUpperCase() + account.plan.slice(1) : 'None'}
-                  </span>
-                </div>
-                
-                {/* Key Features with Limits - Compact Display */}
-                {!featuresLoading && displayFeatures.length > 0 && (
-                  <div className="space-y-1.5">
-                    {displayFeatures.map((feature) => {
-                      // Use actual feature name from database, but remove "Custom" prefix if present
-                      let label = feature.name;
-                      if (label.startsWith('Custom ')) {
-                        label = label.replace(/^Custom /, '');
-                      }
-                      
-                      // Determine icon based on feature slug (exact matching)
-                      let Icon = MapIcon;
-                      
-                      // Use exact matching or category-based logic
-                      if (feature.slug === 'custom_maps' || feature.slug === 'map' || feature.slug === 'unlimited_maps') {
-                        Icon = MapIcon;
-                      } else if (feature.slug === 'posts' || feature.slug === 'post') {
-                        Icon = DocumentTextIcon;
-                      } else if (feature.slug === 'collections' || feature.slug === 'collection') {
-                        Icon = FolderIcon;
-                      } else if (feature.slug === 'groups' || feature.slug === 'group') {
-                        Icon = UserGroupIcon;
-                      } else if (feature.category === 'maps' || (feature.slug && feature.slug.startsWith('map_'))) {
-                        Icon = MapIcon;
-                      } else if (feature.category === 'content' || (feature.slug && feature.slug.startsWith('content_'))) {
-                        Icon = DocumentTextIcon;
-                      }
-                      
-                      // Get usage by feature slug (API returns usage keyed by slug)
-                      const currentUsage = usage[feature.slug] ?? 0;
-                      const displayCount = loadingUsage ? '...' : currentUsage;
-                      
-                      const limitDisplay = feature.is_unlimited 
-                        ? '∞' 
-                        : feature.limit_value !== null 
-                          ? feature.limit_value 
-                          : '∞';
-                      
-                      const isAtLimit = !feature.is_unlimited && 
-                                       feature.limit_value !== null && 
-                                       currentUsage >= feature.limit_value;
-                      
-                      return (
-                        <div key={feature.slug} className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <Icon className="w-3 h-3 text-gray-500 flex-shrink-0" />
-                            <span className="text-xs text-gray-600 truncate" title={feature.slug}>
-                              {label}
-                            </span>
-                          </div>
-                          <span className={`text-xs font-medium flex-shrink-0 ml-2 ${
-                            isAtLimit ? 'text-red-600' : 'text-gray-900'
-                          }`}>
-                            {feature.is_unlimited 
-                              ? `${displayCount} (∞)`
-                              : `${displayCount} / ${limitDisplay}`}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* Boolean Features (Yes/No access) */}
-                {!featuresLoading && booleanFeatures.length > 0 && (
-                  <div className="pt-1.5 border-t border-gray-100 space-y-1">
-                    <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Features</div>
-                    <div className="flex flex-wrap gap-1">
-                      {booleanFeatures.map((feature) => (
-                        <span 
-                          key={feature.slug}
-                          className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700"
-                          title={feature.name}
-                        >
-                          <CheckCircleIcon className="w-2.5 h-2.5" />
-                          <span className="truncate max-w-[60px]">{feature.name}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Actions */}
-                <div className="pt-1.5 border-t border-gray-100 space-y-1">
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      router.push('/billing');
-                    }}
-                    className="w-full px-2 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-md transition-colors text-center border border-indigo-200"
-                  >
-                    Manage Plan
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      router.push('/plans');
-                    }}
-                    className="w-full px-2 py-1 text-[10px] text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded transition-colors text-center"
-                  >
-                    View All Plans
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sign In / Sign Out */}
+          {/* Actions: Settings/Billing/Analytics admins only; Sign Out everyone */}
           <div className="border-t border-gray-200">
             {account ? (
               <>
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    router.push('/settings');
-                  }}
-                  className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
-                >
-                  <Cog6ToothIcon className="w-4 h-4 text-gray-500" />
-                  Settings
-                </button>
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    router.push('/billing');
-                  }}
-                  className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
-                >
-                  <CreditCardIcon className="w-4 h-4 text-gray-500" />
-                  Billing
-                </button>
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    router.push('/analytics');
-                  }}
-                  className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
-                >
-                  <ChartBarIcon className="w-4 h-4 text-gray-500" />
-                  Analytics
-                </button>
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push('/settings');
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                    >
+                      <Cog6ToothIcon className="w-4 h-4 text-gray-500" />
+                      Settings
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push('/billing');
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                    >
+                      <CreditCardIcon className="w-4 h-4 text-gray-500" />
+                      Billing
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsOpen(false);
+                        router.push('/analytics');
+                      }}
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                    >
+                      <ChartBarIcon className="w-4 h-4 text-gray-500" />
+                      Analytics
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={handleSignOut}
                   className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-red-600 border-t border-gray-100"
@@ -512,12 +355,16 @@ export default function AccountDropdown({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            if (onTriggerClick) {
+              onTriggerClick();
+              return;
+            }
             setIsOpen(!isOpen);
           }}
           className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm ${
             isDark
               ? 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
-              : 'bg-white/10 hover:bg-white/20 text-gray-900'
+              : 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
           }`}
           aria-label="Account menu"
           aria-expanded={isOpen}
@@ -530,7 +377,7 @@ export default function AccountDropdown({
             />
           ) : (
             <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-              <UserIcon className="w-3 h-3 text-gray-500" />
+              <UserIcon className={`w-3 h-3 ${isDark ? 'text-gray-500' : 'text-[#3C3C43]'}`} />
             </div>
           )}
         </button>

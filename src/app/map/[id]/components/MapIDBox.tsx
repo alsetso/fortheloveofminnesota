@@ -19,6 +19,38 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 import BoundaryLayersManager from './BoundaryLayersManager';
 import MentionsLayer from '@/features/map/components/MentionsLayer';
 import { useUnifiedMapClickHandler } from '../hooks/useUnifiedMapClickHandler';
+import { getLiveBoundaryZoomRange, type LiveBoundaryLayerId } from '@/features/map/config';
+
+function LiveMapZoomIndicator({ map }: { map: MapboxMapInstance }) {
+  const mapboxMap = map as any;
+  const [zoom, setZoom] = useState(() => (typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 0));
+  useEffect(() => {
+    const update = () => setZoom(typeof mapboxMap.getZoom === 'function' ? mapboxMap.getZoom() : 0);
+    let rafId: number | null = null;
+    const throttledUpdate = () => {
+      if (rafId != null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        update();
+      });
+    };
+    map.on('zoom', throttledUpdate);
+    map.on('zoomend', update);
+    map.on('moveend', update);
+    update();
+    return () => {
+      map.off('zoom', throttledUpdate);
+      map.off('zoomend', update);
+      map.off('moveend', update);
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
+  }, [map]);
+  return (
+    <div className="absolute bottom-2 left-2 z-10 rounded-md border border-gray-200 bg-white/90 px-2 py-1 text-xs font-medium text-gray-600 tabular-nums">
+      Zoom {zoom.toFixed(1)}
+    </div>
+  );
+}
 
 interface MapIDBoxProps {
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
@@ -108,6 +140,30 @@ interface MapIDBoxProps {
   viewAsRole?: 'owner' | 'manager' | 'editor' | 'non-member';
   onOpenContributeOverlay?: (coordinates: { lat: number; lng: number }, mapMeta: Record<string, any> | null, fullAddress?: string | null) => void;
   onRemoveClickMarker?: (removeFn: () => void) => void;
+  /** When true, collaboration tools use default iOS grey (matches PageWrapper). When false, use map settings colors. */
+  useDefaultAppearance?: boolean;
+  /** When false, collaboration tools nav is hidden (e.g. on /live). Default true. */
+  showCollaborationTools?: boolean;
+  /** When true, map uses basic defaults (no bounds, world view) and shows zoom indicator. Used for /live only. */
+  isLiveMap?: boolean;
+  /** When false (e.g. on /live until boundaries done), pins fetch is deferred. Omit/true = load pins when map ready. */
+  allowPinsLoad?: boolean;
+  /** Called when mentions/pins layer loading state changes (e.g. for /live footer status). */
+  onMentionsLoadingChange?: (loading: boolean) => void;
+  /** Called when a boundary layer load starts/finishes (state, county, ctu). For Review accordion on /live. */
+  onBoundaryLayerLoadChange?: (layerId: 'state' | 'county' | 'district' | 'ctu', loading: boolean) => void;
+  /** Called when a boundary is clicked. Single item for toggle selection; passed to /live footer. */
+  onBoundarySelect?: (item: { layer: 'state' | 'county' | 'district' | 'ctu'; id: string; name: string; lat: number; lng: number }) => void;
+  /** Called when map zoom changes (for /live: footer status and boundary layer selection). */
+  onZoomChange?: (zoom: number) => void;
+  /** When set (e.g. on /live), pin clicks call this with pin data; used to show pin in app footer. */
+  onLivePinSelect?: (pinId: string, pinData?: Record<string, unknown> | null) => void;
+  /** When false, show all pins unclustered. When true (default), cluster pins on the live map. */
+  pinDisplayGrouping?: boolean;
+  /** When true on /live, show only current account's pins. Default false. */
+  showOnlyMyPins?: boolean;
+  /** When on /live: time filter for pins (24h, 7d, or null = all time). */
+  timeFilter?: '24h' | '7d' | null;
 }
 
 interface MapPin {
@@ -198,6 +254,18 @@ export default function MapIDBox({
   viewAsRole,
   onOpenContributeOverlay,
   onRemoveClickMarker,
+  useDefaultAppearance = false,
+  showCollaborationTools = true,
+  isLiveMap = false,
+  allowPinsLoad,
+  onMentionsLoadingChange,
+  onBoundaryLayerLoadChange,
+  onBoundarySelect,
+  onZoomChange,
+  onLivePinSelect,
+  pinDisplayGrouping = true,
+  showOnlyMyPins = false,
+  timeFilter: timeFilterProp,
 }: MapIDBoxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const { account: currentAccount, activeAccountId } = useAuthStateSafe();
@@ -259,6 +327,8 @@ export default function MapIDBox({
   const handlePinClick = handlePinModeToggle;
   const handleDrawClick = handleAreaDrawToggle;
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showBoundaryModal, setShowBoundaryModal] = useState(false);
+  const [boundaryModalRecord, setBoundaryModalRecord] = useState<{ title: string; subtitle: string | null; record: Record<string, unknown> } | null>(null);
   // Keep selectedEntity for layer clicks (not migrated to sidebar yet)
   const [selectedEntity, setSelectedEntity] = useState<MapPin | MapArea | MapLayerPolygonEntity | null>(null);
   const [selectedEntityType, setSelectedEntityType] = useState<'pin' | 'area' | 'layer' | null>(null);
@@ -268,7 +338,29 @@ export default function MapIDBox({
     containerRef: mapContainer as React.RefObject<HTMLDivElement>,
     meta,
     onMapLoad,
+    restrictToMinnesota: !isLiveMap,
   });
+  const [currentZoom, setCurrentZoom] = useState(0);
+  useEffect(() => {
+    if (!mapInstance || !mapLoaded || typeof (mapInstance as any).getZoom !== 'function') return;
+    const map = mapInstance as any;
+    const syncZoom = () => {
+      const z = map.getZoom();
+      setCurrentZoom(z);
+    };
+    const syncZoomAndNotify = () => {
+      const z = map.getZoom();
+      setCurrentZoom(z);
+      onZoomChange?.(z);
+    };
+    map.on('zoomend', syncZoomAndNotify);
+    map.on('moveend', syncZoom);
+    syncZoomAndNotify();
+    return () => {
+      map.off('zoomend', syncZoomAndNotify);
+      map.off('moveend', syncZoom);
+    };
+  }, [mapInstance, mapLoaded, onZoomChange]);
   const [pins, setPins] = useState<MapPin[]>(initialPins);
   const [areas, setAreas] = useState<MapArea[]>(initialAreas);
   const [showPinForm, setShowPinForm] = useState(false);
@@ -299,6 +391,7 @@ export default function MapIDBox({
     map: mapInstance,
     mapLoaded,
     mapData: fullMapData,
+    isLiveMap,
     account: (currentAccount ? {
       id: currentAccount.id,
       plan: currentAccount.plan || null,
@@ -316,7 +409,23 @@ export default function MapIDBox({
     pinMode,
     showAreaDrawModal,
     onPinClick: async (pinId) => {
-      // Fetch pin data and dispatch event
+      if (onLivePinSelect) {
+        setLoadingEntity(true);
+        try {
+          const response = await fetch(`/api/maps/${mapId}/pins/${pinId}`);
+          if (response.ok) {
+            const pinData = await response.json();
+            onLivePinSelect(pinId, pinData);
+          } else {
+            onLivePinSelect(pinId, null);
+          }
+        } catch {
+          onLivePinSelect(pinId, null);
+        } finally {
+          setLoadingEntity(false);
+        }
+        return;
+      }
       setLoadingEntity(true);
       try {
         const response = await fetch(`/api/maps/${mapId}/pins/${pinId}`);
@@ -404,6 +513,79 @@ export default function MapIDBox({
         // Address will be reverse geocoded in the contribute overlay
         onOpenContributeOverlay({ lat, lng }, mapMeta || null, null);
         setPinMode(false); // Exit pin mode after opening overlay
+      }
+    },
+    onBoundaryClick: async (feature) => {
+      // When parent provides onBoundarySelect, layers update the app footer; do not open modal.
+      if (onBoundarySelect) return;
+
+      const layerId = typeof feature?.layer?.id === 'string' ? feature.layer.id : null;
+      const props = feature?.properties as Record<string, unknown> | undefined;
+      if (!layerId) return;
+
+      const baseLayerId = layerId.replace(/-fill$|-outline$|-highlight-fill$|-highlight-outline$/, '');
+      setLoadingEntity(true);
+      try {
+        let url: string;
+        if (baseLayerId === 'state-boundary') {
+          url = '/api/civic/state-boundary';
+        } else if (baseLayerId === 'county-boundaries' && typeof props?.county_id === 'string') {
+          url = `/api/civic/county-boundaries?id=${encodeURIComponent(props.county_id)}`;
+        } else if (baseLayerId === 'ctu-boundaries' && typeof props?.ctu_id === 'string') {
+          url = `/api/civic/ctu-boundaries?id=${encodeURIComponent(props.ctu_id)}`;
+        } else {
+          setLoadingEntity(false);
+          return;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) {
+          setLoadingEntity(false);
+          return;
+        }
+        const record = await response.json();
+
+        const geometry =
+          record?.geometry?.type === 'FeatureCollection' && Array.isArray(record.geometry.features) && record.geometry.features[0]?.geometry
+            ? record.geometry.features[0].geometry
+            : record?.geometry;
+
+        let title: string;
+        let subtitle: string | null = null;
+
+        if (baseLayerId === 'state-boundary') {
+          title = typeof record?.name === 'string' && record.name.trim() ? record.name : 'Minnesota';
+          subtitle = 'State boundary';
+        } else if (baseLayerId === 'county-boundaries') {
+          title = typeof record?.county_name === 'string' && record.county_name.trim() ? record.county_name : 'County';
+          subtitle = 'County boundary';
+        } else {
+          title = typeof record?.feature_name === 'string' && record.feature_name.trim() ? record.feature_name : 'CTU';
+          const ctuClass = typeof record?.ctu_class === 'string' ? record.ctu_class : null;
+          const county = typeof record?.county_name === 'string' ? record.county_name : null;
+          subtitle = [ctuClass, county].filter(Boolean).join(' • ') || 'CTU boundary';
+        }
+
+        const layerEntity: MapLayerPolygonEntity = {
+          layerId,
+          title,
+          subtitle,
+          properties: record && typeof record === 'object' ? { ...record, geometry: undefined } : {},
+          geometryType: geometry?.type ?? null,
+          geometry: geometry ?? null,
+        };
+        setSelectedEntity(layerEntity);
+        setSelectedEntityType('layer');
+        setBoundaryModalRecord({
+          title,
+          subtitle,
+          record: record && typeof record === 'object' ? { ...record, geometry: undefined } : {},
+        });
+        setShowBoundaryModal(true);
+      } catch {
+        // no-op
+      } finally {
+        setLoadingEntity(false);
       }
     },
   });
@@ -760,7 +942,14 @@ export default function MapIDBox({
       setSelectedOverlayFeature(mapboxMap, feature);
       const bounds = computeBoundsFromGeometry(geometry);
       if (bounds && typeof mapboxMap.fitBounds === 'function') {
-        mapboxMap.fitBounds(bounds, { padding: 70, duration: 700, essential: true });
+        const lid = layer.layerId;
+        let layerKey: LiveBoundaryLayerId | null = null;
+        if (lid.startsWith('state-boundary-')) layerKey = 'state';
+        else if (lid.startsWith('county-boundaries-')) layerKey = 'county';
+        else if (lid.startsWith('ctu-boundaries-')) layerKey = 'ctu';
+        else if (/^congressional-district-\d+-/.test(lid)) layerKey = 'district';
+        const maxZoom = layerKey ? getLiveBoundaryZoomRange(layerKey).maxzoom : undefined;
+        mapboxMap.fitBounds(bounds, { padding: 70, duration: 700, essential: true, maxZoom });
       }
     }
   }, [
@@ -935,11 +1124,12 @@ export default function MapIDBox({
         return;
       }
 
-      // Add layer
+      // Add layer (only visible at zoom 12+)
       mapboxMap.addLayer({
         id: PINS_LAYER_ID,
         type: 'circle',
         source: PINS_SOURCE_ID,
+        minzoom: 12,
         paint: {
           'circle-radius': 8,
           'circle-color': '#ef4444',
@@ -1316,6 +1506,9 @@ export default function MapIDBox({
               showCTU={showCTU}
               showStateBoundary={showStateBoundary}
               showCountyBoundaries={showCountyBoundaries}
+              liveMapBoundaryZoom={false}
+              onLayerLoadChange={onBoundaryLayerLoadChange}
+              onBoundarySelect={onBoundarySelect}
             />
           )}
           
@@ -1327,6 +1520,11 @@ export default function MapIDBox({
               mapLoaded={mapLoaded}
               mapId={mapId}
               skipClickHandlers={true}
+              startPinsLoad={allowPinsLoad ?? true}
+              onLoadingChange={onMentionsLoadingChange}
+              clusterPins={pinDisplayGrouping}
+              showOnlyMyPins={showOnlyMyPins}
+              timeFilter={timeFilterProp}
             />
           )}
         </>
@@ -1349,6 +1547,10 @@ export default function MapIDBox({
           bottom: 0,
         }}
       />
+      {/* Live map: zoom level indicator bottom-left */}
+      {isLiveMap && mapLoaded && mapInstance && (
+        <LiveMapZoomIndicator map={mapInstance} />
+      )}
       {/* Desktop: Join experience now handled by PageWrapper info card */}
 
       {/* Mobile: Join experience now handled by PageWrapper info card */}
@@ -1416,12 +1618,73 @@ export default function MapIDBox({
         />
       )}
 
+      {/* Boundary detail modal - opens on entity layer click after API success */}
+      {showBoundaryModal && boundaryModalRecord && (
+        <div className="fixed bottom-0 left-0 right-0 z-[110] px-[10px] flex justify-center">
+          <div className="w-full max-w-[500px] bg-white rounded-t-md border border-gray-200 border-b-0 p-[10px] shadow-[0_-2px_10px_rgba(0,0,0,0.08)] space-y-3 max-h-[50vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-gray-900">{boundaryModalRecord.title}</h2>
+              <button
+                type="button"
+                onClick={() => { setShowBoundaryModal(false); setBoundaryModalRecord(null); }}
+                className="p-1 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
+            {boundaryModalRecord.subtitle && (
+              <p className="text-xs text-gray-500">{boundaryModalRecord.subtitle}</p>
+            )}
+            <dl className="space-y-1.5 text-xs">
+              {boundaryModalRecord.record.description != null && String(boundaryModalRecord.record.description).trim() !== '' && (
+                <div>
+                  <dt className="text-gray-500">Description</dt>
+                  <dd className="text-gray-700">{String(boundaryModalRecord.record.description)}</dd>
+                </div>
+              )}
+              {boundaryModalRecord.record.county_code != null && (
+                <div>
+                  <dt className="text-gray-500">County code</dt>
+                  <dd className="text-gray-700">{String(boundaryModalRecord.record.county_code)}</dd>
+                </div>
+              )}
+              {boundaryModalRecord.record.population != null && (
+                <div>
+                  <dt className="text-gray-500">Population</dt>
+                  <dd className="text-gray-700">{String(boundaryModalRecord.record.population)}</dd>
+                </div>
+              )}
+              {boundaryModalRecord.record.acres != null && (
+                <div>
+                  <dt className="text-gray-500">Acres</dt>
+                  <dd className="text-gray-700">{String(boundaryModalRecord.record.acres)}</dd>
+                </div>
+              )}
+              {boundaryModalRecord.record.publisher != null && (
+                <div>
+                  <dt className="text-gray-500">Source</dt>
+                  <dd className="text-gray-700">{String(boundaryModalRecord.record.publisher)}</dd>
+                </div>
+              )}
+            </dl>
+            <button
+              type="button"
+              onClick={() => { setShowBoundaryModal(false); setBoundaryModalRecord(null); }}
+              className="w-full px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* Entity sidebar is now handled by page-level useEntitySidebar hook */}
       {/* Layer clicks still use local state (not migrated yet) */}
 
-      {/* Collaboration Tools Nav - Show for members, owners, and non-members (for preview/join prompt) */}
-      {mapLoaded && current_account_id && (
+      {/* Collaboration Tools Nav - Show for members, owners, and non-members (for preview/join prompt). Hidden on /live. */}
+      {showCollaborationTools && mapLoaded && current_account_id && (
         <CollaborationToolsNav
           onToolSelect={handleToolSelect}
           activeTool={activeTool}
@@ -1490,6 +1753,7 @@ export default function MapIDBox({
           viewAsRole={viewAsRole}
           onJoinClick={onJoinClick}
           mapSettings={mapSettings}
+          useDefaultAppearance={useDefaultAppearance}
         />
       )}
     </div>

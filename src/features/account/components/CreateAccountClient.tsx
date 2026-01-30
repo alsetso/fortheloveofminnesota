@@ -413,7 +413,7 @@ export default function CreateAccountClient({ onComplete, onWelcomeShown }: Crea
         {account?.username && (
           <div className="pt-1">
             <a
-              href={`/profile/${account.username}`}
+              href={`/${account.username}`}
               className="w-full flex justify-center items-center gap-1.5 px-[10px] py-[10px] border border-gray-200 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 transition-colors"
             >
               <UserIcon className="w-3 h-3" />

@@ -143,7 +143,6 @@ export async function POST(
         const supabase = await createServerClientWithAuth(cookies());
         
         // Resolve identifier to map_id (handle both UUID and slug)
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id, visibility, settings');
@@ -161,7 +160,7 @@ export async function POST(
         }
 
         const mapData = map as { account_id: string; id: string; visibility: string; settings: any };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check member role
         const { data: member } = await supabase

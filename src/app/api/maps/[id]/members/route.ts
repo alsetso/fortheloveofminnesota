@@ -51,6 +51,7 @@ export async function GET(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id and get map owner
+        // eslint-disable-next-line prefer-const -- assigned in branch or after await
         let mapId: string;
         let mapOwnerId: string | null = null;
         
@@ -97,7 +98,7 @@ export async function GET(
           }
         }
 
-        // Fetch all members
+        // Fetch all members (include search_visibility for live search filtering)
         const { data: members, error } = await supabase
           .from('map_members')
           .select(`
@@ -111,7 +112,9 @@ export async function GET(
               username,
               first_name,
               last_name,
-              image_url
+              image_url,
+              search_visibility,
+              onboarded
             )
           `)
           .eq('map_id', mapId)
@@ -185,7 +188,6 @@ export async function POST(
         const { account_id: inviteAccountId, role } = validation.data;
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id, settings, member_count');
@@ -207,7 +209,7 @@ export async function POST(
           settings: MapSettings;
           member_count: number;
         };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: currentMember } = await supabase

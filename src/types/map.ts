@@ -55,6 +55,7 @@ export interface MapSettings {
     area_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
     post_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
     click_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+    allowed_mention_types?: string[] | null; // Array of mention_type IDs that are allowed in this map (null/undefined = all types allowed)
     role_overrides?: {
       managers_can_edit?: boolean;
       editors_can_edit?: boolean;

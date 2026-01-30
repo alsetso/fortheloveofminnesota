@@ -130,7 +130,7 @@ export default function ProfileSidebar({
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/profile/${localAccount.username}`;
+    const url = `${window.location.origin}/${localAccount.username}`;
     
     if (navigator.share) {
       try {
@@ -668,7 +668,7 @@ export default function ProfileSidebar({
               Debug: Your Profile
             </div>
             <div className="text-[10px] text-yellow-700">
-              /profile/{localAccount.username || 'unknown'}
+              /{localAccount.username || 'unknown'}
             </div>
           </div>
         )}

@@ -54,6 +54,7 @@ const getCachedLiveMentions = cache(async () => {
     .from('map_pins')
     .select(`
       id,
+      map_id,
       lat,
       lng,
       description,

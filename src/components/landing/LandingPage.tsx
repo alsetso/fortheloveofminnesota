@@ -29,7 +29,7 @@ export default function LandingPage() {
 
   const handleProfileClick = () => {
     if (account?.username) {
-      router.push(`/profile/${account.username}`);
+      router.push(`/${account.username}`);
     }
   };
 
@@ -188,7 +188,7 @@ export default function LandingPage() {
       accountDropdownProps={{
         onAccountClick: () => {
           if (account?.username) {
-            router.push(`/profile/${account.username}`);
+            router.push(`/${account.username}`);
           }
         },
         onSignInClick: handleGetStarted,
@@ -512,7 +512,8 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* After You Post Section */}
+          {/* After You Post Section - only when authenticated */}
+          {user && account && (
           <div className="relative z-10 bg-white py-8 w-full">
             <div className="max-w-[1200px] mx-auto px-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">After you post</h2>
@@ -562,6 +563,7 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+          )}
           </div>
         </div>
 

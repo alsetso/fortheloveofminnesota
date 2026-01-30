@@ -47,7 +47,6 @@ export async function GET(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id');
@@ -63,7 +62,7 @@ export async function GET(
           return createErrorResponse('Map not found', 404);
         }
 
-        mapId = (map as any).id;
+        const mapId = (map as any).id;
 
         // Get user's pending request
         const { data: request, error } = await supabase
@@ -129,7 +128,6 @@ export async function DELETE(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id');
@@ -145,7 +143,7 @@ export async function DELETE(
           return createErrorResponse('Map not found', 404);
         }
 
-        mapId = (map as any).id;
+        const mapId = (map as any).id;
 
         // Get user's pending request
         const { data: userRequest } = await supabase

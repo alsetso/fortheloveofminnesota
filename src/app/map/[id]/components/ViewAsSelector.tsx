@@ -17,6 +17,8 @@ interface ViewAsSelectorProps {
       'non-member'?: string;
     };
   } | null;
+  /** When true, use default iOS grey (matches PageWrapper). When false, use map settings colors. */
+  useDefaultAppearance?: boolean;
 }
 
 const OWNER_GRADIENT = 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)';
@@ -24,6 +26,8 @@ const BLACK_BACKGROUND = 'rgba(0, 0, 0, 0.8)';
 const BLACK_BACKGROUND_HOVER = 'rgba(0, 0, 0, 0.9)';
 const GRADIENT_BORDER_COLOR = 'rgba(255, 183, 0, 0.4)'; // Matches gradient start color (#FFB700)
 const BLACK_BORDER_COLOR = 'rgba(255, 255, 255, 0.1)';
+/** Default iOS grey (matches PageWrapper when no custom map colors) */
+const DEFAULT_IOS_BG = '#F2F2F7';
 
 const ROLES: Array<{ value: ViewAsRole; label: string }> = [
   { value: 'owner', label: 'Owner' },
@@ -37,33 +41,35 @@ export default function ViewAsSelector({
   onRoleChange,
   viewAsRole,
   mapSettings,
+  useDefaultAppearance = false,
 }: ViewAsSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Get background color based on viewAsRole and mapSettings
+  // Get background color: default iOS grey when useDefaultAppearance, else from mapSettings
   const backgroundColor = useMemo(() => {
+    if (useDefaultAppearance) return DEFAULT_IOS_BG;
     if (!viewAsRole) return BLACK_BACKGROUND;
     
-    // Get color from mapSettings if available
     const roleColor = mapSettings?.colors?.[viewAsRole];
     if (roleColor && roleColor.trim() !== '') {
       return roleColor;
     }
     
-    // Fallback to default: gradient for owner, black for others
     return viewAsRole === 'owner' ? OWNER_GRADIENT : BLACK_BACKGROUND;
-  }, [viewAsRole, mapSettings]);
+  }, [viewAsRole, mapSettings, useDefaultAppearance]);
 
   // Get border color based on background
   const borderColor = useMemo(() => {
-    // Use gradient border if the background is actually a gradient
+    if (useDefaultAppearance) return 'rgba(0, 0, 0, 0.1)';
     const isGradient = backgroundColor.includes('gradient');
     return isGradient ? GRADIENT_BORDER_COLOR : BLACK_BORDER_COLOR;
-  }, [backgroundColor]);
+  }, [backgroundColor, useDefaultAppearance]);
 
   const shouldShowGradient = useMemo(() => {
     return backgroundColor.includes('gradient');
   }, [backgroundColor]);
+
+  const isLightAppearance = useDefaultAppearance || backgroundColor === DEFAULT_IOS_BG;
   
   const currentLabel = useMemo(
     () => ROLES.find(r => r.value === currentRole)?.label || 'Owner',
@@ -86,31 +92,37 @@ export default function ViewAsSelector({
   }, [onRoleChange]);
 
   const handleMouseEnter = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!shouldShowGradient) {
+    if (useDefaultAppearance) {
+      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.06)';
+    } else if (!shouldShowGradient) {
       e.currentTarget.style.background = BLACK_BACKGROUND_HOVER;
     }
-  }, [shouldShowGradient]);
+  }, [shouldShowGradient, useDefaultAppearance]);
 
   const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!shouldShowGradient) {
+    if (useDefaultAppearance || !shouldShowGradient) {
       e.currentTarget.style.background = backgroundColor;
     }
-  }, [shouldShowGradient, backgroundColor]);
+  }, [shouldShowGradient, backgroundColor, useDefaultAppearance]);
 
   return (
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-white rounded-md border shadow-lg transition-all"
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border shadow-lg transition-all ${
+          isLightAppearance ? 'text-[#3C3C43]' : 'text-white'
+        }`}
         style={containerStyle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         title="View as different role"
       >
-        <span className="text-[10px] text-white/70 uppercase tracking-wide">View As:</span>
+        <span className={isLightAppearance ? 'text-[10px] text-[#3C3C43]/70 uppercase tracking-wide' : 'text-[10px] text-white/70 uppercase tracking-wide'}>
+          View As:
+        </span>
         <span>{currentLabel}</span>
         <ChevronDownIcon 
-          className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+          className={`w-3 h-3 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${isLightAppearance ? 'text-[#3C3C43]/70' : ''}`} 
         />
       </button>
 

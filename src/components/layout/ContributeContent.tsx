@@ -111,7 +111,7 @@ export default function ContributeContent({ map, mapLoaded }: ContributeContentP
           </div>
           {account.username && (
             <button
-              onClick={() => router.push(`/profile/${account.username}`)}
+              onClick={() => router.push(`/${account.username}`)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors flex-shrink-0 ${
                 useTransparentUI
                   ? 'text-white bg-white/10 border border-white/20 hover:bg-white/20'

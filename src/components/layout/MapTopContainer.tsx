@@ -769,7 +769,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
       setSearchQuery(`@${account.username}`);
       // Navigate to profile
       if (account.username) {
-        window.location.href = `/profile/${account.username}`;
+        window.location.href = `/${account.username}`;
       }
       return;
     }
@@ -848,14 +848,15 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
 
   const handleLogoClick = useCallback(() => {
     // Route-aware navigation:
-    // - On /profile/* pages: go to /map/live
-    // - On /live or /map/live page: go to / (homepage)
-    if (pathname?.startsWith('/profile/')) {
-      router.push('/map/live');
-    } else if (pathname === '/live' || pathname === '/map/live') {
+    // - On /:username (profile) pages: go to /live
+    // - On /live page: go to / (homepage)
+    const isUsernamePage = pathname && pathname !== '/' && pathname.split('/').filter(Boolean).length === 1
+      && !['live', 'settings', 'map', 'maps', 'onboarding', 'analytics', 'billing', 'plans', 'login', 'signup', 'news', 'search', 'admin', 'api', 'privacy', 'terms', 'gov', 'contact', 'contribute', 'download'].includes(pathname.slice(1).split('/')[0]);
+    if (isUsernamePage) {
+      router.push('/live');
+    } else if (pathname === '/live') {
       router.push('/');
     } else {
-      // Fallback: go to homepage
       router.push('/');
     }
   }, [router, pathname]);

@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+/** Query params set when opening contribute; stripped on close so URL is clean. */
+const CONTRIBUTE_PARAMS = ['mention_type_id', 'lat', 'lng', 'data_key'];
+
 /**
  * Hook to manage contribute overlay state based on URL hash
  * Consolidates hash detection, URL param handling, and overlay state
@@ -61,14 +64,15 @@ export function useContributeOverlay() {
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   }, []);
 
-  // Close overlay
+  // Close overlay and strip contribute-related query params from URL
   const closeOverlay = useCallback(() => {
     if (typeof window === 'undefined') return;
 
-    // Use history API to remove hash without page reload
-    const url = window.location.pathname + window.location.search;
+    const params = new URLSearchParams(window.location.search);
+    CONTRIBUTE_PARAMS.forEach((key) => params.delete(key));
+    const search = params.toString();
+    const url = window.location.pathname + (search ? `?${search}` : '');
     window.history.replaceState(null, '', url);
-    // Manually trigger hashchange to update state
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   }, []);
 

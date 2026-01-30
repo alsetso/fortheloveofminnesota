@@ -16,6 +16,8 @@ import {
   buildMentionsIconLayout,
   mentionsLayerStyles,
 } from '@/features/map/config/layerStyles';
+import { ZOOM_SCALE_REFERENCE } from '@/features/map/config';
+import { moveMentionsLayersToTop } from '@/features/map/utils/layerOrder';
 
 interface MentionsLayerProps {
   map: MapboxMapInstance;
@@ -27,18 +29,33 @@ interface MentionsLayerProps {
   mapId?: string | null;
   /** If true, skip registering click handlers (unified handler will handle clicks) */
   skipClickHandlers?: boolean;
+  /** When false (e.g. on /live until boundaries are done), defer fetching pins until it becomes true. */
+  startPinsLoad?: boolean;
+  /** When false, show all pins unclustered at every zoom. When true (default), cluster below pinsMinZoom. */
+  clusterPins?: boolean;
+  /** When true on /live, show only current account's pins. Default false. */
+  showOnlyMyPins?: boolean;
+  /** When on /live: time filter for pins (24h, 7d, or null = all time). When provided, overrides internal state. */
+  timeFilter?: '24h' | '7d' | null;
 }
+
+/** In-memory cache for live map mentions so we don't heavy reload on remount/style change */
+let liveMapMentionsCache: { data: Mention[]; timestamp: number } | null = null;
 
 /**
  * MentionsLayer component manages Mapbox mention visualization
  * Handles fetching, formatting, and real-time updates
  */
-export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId, mapId, skipClickHandlers = false }: MentionsLayerProps) {
+export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selectedMentionId, mapId, skipClickHandlers = false, startPinsLoad = true, clusterPins = true, showOnlyMyPins = false, timeFilter: timeFilterProp }: MentionsLayerProps) {
   const sourceId = 'map-mentions';
+  const clusterCircleLayerId = 'map-mentions-cluster-circle';
+  const clusterCountLayerId = 'map-mentions-cluster-count';
   const pointLayerId = 'map-mentions-point';
   const pointLabelLayerId = 'map-mentions-point-label';
   const highlightLayerId = 'map-mentions-highlight';
   const highlightSourceId = 'map-mentions-highlight-source';
+  /** Show cluster groups below this zoom; show individual pins at this zoom and above */
+  const pinsMinZoom = ZOOM_SCALE_REFERENCE.CITY; // 12
   
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
@@ -52,6 +69,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   const clickHandlersAddedRef = useRef<boolean>(false);
   const locationSelectedHandlerRef = useRef<(() => void) | null>(null);
   const mentionClickHandlerRef = useRef<((e: any) => void) | null>(null);
+  const clusterClickHandlerRef = useRef<((e: any) => void) | null>(null);
   const mentionHoverStartHandlerRef = useRef<((e: any) => void) | null>(null);
   const mentionHoverEndHandlerRef = useRef<(() => void) | null>(null);
   const styleChangeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,7 +83,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>(null);
+  const [timeFilterState, setTimeFilterState] = useState<'24h' | '7d' | null>(null);
+  const timeFilter = timeFilterProp !== undefined ? timeFilterProp : timeFilterState;
   const [isLoadingMentions, setIsLoadingMentions] = useState(false);
 
   // Notify parent of loading state changes
@@ -92,13 +111,13 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
     showErrorToastRef.current = showErrorToast;
   }, [showErrorToast]);
 
-  // Listen for time filter changes
+  // Listen for time filter changes (only when not controlled by prop)
   useEffect(() => {
     const handleTimeFilterChange = (event: Event) => {
+      if (timeFilterProp !== undefined) return;
       const customEvent = event as CustomEvent<{ timeFilter: '24h' | '7d' | 'all' }>;
       const filter = customEvent.detail?.timeFilter;
-      // Convert 'all' to null for the service (no filter)
-      setTimeFilter(filter === 'all' ? null : filter || '7d');
+      setTimeFilterState(filter === 'all' ? null : filter || '7d');
     };
 
     const handleReloadMentions = () => {
@@ -113,7 +132,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
       window.removeEventListener('mention-time-filter-change', handleTimeFilterChange);
       window.removeEventListener('reload-mentions', handleReloadMentions);
     };
-  }, []);
+  }, [timeFilterProp]);
 
   // Update highlight when selectedMentionId changes
   useEffect(() => {
@@ -248,9 +267,10 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
     };
   }, [selectedMentionId, mapLoaded, map, pointLayerId, highlightLayerId, highlightSourceId]);
 
-  // Fetch mentions and add to map
+  // Fetch mentions and add to map (deferred on live until boundaries are done when startPinsLoad is false)
   useEffect(() => {
     if (!map || !mapLoaded) return;
+    if (startPinsLoad === false) return;
 
     let mounted = true;
 
@@ -258,13 +278,16 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
       // Prevent concurrent calls
       if (isAddingLayersRef.current) return;
       
-      // Always show loading on initial load or when explicitly requested
-      setIsLoadingMentions(true);
+      // Check if this is the live map (needed for cache path)
+      const isLiveMap = pathname === '/map/live' || pathname === '/live';
+      const useCacheFirst = isLiveMap && liveMapMentionsCache?.data?.length;
+      
+      // Only show loading when we don't have in-memory cache (avoids heavy reload UX)
+      if (!useCacheFirst) {
+        setIsLoadingMentions(true);
+      }
       
       try {
-        // Check if this is the live map
-        const isLiveMap = pathname === '/map/live' || pathname === '/live';
-        
         // Get year filter from URL
         const yearParam = searchParams.get('year');
         const year = yearParam ? parseInt(yearParam, 10) : undefined;
@@ -316,14 +339,63 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           }
         }
         
+        const applyFilters = (raw: Mention[]) => {
+          let out = raw;
+          if (showOnlyMyPins && account?.id) {
+            out = out.filter(m => m.account_id === account.id);
+          }
+          if (mentionTypeIds && mentionTypeIds.length > 0) {
+            out = out.filter(m => m.mention_type?.id && mentionTypeIds!.includes(m.mention_type.id));
+          }
+          if (timeFilter) {
+            const now = Date.now();
+            const filterTime = timeFilter === '24h'
+              ? now - 24 * 60 * 60 * 1000
+              : timeFilter === '7d'
+                ? now - 7 * 24 * 60 * 60 * 1000
+                : 0;
+            if (filterTime > 0) {
+              out = out.filter(m => new Date(m.created_at).getTime() >= filterTime);
+            }
+          }
+          if (year) {
+            out = out.filter(m => m.post_date && new Date(m.post_date).getFullYear() === year);
+          }
+          return out;
+        };
+        
         let mentions: Mention[] = [];
         
-        // For live map, use cached endpoint with client-side filtering
+        // For live map: in-memory cache first (no heavy reload), then sessionStorage, then API
         if (isLiveMap) {
           const CACHE_KEY = 'live_map_mentions_cache';
           const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
           
-          // Check sessionStorage cache first
+          // 1) In-memory cache: use immediately, no loading spinner, revalidate in background
+          if (liveMapMentionsCache?.data?.length) {
+            mentions = applyFilters([...liveMapMentionsCache.data]);
+            setIsLoadingMentions(false);
+            // Background revalidate
+            fetch('/api/maps/live/mentions')
+              .then(res => res.json())
+              .then(data => {
+                if (data?.mentions && mounted) {
+                  liveMapMentionsCache = { data: data.mentions, timestamp: Date.now() };
+                  try {
+                    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                      data: data.mentions,
+                      timestamp: Date.now(),
+                    }));
+                  } catch {
+                    // ignore
+                  }
+                }
+              })
+              .catch(() => {});
+          }
+          
+          // 2) SessionStorage cache (if no memory cache or memory was used but we need to continue to add layers)
+          if (mentions.length === 0) {
           try {
             const cached = sessionStorage.getItem(CACHE_KEY);
             if (cached) {
@@ -331,113 +403,52 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               const age = Date.now() - timestamp;
               
               if (age < CACHE_DURATION) {
-                // Use cached data immediately
-                mentions = data;
-                
-                // Apply client-side filters
-                if (mentionTypeIds && mentionTypeIds.length > 0) {
-                  mentions = mentions.filter(m => 
-                    m.mention_type?.id && mentionTypeIds!.includes(m.mention_type.id)
-                  );
-                }
-                
-                if (timeFilter) {
-                  const now = Date.now();
-                  const filterTime = timeFilter === '24h' 
-                    ? now - 24 * 60 * 60 * 1000
-                    : timeFilter === '7d'
-                    ? now - 7 * 24 * 60 * 60 * 1000
-                    : 0;
-                  
-                  if (filterTime > 0) {
-                    mentions = mentions.filter(m => {
-                      const mentionTime = new Date(m.created_at).getTime();
-                      return mentionTime >= filterTime;
-                    });
-                  }
-                }
-                
-                if (year) {
-                  mentions = mentions.filter(m => {
-                    if (!m.post_date) return false;
-                    const mentionYear = new Date(m.post_date).getFullYear();
-                    return mentionYear === year;
-                  });
-                }
+                mentions = applyFilters(data);
+                liveMapMentionsCache = { data, timestamp };
                 
                 // Fetch fresh data in background (stale-while-revalidate)
                 fetch('/api/maps/live/mentions')
                   .then(res => res.json())
                   .then(data => {
-                    if (data.mentions && mounted) {
-                      // Update cache
+                    if (data?.mentions && mounted) {
+                      liveMapMentionsCache = { data: data.mentions, timestamp: Date.now() };
                       try {
                         sessionStorage.setItem(CACHE_KEY, JSON.stringify({
                           data: data.mentions,
                           timestamp: Date.now(),
                         }));
-                      } catch (err) {
-                        // Cache write failed, continue
+                      } catch {
+                        // ignore
                       }
                     }
                   })
-                  .catch(() => {
-                    // Background fetch failed, continue with cached data
-                  });
+                  .catch(() => {});
               }
             }
-          } catch (err) {
+          } catch {
             // Cache read failed, continue with API fetch
           }
+          }
           
-          // If no valid cache, fetch from API
+          // 3) No valid cache, fetch from API
           if (mentions.length === 0) {
             try {
               const response = await fetch('/api/maps/live/mentions');
               if (response.ok) {
                 const data = await response.json();
-                mentions = data.mentions || [];
-                
-                // Store in cache
+                const raw = data.mentions || [];
+                mentions = applyFilters(raw);
+                const ts = Date.now();
+                liveMapMentionsCache = { data: raw, timestamp: ts };
                 try {
                   sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-                    data: mentions,
-                    timestamp: Date.now(),
+                    data: raw,
+                    timestamp: ts,
                   }));
-                } catch (err) {
-                  // Cache write failed, continue
+                } catch {
+                  // ignore
                 }
                 
-                // Apply client-side filters
-                if (mentionTypeIds && mentionTypeIds.length > 0) {
-                  mentions = mentions.filter(m => 
-                    m.mention_type?.id && mentionTypeIds!.includes(m.mention_type.id)
-                  );
-                }
-                
-                if (timeFilter) {
-                  const now = Date.now();
-                  const filterTime = timeFilter === '24h' 
-                    ? now - 24 * 60 * 60 * 1000
-                    : timeFilter === '7d'
-                    ? now - 7 * 24 * 60 * 60 * 1000
-                    : 0;
-                  
-                  if (filterTime > 0) {
-                    mentions = mentions.filter(m => {
-                      const mentionTime = new Date(m.created_at).getTime();
-                      return mentionTime >= filterTime;
-                    });
-                  }
-                }
-                
-                if (year) {
-                  mentions = mentions.filter(m => {
-                    if (!m.post_date) return false;
-                    const mentionYear = new Date(m.post_date).getFullYear();
-                    return mentionYear === year;
-                  });
-                }
               } else {
                 // API failed, fallback to MentionService
                 throw new Error('API fetch failed');
@@ -515,7 +526,21 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         // First, clean up any existing layers (shouldn't exist if source doesn't, but be safe)
         // IMPORTANT: Remove layers BEFORE removing source to avoid "source not found" errors
         try {
-          // Remove layers first (they depend on the source)
+          // Remove layers first (cluster count, cluster circle, then point/label)
+          if (mapboxMap.getLayer(clusterCountLayerId)) {
+            try {
+              mapboxMap.removeLayer(clusterCountLayerId);
+            } catch (e) {
+              // Layer may already be removed or source missing - ignore
+            }
+          }
+          if (mapboxMap.getLayer(clusterCircleLayerId)) {
+            try {
+              mapboxMap.removeLayer(clusterCircleLayerId);
+            } catch (e) {
+              // Layer may already be removed or source missing - ignore
+            }
+          }
           if (mapboxMap.getLayer(pointLabelLayerId)) {
             try {
               mapboxMap.removeLayer(pointLabelLayerId);
@@ -546,16 +571,17 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           }
         }
 
-        // Add source (no clustering)
-        // Ensure source doesn't already exist before adding
+        // Add source: clustering when clusterPins true, else all pins as points
         try {
           if (!mapboxMap.getSource(sourceId)) {
             mapboxMap.addSource(sourceId, {
               type: 'geojson',
               data: geoJSON,
+              ...(clusterPins
+                ? { cluster: true, clusterMaxZoom: pinsMinZoom - 1, clusterRadius: 40 }
+                : { cluster: false }),
             });
           } else {
-            // Source exists, just update data
             const existingSource = mapboxMap.getSource(sourceId) as any;
             if (existingSource && existingSource.setData) {
               existingSource.setData(geoJSON);
@@ -565,6 +591,56 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           console.error('[MentionsLayer] Error adding/updating source:', e);
           isAddingLayersRef.current = false;
           return;
+        }
+
+        if (clusterPins) {
+          // Cluster circle layer: pin groups visible at all zoom levels below pinsMinZoom
+          try {
+            if (!mapboxMap.getLayer(clusterCircleLayerId)) {
+              mapboxMap.addLayer({
+                id: clusterCircleLayerId,
+                type: 'circle',
+                source: sourceId,
+                filter: ['has', 'point_count'],
+                maxzoom: pinsMinZoom,
+                paint: {
+                  'circle-color': ['step', ['get', 'point_count'], '#93c5fd', 10, '#60a5fa', 30, '#3b82f6', 100, '#2563eb'],
+                  'circle-radius': ['step', ['get', 'point_count'], 14, 10, 18, 30, 22, 100, 26],
+                  'circle-stroke-width': 2,
+                  'circle-stroke-color': '#fff',
+                },
+              });
+            }
+          } catch (e: any) {
+            if (!e?.message?.includes('already exists')) {
+              console.error('[MentionsLayer] Error adding cluster circle layer:', e);
+            }
+          }
+
+          // Cluster count layer: count label on each group, visible below pinsMinZoom
+          try {
+            if (!mapboxMap.getLayer(clusterCountLayerId)) {
+              mapboxMap.addLayer({
+                id: clusterCountLayerId,
+                type: 'symbol',
+                source: sourceId,
+                filter: ['has', 'point_count'],
+                maxzoom: pinsMinZoom,
+                layout: {
+                  'text-field': ['get', 'point_count_abbreviated'],
+                  'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                  'text-size': 12,
+                },
+                paint: {
+                  'text-color': '#fff',
+                },
+              });
+            }
+          } catch (e: any) {
+            if (!e?.message?.includes('already exists')) {
+              console.error('[MentionsLayer] Error adding cluster count layer:', e);
+            }
+          }
         }
 
         // Load account images and fallback heart icon
@@ -854,6 +930,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               id: pointLayerId,
               type: 'symbol',
               source: sourceId,
+              filter: ['!', ['has', 'point_count']],
+              minzoom: clusterPins ? pinsMinZoom : 0,
               layout: {
                 ...iconLayout,
                 'icon-image': iconExpression,
@@ -874,17 +952,14 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
 
         // Add labels for points (positioned above mention icon)
         try {
-          // Check if layer already exists before adding
-          if (mapboxMap.getLayer(pointLabelLayerId)) {
-            // Layer already exists, skip adding
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('[MentionsLayer] Label layer already exists, skipping add');
-            }
-          } else {
+          // Idempotent: effect may re-run (deps change, Strict Mode); skip if already added
+          if (!mapboxMap.getLayer(pointLabelLayerId)) {
             mapboxMap.addLayer({
               id: pointLabelLayerId,
               type: 'symbol',
               source: sourceId,
+              filter: ['!', ['has', 'point_count']],
+              minzoom: clusterPins ? pinsMinZoom : 0,
               layout: buildMentionsLabelLayout(),
               paint: buildMentionsLabelPaint(),
             });
@@ -957,6 +1032,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                     id: highlightLayerId,
                     type: 'circle',
                     source: highlightSourceId,
+                    minzoom: pinsMinZoom,
                     paint: {
                       'circle-radius': [
                         'interpolate',
@@ -1002,6 +1078,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             // Ignore if doesn't exist
           }
         }
+
+        // Default: pins and cluster groupings render above all area layers
+        moveMentionsLayersToTop(mapboxMap);
 
         isAddingLayersRef.current = false;
 
@@ -1050,6 +1129,12 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
 
         // Ensure layers are visible after adding
         try {
+          if (mapboxMap.getLayer(clusterCircleLayerId)) {
+            mapboxMap.setLayoutProperty(clusterCircleLayerId, 'visibility', 'visible');
+          }
+          if (mapboxMap.getLayer(clusterCountLayerId)) {
+            mapboxMap.setLayoutProperty(clusterCountLayerId, 'visibility', 'visible');
+          }
           if (mapboxMap.getLayer(pointLayerId)) {
             mapboxMap.setLayoutProperty(pointLayerId, 'visibility', 'visible');
           }
@@ -1087,7 +1172,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             if (!mentionId) return;
 
             // Find the mention data
-            let mention = mentionsRef.current.find(m => m.id === mentionId);
+            const mention = mentionsRef.current.find(m => m.id === mentionId);
             if (!mention) return;
             
             // Fetch complete mention data in parallel for fast switching
@@ -1247,6 +1332,24 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
 
           // Store handler references for cleanup
           mentionClickHandlerRef.current = handleMentionClick;
+
+          // Cluster click: zoom in to expand the group
+          const handleClusterClick = (e: any) => {
+            if (!e?.features?.[0]) return;
+            const feature = e.features[0];
+            const clusterId = feature.properties?.cluster_id;
+            const coordinates = feature.geometry?.coordinates?.slice() as [number, number] | undefined;
+            if (clusterId == null || !coordinates) return;
+            const source = mapboxMap.getSource(sourceId) as any;
+            if (!source?.getClusterExpansionZoom) return;
+            e.originalEvent?.stopPropagation();
+            source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
+              mapboxMap.flyTo({ center: coordinates, zoom, duration: 400 });
+            }).catch(() => {});
+          };
+          clusterClickHandlerRef.current = handleClusterClick;
+          (mapboxMap as any).on('click', clusterCircleLayerId, handleClusterClick);
+          (mapboxMap as any).on('click', clusterCountLayerId, handleClusterClick);
           
           // Add click handler to point layer
           // Cast to any for layer-specific event handlers (not in interface)
@@ -1322,6 +1425,12 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
 
             // Hide mentions layers when style changes (if they exist)
             try {
+              if (mapboxMap.getLayer(clusterCircleLayerId)) {
+                mapboxMap.setLayoutProperty(clusterCircleLayerId, 'visibility', 'none');
+              }
+              if (mapboxMap.getLayer(clusterCountLayerId)) {
+                mapboxMap.setLayoutProperty(clusterCountLayerId, 'visibility', 'none');
+              }
               if (mapboxMap.getLayer(pointLayerId)) {
                 mapboxMap.setLayoutProperty(pointLayerId, 'visibility', 'none');
               }
@@ -1423,6 +1532,19 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           const mapboxMap = map as any;
           
           // Remove click handlers
+          if (clusterClickHandlerRef.current) {
+            try {
+              if (mapboxMap.getLayer(clusterCircleLayerId)) {
+                (mapboxMap as any).off('click', clusterCircleLayerId, clusterClickHandlerRef.current);
+              }
+              if (mapboxMap.getLayer(clusterCountLayerId)) {
+                (mapboxMap as any).off('click', clusterCountLayerId, clusterClickHandlerRef.current);
+              }
+            } catch (e) {
+              // Handlers may already be removed
+            }
+            clusterClickHandlerRef.current = null;
+          }
           if (mentionClickHandlerRef.current) {
             try {
               if (mapboxMap.getLayer(pointLayerId)) {
@@ -1469,22 +1591,35 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         try {
           const mapboxMap = map as any;
           
-          // Remove layers
+          // Remove layers (cluster count, cluster circle, then point/label)
+          try {
+            if (mapboxMap.getLayer(clusterCountLayerId)) {
+              mapboxMap.removeLayer(clusterCountLayerId);
+            }
+          } catch (e) {
+            // Layer may not exist
+          }
+          try {
+            if (mapboxMap.getLayer(clusterCircleLayerId)) {
+              mapboxMap.removeLayer(clusterCircleLayerId);
+            }
+          } catch (e) {
+            // Layer may not exist
+          }
           try {
             if (mapboxMap.getLayer(pointLayerId)) {
               mapboxMap.removeLayer(pointLayerId);
-                }
-              } catch (e) {
+            }
+          } catch (e) {
             // Layer may not exist
-              }
-              
-              try {
+          }
+          try {
             if (mapboxMap.getLayer(pointLabelLayerId)) {
               mapboxMap.removeLayer(pointLabelLayerId);
-                }
-              } catch (e) {
-            // Layer may not exist
             }
+          } catch (e) {
+            // Layer may not exist
+          }
             
             // Remove source
               try {
@@ -1504,7 +1639,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         }
       }
     };
-  }, [map, mapLoaded, searchParams, timeFilter, mapId]);
+  }, [map, mapLoaded, searchParams, timeFilter, mapId, startPinsLoad, clusterPins, showOnlyMyPins, account?.id]);
 
   // Component doesn't render anything visible - loading state is shown in MapTopContainer toast
   return null;

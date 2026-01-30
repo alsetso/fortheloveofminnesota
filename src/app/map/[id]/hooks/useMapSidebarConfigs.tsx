@@ -155,7 +155,7 @@ export function useMapSidebarConfigs({
             />
           </Suspense>
         ),
-        popupType: 'members' as 'members',
+        popupType: 'members' as const,
         infoText: 'Manage map members, roles, and membership requests',
       });
     }

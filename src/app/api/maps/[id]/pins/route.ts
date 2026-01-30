@@ -44,7 +44,9 @@ export async function GET(
         }
         
         const { id: identifier } = pathValidation.data;
-        
+        const { searchParams } = new URL(req.url);
+        const period = searchParams.get('period') ?? 'all'; // 24h | 7d | all
+
         const auth = await getServerAuth();
         const supabase = auth 
           ? await createServerClientWithAuth(cookies())
@@ -68,13 +70,27 @@ export async function GET(
           mapId = (map as any).id;
         }
 
-        // Fetch pins (RLS will filter based on permissions)
-        const { data: pins, error } = await supabase
+        let since: string | null = null;
+        if (period === '24h') {
+          since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        } else if (period === '7d') {
+          since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
+
+        let pinsQuery = supabase
           .from('map_pins')
-          .select('*')
+          .select(`
+            *,
+            account:accounts!map_pins_account_id_fkey(id, username, first_name, last_name, image_url),
+            mention_type:mention_types(id, emoji, name)
+          `)
           .eq('map_id', mapId)
           .eq('is_active', true)
           .order('created_at', { ascending: false });
+        if (since) {
+          pinsQuery = pinsQuery.gte('created_at', since);
+        }
+        const { data: pins, error } = await pinsQuery;
 
         if (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -117,6 +133,7 @@ const createPinSchema = z.object({
   video_url: z.string().url().nullable().optional(),
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
+  mention_type_id: z.string().uuid().nullable().optional(),
 });
 
 export async function POST(
@@ -144,7 +161,6 @@ export async function POST(
         const supabase = await createServerClientWithAuth(cookies());
         
         // Resolve identifier to map_id (handle both UUID and slug)
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id, visibility, settings');
@@ -162,7 +178,7 @@ export async function POST(
         }
 
         const mapData = map as { account_id: string; id: string; visibility: string; settings: any };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check member role
         const { data: member } = await supabase
@@ -192,6 +208,29 @@ export async function POST(
             return createErrorResponse('Forbidden - you do not have access to this map', 403);
           }
           return createErrorResponse('Forbidden - this map does not allow others to add pins', 403);
+        }
+
+        // Validate request body
+        const validation = await validateRequestBody(req, createPinSchema, REQUEST_SIZE_LIMITS.json);
+        if (!validation.success) {
+          return validation.error;
+        }
+        
+        const body = validation.data;
+
+        // Check allowed mention types if mention_type_id is provided
+        if (body.mention_type_id) {
+          const allowedMentionTypes = collaboration.allowed_mention_types;
+          // If allowed_mention_types is null/undefined/empty array, all types are allowed
+          if (allowedMentionTypes !== null && allowedMentionTypes !== undefined && allowedMentionTypes.length > 0) {
+            if (!allowedMentionTypes.includes(body.mention_type_id)) {
+              return createErrorResponse(
+                'Forbidden - this mention type is not allowed in this map',
+                403,
+                { reason: 'mention_type_not_allowed', mention_type_id: body.mention_type_id }
+              );
+            }
+          }
         }
         
         // NEW: Check plan-based permissions
@@ -242,14 +281,6 @@ export async function POST(
             }
           }
         }
-        
-        // Validate request body
-        const validation = await validateRequestBody(req, createPinSchema, REQUEST_SIZE_LIMITS.json);
-        if (!validation.success) {
-          return validation.error;
-        }
-        
-        const body = validation.data;
 
         // Create pin
         const { data: pin, error: pinError } = await supabase
@@ -262,6 +293,7 @@ export async function POST(
             video_url: body.video_url || null,
             lat: body.lat,
             lng: body.lng,
+            mention_type_id: body.mention_type_id || null,
           } as any)
           .select()
           .single();

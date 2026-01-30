@@ -67,7 +67,7 @@ export default function FeedContent() {
         setHasMore(newPosts.length === 20);
         offsetRef.current += newPosts.length;
       } catch (err) {
-        // eslint-disable-next-line no-console
+         
         console.error('Error fetching posts:', err);
         setError(err instanceof Error ? err.message : 'Failed to load posts');
       } finally {

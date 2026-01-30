@@ -39,33 +39,42 @@ interface UseEntitySidebarReturn {
   closeSidebar: () => void;
 }
 
+export interface UseEntitySidebarOptions {
+  /** When true (e.g. on /live), do not open sidebar on mention-click or entity-click; pin/mention selection is shown in app footer only. */
+  disableForClicks?: boolean;
+}
+
 /**
  * Hook to manage entity sidebar state for mentions, pins, and areas
  * Listens to 'mention-click' and 'entity-click' events and manages sidebar state
  */
-export function useEntitySidebar(): UseEntitySidebarReturn {
+export function useEntitySidebar(options: UseEntitySidebarOptions = {}): UseEntitySidebarReturn {
+  const { disableForClicks = false } = options;
   const [selectedMentionId, setSelectedMentionId] = useState<string | null>(null);
   const [selectedMention, setSelectedMention] = useState<Mention | null>(null);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<MapPin | MapArea | null>(null);
 
+  const disableForClicksRef = useRef(disableForClicks);
+  disableForClicksRef.current = disableForClicks;
+
   // Store handlers in refs to prevent re-registration
   const handlersRegisteredRef = useRef(false);
 
-  // Listen to mention-click events
+  // Listen to mention-click and entity-click events
   useEffect(() => {
     if (handlersRegisteredRef.current) return;
     handlersRegisteredRef.current = true;
 
     const handleMentionClick = (event: Event) => {
+      if (disableForClicksRef.current) return;
       const customEvent = event as CustomEvent<{ mention: Mention }>;
       const mention = customEvent.detail?.mention;
       
       if (mention && mention.id) {
         setSelectedMention(mention);
         setSelectedMentionId(mention.id);
-        // Clear entity selection when mention is selected
         setSelectedEntityId(null);
         setSelectedEntityType(null);
         setSelectedEntity(null);
@@ -73,15 +82,14 @@ export function useEntitySidebar(): UseEntitySidebarReturn {
     };
 
     const handleEntityClick = (event: Event) => {
+      if (disableForClicksRef.current) return;
       const customEvent = event as CustomEvent<{ entity: MapPin | MapArea; type: 'pin' | 'area' }>;
       const { entity, type } = customEvent.detail || {};
       
       if (entity && entity.id) {
-        // Fast switching: immediately update state (no debounce)
         setSelectedEntity(entity);
         setSelectedEntityId(entity.id);
         setSelectedEntityType(type);
-        // Clear mention selection when entity is selected
         setSelectedMentionId(null);
         setSelectedMention(null);
       }

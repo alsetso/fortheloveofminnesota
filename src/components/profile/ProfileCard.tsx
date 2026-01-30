@@ -157,7 +157,7 @@ export default function ProfileCard({
             </div>
             {showViewButton && account.username && (
               <Link
-                href={`/profile/${account.username}`}
+                href={`/${account.username}`}
                 className={`inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded shrink-0 grow-0 basis-auto leading-none transition-colors ${
                   darkMode
                     ? 'bg-white text-black hover:bg-white/90'

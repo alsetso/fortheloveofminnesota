@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MagnifyingGlassIcon, UserIcon, XCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { useAuthStateSafe } from '@/features/auth';
@@ -349,7 +349,7 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
       const account = suggestion as AccountSuggestion;
       setSearchQuery(`@${account.username}`);
       if (account.username) {
-        window.location.href = `/profile/${account.username}`;
+        window.location.href = `/${account.username}`;
       }
       return;
     }
@@ -469,10 +469,14 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
     };
   }, [map, onLocationSelect]);
 
+  const inputTextClass = 'text-[#3C3C43] placeholder:text-[#3C3C43]/60 caret-[#3C3C43]';
+  const prefixClass = 'text-[#3C3C43]';
+  const caretColor = '#3C3C43';
+
   return (
     <div ref={containerRef} className="relative w-full">
       {/* Search Bar */}
-      <div className="rounded-xl shadow-lg px-2 py-1 flex items-center gap-1.5 relative bg-white/10 backdrop-blur-sm h-8">
+      <div className="rounded-xl shadow-lg px-2 py-1 flex items-center gap-1.5 relative bg-white h-8">
         {/* Search Input */}
         <div className="flex-1 min-w-0 relative flex items-center gap-1.5 h-full">
           <div className="flex-1 relative">
@@ -489,8 +493,8 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
                   paddingBottom: '0.125rem',
                 }}
               >
-                <span className="text-white">@</span>
-                <span className="text-white">
+                <span className={prefixClass}>@</span>
+                <span className={prefixClass}>
                   {searchQuery.slice(1)}
                 </span>
               </div>
@@ -542,12 +546,12 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
                 }
               }}
               placeholder={placeholderText}
-              className={`w-full bg-transparent border-0 outline-none text-sm py-0.5 caret-white text-white placeholder:text-white/70 ${
-                searchQuery && searchQuery.startsWith('@') ? 'text-transparent caret-white' : ''
+              className={`w-full bg-transparent border-0 outline-none text-sm py-0.5 ${inputTextClass} ${
+                searchQuery && searchQuery.startsWith('@') ? 'text-transparent' : ''
               }`}
               style={searchQuery && searchQuery.startsWith('@') ? { 
                 color: 'transparent',
-                caretColor: '#ffffff'
+                caretColor
               } : undefined}
             />
           </div>
@@ -646,27 +650,6 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
           )}
         </div>
 
-        {/* Close Icon (only in search mode) */}
-        {isSearchMode && (
-          <div className="flex-shrink-0">
-            <a
-              href={`${pathname}${window.location.search}`}
-              onClick={(e) => {
-                e.preventDefault();
-                // Exit search mode
-                const newUrl = pathname + window.location.search;
-                window.history.pushState({}, '', newUrl);
-                window.dispatchEvent(new HashChangeEvent('hashchange'));
-                setShowSuggestions(false);
-                inputRef.current?.blur();
-              }}
-              className="flex items-center justify-center text-white hover:text-white/80 transition-colors"
-              aria-label="Close search"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </a>
-          </div>
-        )}
       </div>
     </div>
   );

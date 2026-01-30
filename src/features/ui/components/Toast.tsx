@@ -37,7 +37,7 @@ export function Toast({ toast }: ToastProps) {
       case 'success':
         return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
       case 'error':
-        return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
+        return 'bg-red-50 border-red-500 text-gray-900';
       case 'loading':
         return 'bg-white/90 backdrop-blur-sm text-gray-900 border-gray-200';
       case 'info':

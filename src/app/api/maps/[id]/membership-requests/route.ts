@@ -50,7 +50,6 @@ export async function GET(
         const supabase = await createServerClientWithAuth(cookies());
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id');
@@ -67,7 +66,7 @@ export async function GET(
         }
 
         const mapData = map as { account_id: string; id: string };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if user is owner or manager
         const { data: member } = await supabase
@@ -180,7 +179,6 @@ export async function POST(
         const { answers } = validation.data;
 
         // Resolve identifier to map_id
-        let mapId: string;
         let mapQuery = supabase
           .from('map')
           .select('id, account_id, visibility, auto_approve_members, settings, member_count');
@@ -204,7 +202,7 @@ export async function POST(
           settings: MapSettings;
           member_count: number;
         };
-        mapId = mapData.id;
+        const mapId = mapData.id;
 
         // Check if already a member
         const { data: existingMember } = await supabase
@@ -252,14 +250,24 @@ export async function POST(
             .rpc('join_map_auto_approve', {
               p_map_id: mapId,
               p_account_id: accountId,
-            } as any)
-            .single();
+            } as any);
+
+          // Always check map_members after RPC: RPC can return PGRST116 (0 rows) even when INSERT succeeded
+          const { data: existingMember } = await supabase
+            .from('map_members')
+            .select('id, role')
+            .eq('map_id', mapId)
+            .eq('account_id', accountId)
+            .maybeSingle();
+
+          if (existingMember) {
+            return createSuccessResponse({ member: existingMember, auto_approved: true }, 201);
+          }
 
           if (memberError) {
             if (process.env.NODE_ENV === 'development') {
               console.error('[Maps API] Error auto-adding member:', memberError);
             }
-            // Check for specific error types
             if (memberError.message?.includes('Already a member')) {
               return createErrorResponse('You are already a member of this map', 409);
             }
@@ -269,10 +277,19 @@ export async function POST(
             if (memberError.message?.includes('Account does not belong to user')) {
               return createErrorResponse('Invalid account', 403);
             }
+            if (memberError.message?.includes('maximum member limit')) {
+              return createErrorResponse(memberError.message, 403);
+            }
             return createErrorResponse('Failed to join map', 500);
           }
 
-          return createSuccessResponse({ member: newMember, auto_approved: true }, 201);
+          // Handle case where RPC returns array (should be single item)
+          const member = Array.isArray(newMember) ? newMember[0] : newMember;
+          if (member) {
+            return createSuccessResponse({ member, auto_approved: true }, 201);
+          }
+
+          return createErrorResponse('Failed to join map', 500);
         }
 
         // Create membership request

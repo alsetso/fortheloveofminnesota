@@ -223,7 +223,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                   </button>
                   {mention.accounts?.username && (
                     <Link
-                      href={`/profile/${mention.accounts.username}?mentionId=${mention.id}`}
+                      href={`/${mention.accounts.username}?mentionId=${mention.id}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -301,7 +301,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                 <div className="text-sm font-medium text-gray-900">{accountName}</div>
                 {mention.accounts.username && (
                   <Link
-                    href={`/profile/${mention.accounts.username}`}
+                    href={`/${mention.accounts.username}`}
                     className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
                   >
                     @{mention.accounts.username}

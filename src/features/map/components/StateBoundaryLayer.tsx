@@ -2,12 +2,24 @@
 
 import { useEffect, useState, useRef } from 'react';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
+import { getStateBoundary, hasStateCached } from '@/features/map/services/liveBoundaryCache';
+import { moveMentionsLayersToTop } from '@/features/map/utils/layerOrder';
 
 interface StateBoundaryLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
   visible: boolean;
   onStateHover?: (state: any) => void;
+  /** When set, layer only visible at zoom >= this (e.g. 1). */
+  minzoom?: number;
+  /** When set, layer only visible below this zoom (e.g. 4 = show when zoom < 4). */
+  maxzoom?: number;
+  /** Override fill color (e.g. red for live map). */
+  fillColor?: string;
+  /** Called when load starts (true) or finishes (false). For Review accordion on /live. */
+  onLoadChange?: (loading: boolean) => void;
+  /** Called when boundary is clicked (e.g. /live footer). */
+  onBoundarySelect?: (item: { layer: 'state' | 'county' | 'ctu'; id: string; name: string; lat: number; lng: number; details?: Record<string, unknown> }) => void;
 }
 
 /**
@@ -19,26 +31,41 @@ export default function StateBoundaryLayer({
   mapLoaded,
   visible,
   onStateHover,
+  minzoom,
+  maxzoom,
+  fillColor = '#4A90E2',
+  onLoadChange,
+  onBoundarySelect,
 }: StateBoundaryLayerProps) {
   const [stateBoundary, setStateBoundary] = useState<any | null>(null);
   const isAddingLayersRef = useRef(false);
+  const onLoadChangeRef = useRef(onLoadChange);
+  onLoadChangeRef.current = onLoadChange;
 
-  // Fetch state boundary
+  // Fetch state boundary (cached; one API call per session)
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      onLoadChangeRef.current?.(false);
+      return;
+    }
+    const loading = !hasStateCached();
+    if (loading) onLoadChangeRef.current?.(true);
 
-    const fetchStateBoundary = async () => {
-      try {
-        const response = await fetch('/api/civic/state-boundary');
-        if (!response.ok) throw new Error('Failed to fetch state boundary');
-        const data = await response.json();
-        setStateBoundary(data);
-      } catch (error) {
-        console.error('[StateBoundaryLayer] Failed to fetch state boundary:', error);
-      }
+    let cancelled = false;
+    getStateBoundary()
+      .then((data) => {
+        if (!cancelled) setStateBoundary(data);
+      })
+      .catch((error) => {
+        if (!cancelled) console.error('[StateBoundaryLayer] Failed to fetch state boundary:', error);
+      })
+      .finally(() => {
+        if (!cancelled) onLoadChangeRef.current?.(false);
+      });
+
+    return () => {
+      cancelled = true;
     };
-
-    fetchStateBoundary();
   }, [visible]);
 
   // Render state boundary on map
@@ -109,21 +136,25 @@ export default function StateBoundaryLayer({
       id: fillLayerId,
       type: 'fill',
       source: sourceId,
+      ...(minzoom != null && { minzoom }),
+      ...(maxzoom != null && { maxzoom }),
       paint: {
-        'fill-color': '#4A90E2',
-        'fill-opacity': 0.1,
+        'fill-color': fillColor,
+        'fill-opacity': 0.12,
       },
     }, beforeId);
 
-    // Add outline layer
+    // Add outline layer (aligned with county/CTU: 1.5px, 0.7 opacity)
     mapboxMap.addLayer({
       id: outlineLayerId,
       type: 'line',
       source: sourceId,
+      ...(minzoom != null && { minzoom }),
+      ...(maxzoom != null && { maxzoom }),
       paint: {
-        'line-color': '#4A90E2',
-        'line-width': 2,
-        'line-opacity': 0.8,
+        'line-color': fillColor,
+        'line-width': 1.5,
+        'line-opacity': 0.7,
       },
     }, beforeId);
 
@@ -144,26 +175,32 @@ export default function StateBoundaryLayer({
         id: highlightFillLayerId,
         type: 'fill',
         source: highlightSourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
-          'fill-color': '#4A90E2',
-          'fill-opacity': 0.3,
+          'fill-color': fillColor,
+          'fill-opacity': 0.35,
         },
       }, beforeId);
     }
 
-    // Add highlight outline layer
+    // Add highlight outline layer (aligned: 2.5px)
     if (!mapboxMap.getLayer(highlightOutlineLayerId)) {
       mapboxMap.addLayer({
         id: highlightOutlineLayerId,
         type: 'line',
         source: highlightSourceId,
+        ...(minzoom != null && { minzoom }),
+        ...(maxzoom != null && { maxzoom }),
         paint: {
-          'line-color': '#4A90E2',
-          'line-width': 3,
+          'line-color': fillColor,
+          'line-width': 2.5,
           'line-opacity': 1,
         },
       }, beforeId);
     }
+
+    moveMentionsLayersToTop(mapboxMap);
 
     // Add hover handlers
     const handleMouseMove = (e: any) => {
@@ -192,7 +229,7 @@ export default function StateBoundaryLayer({
             mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.05);
           }
           if (mapboxMap.getLayer(outlineLayerId)) {
-            mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.4);
+            mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.3);
           }
         } catch (e) {
           // Ignore errors
@@ -222,20 +259,46 @@ export default function StateBoundaryLayer({
       // Restore normal opacity
       try {
         if (mapboxMap.getLayer(fillLayerId)) {
-          mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.1);
+          mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.12);
         }
         if (mapboxMap.getLayer(outlineLayerId)) {
-          mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.8);
+          mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.7);
         }
       } catch (e) {
         // Ignore errors
       }
     };
 
-    // Use mousemove on fill layer to detect hover
+    // Click: update footer/selection only (no map popup).
+    const handleClick = (e: any) => {
+      const features = mapboxMap.queryRenderedFeatures(e.point, { layers: [fillLayerId] });
+      if (features.length === 0) return;
+      const geom = features[0].geometry as any;
+      const c = geom?.coordinates;
+      const ring = c?.[0]?.[0] && typeof c[0][0][0] === 'number' ? c[0][0] : c?.[0];
+      const pt = ring?.[0];
+      if (!Array.isArray(pt) || pt.length < 2) return;
+      const [lng, lat] = pt;
+      const name = (stateBoundary as any)?.name ?? 'Minnesota';
+      const item = {
+        layer: 'state' as const,
+        id: (stateBoundary as any)?.id ?? 'mn',
+        name,
+        lat,
+        lng,
+        details: stateBoundary ? { ...stateBoundary, geometry: undefined } : undefined,
+      };
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[LiveBoundary] state click', { layer: item.layer, id: item.id, name: item.name, hasOnBoundarySelect: !!onBoundarySelect });
+      }
+      onBoundarySelect?.(item);
+    };
+
     mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
     mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
+    mapboxMap.on('click', fillLayerId, handleClick);
 
+    onLoadChange?.(false);
     isAddingLayersRef.current = false;
 
     // Cleanup function
@@ -244,9 +307,9 @@ export default function StateBoundaryLayer({
       const mapboxMap = map as any;
 
       try {
-        // Remove event listeners
         mapboxMap.off('mousemove', fillLayerId);
         mapboxMap.off('mouseleave', fillLayerId);
+        mapboxMap.off('click', fillLayerId, handleClick);
 
         // Remove layers and sources
         if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
@@ -259,7 +322,7 @@ export default function StateBoundaryLayer({
         // Ignore cleanup errors
       }
     };
-  }, [map, mapLoaded, stateBoundary, visible, onStateHover]);
+  }, [map, mapLoaded, stateBoundary, visible, onStateHover, minzoom, maxzoom, fillColor, onLoadChange, onBoundarySelect]);
 
   return null; // This component doesn't render any UI
 }

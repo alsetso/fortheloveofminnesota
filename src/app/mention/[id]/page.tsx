@@ -1,6 +1,9 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
+import PageWrapper from '@/components/layout/PageWrapper';
+import MapSearchInput from '@/components/layout/MapSearchInput';
+import SearchResults from '@/components/layout/SearchResults';
 import MentionDetailClient from '@/features/mentions/components/MentionDetailClient';
 
 interface Props {
@@ -78,6 +81,7 @@ export default async function MentionPage({ params }: Props) {
       id,
       lat,
       lng,
+      map_id,
       description,
       visibility,
       archived,
@@ -89,6 +93,10 @@ export default async function MentionPage({ params }: Props) {
       created_at,
       updated_at,
       account_id,
+      map:map (
+        id,
+        slug
+      ),
       accounts (
         id,
         username,
@@ -154,6 +162,13 @@ export default async function MentionPage({ params }: Props) {
   if (mentionData.collections) {
     delete mentionData.collections;
   }
+
+  // Transform map relationship
+  if (mentionData.map && Array.isArray(mentionData.map)) {
+    mentionData.map = mentionData.map.length > 0 ? mentionData.map[0] : null;
+  } else if (!mentionData.map) {
+    mentionData.map = null;
+  }
   
   // Debug: Log the transformed data
   if (process.env.NODE_ENV === 'development') {
@@ -188,5 +203,12 @@ export default async function MentionPage({ params }: Props) {
     notFound();
   }
 
-  return <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />;
+  return (
+    <PageWrapper
+      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
+      searchResultsComponent={<SearchResults />}
+    >
+      <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />
+    </PageWrapper>
+  );
 }

@@ -5,8 +5,8 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Script from 'next/script';
 import { Toaster } from 'react-hot-toast';
-import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import ContentTypeFilters from './ContentTypeFilters';
+import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { usePageView } from '@/hooks/usePageView';
 import { useNativeIOSApp } from '@/hooks/useNativeIOSApp';
 import { supabase } from '@/lib/supabase';
@@ -14,7 +14,7 @@ import { useAuthStateSafe } from '@/features/auth';
 import { HeaderThemeProvider } from '@/contexts/HeaderThemeContext';
 import MapsSelectorDropdown from './MapsSelectorDropdown';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
-import { XCircleIcon, EyeIcon, UserPlusIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { XCircleIcon, EyeIcon, UserPlusIcon, UserIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { 
@@ -34,6 +34,7 @@ import {
   Cog6ToothIcon as Cog6ToothIconSolid
 } from '@heroicons/react/24/solid';
 
+/** @deprecated No longer used; account control links directly to /settings. Kept for backward compatibility. */
 interface AccountDropdownProps {
   onAccountClick?: () => void;
   onSignInClick?: () => void;
@@ -107,12 +108,6 @@ interface PageWrapperProps {
   } | null;
 }
 
-// Default empty handlers to reduce prop boilerplate
-const defaultAccountDropdownProps: AccountDropdownProps = {
-  onAccountClick: () => {},
-  onSignInClick: () => {},
-};
-
 /** Desktop horizontal inset for main content; sidebars, popups, and header use this to align. */
 const CONTENT_INSET_DESKTOP = '10px';
 
@@ -127,7 +122,7 @@ export default function PageWrapper({
   headerContent, 
   searchComponent, 
   showAccountDropdown = true, 
-  accountDropdownProps = defaultAccountDropdownProps, 
+  accountDropdownProps: _accountDropdownProps,
   searchResultsComponent, 
   className = '',
   trackPageView = true,
@@ -438,6 +433,26 @@ export default function PageWrapper({
     return items;
   }, [isMapPage, mapIdOrSlug, account?.username]);
 
+  // Page name for mobile header when bottom nav is visible (replaces logo)
+  const mobilePageTitle = useMemo(() => {
+    if (!pathname) return 'Home';
+    if (pathname === '/') return 'Home';
+    if (pathname === '/maps' || pathname === '/map') return 'Maps';
+    if (pathname === '/settings') return 'Settings';
+    if (isMapPage && mapInfo?.name) return mapInfo.name;
+    if (isMapPage) return 'Map';
+    if (pathname.startsWith('/news')) return 'News';
+    if (pathname.startsWith('/gov')) return 'Government';
+    if (pathname.startsWith('/analytics')) return 'Analytics';
+    if (pathname.startsWith('/billing') || pathname.startsWith('/upgrade')) return 'Billing';
+    if (pathname.startsWith('/admin')) return 'Admin';
+    if (pathname.startsWith('/onboarding')) return 'Onboarding';
+    // Single segment (e.g. /username) - profile
+    const segment = pathname.replace(/^\/|\/$/g, '').split('/')[0];
+    if (segment && !pathname.startsWith('/map') && !pathname.startsWith('/news') && !pathname.startsWith('/gov') && !pathname.startsWith('/settings') && !pathname.startsWith('/analytics') && !pathname.startsWith('/billing') && !pathname.startsWith('/upgrade') && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) return 'Profile';
+    return 'Home';
+  }, [pathname, isMapPage, mapInfo?.name]);
+
   // Set mounted flag on client side only
   useEffect(() => {
     setMounted(true);
@@ -627,7 +642,7 @@ export default function PageWrapper({
           )}
             </div>
           
-            {/* Mobile Header Layout (Logo, Maps Selector/Map Name, Search, Header Content, Account) */}
+            {/* Mobile Header Layout (Page name or back/onboarding, Maps Selector, Search, Header Content, Account) */}
             <div className="lg:hidden col-span-12 flex items-center justify-between gap-2 px-1">
               <div className="flex items-center gap-2">
                 <div className="flex-shrink-0">
@@ -642,15 +657,9 @@ export default function PageWrapper({
                   ) : isOnboardingPage ? (
                     <span className={`text-xs font-semibold ${headerText}`}>Onboarding</span>
                   ) : (
-                    <Image
-                      src="/logo.png"
-                      alt="Logo"
-                      width={24}
-                      height={24}
-                      className={`w-6 h-6 ${isDefaultLightBg ? '' : 'invert'}`}
-                      priority
-                      unoptimized
-                    />
+                    <span className={`text-sm font-semibold truncate max-w-[140px] sm:max-w-[200px] ${headerText}`} title={mobilePageTitle}>
+                      {mobilePageTitle}
+                    </span>
                   )}
                 </div>
                 {/* Maps Selector - shown on /map or /maps routes, next to logo */}
@@ -661,11 +670,23 @@ export default function PageWrapper({
               <div className="flex-shrink-0 flex items-center gap-1">
                 {headerContent}
                 {showAccountDropdown && !isOnboardingPage && (
-                  <AccountDropdown 
-                    variant={isDefaultLightBg ? 'light' : 'dark'}
-                    onAccountClick={accountDropdownProps?.onAccountClick}
-                    onSignInClick={accountDropdownProps?.onSignInClick}
-                  />
+                  <Link
+                    href="/settings"
+                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm ${
+                      isDefaultLightBg
+                        ? 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
+                        : 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
+                    }`}
+                    aria-label="Account settings"
+                  >
+                    {account ? (
+                      <ProfilePhoto account={account} size="sm" editable={false} />
+                    ) : (
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDefaultLightBg ? 'bg-gray-200' : 'bg-white/20'}`}>
+                        <UserIcon className={`w-3 h-3 ${isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white/90'}`} />
+                      </div>
+                    )}
+                  </Link>
                 )}
               </div>
             </div>
@@ -738,15 +759,27 @@ export default function PageWrapper({
               </div>
             )}
             
-            {/* 3rd Column: Header Content, Account Dropdown (Aligns with right sidebar) */}
+            {/* 3rd Column: Header Content, Account link to settings (Aligns with right sidebar) */}
             <div className="hidden lg:flex lg:col-span-3 justify-end items-center gap-2">
               {headerContent}
               {showAccountDropdown && !isOnboardingPage && (
-                <AccountDropdown 
-                  variant={isDefaultLightBg ? 'light' : 'dark'}
-                  onAccountClick={accountDropdownProps?.onAccountClick}
-                  onSignInClick={accountDropdownProps?.onSignInClick}
-                />
+                <Link
+                  href="/settings"
+                  className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm ${
+                    isDefaultLightBg
+                      ? 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
+                      : 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
+                  }`}
+                  aria-label="Account settings"
+                >
+                  {account ? (
+                    <ProfilePhoto account={account} size="sm" editable={false} />
+                  ) : (
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDefaultLightBg ? 'bg-gray-200' : 'bg-white/20'}`}>
+                      <UserIcon className={`w-3 h-3 ${isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white/90'}`} />
+                    </div>
+                  )}
+                </Link>
               )}
             </div>
             </div>

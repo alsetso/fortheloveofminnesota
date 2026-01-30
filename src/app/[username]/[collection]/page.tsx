@@ -1,13 +1,14 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
-import type { ProfileAccount, ProfilePin } from '@/types/profile';
+import type { ProfileAccount, ProfilePin, PinVisibility } from '@/types/profile';
 import type { Collection } from '@/types/collection';
+import { collectionTitleToSlug } from '@/features/collections/collectionSlug';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import ProfileLayout from '@/features/profiles/components/ProfileLayout';
 import ProfileMentionsList from '@/features/profiles/components/ProfileMentionsList';
-import HomeDashboardContent from '@/features/homepage/components/HomeDashboardContent';
-import UsernamePageShell from './UsernamePageShell';
+import CollectionPageHeader from './CollectionPageHeader';
+import UsernamePageShell from '../UsernamePageShell';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,53 +18,51 @@ const RESERVED_USERNAMES = new Set([
   'privacy', 'terms', 'gov', 'mention', 'not-found',
 ]);
 
-type ViewAsMode = 'owner' | 'public';
-const VIEW_AS_PUBLIC: ViewAsMode = 'public';
-
 interface Props {
-  params: Promise<{ username: string }>;
-  searchParams?: Promise<{ view?: string }>;
+  params: Promise<{ username: string; collection: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { username } = await params;
+  const { username, collection: collectionSlug } = await params;
   if (RESERVED_USERNAMES.has(username.toLowerCase())) {
     return { title: 'Not Found' };
   }
   const supabase = await createServerClientWithAuth();
   const { data: account } = await supabase
     .from('accounts')
-    .select('username, first_name, last_name')
+    .select('id, username, first_name, last_name')
     .eq('username', username)
     .single();
+  if (!account) return { title: 'Profile Not Found' };
 
-  if (!account) {
-    return { title: 'Profile Not Found' };
-  }
-
+  const { data: collectionsData } = await supabase
+    .from('collections')
+    .select('id, title')
+    .eq('account_id', (account as { id: string }).id);
+  const collectionsList: { id: string; title: string }[] = collectionsData ?? [];
+  const match = collectionsList.find(
+    (c) => collectionTitleToSlug(c.title) === decodeURIComponent(collectionSlug)
+  );
+  const displayName = match?.title ?? 'Collection';
   const accountMeta = account as { username: string | null; first_name: string | null; last_name: string | null };
-  const displayName = accountMeta.first_name
+  const userDisplay = accountMeta.first_name
     ? `${accountMeta.first_name}${accountMeta.last_name ? ` ${accountMeta.last_name}` : ''}`
     : accountMeta.username || 'User';
 
   return {
-    title: `${displayName}`,
-    description: `View ${displayName}'s profile - For the Love of Minnesota`,
+    title: `${displayName} · ${userDisplay}`,
+    description: `View ${displayName} by ${userDisplay} - For the Love of Minnesota`,
   };
 }
 
-export default async function UsernamePage({ params, searchParams }: Props) {
-  const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const view = (resolvedSearchParams?.view ?? 'owner') as ViewAsMode;
-  const viewAsPublic = view === VIEW_AS_PUBLIC;
+export default async function UsernameCollectionPage({ params }: Props) {
+  const { username, collection: collectionSlug } = await params;
 
   if (RESERVED_USERNAMES.has(username.toLowerCase())) {
     notFound();
   }
 
   const supabase = await createServerClientWithAuth();
-
   const accountFields = `
     id, username, first_name, last_name, email, phone,
     image_url, cover_image_url, bio, city_id, view_count,
@@ -92,14 +91,24 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     bio: string | null;
     city_id: string | null;
     view_count: number | null;
-    traits: any;
+    traits: string[] | null;
     user_id: string;
     plan: string | null;
     created_at: string;
   };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  const isOwnProfile = !!(user && accountData.user_id === user.id);
+  const { data: collectionsData } = await supabase
+    .from('collections')
+    .select('*')
+    .eq('account_id', accountData.id)
+    .order('created_at', { ascending: false });
+  const collections: Collection[] = (collectionsData || []) as Collection[];
+
+  const slugDecoded = decodeURIComponent(collectionSlug);
+  const selectedCollection = collections.find((c) => collectionTitleToSlug(c.title) === slugDecoded);
+  if (!selectedCollection) {
+    notFound();
+  }
 
   const profileAccountData: ProfileAccount = {
     id: accountData.id,
@@ -119,24 +128,9 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     created_at: accountData.created_at,
   };
 
-  if (isOwnProfile && !viewAsPublic) {
-    return (
-      <>
-        <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
-        <UsernamePageShell isOwnProfile profileAccountData={profileAccountData} />
-      </>
-    );
-  }
+  const { data: { user } } = await supabase.auth.getUser();
+  const isOwnProfile = !!(user && accountData.user_id === user.id);
 
-  // Public profile: either visitor or owner "viewing as" Public (profile pages removed; canonical is /:username)
-  const { data: collectionsData } = await supabase
-    .from('collections')
-    .select('*')
-    .eq('account_id', accountData.id)
-    .order('created_at', { ascending: false });
-  const collections: Collection[] = (collectionsData || []) as Collection[];
-
-  // Maps the profile account owns or is a member of (for profile pins: all pins this account posted on any of these maps)
   const { data: ownedMaps } = await supabase
     .from('map')
     .select('id')
@@ -150,7 +144,25 @@ export default async function UsernamePage({ params, searchParams }: Props) {
   const memberIds = (memberRows || []).map((m: { map_id: string }) => m.map_id);
   const profileMapIds = Array.from(new Set([...ownedIds, ...memberIds]));
 
-  let mentionsData: any[] | null = null;
+  interface MapPinRow {
+    id: string;
+    lat: number;
+    lng: number;
+    description: string | null;
+    visibility: string;
+    collection_id: string | null;
+    map_id: string;
+    image_url: string | null;
+    video_url: string | null;
+    media_type: string;
+    view_count: number | null;
+    created_at: string;
+    updated_at: string;
+    collections?: { id: string; emoji: string; title: string } | null;
+    mention_type?: { id: string; emoji: string; name: string } | null;
+    map?: { id: string; slug: string | null } | null;
+  }
+  let mentionsData: MapPinRow[] | null = null;
   if (profileMapIds.length > 0) {
     const { data } = await supabase
       .from('map_pins')
@@ -162,15 +174,16 @@ export default async function UsernamePage({ params, searchParams }: Props) {
         map:map (id, slug)
       `)
       .eq('account_id', accountData.id)
+      .eq('collection_id', selectedCollection.id)
       .in('map_id', profileMapIds)
       .eq('archived', false)
       .eq('is_active', true)
       .eq('visibility', 'public')
       .order('created_at', { ascending: false });
-    mentionsData = data;
+    mentionsData = data as MapPinRow[] | null;
   }
 
-  const mentionIds = (mentionsData || []).map((m: any) => m.id);
+  const mentionIds = (mentionsData || []).map((m) => m.id);
   const likesCounts = new Map<string, number>();
   if (mentionIds.length > 0) {
     const { data: likesData } = await supabase
@@ -182,7 +195,7 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     });
   }
 
-  const mentions: ProfilePin[] = (mentionsData || []).map((mention: any) => ({
+  const mentions: ProfilePin[] = (mentionsData || []).map((mention: MapPinRow) => ({
     id: mention.id,
     lat: mention.lat,
     lng: mention.lng,
@@ -190,10 +203,10 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     collection_id: mention.collection_id,
     collection: mention.collections ? { id: mention.collections.id, emoji: mention.collections.emoji, title: mention.collections.title } : null,
     mention_type: mention.mention_type ? { id: mention.mention_type.id, emoji: mention.mention_type.emoji, name: mention.mention_type.name } : null,
-    visibility: mention.visibility || 'public',
+    visibility: (mention.visibility || 'public') as PinVisibility,
     image_url: mention.image_url,
     video_url: mention.video_url,
-    media_type: mention.media_type || 'none',
+    media_type: (mention.media_type || 'none') as 'image' | 'video' | 'none',
     view_count: mention.view_count || 0,
     likes_count: likesCounts.get(mention.id) || 0,
     created_at: mention.created_at,
@@ -202,24 +215,22 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     map: mention.map ? { id: mention.map.id, slug: mention.map.slug } : undefined,
   }));
 
-  const publicContent = (
-    <ProfileLayout account={profileAccountData} isOwnProfile={false}>
-      <div className="space-y-6">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Mentions</h2>
-          </div>
-          <ProfileMentionsList pins={mentions} isOwnProfile={false} />
-        </div>
-      </div>
-    </ProfileLayout>
-  );
-
   return (
     <>
-      <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
-      <UsernamePageShell showViewAsSelector={isOwnProfile && viewAsPublic}>
-        {publicContent}
+      <PageViewTracker page_url={`/${encodeURIComponent(username)}/${encodeURIComponent(collectionSlug)}`} />
+      <UsernamePageShell>
+        <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile}>
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <CollectionPageHeader
+                collection={selectedCollection}
+                username={username}
+                isOwnProfile={isOwnProfile}
+              />
+              <ProfileMentionsList pins={mentions} isOwnProfile={isOwnProfile} />
+            </div>
+          </div>
+        </ProfileLayout>
       </UsernamePageShell>
     </>
   );

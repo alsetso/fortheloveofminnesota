@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
-import { PencilIcon, XMarkIcon, EyeIcon, EyeSlashIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, XMarkIcon, EyeIcon, EyeSlashIcon, TrashIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 type MentionType = { id: string; emoji: string; name: string; is_active?: boolean };
 
@@ -18,6 +18,7 @@ export default function MentionTypeCards({ isAdmin = false }: MentionTypeCardsPr
   const [loading, setLoading] = useState(true);
   const [editingType, setEditingType] = useState<MentionType | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [inactiveOpen, setInactiveOpen] = useState(false);
 
   const fetchMentionTypes = useCallback(async () => {
     try {
@@ -189,11 +190,25 @@ export default function MentionTypeCards({ isAdmin = false }: MentionTypeCardsPr
         {activeTypes.map(renderCard)}
       </div>
       {isAdmin && inactiveTypes.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Inactive</p>
-          <div className="grid grid-cols-2 gap-2">
-            {inactiveTypes.map(renderCard)}
-          </div>
+        <div className="border border-gray-200 rounded-md bg-gray-50 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setInactiveOpen((o) => !o)}
+            className="w-full flex items-center justify-between gap-2 p-[10px] text-left hover:bg-gray-100 transition-colors"
+            aria-expanded={inactiveOpen}
+          >
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Inactive</span>
+            <span className="text-xs text-gray-500">{inactiveTypes.length}</span>
+            <ChevronDownIcon
+              className={`w-4 h-4 text-gray-500 flex-shrink-0 transition-transform ${inactiveOpen ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
+          </button>
+          {inactiveOpen && (
+            <div className="border-t border-gray-200 p-[10px] grid grid-cols-2 gap-2">
+              {inactiveTypes.map(renderCard)}
+            </div>
+          )}
         </div>
       )}
 

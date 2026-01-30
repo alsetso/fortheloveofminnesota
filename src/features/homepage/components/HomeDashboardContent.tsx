@@ -51,6 +51,7 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
     fetchFeed();
   }, [account?.id]);
 
+  // Profile card analytics: mapsCount = maps owned by account; mentionsCount = pins owned by account on the live map.
   useEffect(() => {
     if (!account?.id) {
       setQuickStats({});
@@ -96,7 +97,7 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
           quickStats={quickStats}
         />
       </div>
-      <PinActivityFeed maps={feedMaps} activity={feedActivity} loading={feedLoading} />
+      <PinActivityFeed maps={feedMaps} activity={feedActivity} loading={feedLoading} showWhatYouCanPost={false} />
       <div className="bg-white border border-gray-200 rounded-md p-[10px]">
         <Link href="/analytics" className="block hover:bg-gray-50 transition-colors rounded-md -m-[10px] p-[10px]">
           <div className="space-y-3">

@@ -23,6 +23,7 @@ import { MAP_FEATURE_SLUG, checkMapLimitServer } from '@/lib/billing/mapLimits';
 const mapsQuerySchema = z.object({
   visibility: z.enum(['public', 'private']).optional(),
   account_id: commonSchemas.uuid.optional(),
+  slug: z.string().min(1).max(100).optional(), // e.g. "live" — returns single map when provided
   category: z.enum(['community', 'professional', 'government', 'atlas', 'user']).optional(),
   community: z.coerce.boolean().optional(), // Filter by published_to_community
   limit: z.coerce.number().int().positive().max(200).default(50),
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
           return validation.error;
         }
         
-        const { visibility, account_id, category, community, limit, offset } = validation.data;
+        const { visibility, account_id, slug, category, community, limit, offset } = validation.data;
 
     // Build query - use new structure
     let query = supabase
@@ -75,6 +76,10 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('is_active', true);
+
+        if (slug) {
+          query = query.eq('slug', slug);
+        }
 
         // Apply filters
         if (community) {

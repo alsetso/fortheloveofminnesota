@@ -274,11 +274,11 @@ export default function ProfileCard({
           </div>
         </div>
 
-        {/* Quick Stats Section */}
+        {/* Quick Stats (own profile only) — card style.
+            Views: accounts.view_count; Maps: maps owned; Mentions: pins on live map. */}
         {showQuickStats && isOwnProfile && (
-          <div className="pt-2 border-t border-gray-200">
+          <div className="border border-gray-200 rounded-md bg-gray-50 p-[10px]">
             <div className="grid grid-cols-3 gap-2">
-              {/* Profile Views */}
               {account.view_count !== undefined && (
                 <div className="text-center">
                   <div className="text-xs font-semibold text-gray-900">
@@ -287,8 +287,6 @@ export default function ProfileCard({
                   <div className="text-[10px] text-gray-500">Views</div>
                 </div>
               )}
-              
-              {/* Maps Count */}
               {quickStats?.mapsCount !== undefined && (
                 <div className="text-center">
                   <div className="text-xs font-semibold text-gray-900">
@@ -297,8 +295,6 @@ export default function ProfileCard({
                   <div className="text-[10px] text-gray-500">Maps</div>
                 </div>
               )}
-              
-              {/* Mentions Count */}
               {quickStats?.mentionsCount !== undefined && (
                 <div className="text-center">
                   <div className="text-xs font-semibold text-gray-900">

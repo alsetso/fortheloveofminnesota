@@ -33,10 +33,10 @@ function PinCardSkeleton({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="flex-shrink-0 flex items-center justify-center w-8 h-8 p-0 rounded-md hover:bg-gray-100 transition-colors"
+          className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
           aria-label="Close"
         >
-          <XMarkIcon className="w-4 h-4 text-gray-500" />
+          <XMarkIcon className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -67,6 +67,8 @@ export interface LivePinData {
     emoji: string | null;
     name: string;
   } | null;
+  /** Resolved tagged users (from tagged_account_ids); only present when pin has tagged users */
+  tagged_accounts?: { id: string; username: string | null }[] | null;
 }
 
 interface LivePinCardProps {
@@ -98,10 +100,10 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center justify-center w-8 h-8 p-0 rounded-md hover:bg-gray-100 transition-colors"
+          className="flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
           aria-label="Close"
         >
-          <XMarkIcon className="w-4 h-4 text-gray-500" />
+          <XMarkIcon className="w-4 h-4" />
         </button>
       </div>
     );
@@ -155,28 +157,54 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
               <div className="h-3 w-full max-w-[160px] rounded bg-gray-100 animate-pulse" aria-hidden />
             )}
             {(pin.image_url || pin.video_url) && (
-              <p className="text-xs">
+              <div className="mt-2 space-y-1.5">
                 {pin.image_url && (
-                  <a
-                    href={pin.image_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 hover:underline"
+                  <Link
+                    href={`/mention/${pin.id}`}
+                    className="block rounded-md border border-gray-200 overflow-hidden bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
                   >
-                    +1 image
-                  </a>
+                    <img
+                      src={pin.image_url}
+                      alt=""
+                      className="w-full max-h-[100px] object-cover"
+                    />
+                  </Link>
                 )}
-                {pin.image_url && pin.video_url && <span className="text-gray-400 mx-1">·</span>}
                 {pin.video_url && (
-                  <a
-                    href={pin.video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-700 hover:underline"
+                  <Link
+                    href={`/mention/${pin.id}`}
+                    className="block rounded-md border border-gray-200 overflow-hidden bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
                   >
-                    + video
-                  </a>
+                    <video
+                      src={pin.video_url}
+                      preload="metadata"
+                      muted
+                      playsInline
+                      className="w-full max-h-[100px] object-cover pointer-events-none"
+                      aria-label="Video thumbnail"
+                    />
+                  </Link>
                 )}
+              </div>
+            )}
+            {pin.tagged_accounts && pin.tagged_accounts.length > 0 && (
+              <p className="mt-2 text-[10px] text-gray-600">
+                Tagged{' '}
+                {pin.tagged_accounts.map((acc, i) => (
+                  <span key={acc.id}>
+                    {i > 0 && ', '}
+                    {acc.username ? (
+                      <Link
+                        href={`/${encodeURIComponent(acc.username)}`}
+                        className="text-blue-600 hover:text-blue-700 hover:underline"
+                      >
+                        @{acc.username}
+                      </Link>
+                    ) : (
+                      <span className="text-gray-500">@{acc.id.slice(0, 8)}…</span>
+                    )}
+                  </span>
+                ))}
               </p>
             )}
             <p className="text-[10px] text-gray-500">
@@ -200,10 +228,10 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
         <button
           type="button"
           onClick={onClose}
-          className="flex-shrink-0 flex items-center justify-center w-8 h-8 p-0 rounded-md hover:bg-gray-100 transition-colors"
+          className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
           aria-label="Close"
         >
-          <XMarkIcon className="w-4 h-4 text-gray-500" />
+          <XMarkIcon className="w-4 h-4" />
         </button>
       </div>
     </div>

@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { usePageView } from '@/hooks/usePageView';
 import { useAuthStateSafe } from '@/features/auth';
 import LikeButton from '@/components/mentions/LikeButton';
+import { getMapUrlWithPin } from '@/lib/maps/urls';
 
 interface MentionDetailClientProps {
   mention: {
@@ -45,8 +46,17 @@ interface MentionDetailClientProps {
       emoji: string;
       title: string;
     } | null;
+    map?: { id: string; slug: string | null } | null;
   };
   isOwner: boolean;
+}
+
+function getViewOnMapHref(mention: MentionDetailClientProps['mention']): string {
+  if (mention.map?.slug === 'live') return `/live?pin=${encodeURIComponent(mention.id)}`;
+  if (mention.map && Number.isFinite(mention.lat) && Number.isFinite(mention.lng)) {
+    return getMapUrlWithPin({ id: mention.map.id, slug: mention.map.slug ?? null }, mention.lat, mention.lng);
+  }
+  return `/live?pin=${encodeURIComponent(mention.id)}`;
 }
 
 export default function MentionDetailClient({ mention, isOwner }: MentionDetailClientProps) {
@@ -401,6 +411,16 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
             <div>
               <span>{createdDate}</span>
             </div>
+          </div>
+
+          <div className="pt-4">
+            <Link
+              href={getViewOnMapHref(mention)}
+              className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+            >
+              <MapPinIcon className="w-4 h-4 text-gray-500" />
+              View on Map
+            </Link>
           </div>
 
         </main>

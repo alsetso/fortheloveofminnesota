@@ -35,6 +35,9 @@ export interface ProfilePin {
   is_liked?: boolean;
   created_at: string;
   updated_at: string;
+  /** Map this pin belongs to (for "View on Map" link on public profile). */
+  map_id?: string;
+  map?: { id: string; slug: string | null };
 }
 
 export type PinVisibility = 'public' | 'only_me';

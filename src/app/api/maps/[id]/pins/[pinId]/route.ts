@@ -101,7 +101,26 @@ export async function GET(
           return createErrorResponse('Pin not found', 404);
         }
 
-        return createSuccessResponse(pin);
+        const raw = pin as Record<string, unknown>;
+        const rawTagged = raw.tagged_account_ids;
+        const taggedIdsList = Array.isArray(rawTagged)
+          ? (rawTagged as unknown[]).filter((id): id is string => typeof id === 'string' && id.length > 0)
+          : [];
+        let tagged_accounts: { id: string; username: string | null }[] | null = null;
+        if (taggedIdsList.length > 0) {
+          const { data: taggedRows } = await supabase
+            .from('accounts')
+            .select('id, username')
+            .in('id', taggedIdsList);
+          tagged_accounts =
+            (taggedRows || []).map((r: { id: string; username: string | null }) => ({
+              id: r.id,
+              username: r.username ?? null,
+            })) as { id: string; username: string | null }[];
+          if (tagged_accounts.length === 0) tagged_accounts = null;
+        }
+
+        return createSuccessResponse({ ...raw, tagged_accounts });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[Maps API] Error:', error);

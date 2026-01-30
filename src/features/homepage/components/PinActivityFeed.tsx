@@ -1,12 +1,47 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserIcon, MapPinIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { UserIcon, MapPinIcon, EyeIcon, FolderIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { getMapUrl, getMapUrlWithPin } from '@/lib/maps/urls';
 import type { FeedMap, FeedPinActivity } from '@/app/api/feed/pin-activity/route';
 import { useAuthStateSafe } from '@/features/auth';
+import { CollectionService } from '@/features/collections/services/collectionService';
+import { collectionTitleToSlug } from '@/features/collections/collectionSlug';
+import type { Collection, CreateCollectionData } from '@/types/collection';
+import { useToast } from '@/features/ui/hooks/useToast';
 import MentionTypeCards from './MentionTypeCards';
+
+const SECTION_TITLE_CLASS = 'text-xs font-medium text-gray-500 uppercase tracking-wide leading-none';
+const ADD_LINK_CLASS =
+  'text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus:underline inline-flex items-center leading-none shrink-0';
+
+function SectionHeaderWithAdd({
+  title,
+  addHref,
+  onAddClick,
+}: {
+  title: string;
+  addHref?: string;
+  onAddClick?: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 min-h-[1.5rem]">
+      <p className={SECTION_TITLE_CLASS}>{title}</p>
+      {addHref ? (
+        <Link href={addHref} className={ADD_LINK_CLASS}>
+          +Add
+        </Link>
+      ) : onAddClick ? (
+        <button type="button" onClick={onAddClick} className={ADD_LINK_CLASS}>
+          +Add
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function getRelativeTime(date: string): string {
   const now = new Date();
@@ -25,11 +60,70 @@ interface PinActivityFeedProps {
   maps: FeedMap[];
   activity: FeedPinActivity[];
   loading?: boolean;
+  /** When false, hide "What you can post" section (e.g. on /username dashboard). Default true. */
+  showWhatYouCanPost?: boolean;
 }
 
-export default function PinActivityFeed({ maps, activity, loading }: PinActivityFeedProps) {
+export default function PinActivityFeed({ maps, activity, loading, showWhatYouCanPost = true }: PinActivityFeedProps) {
   const { account } = useAuthStateSafe();
   const isAdmin = account?.role === 'admin';
+  const { success, error: showError } = useToast();
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createEmoji, setCreateEmoji] = useState('📍');
+  const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createSaving, setCreateSaving] = useState(false);
+
+  useEffect(() => {
+    if (!account?.id) {
+      setCollections([]);
+      return;
+    }
+    setCollectionsLoading(true);
+    CollectionService.getCollections(account.id)
+      .then(setCollections)
+      .catch(() => setCollections([]))
+      .finally(() => setCollectionsLoading(false));
+  }, [account?.id]);
+
+  const openCreateModal = () => {
+    setCreateEmoji('📍');
+    setCreateTitle('');
+    setCreateDescription('');
+    setCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+    if (!createSaving) setCreateModalOpen(false);
+  };
+
+  const handleCreateCollection = async () => {
+    if (!createTitle.trim()) {
+      showError('Error', 'Title is required');
+      return;
+    }
+    setCreateSaving(true);
+    try {
+      const data: CreateCollectionData = {
+        emoji: createEmoji || '📍',
+        title: createTitle.trim(),
+        description: createDescription.trim() || null,
+      };
+      const created = await CollectionService.createCollection(data);
+      setCollections((prev) => [created, ...prev]);
+      setCreateModalOpen(false);
+      setCreateTitle('');
+      setCreateDescription('');
+      setCreateEmoji('📍');
+      success('Created', 'Collection created');
+    } catch (err) {
+      showError('Error', err instanceof Error ? err.message : 'Failed to create collection');
+    } finally {
+      setCreateSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -71,12 +165,146 @@ export default function PinActivityFeed({ maps, activity, loading }: PinActivity
         )}
       </div>
 
-      {/* What you can post - mention type cards */}
-      <MentionTypeCards isAdmin={isAdmin} />
+      {showWhatYouCanPost && <MentionTypeCards isAdmin={isAdmin} />}
+
+      {/* Personal Collections */}
+      <div className="space-y-2">
+        <SectionHeaderWithAdd title="Personal Collections" onAddClick={openCreateModal} />
+        {collectionsLoading ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="bg-white border border-gray-200 rounded-md p-[10px] h-10 animate-pulse" />
+            ))}
+          </div>
+        ) : collections.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+            <p className="text-xs text-gray-500">No collections yet.</p>
+            {account?.username && (
+              <Link
+                href={`/${encodeURIComponent(account.username)}`}
+                className="text-xs font-medium text-gray-600 hover:text-gray-900 mt-0.5 inline-block"
+              >
+                Create on your profile →
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {collections.map((collection) => (
+              <Link
+                key={collection.id}
+                href={
+                  account?.username
+                    ? `/${encodeURIComponent(account.username)}/${encodeURIComponent(collectionTitleToSlug(collection.title))}`
+                    : '#'
+                }
+                className="flex items-center gap-2 bg-white border border-gray-200 rounded-md p-[10px] hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-sm flex-shrink-0">{collection.emoji}</span>
+                <span className="text-xs font-medium text-gray-900 truncate flex-1">{collection.title}</span>
+                <FolderIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create collection modal — portaled to body, above page wrapper and mobile nav */}
+      {createModalOpen &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50"
+            onClick={closeCreateModal}
+            onKeyDown={(e) => e.key === 'Escape' && closeCreateModal()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-collection-title"
+          >
+            <div
+              className="bg-white border border-gray-200 rounded-md w-full max-w-sm shadow-lg overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && closeCreateModal()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <h2 id="create-collection-title" className="text-sm font-semibold text-gray-900">
+                  Create collection
+                </h2>
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  disabled={createSaving}
+                  className="p-1 -m-1 text-gray-400 hover:text-gray-600 disabled:opacity-50 rounded transition-colors"
+                  aria-label="Close"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Form */}
+              <div className="px-4 py-3 space-y-3">
+                <div className="flex gap-2 items-end">
+                  <div className="w-14 flex-shrink-0">
+                    <label className="block text-[10px] font-medium text-gray-500 mb-1">Emoji</label>
+                    <input
+                      type="text"
+                      value={createEmoji}
+                      onChange={(e) => setCreateEmoji(e.target.value.slice(0, 2))}
+                      className="w-full h-9 px-2 text-center text-base border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
+                      maxLength={2}
+                      placeholder="📍"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-[10px] font-medium text-gray-500 mb-1">Title</label>
+                    <input
+                      type="text"
+                      value={createTitle}
+                      onChange={(e) => setCreateTitle(e.target.value)}
+                      className="w-full h-9 px-2.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 placeholder:text-gray-400"
+                      placeholder="Collection name"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-500 mb-1">Description (optional)</label>
+                  <input
+                    type="text"
+                    value={createDescription}
+                    onChange={(e) => setCreateDescription(e.target.value)}
+                    className="w-full h-9 px-2.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 placeholder:text-gray-400"
+                    placeholder="Short description"
+                  />
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex gap-2 px-4 py-3 border-t border-gray-200 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  disabled={createSaving}
+                  className="flex-1 h-9 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateCollection}
+                  disabled={createSaving || !createTitle.trim()}
+                  className="flex-1 h-9 text-xs font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {createSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Map pins list */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Map pins</p>
+        <SectionHeaderWithAdd title="Map Pins" addHref="/map/live#contribute" />
         {activity.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-md p-[10px]">
             <p className="text-xs text-gray-500">No pin activity yet on your maps.</p>

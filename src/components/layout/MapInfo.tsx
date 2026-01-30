@@ -135,7 +135,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
       data-container="map-info"
       aria-label="Map info"
     >
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         {mapMetaCard ? (
           <div
             className="flex items-center gap-2 min-w-0 flex-1"
@@ -154,7 +154,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
           <button
             type="button"
             onClick={onClose}
-            className="flex-shrink-0 p-1.5 rounded-md hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+            className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
             aria-label="Close"
           >
             <XMarkIcon className="w-4 h-4" />

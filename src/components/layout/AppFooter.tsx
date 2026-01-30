@@ -26,7 +26,7 @@ export default function AppFooter({ children, headerLabel = 'Footer', isOpen: co
 
   return (
     <footer
-      className="flex-shrink-0 flex flex-col-reverse border-t border-gray-200 bg-white rounded-tl-md rounded-tr-md overflow-hidden"
+      className="flex-shrink-0 flex flex-col-reverse border-t border-gray-200 bg-white rounded-tl-md rounded-tr-md overflow-hidden shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]"
       data-container="app-footer"
       aria-label="App footer"
     >

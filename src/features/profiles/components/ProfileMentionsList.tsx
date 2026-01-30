@@ -1,14 +1,25 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { formatPinDate } from '@/types/profile';
 import type { ProfilePin } from '@/types/profile';
-import { EyeIcon, HeartIcon } from '@heroicons/react/24/outline';
+import { EyeIcon, HeartIcon, MapPinIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { getMapUrlWithPin } from '@/lib/maps/urls';
 
 interface ProfileMentionsListProps {
   pins: ProfilePin[];
   isOwnProfile?: boolean;
   onViewMap?: () => void;
+}
+
+function getViewOnMapHref(pin: ProfilePin): string {
+  const isLive = pin.map?.slug === 'live';
+  if (isLive) return `/live?pin=${encodeURIComponent(pin.id)}`;
+  if (pin.map && Number.isFinite(pin.lat) && Number.isFinite(pin.lng)) {
+    return getMapUrlWithPin({ id: pin.map.id, slug: pin.map.slug ?? null }, pin.lat, pin.lng);
+  }
+  return `/live?pin=${encodeURIComponent(pin.id)}`;
 }
 
 export default function ProfileMentionsList({ pins, isOwnProfile = false, onViewMap }: ProfileMentionsListProps) {
@@ -113,6 +124,26 @@ export default function ProfileMentionsList({ pins, isOwnProfile = false, onView
               <p className="text-[10px] text-gray-500">
                 {formatPinDate(pin.created_at)}
               </p>
+
+              {/* View on Map + See post - public profile only */}
+              {!isOwnProfile && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={getViewOnMapHref(pin)}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus:underline"
+                  >
+                    <MapPinIcon className="w-3.5 h-3.5" />
+                    View on Map
+                  </Link>
+                  <Link
+                    href={`/mention/${pin.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus:underline"
+                  >
+                    <DocumentTextIcon className="w-3.5 h-3.5" />
+                    See post
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         ))}

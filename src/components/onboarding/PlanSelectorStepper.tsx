@@ -385,21 +385,25 @@ export default function PlanSelectorStepper({
     const isAdmin = account?.role === 'admin';
     
     return (
-      <div className="space-y-4">
-        {renderAccountHeader()}
-        {/* Show completed step 1 */}
-        {step1Confirmed && renderCompletedStep(1, 'Setup customer account')}
-        
-        <div className="flex items-center gap-2.5 mb-3">
-          <span className={`flex items-center justify-center w-7 h-7 rounded-full bg-transparent border text-xs font-bold transition-colors ${
-            step2Confirmed 
-              ? 'border-green-500 text-green-400' 
-              : 'border-white text-white'
-          }`}>2</span>
-          <h3 className={`text-sm font-semibold transition-colors ${
-            step2Confirmed ? 'text-neutral-500' : 'text-white'
-          }`}>Select a plan</h3>
+      <div className="flex flex-col min-h-0 max-h-full">
+        <div className="flex-shrink-0 space-y-4 mb-4">
+          {renderAccountHeader()}
+          {/* Show completed step 1 */}
+          {step1Confirmed && renderCompletedStep(1, 'Setup customer account')}
+          
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className={`flex items-center justify-center w-7 h-7 rounded-full bg-transparent border text-xs font-bold transition-colors ${
+              step2Confirmed 
+                ? 'border-green-500 text-green-400' 
+                : 'border-white text-white'
+            }`}>2</span>
+            <h3 className={`text-sm font-semibold transition-colors ${
+              step2Confirmed ? 'text-neutral-500' : 'text-white'
+            }`}>Select a plan</h3>
+          </div>
         </div>
+        
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-hide space-y-4 pr-1 -mr-1">
 
         {/* For non-admin users: Show "coming soon" banner and hide plans */}
         {!isAdmin ? (
@@ -554,6 +558,7 @@ export default function PlanSelectorStepper({
             )}
           </>
         )}
+        </div>
       </div>
     );
   }

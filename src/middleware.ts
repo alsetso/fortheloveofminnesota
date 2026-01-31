@@ -132,8 +132,10 @@ function matchesProtectedRoute(pathname: string): {
 export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   
-  // Skip middleware for Stripe webhook - it needs raw body and no redirects
-  if (pathname === '/api/stripe/webhook') {
+  // Skip ALL middleware processing for Stripe webhook - it needs raw body and no redirects
+  // This prevents any redirects (www/non-www, trailing slash, etc.) from interfering
+  if (pathname === '/api/stripe/webhook' || pathname === '/api/stripe/webhook/') {
+    // Return immediately without any processing to prevent redirects
     return NextResponse.next();
   }
   
@@ -411,7 +413,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
+     * - api/stripe/webhook (Stripe webhook - excluded to prevent redirects)
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public|api/stripe/webhook).*)',
   ],
 };

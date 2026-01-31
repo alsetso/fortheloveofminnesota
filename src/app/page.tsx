@@ -13,18 +13,15 @@ import HomeFeedContent from '@/features/homepage/components/HomeFeedContent';
 import PromotionalBanner from '@/components/auth/PromotionalBanner';
 
 export default function Home() {
-  const { account: authAccount, activeAccountId, isLoading } = useAuthStateSafe();
+  const { account: authAccount, isLoading, isAuthenticated: authIsAuthenticated } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const { closeSidebar: closeLeftSidebar } = useUnifiedSidebar();
   const leftSidebarConfigs = useMemo(() => [], []);
   const rightSidebarConfigs = useMemo(() => [], []);
   
-  const isAuthenticated = Boolean(authAccount || activeAccountId);
-
-  // Wait for auth to load before showing banner
-  if (isLoading) {
-    return null;
-  }
+  // Use the isAuthenticated from the hook (based on user, not just activeAccountId)
+  // Also require authAccount to exist (not just user) to be fully authenticated
+  const isAuthenticated = authIsAuthenticated && !!authAccount;
 
   // Check if user is on hobby plan (no active subscription)
   const isOnHobbyPlan = authAccount 
@@ -35,7 +32,8 @@ export default function Home() {
     : false;
 
   // Show banner for anonymous users OR authenticated users on hobby plan
-  if (!isAuthenticated || isOnHobbyPlan) {
+  // Default to showing banner if we're not sure (loading) or not authenticated
+  if (isLoading || !isAuthenticated || isOnHobbyPlan) {
     return <PromotionalBanner isOpen={true} />;
   }
 

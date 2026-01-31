@@ -194,8 +194,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get base URL for success/cancel redirects
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    // Get base URL from request URL (current origin)
+    const requestUrl = new URL(req.url);
+    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
     
     // Build success and cancel URLs with checkout status
     const successUrl = `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}checkout=success`;

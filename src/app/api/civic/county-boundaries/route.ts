@@ -37,8 +37,8 @@ export async function GET(request: NextRequest) {
     // Type assertion needed: Supabase TypeScript types only support 'public' schema,
     // but we need to query from 'civic' schema. The schema() method exists at runtime.
     let query = (supabase as any)
-      .schema('civic')
-      .from('county_boundaries')
+      .schema('layers')
+      .from('counties')
       .select('id, county_name, county_code, county_gnis_feature_id, county_id, description, publisher, source_date, geometry')
       .order('county_name', { ascending: true });
     

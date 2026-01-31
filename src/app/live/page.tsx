@@ -19,6 +19,7 @@ import MapPage from '../map/[id]/page';
 import { generateUUID } from '@/lib/utils/uuid';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SignInGate from '@/components/auth/SignInGate';
+import ProtectedRouteGuard from '@/components/auth/ProtectedRouteGuard';
 
 function LiveHeaderThemeSync({ children }: { children: ReactNode }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -512,28 +513,10 @@ export default function LivePage() {
   const { openWelcome } = useAppModalContextSafe();
 
   return (
-    <LiveHeaderThemeSync>
-    <AppContainer>
-      {/* Subtle sign-in prompt for non-authenticated users */}
-      {!isAuthenticated && (
-        <div className="absolute top-0 left-0 right-0 z-40 bg-gradient-to-b from-red-600/95 to-red-600/90 backdrop-blur-sm border-b border-red-700/20">
-          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-white">
-                <span className="font-medium">Join the Minnesota community</span>
-                {' '}— Sign in to add pins, like posts, and explore mentions
-              </p>
-            </div>
-            <button
-              onClick={openWelcome}
-              className="flex-shrink-0 px-3 py-1 text-xs font-medium text-red-600 bg-white hover:bg-gray-50 rounded-md transition-colors"
-            >
-              Sign In
-            </button>
-          </div>
-        </div>
-      )}
-      <MapPage
+    <ProtectedRouteGuard>
+      <LiveHeaderThemeSync>
+      <AppContainer>
+        <MapPage
         params={Promise.resolve({ id: 'live' })}
         skipPageWrapper
         onLocationSelect={handleLocationSelect}
@@ -567,7 +550,8 @@ export default function LivePage() {
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
       />
-    </AppContainer>
-    </LiveHeaderThemeSync>
+      </AppContainer>
+      </LiveHeaderThemeSync>
+    </ProtectedRouteGuard>
   );
 }

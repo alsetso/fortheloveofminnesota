@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PinActivityFeed from './PinActivityFeed';
 import MentionTypeCards from './MentionTypeCards';
+import RecentAccountActivity from './RecentAccountActivity';
 import HeroSection from '@/components/landing/HeroSection';
+import PostCreationForm from '@/components/feed/PostCreationForm';
 import { useAuthStateSafe } from '@/features/auth';
 import type { FeedMap, FeedPinActivity } from '@/app/api/feed/pin-activity/route';
 
@@ -35,111 +37,124 @@ export default function HomeFeedContent() {
   const [feedActivity, setFeedActivity] = useState<FeedPinActivity[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchFeed = async () => {
-      setFeedLoading(true);
-      try {
-        if (account) {
-          // Authenticated: fetch all maps user is part of (including live) and their pin activity
-          const res = await fetch('/api/feed/pin-activity', { credentials: 'include' });
-          if (!res.ok) {
-            if (process.env.NODE_ENV === 'development') {
-              console.error('[HomeFeedContent] Feed API error:', res.status, res.statusText);
-            }
-            setFeedMaps([]);
-            setFeedActivity([]);
-            return;
-          }
-          const data = await res.json();
-          
+  const fetchFeed = useCallback(async () => {
+    setFeedLoading(true);
+    try {
+      if (account) {
+        // Authenticated: fetch all maps user is part of (including live) and their pin activity
+        const res = await fetch('/api/feed/pin-activity', { credentials: 'include' });
+        if (!res.ok) {
           if (process.env.NODE_ENV === 'development') {
-            console.log('[HomeFeedContent] Feed data:', { 
-              mapsCount: data.maps?.length || 0, 
-              activityCount: data.activity?.length || 0 
-            });
+            console.error('[HomeFeedContent] Feed API error:', res.status, res.statusText);
           }
-          
-          setFeedMaps(data.maps ?? []);
-          setFeedActivity(data.activity ?? []);
-        } else {
-          // Logged out: fetch public pins from live map
-          const res = await fetch('/api/maps/live/mentions', { credentials: 'include' });
-          if (!res.ok) {
-            setFeedMaps([]);
-            setFeedActivity([]);
-            return;
-          }
-          const responseData = await res.json();
-          // API returns { mentions: [...], count: ... } - extract the mentions array
-          const liveMentions: any[] = responseData.mentions || [];
-          
-          if (process.env.NODE_ENV === 'development' && liveMentions.length === 0) {
-            console.log('[HomeFeedContent] No live mentions found:', { responseData });
-          }
-          
-          // Transform live mentions to FeedPinActivity format
-          const transformedActivity: FeedPinActivity[] = liveMentions.map((mention: any) => {
-            // Handle accounts - could be object or array
-            const accountsData = mention.accounts || (Array.isArray(mention.accounts) ? mention.accounts[0] : null);
-            
-            return {
-              id: mention.id,
-              map_id: mention.map_id,
-              lat: mention.lat,
-              lng: mention.lng,
-              description: mention.description,
-              caption: null, // API doesn't return caption
-              emoji: null, // API doesn't return emoji
-              image_url: mention.image_url,
-              video_url: mention.video_url,
-              media_type: mention.media_type,
-              account_id: mention.account_id,
-              created_at: mention.created_at,
-              map: {
-                id: mention.map_id,
-                name: 'Live Map',
-                slug: 'live',
-              },
-              account: accountsData ? {
-                id: mention.account_id || '',
-                username: null, // API doesn't return username for anonymous users
-                image_url: accountsData.image_url || null,
-              } : null,
-              mention_type: mention.mention_type,
-              tagged_accounts: null,
-            };
+          setFeedMaps([]);
+          setFeedActivity([]);
+          return;
+        }
+        const data = await res.json();
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[HomeFeedContent] Feed data:', { 
+            mapsCount: data.maps?.length || 0, 
+            activityCount: data.activity?.length || 0 
           });
+        }
+        
+        setFeedMaps(data.maps ?? []);
+        setFeedActivity(data.activity ?? []);
+      } else {
+        // Logged out: fetch public pins from live map
+        const res = await fetch('/api/maps/live/mentions', { credentials: 'include' });
+        if (!res.ok) {
+          setFeedMaps([]);
+          setFeedActivity([]);
+          return;
+        }
+        const responseData = await res.json();
+        // API returns { mentions: [...], count: ... } - extract the mentions array
+        const liveMentions: any[] = responseData.mentions || [];
+        
+        if (process.env.NODE_ENV === 'development' && liveMentions.length === 0) {
+          console.log('[HomeFeedContent] No live mentions found:', { responseData });
+        }
+        
+        // Transform live mentions to FeedPinActivity format
+        const transformedActivity: FeedPinActivity[] = liveMentions.map((mention: any) => {
+          // Handle accounts - could be object or array
+          const accountsData = mention.accounts || (Array.isArray(mention.accounts) ? mention.accounts[0] : null);
           
-          // Set live map info
-          if (liveMentions.length > 0 && liveMentions[0].map_id) {
-            setFeedMaps([{
-              id: liveMentions[0].map_id,
+          return {
+            id: mention.id,
+            map_id: mention.map_id,
+            lat: mention.lat,
+            lng: mention.lng,
+            description: mention.description,
+            caption: null, // API doesn't return caption
+            emoji: null, // API doesn't return emoji
+            image_url: mention.image_url,
+            video_url: mention.video_url,
+            media_type: mention.media_type,
+            account_id: mention.account_id,
+            created_at: mention.created_at,
+            map: {
+              id: mention.map_id,
               name: 'Live Map',
               slug: 'live',
-            }]);
-          } else {
-            setFeedMaps([]);
-          }
-          setFeedActivity(transformedActivity);
+            },
+            account: accountsData ? {
+              id: mention.account_id || '',
+              username: null, // API doesn't return username for anonymous users
+              image_url: accountsData.image_url || null,
+            } : null,
+            mention_type: mention.mention_type,
+            tagged_accounts: null,
+          };
+        });
+        
+        // Set live map info
+        if (liveMentions.length > 0 && liveMentions[0].map_id) {
+          setFeedMaps([{
+            id: liveMentions[0].map_id,
+            name: 'Live Map',
+            slug: 'live',
+          }]);
+        } else {
+          setFeedMaps([]);
         }
-      } catch {
-        setFeedMaps([]);
-        setFeedActivity([]);
-      } finally {
-        setFeedLoading(false);
+        setFeedActivity(transformedActivity);
       }
-    };
-    fetchFeed();
+    } catch {
+      setFeedMaps([]);
+      setFeedActivity([]);
+    } finally {
+      setFeedLoading(false);
+    }
   }, [account]);
+
+  useEffect(() => {
+    fetchFeed();
+  }, [fetchFeed]);
+
+  const handlePostCreated = () => {
+    // Refresh the feed after post is created
+    fetchFeed();
+  };
 
   return (
     <div className="w-full">
       {/* Main Content - Centered */}
-      <div className="max-w-md mx-auto space-y-3 px-4">
-        {/* Show hero section for all users */}
-        <HeroSection />
-        {/* What you can post section - shown above map pins */}
-        <MentionTypeCards isAdmin={isAdmin} />
+      <div className="max-w-[600px] mx-auto space-y-3 px-4">
+        {/* Show hero section only when user is not logged in */}
+        {!account && <HeroSection />}
+        {/* Admin sections - shown only to admins, above the form */}
+        {isAdmin && (
+          <>
+            <MentionTypeCards isAdmin={isAdmin} />
+            <RecentAccountActivity isAdmin={isAdmin} />
+          </>
+        )}
+        {/* Post creation form - shown when user is logged in */}
+        {account && <PostCreationForm onPostCreated={handlePostCreated} />}
         <PinActivityFeed 
           maps={feedMaps} 
           activity={feedActivity} 

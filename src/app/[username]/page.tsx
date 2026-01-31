@@ -5,10 +5,10 @@ import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import ProfileLayout from '@/features/profiles/components/ProfileLayout';
-import ProfileMentionsList from '@/features/profiles/components/ProfileMentionsList';
 import HomeDashboardContent from '@/features/homepage/components/HomeDashboardContent';
 import UsernamePageShell from './UsernamePageShell';
 import SignInGate from '@/components/auth/SignInGate';
+import ProfileMentionsSection from './ProfileMentionsSection';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,6 +102,7 @@ export default async function UsernamePage({ params, searchParams }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   const isOwnProfile = !!(user && accountData.user_id === user.id);
   const isAuthenticated = Boolean(user);
+  const isViewingAsPublic = viewAsPublic || !isOwnProfile;
 
   const profileAccountData: ProfileAccount = {
     id: accountData.id,
@@ -121,16 +122,7 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     created_at: accountData.created_at,
   };
 
-  if (isOwnProfile && !viewAsPublic) {
-    return (
-      <>
-        <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
-        <UsernamePageShell isOwnProfile profileAccountData={profileAccountData} />
-      </>
-    );
-  }
-
-  // Public profile: either visitor or owner "viewing as" Public (profile pages removed; canonical is /:username)
+  // Fetch collections - owners see all, visitors see public ones with public pins
   const { data: collectionsData } = await supabase
     .from('collections')
     .select('*')
@@ -138,22 +130,28 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     .order('created_at', { ascending: false });
   const collections: Collection[] = (collectionsData || []) as Collection[];
 
-  // Always fetch public mentions for this account (even without auth)
-  // For visitors, we'll show skeleton loaders that prompt signup
-  const { data: mentionsData, error: mentionsError } = await supabase
+  // Fetch mentions based on permissions:
+  // - Owners viewing their own profile: all mentions (public + private)
+  // - Public view (visitors or owner viewing as public): only public mentions
+  const mentionsQuery = supabase
     .from('map_pins')
     .select(`
       id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
       image_url, video_url, media_type, view_count, created_at, updated_at,
       collections (id, emoji, title),
       mention_type:mention_types (id, emoji, name),
-      map:map (id, slug)
+      map:map (id, name, slug)
     `)
     .eq('account_id', accountData.id)
     .eq('archived', false)
-    .eq('is_active', true)
-    .eq('visibility', 'public')
-    .order('created_at', { ascending: false });
+    .eq('is_active', true);
+
+  // Apply visibility filter for public view
+  if (isViewingAsPublic) {
+    mentionsQuery.eq('visibility', 'public');
+  }
+
+  const { data: mentionsData, error: mentionsError } = await mentionsQuery.order('created_at', { ascending: false });
 
   // Log error in development for debugging
   if (mentionsError && process.env.NODE_ENV === 'development') {
@@ -190,18 +188,33 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     created_at: mention.created_at,
     updated_at: mention.updated_at,
     map_id: mention.map_id,
-    map: mention.map ? { id: mention.map.id, slug: mention.map.slug } : undefined,
+    map: mention.map ? { id: mention.map.id, name: mention.map.name, slug: mention.map.slug } : undefined,
   }));
 
-  const publicContent = (
-    <ProfileLayout account={profileAccountData} isOwnProfile={false}>
+  // For owner viewing their own profile (not as public), show dashboard by default
+  // But allow them to switch to profile view via viewAsPublic
+  if (isOwnProfile && !viewAsPublic) {
+    return (
+      <>
+        <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
+        <UsernamePageShell isOwnProfile profileAccountData={profileAccountData} />
+      </>
+    );
+  }
+
+  // Unified profile view: works for both owner (viewing as public) and visitors
+  const profileContent = (
+    <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile && !isViewingAsPublic}>
       <div className="space-y-6">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-900">Mentions</h2>
-          </div>
-          <ProfileMentionsList pins={mentions} isOwnProfile={isOwnProfile} />
-        </div>
+        {/* Profile Mentions Section - Map + Collections Panel with Toggle */}
+        <ProfileMentionsSection
+          pins={mentions}
+          accountId={accountData.id}
+          isOwnProfile={isOwnProfile && !isViewingAsPublic}
+          accountUsername={accountData.username}
+          accountImageUrl={accountData.image_url}
+          collections={collections}
+        />
         
         {/* Sign in prompt for non-authenticated visitors */}
         {!isAuthenticated && (
@@ -219,7 +232,7 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     <>
       <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
       <UsernamePageShell showViewAsSelector={isOwnProfile && viewAsPublic}>
-        {publicContent}
+        {profileContent}
       </UsernamePageShell>
     </>
   );

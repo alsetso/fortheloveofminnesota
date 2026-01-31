@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Import CTU boundaries from GeoPackage into civic.ctu_boundaries table
+ * Import CTU boundaries from GeoPackage into layers.cities_and_towns table
  * 
  * Usage: 
  *   npx tsx scripts/import-ctu-boundaries.ts
@@ -311,8 +311,8 @@ async function importCTUs() {
     // Clear existing data
     console.log('\n🗑️  Clearing existing CTU boundaries...');
     const { count, error: countError } = await supabase
-      .schema('civic')
-      .from('ctu_boundaries')
+      .schema('layers')
+      .from('cities_and_towns')
       .select('*', { count: 'exact', head: true });
     
     if (!countError && count !== null) {
@@ -320,8 +320,8 @@ async function importCTUs() {
     }
     
     const { error: deleteError } = await supabase
-      .schema('civic')
-      .from('ctu_boundaries')
+      .schema('layers')
+      .from('cities_and_towns')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
@@ -345,8 +345,8 @@ async function importCTUs() {
       const cleanBatch = batch.map(({ id, ...rest }) => rest);
       
       const { data, error } = await supabase
-        .schema('civic')
-        .from('ctu_boundaries')
+        .schema('layers')
+        .from('cities_and_towns')
         .insert(cleanBatch)
         .select();
 
@@ -357,7 +357,8 @@ async function importCTUs() {
           let batchImported = 0;
           for (const record of cleanBatch) {
             const { data: singleData, error: singleError } = await supabase
-              .from('ctu_boundaries')
+              .schema('layers')
+              .from('cities_and_towns')
               .insert(record)
               .select();
             

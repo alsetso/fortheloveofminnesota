@@ -160,7 +160,7 @@ export default async function UsernameCollectionPage({ params }: Props) {
     updated_at: string;
     collections?: { id: string; emoji: string; title: string } | null;
     mention_type?: { id: string; emoji: string; name: string } | null;
-    map?: { id: string; slug: string | null } | null;
+    map?: { id: string; name: string | null; slug: string | null } | null;
   }
   let mentionsData: MapPinRow[] | null = null;
   if (profileMapIds.length > 0) {
@@ -171,7 +171,7 @@ export default async function UsernameCollectionPage({ params }: Props) {
         image_url, video_url, media_type, view_count, created_at, updated_at,
         collections (id, emoji, title),
         mention_type:mention_types (id, emoji, name),
-        map:map (id, slug)
+        map:map (id, name, slug)
       `)
       .eq('account_id', accountData.id)
       .eq('collection_id', selectedCollection.id)
@@ -212,7 +212,7 @@ export default async function UsernameCollectionPage({ params }: Props) {
     created_at: mention.created_at,
     updated_at: mention.updated_at,
     map_id: mention.map_id,
-    map: mention.map ? { id: mention.map.id, slug: mention.map.slug } : undefined,
+    map: mention.map ? { id: mention.map.id, name: mention.map.name || null, slug: mention.map.slug } : undefined,
   }));
 
   return (

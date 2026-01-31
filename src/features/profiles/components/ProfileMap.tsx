@@ -35,6 +35,7 @@ export default function ProfileMap({
   onPinSelect,
 }: ProfileMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [showCollectionToast, setShowCollectionToast] = useState(false);
   const [collectionToastData, setCollectionToastData] = useState<{ emoji: string; title: string; count: number } | null>(null);
@@ -590,7 +591,9 @@ export default function ProfileMap({
             };
 
             // Create popup immediately (without view count initially)
+            // Set container to map wrapper to ensure popup stays within bounds
             const mapbox = await import('mapbox-gl');
+            const popupContainer = mapWrapperRef.current || mapContainer.current?.parentElement || mapContainer.current;
             popupRef.current = new mapbox.default.Popup({
               offset: 25,
               closeButton: false,
@@ -598,6 +601,7 @@ export default function ProfileMap({
               className: 'map-mention-popup',
               maxWidth: '280px',
               anchor: 'bottom',
+              ...(popupContainer ? { container: popupContainer } : {}),
             })
               .setLngLat([pin.lng, pin.lat])
               .setHTML(createPopupContent())
@@ -742,7 +746,7 @@ export default function ProfileMap({
   }, [activeCollectionId, collections, pins]);
 
   return (
-    <div className="relative w-full h-full bg-gray-100 overflow-hidden" style={{ height: '100%' }}>
+    <div ref={mapWrapperRef} className="relative w-full h-full bg-gray-100 overflow-hidden" style={{ height: '100%', position: 'relative' }}>
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{ height: '100%' }} />
       {/* Floating Collection Toast */}
       {showCollectionToast && collectionToastData && (

@@ -2,9 +2,9 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
-import PageWrapper from '@/components/layout/PageWrapper';
-import OnboardingClient from '@/features/account/components/OnboardingClient';
 import OnboardingGuard from './OnboardingGuard';
+import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
+import { StripeProvider } from '@/components/providers/StripeProvider';
 import type { Account } from '@/features/auth';
 
 /**
@@ -122,16 +122,17 @@ export default async function OnboardingPage() {
     redirect('/');
   }
 
+  // Note: Incomplete billing check moved to client-side to prevent redirect loops
+  // The OnboardingBanner component will handle this after account loads
+
   return (
     <OnboardingGuard>
-      <PageWrapper>
-        <div className="max-w-md mx-auto px-4 py-8">
-          <OnboardingClient 
-            initialAccount={account}
-            redirectTo={account?.username ? `/${account.username}` : '/'}
-          />
-        </div>
-      </PageWrapper>
+      <StripeProvider>
+        <OnboardingBanner
+          initialAccount={account}
+          redirectTo={account?.username ? `/${account.username}` : '/'}
+        />
+      </StripeProvider>
     </OnboardingGuard>
   );
 }

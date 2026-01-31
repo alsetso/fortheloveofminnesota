@@ -23,6 +23,8 @@ export interface OnboardingClientProps {
   redirectTo?: string;
   onComplete?: () => void | Promise<void>;
   onWelcomeShown?: () => void;
+  /** Callback to update stepper state in parent component */
+  onStepperChange?: (currentStep: number, totalSteps: number, label?: string) => void;
 }
 
 export interface AccountData {

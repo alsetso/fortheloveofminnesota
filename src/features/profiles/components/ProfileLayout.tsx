@@ -15,8 +15,8 @@ export default function ProfileLayout({
   isOwnProfile,
   children,
 }: ProfileLayoutProps) {
-  // Public visitors see 600px max width, own profile keeps full width
-  const maxWidthClass = isOwnProfile ? 'max-w-7xl' : 'max-w-[600px]';
+  // All profiles use 600px max width to match header navigation center
+  const maxWidthClass = 'max-w-[600px]';
   
   return (
     <div className={`flex-1 flex flex-col gap-6 px-4 sm:px-6 lg:px-8 py-6 ${maxWidthClass} mx-auto w-full`}>

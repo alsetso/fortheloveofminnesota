@@ -12,3 +12,63 @@
 .animate-confetti {
   animation: confetti-fall linear forwards;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.carousel-fade-in {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes pin-drop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.animate-pin-drop {
+  animation: pin-drop 0.4s ease-out;
+}
+
+@keyframes fade-in-screen {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out-screen {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.fade-in-screen {
+  animation: fade-in-screen 0.3s ease-in-out;
+}
+
+.fade-out-screen {
+  animation: fade-out-screen 0.3s ease-in-out;
+}

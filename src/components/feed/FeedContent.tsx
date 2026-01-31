@@ -110,7 +110,7 @@ export default function FeedContent() {
 
   return (
     <div className="h-full overflow-y-auto scrollbar-hide">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-[600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-4">
             {account && <PostCreationForm onPostCreated={handlePostCreated} />}
 

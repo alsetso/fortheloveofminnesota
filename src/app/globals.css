@@ -29,11 +29,8 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Ensure touch targets are at least 44x44px (iOS/Android guidelines) */
-  button, a, input, select, textarea {
-    min-height: 44px;
-    min-width: 44px;
-  }
+  /* Touch targets - removed global min-height/width to allow custom sizing */
+  /* Individual components can set their own min-height/width as needed */
 
   /* Prevent zoom on input focus (iOS) */
   input, select, textarea {
@@ -322,6 +319,17 @@ body {
 
 .mapboxgl-popup-content {
   z-index: 2000 !important;
+}
+
+/* Contain profile map mention popups within their container */
+.map-mention-popup {
+  max-width: 100% !important;
+}
+
+/* Ensure popup container clips overflow */
+.map-mention-popup-container {
+  overflow: hidden !important;
+  position: relative !important;
 }
 
 /* Hide Mapbox attribution (including "Improve this map" text) */

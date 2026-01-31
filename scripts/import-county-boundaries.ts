@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Import county boundaries from shapefile into civic.county_boundaries table
+ * Import county boundaries from shapefile into layers.counties table
  * 
  * Usage: 
  *   npx tsx scripts/import-county-boundaries.ts
@@ -257,8 +257,8 @@ async function importCountyBoundaries() {
       });
 
       const { data, error } = await supabase
-        .schema('civic')
-        .from('county_boundaries')
+        .schema('layers')
+        .from('counties')
         .insert(insertData)
         .select();
 

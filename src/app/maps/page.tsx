@@ -15,6 +15,7 @@ import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
 import { getMapUrl } from '@/lib/maps/urls';
 import type { MapItem } from './types';
 import { MAP_FEATURE_SLUG, calculateMapLimitState } from '@/lib/billing/mapLimits';
+import ProtectedRouteGuard from '@/components/auth/ProtectedRouteGuard';
 
 type ViewType = 'featured' | 'community' | 'my-maps';
 
@@ -347,9 +348,10 @@ export default function MapsPage() {
   }, []);
 
   return (
-    <>
-      <PageViewTracker />
-      <PageWrapper
+    <ProtectedRouteGuard>
+      <>
+        <PageViewTracker />
+        <PageWrapper
         headerContent={null}
         searchComponent={null}
         accountDropdownProps={{
@@ -636,6 +638,7 @@ export default function MapsPage() {
         </div>
         </MapsPageLayout>
       </PageWrapper>
-    </>
+      </>
+    </ProtectedRouteGuard>
   );
 }

@@ -752,7 +752,7 @@ export default function ContributePageContent({ mapId, mapSlug }: ContributePage
 
   return (
     <div className="min-h-full bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
+      <div className="max-w-[600px] mx-auto px-4 py-6 space-y-3">
         {isSuccessScreen ? (
           <div className="min-h-[60vh] flex items-center justify-center">
             <div className="max-w-md w-full">

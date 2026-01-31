@@ -280,10 +280,10 @@ export default function PostMapDrawer({ onClose, onMapDataSave, initialMapData }
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       {/* Map Container */}
-      <div className="flex-1 relative">
-        <div ref={mapContainer} className="absolute inset-0" />
+      <div className="flex-1 relative min-h-0">
+        <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
       </div>
 
       {/* Controls */}

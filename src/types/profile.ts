@@ -37,7 +37,7 @@ export interface ProfilePin {
   updated_at: string;
   /** Map this pin belongs to (for "View on Map" link on public profile). */
   map_id?: string;
-  map?: { id: string; slug: string | null };
+  map?: { id: string; name: string | null; slug: string | null };
 }
 
 export type PinVisibility = 'public' | 'only_me';
@@ -66,6 +66,11 @@ export interface ProfileAccount {
   billing_mode?: string | null; // Billing mode configuration
   search_visibility?: boolean; // Whether profile is searchable in @ mention searches
   account_taggable?: boolean; // Whether this account can be tagged by other users in mentions
+  state_verified?: boolean | null; // Whether user is currently verified to be in Minnesota
+  state_verification_checked_at?: string | null; // Timestamp of last state verification check
+  cities_and_towns?: any; // User-selected cities and towns boundaries (JSONB)
+  county?: any; // User-selected county boundary (JSONB)
+  districts?: any; // User-selected districts boundaries (JSONB)
   created_at: string;
 }
 

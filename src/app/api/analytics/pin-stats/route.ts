@@ -61,17 +61,18 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    // Get stats using get_mention_stats function (aggregates from url_visits)
-    // Note: pin_id is actually a mention ID (legacy naming)
-    const { data, error } = await supabase.rpc('get_mention_stats', {
-      p_mention_id: pinId,
+    // Get stats using RPC function (analytics.events not directly accessible via PostgREST)
+    // Note: pin_id is actually a mention/pin ID (legacy naming)
+    const { data, error } = await supabase.rpc('get_entity_stats', {
+      p_entity_type: 'pin',
+      p_entity_id: pinId,
       p_hours: hours,
     } as any) as { data: Array<{ total_views: number; unique_viewers: number; accounts_viewed: number }> | null; error: any };
 
     if (error) {
-      console.error('Error fetching mention stats:', error);
+      console.error('Error fetching pin stats:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch mention stats', details: error.message },
+        { error: 'Failed to fetch pin stats', details: error.message },
         { status: 500 }
       );
     }

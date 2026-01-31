@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
         const supabase = createServerClient();
     
     let query = (supabase as any)
-      .schema('civic')
-      .from('ctu_boundaries')
+      .schema('layers')
+      .from('cities_and_towns')
       .select('id, ctu_class, feature_name, gnis_feature_id, county_name, county_code, county_gnis_feature_id, population, acres, geometry')
       .order('ctu_class', { ascending: true })
       .order('feature_name', { ascending: true });

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import ProfileMap from './ProfileMap';
+import ProfileMentionsList from './ProfileMentionsList';
 import SimpleProfileCardWithCollections from './SimpleProfileCardWithCollections';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { CollectionService } from '@/features/collections/services/collectionService';
@@ -16,6 +17,8 @@ interface ProfileMentionsContainerProps {
   accountImageUrl: string | null;
   collections: Collection[];
   onCollectionsUpdate?: () => void;
+  viewMode?: 'map' | 'list';
+  onViewModeChange?: (mode: 'map' | 'list') => void;
 }
 
 export default function ProfileMentionsContainer({
@@ -26,7 +29,12 @@ export default function ProfileMentionsContainer({
   accountImageUrl,
   collections,
   onCollectionsUpdate,
+  viewMode: externalViewMode,
+  onViewModeChange,
 }: ProfileMentionsContainerProps) {
+  const [internalViewMode, setInternalViewMode] = useState<'map' | 'list'>('map');
+  const viewMode = externalViewMode ?? internalViewMode;
+  const setViewMode = onViewModeChange ?? setInternalViewMode;
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [localCollections, setLocalCollections] = useState<Collection[]>(collections);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
@@ -98,35 +106,47 @@ export default function ProfileMentionsContainer({
 
   return (
     <div>
-      {/* Map with Collections Panel */}
-      <div className="overflow-hidden">
-        <div className="aspect-square w-full relative">
-          <ProfileMap 
-            pins={filteredPins} 
-            accountId={accountId}
-            isOwnProfile={isOwnProfile}
-            accountUsername={accountUsername}
-            accountImageUrl={accountImageUrl}
-            selectedCollectionId={selectedCollectionId}
-            collections={localCollections}
-            onPinSelect={setSelectedPinId}
-          />
-          <SimpleProfileCardWithCollections
-            accountUsername={accountUsername}
-            accountImageUrl={accountImageUrl}
-            collections={localCollections}
-            pins={localPins}
-            isOwnProfile={isOwnProfile}
-            accountId={accountId}
-            selectedCollectionId={selectedCollectionId}
-            onCollectionSelect={setSelectedCollectionId}
-            onCollectionsUpdate={handleCollectionsUpdate}
-            onPinUpdate={handlePinUpdate}
-            selectedPinId={selectedPinId}
-            onPinSelect={setSelectedPinId}
-          />
+      {/* Map View */}
+      {viewMode === 'map' && (
+        <div className="overflow-hidden relative">
+          <div className="aspect-square w-full relative overflow-hidden">
+            <ProfileMap 
+              pins={filteredPins} 
+              accountId={accountId}
+              isOwnProfile={isOwnProfile}
+              accountUsername={accountUsername}
+              accountImageUrl={accountImageUrl}
+              selectedCollectionId={selectedCollectionId}
+              collections={localCollections}
+              onPinSelect={setSelectedPinId}
+            />
+            <SimpleProfileCardWithCollections
+              accountUsername={accountUsername}
+              accountImageUrl={accountImageUrl}
+              collections={localCollections}
+              pins={localPins}
+              isOwnProfile={isOwnProfile}
+              accountId={accountId}
+              selectedCollectionId={selectedCollectionId}
+              onCollectionSelect={setSelectedCollectionId}
+              onCollectionsUpdate={handleCollectionsUpdate}
+              onPinUpdate={handlePinUpdate}
+              selectedPinId={selectedPinId}
+              onPinSelect={setSelectedPinId}
+            />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <ProfileMentionsList 
+          pins={filteredPins}
+          collections={localCollections}
+          isOwnProfile={isOwnProfile}
+          onCollectionsUpdate={handleCollectionsUpdate}
+        />
+      )}
     </div>
   );
 }

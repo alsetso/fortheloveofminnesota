@@ -5,7 +5,10 @@ import Link from 'next/link';
 import { ChartBarIcon, EyeIcon } from '@heroicons/react/24/outline';
 import ProfileCard from '@/features/profiles/components/ProfileCard';
 import PinActivityFeed from '@/features/homepage/components/PinActivityFeed';
-import type { ProfileAccount } from '@/types/profile';
+import ProfileMentionsSection from '@/app/[username]/ProfileMentionsSection';
+import { CollectionService } from '@/features/collections/services/collectionService';
+import type { ProfileAccount, ProfilePin } from '@/types/profile';
+import type { Collection } from '@/types/collection';
 import type { FeedMap, FeedPinActivity } from '@/app/api/feed/pin-activity/route';
 
 interface HomeDashboardContentProps {
@@ -18,6 +21,9 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
   const [feedLoading, setFeedLoading] = useState(true);
   const [quickStats, setQuickStats] = useState<{ mapsCount?: number; mentionsCount?: number }>({});
   const [loadingStats, setLoadingStats] = useState(false);
+  const [pins, setPins] = useState<ProfilePin[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [pinsLoading, setPinsLoading] = useState(true);
 
   useEffect(() => {
     if (!account?.id) {
@@ -85,8 +91,113 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
     fetchQuickStats();
   }, [account?.id]);
 
+  // Fetch owner's pins and collections for map pins container
+  useEffect(() => {
+    if (!account?.id) {
+      setPins([]);
+      setCollections([]);
+      setPinsLoading(false);
+      return;
+    }
+
+    const fetchPinsAndCollections = async () => {
+      setPinsLoading(true);
+      try {
+        // Fetch collections using service first
+        let fetchedCollections: Collection[] = [];
+        try {
+          fetchedCollections = await CollectionService.getCollections(account.id);
+          setCollections(fetchedCollections);
+        } catch {
+          setCollections([]);
+        }
+
+        // Get live map ID and name first
+        const liveMapRes = await fetch('/api/maps?slug=live');
+        if (!liveMapRes.ok) {
+          setPins([]);
+          return;
+        }
+        const liveMapData = await liveMapRes.json();
+        const liveMap = liveMapData.maps?.[0];
+        const liveMapId = liveMap?.id;
+        const liveMapName = liveMap?.name || 'Live Map';
+        
+        if (!liveMapId) {
+          setPins([]);
+          return;
+        }
+
+        // Fetch all pins from live map (owner sees all, including private)
+        const pinsRes = await fetch(`/api/maps/${liveMapId}/pins`, { credentials: 'include' });
+        if (pinsRes.ok) {
+          const pinsData = await pinsRes.json();
+          // Filter to only pins owned by this account
+          const accountPins = (pinsData.pins || []).filter((p: any) => p.account_id === account.id);
+          
+          // Fetch likes counts - query map_pins_likes directly via Supabase client-side
+          const pinIds = accountPins.map((p: any) => p.id);
+          let likesCounts = new Map<string, number>();
+          if (pinIds.length > 0) {
+            try {
+              // Use the same approach as the page.tsx - fetch likes directly
+              const { supabase } = await import('@/lib/supabase');
+              const { data: likesData } = await supabase
+                .from('map_pins_likes')
+                .select('map_pin_id')
+                .in('map_pin_id', pinIds);
+              likesData?.forEach((like: { map_pin_id: string }) => {
+                likesCounts.set(like.map_pin_id, (likesCounts.get(like.map_pin_id) || 0) + 1);
+              });
+            } catch {
+              // Likes fetch failed, continue without likes
+            }
+          }
+          
+          // Map collections by ID for quick lookup (use fetchedCollections, not state)
+          const collectionsMap = new Map(fetchedCollections.map(c => [c.id, c]));
+          
+          const transformedPins: ProfilePin[] = accountPins.map((pin: any) => {
+            const collection = pin.collection_id && collectionsMap.has(pin.collection_id)
+              ? collectionsMap.get(pin.collection_id)!
+              : null;
+            
+            return {
+              id: pin.id,
+              lat: pin.lat,
+              lng: pin.lng,
+              description: pin.description,
+              collection_id: pin.collection_id,
+              collection: collection ? { id: collection.id, emoji: collection.emoji, title: collection.title } : null,
+              mention_type: pin.mention_type ? { id: pin.mention_type.id, emoji: pin.mention_type.emoji, name: pin.mention_type.name } : null,
+              visibility: pin.visibility || 'public',
+              image_url: pin.image_url,
+              video_url: pin.video_url,
+              media_type: pin.media_type || 'none',
+              view_count: pin.view_count || 0,
+              likes_count: likesCounts.get(pin.id) || 0,
+              created_at: pin.created_at,
+              updated_at: pin.updated_at || pin.created_at,
+              map_id: pin.map_id,
+              map: { id: liveMapId, name: liveMapName, slug: 'live' },
+            };
+          });
+          setPins(transformedPins);
+        }
+      } catch (error) {
+        console.error('Error fetching pins and collections:', error);
+        setPins([]);
+        setCollections([]);
+      } finally {
+        setPinsLoading(false);
+      }
+    };
+
+    fetchPinsAndCollections();
+  }, [account?.id]);
+
   return (
-    <div className="max-w-md mx-auto space-y-3">
+    <div className="max-w-[800px] mx-auto space-y-3">
       <div className="bg-white border border-gray-200 rounded-md p-[10px]">
         <ProfileCard
           account={account}
@@ -97,7 +208,20 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
           quickStats={quickStats}
         />
       </div>
-      <PinActivityFeed maps={feedMaps} activity={feedActivity} loading={feedLoading} showWhatYouCanPost={false} />
+      <PinActivityFeed maps={feedMaps} activity={feedActivity} loading={feedLoading} showWhatYouCanPost={false} showMapPins={false} />
+      
+      {/* Map Pins Container with Toggle */}
+      {!pinsLoading && pins.length > 0 && (
+        <ProfileMentionsSection
+          pins={pins}
+          accountId={account.id}
+          isOwnProfile={true}
+          accountUsername={account.username}
+          accountImageUrl={account.image_url}
+          collections={collections}
+        />
+      )}
+      
       <div className="bg-white border border-gray-200 rounded-md p-[10px]">
         <Link href="/analytics" className="block hover:bg-gray-50 transition-colors rounded-md -m-[10px] p-[10px]">
           <div className="space-y-3">

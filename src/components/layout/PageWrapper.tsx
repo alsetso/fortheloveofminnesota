@@ -3,6 +3,7 @@
 import { ReactNode, useState, useEffect, useMemo, useCallback } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import Script from 'next/script';
 import { Toaster } from 'react-hot-toast';
 import ContentTypeFilters from './ContentTypeFilters';
@@ -16,14 +17,14 @@ import MapsSelectorDropdown from './MapsSelectorDropdown';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { XCircleIcon, EyeIcon, UserPlusIcon, UserIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { 
   HomeIcon, 
   MapIcon, 
   UsersIcon,
   UserCircleIcon,
   SparklesIcon,
-  PlusCircleIcon
+  PlusCircleIcon,
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { 
   HomeIcon as HomeIconSolid, 
@@ -31,7 +32,8 @@ import {
   UsersIcon as UsersIconSolid,
   UserCircleIcon as UserCircleIconSolid,
   SparklesIcon as SparklesIconSolid,
-  PlusCircleIcon as PlusCircleIconSolid
+  PlusCircleIcon as PlusCircleIconSolid,
+  ChartBarIcon as ChartBarIconSolid
 } from '@heroicons/react/24/solid';
 
 /** @deprecated No longer used; account control links directly to /settings. Kept for backward compatibility. */
@@ -110,6 +112,15 @@ interface PageWrapperProps {
     } | null;
     onJoinSuccess?: () => void;
   } | null;
+  /** Stepper configuration for multi-step forms */
+  stepper?: {
+    /** Current step index (0-based) */
+    currentStep: number;
+    /** Total number of steps */
+    totalSteps: number;
+    /** Optional label for the stepper (e.g., "Onboarding", "Setup", etc.) */
+    label?: string;
+  } | null;
 }
 
 /** Desktop horizontal inset for main content; sidebars, popups, and header use this to align. */
@@ -136,7 +147,8 @@ export default function PageWrapper({
   mapSettings,
   initialAuth,
   initialBilling,
-  mapMembership
+  mapMembership,
+  stepper
 }: PageWrapperProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -162,6 +174,7 @@ export default function PageWrapper({
   const isMapPage = pathname?.startsWith('/map/') && pathname !== '/map/new' && pathname !== '/maps';
   const isMapsPage = pathname === '/maps' || pathname === '/map';
   const isOnboardingPage = pathname === '/onboarding';
+  const isSettingsSubpage = Boolean(headerBackHref && headerTitle && pathname?.startsWith('/settings'));
   
   // Extract map ID/slug from pathname
   const mapIdOrSlug = isMapPage ? pathname.replace('/map/', '').split('/')[0] : null;
@@ -404,6 +417,7 @@ export default function PageWrapper({
       { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
       { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
       { label: 'Contribute', href: '/contribute', icon: PlusCircleIcon, iconSolid: PlusCircleIconSolid },
+      { label: 'Analytics', href: '/analytics', icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
     ];
     
     // Only show "People" link when on a map page
@@ -612,75 +626,116 @@ export default function PageWrapper({
           {/* Top Row: Logo, Search, Nav, Account - full width with horizontal padding */}
           {!isSearchMode && (
             <div className="grid grid-cols-12 gap-6 items-center transition-all duration-300 h-14">
-            {/* 1st Column: Logo & Map Name & Search (Aligns with left sidebar) - Hide search when type param exists */}
-            <div className="hidden lg:flex lg:col-span-3 items-center gap-3 min-w-0">
-          <div className="flex-shrink-0">
-            {isMapPage ? (
-              <button
-                onClick={() => router.back()}
-                className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors`}
+            {/* 1st Column: Back button (settings subpage) or Logo/Page name (default) */}
+            <div className={`hidden lg:flex lg:col-span-3 ${isSettingsSubpage ? 'justify-start' : ''} items-center ${isSettingsSubpage ? '' : 'gap-3'} min-w-0 ${(headerBackHref && headerTitle) || isSettingsSubpage ? 'lg:ml-4' : ''}`}>
+          {isSettingsSubpage ? (
+            // Settings subpage: Back arrow on far left
+            headerBackHref && (
+              <Link
+                href={headerBackHref}
+                className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors flex-shrink-0`}
                 aria-label="Go back"
               >
                 <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
-              </button>
-            ) : isOnboardingPage ? (
-              <span className={`text-sm font-semibold ${headerText}`}>Onboarding</span>
-            ) : (
-              <Image
-                src="/logo.png"
-                alt="For the Love of Minnesota"
-                width={28}
-                height={28}
-                className={`w-7 h-7 ${isDefaultLightBg ? '' : 'invert'}`}
-                priority
-                unoptimized
-              />
-            )}
-          </div>
-          
-          {/* Maps Selector - Show on /map or /maps routes only */}
-          {(isMapsPage || isMapPage) && (
-            <div className="flex-1 max-w-[200px] sm:max-w-[250px] transition-all duration-300">
-              <MapsSelectorDropdown darkText={isDefaultLightBg} />
-            </div>
+              </Link>
+            )
+          ) : (
+            <>
+              <div className="flex-shrink-0">
+                {isMapPage ? (
+                  <button
+                    onClick={() => router.back()}
+                    className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors`}
+                    aria-label="Go back"
+                  >
+                    <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
+                  </button>
+                ) : isOnboardingPage ? (
+                  <img 
+                    src="/heart_pin.svg" 
+                    alt="Logo" 
+                    width={20} 
+                    height={20} 
+                    className="flex-shrink-0 w-5 h-5 object-contain"
+                  />
+                ) : (
+                  <span className={`text-sm font-semibold ${headerText}`} title={mobilePageTitle}>
+                    {mobilePageTitle}
+                  </span>
+                )}
+              </div>
+              
+              {/* Maps Selector - Show on /map or /maps routes only */}
+              {(isMapsPage || isMapPage) && (
+                <div className="flex-1 max-w-[200px] sm:max-w-[250px] transition-all duration-300">
+                  <MapsSelectorDropdown darkText={isDefaultLightBg} />
+                </div>
+              )}
+            </>
           )}
             </div>
           
             {/* Mobile Header Layout (Page name or back/onboarding, Maps Selector, Search, Header Content, Account) */}
-            <div className="lg:hidden col-span-12 flex items-center justify-between gap-2 px-1">
-              {headerBackHref && headerTitle ? (
-                <>
-                  <Link
-                    href={headerBackHref}
-                    className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors flex-shrink-0`}
-                    aria-label="Go back"
-                  >
-                    <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
-                  </Link>
-                  <h1 className={`flex-1 text-center text-sm font-semibold truncate px-2 ${headerText}`}>
-                    {headerTitle}
-                  </h1>
-                  {showAccountDropdown && !isOnboardingPage ? (
+            <div className="lg:hidden col-span-12 flex flex-col gap-2 px-1">
+              <div className="flex items-center justify-between gap-2">
+                {(headerBackHref && headerTitle) || isSettingsSubpage ? (
+                  <>
                     <Link
-                      href="/settings"
-                      className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm flex-shrink-0 ${
-                        isDefaultLightBg
-                          ? 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
-                          : 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
-                      }`}
-                      aria-label="Account settings"
+                      href={isSettingsSubpage ? (headerBackHref || '/settings') : (headerBackHref || '#')}
+                      className={`flex items-center justify-center p-1.5 ${headerHover} rounded-md transition-colors flex-shrink-0`}
+                      aria-label="Go back"
                     >
-                      {account ? (
-                        <ProfilePhoto account={account} size="sm" editable={false} />
-                      ) : (
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDefaultLightBg ? 'bg-gray-200' : 'bg-white/20'}`}>
-                          <UserIcon className={`w-3 h-3 ${isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white/90'}`} />
-                        </div>
-                      )}
+                      <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
                     </Link>
-                  ) : <div className="w-8 flex-shrink-0" />}
-                </>
-              ) : (
+                    <h1 className={`flex-1 text-center text-base font-semibold truncate px-2 ${headerText}`}>
+                      {isSettingsSubpage ? headerTitle : (headerTitle || 'Settings')}
+                    </h1>
+                    {showAccountDropdown && !isOnboardingPage ? (
+                      <Link
+                        href="/settings"
+                        className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm flex-shrink-0 ${
+                          isDefaultLightBg
+                            ? 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
+                            : 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
+                        }`}
+                        aria-label="Account settings"
+                      >
+                        {account ? (
+                          <ProfilePhoto account={account} size="sm" editable={false} />
+                        ) : (
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${isDefaultLightBg ? 'bg-gray-200' : 'bg-white/20'}`}>
+                            <UserIcon className={`w-3 h-3 ${isDefaultLightBg ? 'text-[#3C3C43]' : 'text-white/90'}`} />
+                          </div>
+                        )}
+                      </Link>
+                    ) : <div className="w-8 flex-shrink-0" />}
+                  </>
+                ) : isOnboardingPage && stepper ? (
+                  <>
+                    <img 
+                      src="/heart_pin.svg" 
+                      alt="Logo" 
+                      width={16} 
+                      height={16} 
+                      className="flex-shrink-0 w-4 h-4 object-contain"
+                    />
+                    <div className="flex-1 flex items-center justify-center px-2">
+                      <div className="flex items-center gap-1 w-full max-w-[200px]">
+                        {Array.from({ length: stepper.totalSteps }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`flex-1 h-0.5 rounded-full transition-all ${
+                              i <= stepper.currentStep 
+                                ? (isDefaultLightBg ? 'bg-gray-900' : 'bg-white/90')
+                                : (isDefaultLightBg ? 'bg-gray-300' : 'bg-white/30')
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="w-8 flex-shrink-0" />
+                  </>
+                ) : (
                 <>
               <div className="flex items-center gap-2">
                 <div className="flex-shrink-0">
@@ -693,7 +748,13 @@ export default function PageWrapper({
                       <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
                     </button>
                   ) : isOnboardingPage ? (
-                    <span className={`text-xs font-semibold ${headerText}`}>Onboarding</span>
+                    <img 
+                      src="/heart_pin.svg" 
+                      alt="Logo" 
+                      width={16} 
+                      height={16} 
+                      className="flex-shrink-0 w-4 h-4 object-contain"
+                    />
                   ) : (
                     <span className={`text-sm font-semibold truncate max-w-[140px] sm:max-w-[200px] ${headerText}`} title={mobilePageTitle}>
                       {mobilePageTitle}
@@ -728,47 +789,72 @@ export default function PageWrapper({
                 )}
               </div>
                 </>
-              )}
-            </div>
-            
-            {/* 2nd Column: Nav Icons or Mention Type Filters (Aligns with center feed, max-width 800px) */}
-            {!isOnboardingPage && (
-              <div className="hidden lg:flex lg:col-span-6 justify-center px-4">
-                <div className="flex items-center justify-around w-full max-w-[800px]">
-                  {/* Show nav icons on all pages, including map pages */}
-                  {navItems.map((item) => {
-                  // Hash-based items (like #people) are active when hash matches
-                  // Use currentHash state to avoid hydration mismatch (only set after mount)
-                  const isActive = item.href?.startsWith('#')
-                    ? (mounted && currentHash === item.href)
-                    : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
-                  const Icon = isActive ? item.iconSolid : item.icon;
-                  
-                  // Handle items with onClick (e.g., hash-based navigation)
-                  if ((item as any).onClick) {
-                    return (
-                      <button
-                        key={item.label}
-                        onClick={(item as any).onClick}
-                        className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
-                      >
-                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
-                      </button>
-                    );
-                  }
-                  
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href!}
-                      className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
-                    >
-                      <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
-                    </Link>
-                  );
-                })}
+                )}
               </div>
             </div>
+            
+            {/* 2nd Column: Nav Icons, Centered Title for Settings Subpages, or Stepper for Onboarding (Aligns with center feed, max-width 600px) */}
+            {(!isOnboardingPage || stepper) && (
+              <div className={`hidden lg:flex ${isSettingsSubpage ? 'lg:col-span-6 justify-center' : 'lg:col-span-6 justify-center px-4'}`}>
+                {isOnboardingPage && stepper ? (
+                  /* Stepper Progress Indicator - Centered in Header */
+                  <div className="flex items-center gap-1 w-full max-w-[400px]">
+                    {Array.from({ length: stepper.totalSteps }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 h-1 rounded-full transition-all ${
+                          i <= stepper.currentStep 
+                            ? (isDefaultLightBg ? 'bg-gray-900' : 'bg-white/90')
+                            : (isDefaultLightBg ? 'bg-gray-300' : 'bg-white/30')
+                        }`}
+                      />
+                    ))}
+                  </div>
+                ) : isSettingsSubpage ? (
+                  <h1 className={`text-base font-semibold ${headerText} ${headerTitle ? 'lg:ml-4' : ''}`}>
+                    {headerTitle}
+                  </h1>
+                ) : (headerBackHref && headerTitle) ? (
+                  <h1 className={`text-base font-semibold ${headerText} lg:ml-4`}>
+                    {headerTitle}
+                  </h1>
+                ) : (
+                  <div className="flex items-center justify-around w-full max-w-[600px]">
+                    {/* Show nav icons on all pages, including map pages */}
+                    {navItems.map((item) => {
+                      // Hash-based items (like #people) are active when hash matches
+                      // Use currentHash state to avoid hydration mismatch (only set after mount)
+                      const isActive = item.href?.startsWith('#')
+                        ? (mounted && currentHash === item.href)
+                        : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
+                      const Icon = isActive ? item.iconSolid : item.icon;
+                      
+                      // Handle items with onClick (e.g., hash-based navigation)
+                      if ((item as any).onClick) {
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={(item as any).onClick}
+                            className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
+                          >
+                            <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                          </button>
+                        );
+                      }
+                      
+                      return (
+                        <Link
+                          key={item.label}
+                          href={item.href!}
+                          className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
+                        >
+                          <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
             
             {/* Mention Type Filters - Show below nav icons on map pages when types are selected */}
@@ -800,7 +886,7 @@ export default function PageWrapper({
             )}
             
             {/* 3rd Column: Header Content, Account link to settings (Aligns with right sidebar) */}
-            <div className="hidden lg:flex lg:col-span-3 justify-end items-center gap-2">
+            <div className={`hidden lg:flex lg:col-span-3 justify-end items-center gap-2 ${(headerBackHref && headerTitle) || isSettingsSubpage ? 'lg:mr-4' : ''}`}>
               {headerContent}
               {showAccountDropdown && !isOnboardingPage && (
                 <Link
@@ -841,17 +927,17 @@ export default function PageWrapper({
                     <ArrowLeftIcon className={`w-5 h-5 ${headerIconMuted} ${headerIconHover}`} />
                   </button>
                 ) : isOnboardingPage ? (
-                  <span className={`text-sm font-semibold ${headerText}`}>Onboarding</span>
-                ) : (
-                  <Image
-                    src="/logo.png"
-                    alt="For the Love of Minnesota"
-                    width={28}
-                    height={28}
-                    className={`w-6 h-6 lg:w-7 lg:h-7 ${isDefaultLightBg ? '' : 'invert'}`}
-                    priority
-                    unoptimized
+                  <img 
+                    src="/heart_pin.svg" 
+                    alt="Logo" 
+                    width={20} 
+                    height={20} 
+                    className="flex-shrink-0 w-5 h-5 object-contain"
                   />
+                ) : (
+                  <span className={`text-sm font-semibold ${headerText}`} title={mobilePageTitle}>
+                    {mobilePageTitle}
+                  </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -880,7 +966,7 @@ export default function PageWrapper({
       {/* Main Content Area - Source of truth for horizontal inset on desktop. Sidebars live inside this. */}
       <div className="flex-1 flex flex-col min-h-0 lg:px-[10px]" data-content-inset-desktop={CONTENT_INSET_DESKTOP}>
         <div 
-          className="bg-white rounded-t-3xl flex-1 overflow-hidden relative flex flex-col"
+          className="bg-white rounded-t-[10px] border-t border-gray-200 lg:border-l lg:border-r lg:border-gray-200 flex-1 overflow-hidden relative flex flex-col"
           style={{ minHeight: 0 }}
         >
         {/* Scrollable Content Container - Hidden scrollbar, with bottom padding on mobile for fixed nav */}
@@ -896,20 +982,20 @@ export default function PageWrapper({
         </div>
       </div>
 
-      {/* Bottom nav (mobile) - height fits icon row only, no extra space above */}
+      {/* Bottom nav (mobile) - fixed at bottom of screen */}
       {!isSearchMode && !isOnboardingPage && (
         <div
           className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex flex-col items-stretch"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div 
-            className="border-t flex-shrink-0 min-h-0 pt-0 pb-[10px]"
+            className="border-t rounded-t-lg flex-shrink-0 min-h-0 pt-0"
             style={{
               ...backgroundStyle,
-              borderColor: isDefaultLightBg ? '#E5E7EB' : 'rgba(255, 255, 255, 0.1)',
+              borderTopColor: isDefaultLightBg ? '#E5E7EB' : 'rgba(255, 255, 255, 0.1)',
             }}
           >
-            <div className="flex items-center justify-around h-[50px] min-h-[50px] max-h-[50px]">
+            <div className="flex items-center justify-around py-2">
                 {navItems.map((item) => {
                   // Hash-based items use currentHash state to avoid hydration mismatch
                   const isActive = item.href?.startsWith('#')
@@ -923,11 +1009,10 @@ export default function PageWrapper({
                       <button
                         key={item.label}
                         onClick={(item as any).onClick}
-                        className="group flex items-center justify-center flex-1 h-full min-h-[50px] transition-colors rounded-xl"
+                        className="group flex items-center justify-center flex-1 transition-colors rounded-xl py-1"
+                        aria-label={item.label}
                       >
-                        <span className={`rounded-full p-2 transition-colors ${isDefaultLightBg ? 'group-hover:bg-black/5' : 'group-hover:bg-white/10'}`}>
-                          <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
-                        </span>
+                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
                       </button>
                     );
                   }
@@ -936,11 +1021,10 @@ export default function PageWrapper({
                     <Link
                       key={item.label}
                       href={item.href!}
-                      className="group flex items-center justify-center flex-1 h-full min-h-[50px] transition-colors rounded-xl"
+                      className="group flex items-center justify-center flex-1 transition-colors rounded-xl py-1"
+                      aria-label={item.label}
                     >
-                      <span className={`rounded-full p-2 transition-colors ${isDefaultLightBg ? 'group-hover:bg-black/5' : 'group-hover:bg-white/10'}`}>
-                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
-                      </span>
+                      <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
                     </Link>
                   );
                 })}

@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
         const supabase = createServerClient();
     
     let query = (supabase as any)
-      .schema('civic')
-      .from('congressional_districts')
+      .schema('layers')
+      .from('districts')
       .select('id, district_number, name, geometry')
       .order('district_number', { ascending: true });
     

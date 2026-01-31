@@ -1,0 +1,189 @@
+'use client';
+
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import OnboardingClient from '@/features/account/components/OnboardingClient';
+import type { Account } from '@/features/auth';
+import { hasIncompleteBilling, determineOnboardingStep } from '@/lib/onboardingService';
+
+interface OnboardingBannerProps {
+  initialAccount: Account | null;
+  redirectTo: string;
+}
+
+export default function OnboardingBanner({ initialAccount, redirectTo }: OnboardingBannerProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [stepperState, setStepperState] = useState<{
+    currentStep: number;
+    totalSteps: number;
+  } | null>(null);
+  const [currentStepName, setCurrentStepName] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasCheckedRedirect, setHasCheckedRedirect] = useState(false);
+
+  const handleStepperChange = useCallback((currentStep: number, totalSteps: number, stepName?: string) => {
+    setStepperState({ currentStep, totalSteps });
+    if (stepName) {
+      setCurrentStepName(stepName);
+    }
+  }, []);
+
+  const stepInstructions: Record<string, { heading: string; subtext: string }> = {
+    profile_photo: {
+      heading: 'Upload profile image',
+      subtext: 'Add a photo to personalize your profile',
+    },
+    username: {
+      heading: 'Choose username',
+      subtext: 'Pick a unique username for your account',
+    },
+    plans: {
+      heading: 'Select a plan',
+      subtext: 'Choose the plan that works best for you',
+    },
+    // Dynamic plan substeps - format: plans_<stepNumber>_<stepName>
+    'plans_1_Customer account': {
+      heading: 'Step 1: Customer account',
+      subtext: 'Set up your billing account to continue',
+    },
+    'plans_2_Select a plan': {
+      heading: 'Step 2: Select a plan',
+      subtext: 'Choose the plan that works best for you',
+    },
+    'plans_3_Agree and continue': {
+      heading: 'Step 3: Agree and continue',
+      subtext: 'Review payment details and agree to terms',
+    },
+    name: {
+      heading: 'Your name',
+      subtext: 'Tell us how you\'d like to be addressed',
+    },
+    bio: {
+      heading: 'Bio',
+      subtext: 'Share a bit about yourself',
+    },
+    traits: {
+      heading: 'Traits',
+      subtext: 'Select traits that describe you',
+    },
+    owns_business: {
+      heading: 'Business ownership',
+      subtext: 'Do you own a business?',
+    },
+    contact: {
+      heading: 'Contact information',
+      subtext: 'How can others reach you?',
+    },
+    maps: {
+      heading: 'Live Map vs. Custom Maps',
+      subtext: 'Learn about the different map types',
+    },
+    location: {
+      heading: 'Location',
+      subtext: 'Where are you located?',
+    },
+    review: {
+      heading: 'Review your account',
+      subtext: 'Review and confirm your information',
+    },
+  };
+
+  const instructions = currentStepName ? stepInstructions[currentStepName] : null;
+
+  useEffect(() => {
+    // Run auth checks during loading screen
+    const checkAccountAndRedirect = async () => {
+      // Wait for account to be available
+      if (!initialAccount) {
+        // If no account, wait a bit and check again
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 1200);
+        return;
+      }
+
+      // Use service to determine if billing is incomplete and get redirect URL
+      if (!hasCheckedRedirect && initialAccount) {
+        const onboardingState = determineOnboardingStep(initialAccount);
+        
+        // If service determines we need to redirect to plans step
+        if (onboardingState.redirectUrl && onboardingState.currentStep === 'plans') {
+          const urlStep = searchParams.get('step');
+          const urlSubstep = searchParams.get('substep');
+          const isAlreadyOnTargetStep = urlStep === 'plans' && urlSubstep === String(onboardingState.plansSubStep);
+          
+          if (!isAlreadyOnTargetStep) {
+            // Only redirect if not already there to prevent loops
+            setHasCheckedRedirect(true);
+            router.replace(onboardingState.redirectUrl);
+            return; // Don't hide loading yet, let redirect happen
+          }
+        }
+      }
+
+      // Show loading state for at least 800ms to ensure checks complete
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+        setHasCheckedRedirect(true);
+      }, 800);
+
+      return () => clearTimeout(timer);
+    };
+
+    checkAccountAndRedirect();
+  }, [initialAccount, hasCheckedRedirect, router, searchParams]);
+
+  return (
+    <div className="fixed inset-0 w-screen h-screen bg-black z-50 overflow-hidden flex flex-col">
+      {isLoading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-neutral-400">Getting everything ready..</p>
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center w-full">
+          {/* Stepper Container */}
+          {stepperState && (
+            <div className="w-full max-w-[500px] bg-transparent relative">
+              <div className="flex-shrink-0 px-4 py-3">
+                <div className="h-5" />
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: stepperState.totalSteps }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 h-1 rounded-full transition-all ${
+                        i <= stepperState.currentStep ? 'bg-white' : 'bg-neutral-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+                
+                {/* Heading and Subtext - Floating absolute below stepper */}
+                {instructions && (
+                  <div className="absolute top-full left-0 w-full mt-4 px-4">
+                    <h2 className="text-sm font-semibold text-white text-center mb-1">
+                      {instructions.heading}
+                    </h2>
+                    <p className="text-xs text-neutral-400 text-center">
+                      {instructions.subtext}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Content Container */}
+          <div className={`flex-1 w-full max-w-[500px] overflow-y-auto scrollbar-hide ${stepperState && instructions ? 'pt-20' : ''}`}>
+            <OnboardingClient 
+              initialAccount={initialAccount}
+              redirectTo={redirectTo}
+              onStepperChange={handleStepperChange}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

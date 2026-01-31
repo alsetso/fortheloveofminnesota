@@ -20,8 +20,8 @@ export async function GET(request: NextRequest) {
         // Type assertion needed: Supabase TypeScript types only support 'public' schema,
         // but we need to query from 'civic' schema. The schema() method exists at runtime.
         const { data, error } = await (supabase as any)
-          .schema('civic')
-          .from('state_boundary')
+          .schema('layers')
+          .from('state')
           .select('id, name, description, publisher, source_date, geometry')
           .single();
         

@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Import congressional district GeoJSON files into civic.congressional_districts table
+ * Import congressional district GeoJSON files into layers.districts table
  * 
  * Usage: 
  *   npx tsx scripts/import-congressional-districts.ts
@@ -95,7 +95,8 @@ async function importDistricts() {
       // Check if district already exists
       // Access via public view (see migration 355)
       const { data: existing } = await supabase
-        .from('congressional_districts')
+        .schema('layers')
+        .from('districts')
         .select('id, district_number')
         .eq('district_number', districtNum)
         .single();
@@ -103,7 +104,8 @@ async function importDistricts() {
       if (existing) {
         console.log(`  ↻ Updating existing district ${districtNum}...`);
         const { error } = await supabase
-          .from('congressional_districts')
+          .schema('layers')
+          .from('districts')
           .update(insertData)
           .eq('district_number', districtNum);
 
@@ -115,7 +117,8 @@ async function importDistricts() {
       } else {
         console.log(`  ➕ Inserting new district ${districtNum}...`);
         const { error } = await supabase
-          .from('congressional_districts')
+          .schema('layers')
+          .from('districts')
           .insert(insertData);
 
         if (error) {
@@ -148,7 +151,8 @@ async function importDistricts() {
   
   // Verify all districts were imported
   const { data: districts, error } = await supabase
-    .from('congressional_districts')
+    .schema('layers')
+    .from('districts')
     .select('district_number, name')
     .order('district_number');
 

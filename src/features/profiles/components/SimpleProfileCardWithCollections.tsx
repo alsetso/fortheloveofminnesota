@@ -177,7 +177,7 @@ export default function SimpleProfileCardWithCollections({
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[45] bg-black/20 transition-opacity duration-300"
+          className="absolute inset-0 z-[45] bg-black/20 transition-opacity duration-300"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -185,12 +185,12 @@ export default function SimpleProfileCardWithCollections({
       {/* iOS Style Bottom Sheet */}
       <div
         ref={sheetRef}
-        className="fixed z-[50] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col
+        className="absolute z-[50] bg-white shadow-2xl transition-all duration-300 ease-out flex flex-col
           bottom-0 left-0 right-0
           rounded-t-3xl"
         style={{
           transform: 'translateY(calc(100% - 3rem))',
-          maxHeight: '90vh',
+          maxHeight: '90%',
           paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
@@ -357,14 +357,16 @@ export default function SimpleProfileCardWithCollections({
                 }`}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <button
-                    onClick={() => onCollectionSelect(collection.id)}
-                    className="flex-1 text-left flex items-center gap-1.5 min-w-0"
-                  >
-                    <span className="text-xs flex-shrink-0">{collection.emoji}</span>
-                    <span className={`text-xs truncate ${isSelected ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
-                      {collection.title}
-                    </span>
+                  <div className="flex-1 flex items-center gap-1.5 min-w-0">
+                    <button
+                      onClick={() => onCollectionSelect(collection.id)}
+                      className="flex-1 text-left flex items-center gap-1.5 min-w-0"
+                    >
+                      <span className="text-xs flex-shrink-0">{collection.emoji}</span>
+                      <span className={`text-xs truncate ${isSelected ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
+                        {collection.title}
+                      </span>
+                    </button>
                     {isOwnProfile && (
                       <button
                         onClick={(e) => {
@@ -373,13 +375,13 @@ export default function SimpleProfileCardWithCollections({
                           setEditCollectionTitle(collection.title);
                           setEditCollectionEmoji(collection.emoji);
                         }}
-                        className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors flex-shrink-0 ml-0.5"
+                        className="p-0.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                         title="Edit"
                       >
                         <PencilIcon className="w-3 h-3" />
                       </button>
                     )}
-                  </button>
+                  </div>
                   <span className="text-[10px] text-gray-500 flex-shrink-0 ml-auto">{count}</span>
                 </div>
               </div>

@@ -34,6 +34,7 @@ import { TRAIT_OPTIONS } from '@/types/profile';
 import MenuAccountSettingsForm from '@/features/settings/components/MenuAccountSettingsForm';
 import type { ProfileAccount } from '@/types/profile';
 import { getLiveLayerLabel, type LiveBoundaryLayerId } from '@/features/map/config';
+import AccountAnalytics from '@/components/analytics/AccountAnalytics';
 
 export type AppMenuSubPage = 'profile' | 'settings' | 'invite-friends' | 'plans' | 'plan-detail' | 'billing' | 'time-filter' | 'layers' | 'pin-display' | 'my-pins';
 
@@ -1069,6 +1070,13 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [liveMapInfo, setLiveMapInfo] = useState<LiveMapInfo>(DEFAULT_LIVE_MAP_INFO);
   const [liveMapLoading, setLiveMapLoading] = useState(false);
+  const [accountAnalytics, setAccountAnalytics] = useState<{
+    liveMentions: number;
+    profileViews: number;
+    totalPinViews: number;
+    totalMentionViews: number;
+  } | null>(null);
+  const [accountAnalyticsLoading, setAccountAnalyticsLoading] = useState(false);
 
   const fetchMetrics = useCallback(async (accountId: string) => {
     setMetricsLoading(true);
@@ -1117,6 +1125,23 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
       setMetricsLoading(false);
     }
   }, [account?.view_count]);
+
+  const fetchAccountAnalytics = useCallback(async (accountId: string) => {
+    setAccountAnalyticsLoading(true);
+    try {
+      const response = await fetch('/api/analytics/account', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAccountAnalytics(data);
+      }
+    } catch (error) {
+      console.error('Error fetching account analytics:', error);
+    } finally {
+      setAccountAnalyticsLoading(false);
+    }
+  }, []);
 
   const fetchLiveMapInfo = useCallback(async () => {
     setLiveMapLoading(true);
@@ -1168,14 +1193,16 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
         fetchMetrics(account.id);
       }
       fetchLiveMapInfo();
+      fetchAccountAnalytics(account.id);
     } else if (!open) {
       setSubPage(null);
       setSelectedPlan(null);
       setMetrics(DEFAULT_METRICS);
       setLiveMapInfo(DEFAULT_LIVE_MAP_INFO);
+      setAccountAnalytics(null);
       setMyPinsList([]);
     }
-  }, [open, account?.id, account?.view_count, account?.role, fetchMetrics, fetchLiveMapInfo]);
+  }, [open, account?.id, account?.view_count, account?.role, fetchMetrics, fetchLiveMapInfo, fetchAccountAnalytics]);
 
   // Fetch account's pins for My Pins sub-page (live map only)
   useEffect(() => {
@@ -1319,19 +1346,24 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
                 </button>
                 {metricsExpanded && (
                   <div className="px-3 pb-3 pt-0">
-                    <div className="grid grid-cols-3 gap-2">
-                      <MetricCard label="Maps" value={metrics.maps} icon={MapIcon} />
-                      <MetricCard label="Mentions" value={metrics.mentions} icon={MapPinIcon} />
-                      <MetricCard label="Profile views" value={metrics.profileViews} icon={EyeIcon} />
-                      <MetricCard label="Posts" value={metrics.posts} icon={DocumentTextIcon} />
-                      <MetricCard label="Collections" value={metrics.collections} icon={FolderIcon} />
-                      <MetricCard label="Map views" value={metrics.mapViews} icon={MapIcon} />
-                      <MetricCard label="Likes" value={metrics.likes} icon={HeartIcon} />
-                      <MetricCard label="Members" value={metrics.members} icon={UserGroupIcon} />
-                      <MetricCard label="Shared" value={metrics.shared} icon={ShareIcon} />
-                    </div>
-                    {metricsLoading && (
-                      <p className="mt-1.5 text-[10px] text-gray-500">Updating…</p>
+                    {accountAnalytics ? (
+                      <AccountAnalytics
+                        liveMentions={accountAnalytics.liveMentions}
+                        profileViews={accountAnalytics.profileViews}
+                        totalPinViews={accountAnalytics.totalPinViews}
+                        totalMentionViews={accountAnalytics.totalMentionViews}
+                        loading={accountAnalyticsLoading}
+                        isAdmin={account?.role === 'admin'}
+                      />
+                    ) : (
+                      <AccountAnalytics
+                        liveMentions={0}
+                        profileViews={0}
+                        totalPinViews={0}
+                        totalMentionViews={0}
+                        loading={true}
+                        isAdmin={account?.role === 'admin'}
+                      />
                     )}
                   </div>
                 )}

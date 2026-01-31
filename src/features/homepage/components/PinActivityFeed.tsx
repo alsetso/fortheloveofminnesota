@@ -65,9 +65,11 @@ interface PinActivityFeedProps {
   showWhatYouCanPost?: boolean;
   /** When false, hide "Personal Collections" section (e.g. on homepage). Default true. */
   showPersonalCollections?: boolean;
+  /** When false, hide "Map Pins" section. Default true. */
+  showMapPins?: boolean;
 }
 
-export default function PinActivityFeed({ maps, activity, loading, showWhatYouCanPost = true, showPersonalCollections = true }: PinActivityFeedProps) {
+export default function PinActivityFeed({ maps, activity, loading, showWhatYouCanPost = true, showPersonalCollections = true, showMapPins = true }: PinActivityFeedProps) {
   const { account } = useAuthStateSafe();
   const isAdmin = account?.role === 'admin';
   const { success, error: showError } = useToast();
@@ -313,20 +315,22 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
         )}
 
       {/* Map pins list */}
-      <div className="space-y-2">
-        <SectionHeaderWithAdd title="Map Pins" addHref="/contribute" />
-        {activity.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-            <p className="text-xs text-gray-500">No pin activity yet on your maps.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {activity.map((item) => (
-              <PinActivityItem key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </div>
+      {showMapPins && (
+        <div className="space-y-2">
+          <SectionHeaderWithAdd title="Map Pins" addHref="/contribute" />
+          {activity.length === 0 ? (
+            <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+              <p className="text-xs text-gray-500">No pin activity yet on your maps.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activity.map((item) => (
+                <PinActivityItem key={item.id} item={item} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

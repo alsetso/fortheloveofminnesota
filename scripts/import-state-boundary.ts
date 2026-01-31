@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Import state boundary from GeoPackage into civic.state_boundary table
+ * Import state boundary from GeoPackage into layers.state table
  * 
  * Usage: 
  *   npx tsx scripts/import-state-boundary.ts
@@ -133,8 +133,8 @@ async function importStateBoundary() {
     // Clear existing data
     console.log('\n🗑️  Clearing existing state boundary...');
     const { error: deleteError } = await supabase
-      .schema('civic')
-      .from('state_boundary')
+      .schema('layers')
+      .from('state')
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
@@ -155,8 +155,8 @@ async function importStateBoundary() {
 
     console.log('\n➕ Inserting state boundary...');
     const { error: insertError } = await supabase
-      .schema('civic')
-      .from('state_boundary')
+      .schema('layers')
+      .from('state')
       .insert(insertData);
 
     if (insertError) {

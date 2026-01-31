@@ -18,6 +18,7 @@ export default function MentionTypeCards({ isAdmin = false }: MentionTypeCardsPr
   const [loading, setLoading] = useState(true);
   const [editingType, setEditingType] = useState<MentionType | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [activeOpen, setActiveOpen] = useState(false); // Start closed for admin accordions
   const [inactiveOpen, setInactiveOpen] = useState(false);
 
   const fetchMentionTypes = useCallback(async () => {
@@ -185,10 +186,33 @@ export default function MentionTypeCards({ isAdmin = false }: MentionTypeCardsPr
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">What you can post</p>
-      <div className="grid grid-cols-2 gap-2">
-        {activeTypes.map(renderCard)}
+      <div className="flex items-center gap-2">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">What you can post</p>
+        <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide bg-gray-100 px-1.5 py-0.5 rounded">Admin</span>
       </div>
+      {/* Active Types Accordion */}
+      {activeTypes.length > 0 && (
+        <div className="border border-gray-200 rounded-md bg-gray-50 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setActiveOpen((o) => !o)}
+            className="w-full flex items-center justify-between gap-2 p-[10px] text-left hover:bg-gray-100 transition-colors"
+            aria-expanded={activeOpen}
+          >
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Active</span>
+            <span className="text-xs text-gray-500">{activeTypes.length}</span>
+            <ChevronDownIcon
+              className={`w-4 h-4 text-gray-500 flex-shrink-0 transition-transform ${activeOpen ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
+          </button>
+          {activeOpen && (
+            <div className="border-t border-gray-200 p-[10px] grid grid-cols-2 gap-2">
+              {activeTypes.map(renderCard)}
+            </div>
+          )}
+        </div>
+      )}
       {isAdmin && inactiveTypes.length > 0 && (
         <div className="border border-gray-200 rounded-md bg-gray-50 overflow-hidden">
           <button

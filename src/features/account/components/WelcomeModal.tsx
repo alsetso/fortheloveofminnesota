@@ -126,7 +126,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   }, [showGettingStarted, isOpen]);
 
-  // Close modal when user is authenticated
+  // Close modal when user is authenticated and update last account info
   useEffect(() => {
     if (!authLoading && user && isOpen) {
       // Small delay to show success state
@@ -139,6 +139,23 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       }
     }
   }, [authLoading, user, isOpen, handleClose, authState]);
+
+  // Update last account info when account loads (after successful sign-in)
+  const { account } = useAuthStateSafe();
+  useEffect(() => {
+    if (account && typeof window !== 'undefined') {
+      // Update last account info to match the current account
+      // This ensures email and username/image stay in sync
+      if (account.username) {
+        localStorage.setItem(LAST_ACCOUNT_USERNAME_KEY, account.username);
+        setLastAccountUsername(account.username);
+      }
+      if (account.image_url) {
+        localStorage.setItem(LAST_ACCOUNT_IMAGE_KEY, account.image_url);
+        setLastAccountImage(account.image_url);
+      }
+    }
+  }, [account]);
 
   const handleEmailChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -313,6 +330,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setMessage('Verification successful');
       setMessageType('success');
       cleanAuthParams(router);
+      router.refresh();
       // Auto-close handled by useEffect
     } catch (error: unknown) {
       setAuthState('code-sent');

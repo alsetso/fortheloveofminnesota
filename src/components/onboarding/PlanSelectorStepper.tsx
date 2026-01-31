@@ -153,7 +153,31 @@ export default function PlanSelectorStepper({
     }
   };
 
-  // Show confetti when both payment success and terms agreed
+  // Show confetti immediately when returning from Stripe checkout success
+  useEffect(() => {
+    if (checkoutSuccess) {
+      // Trigger confetti animation immediately on checkout success
+      setTimeout(() => {
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+        });
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6, x: 0.3 },
+        });
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6, x: 0.7 },
+        });
+      }, 300);
+    }
+  }, [checkoutSuccess]);
+
+  // Show confetti again when both payment success and terms agreed (for continue button)
   useEffect(() => {
     if (checkoutSuccess && termsAgreed && !showConfetti) {
       setShowConfetti(true);

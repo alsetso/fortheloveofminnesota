@@ -90,10 +90,12 @@ export default function PlanSelectorStepper({
   const [showConfetti, setShowConfetti] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Helper to update URL when substep changes
+  // Helper to update URL when substep changes - preserves existing query params
   const updateSubStepUrl = (substep: 1 | 2 | 3 | 4) => {
-    const newUrl = `/onboarding?step=plans&substep=${substep}`;
-    router.replace(newUrl, { scroll: false });
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('step', 'plans');
+    currentUrl.searchParams.set('substep', substep.toString());
+    router.replace(currentUrl.pathname + currentUrl.search, { scroll: false });
   };
 
   // Check for checkout return status in URL params

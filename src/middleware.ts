@@ -130,6 +130,13 @@ function matchesProtectedRoute(pathname: string): {
 }
 
 export async function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+  
+  // Skip middleware for Stripe webhook - it needs raw body and no redirects
+  if (pathname === '/api/stripe/webhook') {
+    return NextResponse.next();
+  }
+  
   const response = NextResponse.next({
     request: {
       headers: req.headers,
@@ -177,8 +184,6 @@ export async function middleware(req: NextRequest) {
     "frame-ancestors 'none'",
   ].join('; ');
   response.headers.set('Content-Security-Policy', csp);
-
-  const pathname = req.nextUrl.pathname;
 
   // Redirect deprecated routes to /live
   if (pathname === '/maps' || pathname === '/plan' || pathname === '/plans' || pathname === '/billing') {

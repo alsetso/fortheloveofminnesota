@@ -272,6 +272,45 @@ export async function middleware(req: NextRequest) {
   // This helps keep sessions alive across requests
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+  // ALLOWED ROUTES FOR NON-AUTHENTICATED USERS
+  // Homepage, mention detail pages, and profile pages are accessible without auth
+  const isAllowedRouteForAnonymous = (() => {
+    // Homepage is always allowed
+    if (pathname === '/') return true;
+    
+    // Mention detail pages are allowed
+    if (pathname.startsWith('/mention/')) {
+      const mentionId = pathname.split('/mention/')[1]?.split('/')[0];
+      if (mentionId && mentionId.length > 0) {
+        return true;
+      }
+    }
+    
+    // Profile pages (username routes) are allowed
+    // Check if pathname matches pattern: /[username] (single segment, not starting with known routes)
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length === 1) {
+      const firstSegment = segments[0];
+      // Exclude known routes that aren't usernames
+      const excludedRoutes = [
+        'live', 'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
+        'billing', 'admin', 'login', 'signup', 'onboarding', 'contribute',
+        'contact', 'privacy', 'terms', 'download', 'api', '_next', 'favicon.ico'
+      ];
+      if (!excludedRoutes.includes(firstSegment.toLowerCase())) {
+        return true;
+      }
+    }
+    
+    return false;
+  })();
+
+  // REDIRECT NON-AUTHENTICATED USERS TO HOMEPAGE
+  // Only allow homepage, mention pages, and profile pages for logged-out users
+  if (!user && !isAllowedRouteForAnonymous) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
   // ONBOARDING CHECK: First priority for authenticated users
   // Check onboarding status before any other checks
   // Allow /onboarding route to be accessible (prevents redirect loops)

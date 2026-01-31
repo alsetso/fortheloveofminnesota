@@ -13,6 +13,7 @@ export interface BillingPlan {
   description: string | null;
   stripe_price_id_monthly: string | null;
   stripe_price_id_yearly: string | null;
+  is_admin_only?: boolean | null;
   created_at: string;
   updated_at: string;
 }

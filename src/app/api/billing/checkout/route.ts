@@ -201,8 +201,8 @@ export async function POST(request: NextRequest) {
     const successUrl = `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}checkout=success`;
     const cancelUrl = `${baseUrl}${returnUrl}${returnUrl.includes('?') ? '&' : '?'}checkout=canceled`;
 
-    // 7-day free trial for Contributor plan
-    const trialPeriodDays = planSlug === 'contributor' ? 7 : undefined;
+    // 7-day free trial for Contributor and Testing plans
+    const trialPeriodDays = (planSlug === 'contributor' || planSlug === 'testing') ? 7 : undefined;
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         accountId: account.id,
         userId: user.id,
+        planSlug: planSlug, // Store plan slug for reference
       },
     });
 

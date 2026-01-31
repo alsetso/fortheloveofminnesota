@@ -21,11 +21,35 @@ export async function GET(request: NextRequest) {
       try {
         const supabase = await createServerClientWithAuth(cookies());
         
-        // Fetch all active plans
-        const { data: plans, error: plansError } = await supabase
+        // Check if user is admin
+        let isAdmin = false;
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: account } = await supabase
+              .from('accounts')
+              .select('role')
+              .eq('user_id', user.id)
+              .limit(1)
+              .maybeSingle();
+            isAdmin = (account as { role: string } | null)?.role === 'admin';
+          }
+        } catch {
+          // Not authenticated or error - not admin
+        }
+        
+        // Fetch all active plans, filter admin-only plans for non-admins
+        let plansQuery = supabase
           .from('billing_plans')
           .select('*')
-          .eq('is_active', true)
+          .eq('is_active', true);
+        
+        // Hide admin-only plans from non-admins
+        if (!isAdmin) {
+          plansQuery = plansQuery.or('is_admin_only.is.null,is_admin_only.eq.false');
+        }
+        
+        const { data: plans, error: plansError } = await plansQuery
           .order('display_order', { ascending: true })
           .returns<BillingPlan[]>();
         

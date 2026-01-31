@@ -289,7 +289,23 @@ export async function syncStripeData(customerId: string): Promise<void> {
     paused: 'paused',
   };
 
-  const plan = 'contributor'; // If they have a subscription, they're on contributor plan
+  // Map price_id to plan slug using billing.plans table
+  let planSlug: string | null = null;
+  if (priceId) {
+    const { data, error: planError } = await supabase
+      .rpc('get_plan_slug_from_price_id', { p_price_id: priceId });
+    
+    if (planError) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`Failed to lookup plan for price_id ${priceId}:`, planError);
+      }
+    } else {
+      planSlug = data || null;
+    }
+  }
+  
+  // Fallback to 'hobby' if no plan found (shouldn't happen for valid subscriptions)
+  const plan = planSlug || 'hobby';
   const billingMode = subscription.status === 'trialing' ? 'trial' : 'standard';
   const subscriptionStatus = statusMap[subscription.status] || subscription.status;
 

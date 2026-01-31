@@ -35,16 +35,27 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
   useEffect(() => {
     if (isOnboarded) return;
 
+    let allowNavigation = false;
+
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (allowNavigation) {
+        return; // Allow navigation
+      }
       e.preventDefault();
       e.returnValue = '';
       return '';
     };
 
+    const handleIntentionalNavigation = () => {
+      allowNavigation = true;
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('intentional-navigation', handleIntentionalNavigation);
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('intentional-navigation', handleIntentionalNavigation);
     };
   }, [isOnboarded]);
 

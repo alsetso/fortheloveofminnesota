@@ -23,17 +23,9 @@ export default function Home() {
   // Also require authAccount to exist (not just user) to be fully authenticated
   const isAuthenticated = authIsAuthenticated && !!authAccount;
 
-  // Check if user is on hobby plan (no active subscription)
-  const isOnHobbyPlan = authAccount 
-    ? (authAccount.plan === 'hobby' || 
-       (!authAccount.plan || 
-        (authAccount.subscription_status !== 'active' && 
-         authAccount.subscription_status !== 'trialing')))
-    : false;
-
-  // Show banner for anonymous users OR authenticated users on hobby plan
-  // Default to showing banner if we're not sure (loading) or not authenticated
-  if (isLoading || !isAuthenticated || isOnHobbyPlan) {
+  // Show promotional banner only for non-authenticated users
+  // Authenticated users (even on hobby plan) see the full homepage
+  if (isLoading || !isAuthenticated) {
     return <PromotionalBanner isOpen={true} />;
   }
 

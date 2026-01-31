@@ -85,7 +85,6 @@ export default function PlanSelectorStepper({
   const [processing, setProcessing] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState<string>('');
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
-  const [checkoutCanceled, setCheckoutCanceled] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
@@ -100,22 +99,16 @@ export default function PlanSelectorStepper({
     const checkoutStatus = searchParams.get('checkout');
     if (checkoutStatus === 'success') {
       setCheckoutSuccess(true);
-      setCheckoutCanceled(false);
       // Clean up URL param
       const newUrl = window.location.pathname + window.location.search.replace(/[?&]checkout=success/, '').replace(/[?&]checkout=canceled/, '');
       window.history.replaceState({}, '', newUrl);
-      // Refresh account to get updated subscription status
-      if (refreshAccount) {
-        refreshAccount();
-      }
     } else if (checkoutStatus === 'canceled') {
-      setCheckoutCanceled(true);
       setCheckoutSuccess(false);
       // Clean up URL param
       const newUrl = window.location.pathname + window.location.search.replace(/[?&]checkout=canceled/, '').replace(/[?&]checkout=success/, '');
       window.history.replaceState({}, '', newUrl);
     }
-  }, [searchParams, refreshAccount]);
+  }, [searchParams]);
 
   // Handle checkout button click
   const handleCheckout = async () => {
@@ -145,6 +138,8 @@ export default function PlanSelectorStepper({
 
       const { url } = await response.json();
       if (url) {
+        // Signal intentional navigation to prevent browser warning
+        window.dispatchEvent(new Event('intentional-navigation'));
         // Redirect to Stripe Checkout
         window.location.href = url;
       } else {
@@ -407,6 +402,8 @@ export default function PlanSelectorStepper({
                         : `$${(plan.price_monthly_cents / 100).toFixed(0)}/mo`;
                     const directFeatures = plan.features.filter((f) => !f.isInherited);
                     const isContributor = plan.slug?.toLowerCase() === 'contributor';
+                    const isTesting = plan.slug?.toLowerCase() === 'testing';
+                    const hasTrial = isContributor || isTesting; // Both have 7-day free trial
                     const isSelected = selectedPlanSlug === plan.slug?.toLowerCase();
                     
                     return (
@@ -426,12 +423,22 @@ export default function PlanSelectorStepper({
                         )}
                         <div className="flex items-start justify-between mb-1.5">
                           <h3 className="text-xs font-bold text-white leading-tight">{plan.name}</h3>
+                          {isTesting && (
+                            <span className="px-1.5 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded text-[9px] font-bold text-yellow-400">
+                              TEST
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs font-semibold text-neutral-100 mb-2">{priceDisplay}</p>
-                        {isContributor && (
+                        {hasTrial && (
                           <div className="rounded-md border border-neutral-700/50 p-2 bg-neutral-800/70 flex items-center justify-between gap-1.5 mb-2 backdrop-blur-sm">
                             <span className="text-[10px] font-bold text-white">7 Day Free Trial</span>
                             <span className="text-[10px] font-medium text-neutral-300">Due today $0</span>
+                          </div>
+                        )}
+                        {isTesting && (
+                          <div className="rounded-md border border-yellow-500/50 p-2 bg-yellow-500/10 flex items-center gap-1.5 mb-2 backdrop-blur-sm">
+                            <span className="text-[10px] font-bold text-yellow-400">Admin Testing Plan</span>
                           </div>
                         )}
                         {plan.description && (
@@ -671,11 +678,6 @@ export default function PlanSelectorStepper({
           }
         }
 
-        // Refresh account to get updated plan
-        if (refreshAccount) {
-          await refreshAccount();
-        }
-
         setCurrentSubStep(4);
       } catch (err) {
         setSubscriptionError(err instanceof Error ? err.message : 'Failed to process payment');
@@ -765,19 +767,9 @@ export default function PlanSelectorStepper({
           </div>
         )}
 
-        {/* Checkout Canceled Message */}
-        {checkoutCanceled && (
-          <div className="mb-4 px-4 py-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 flex items-start gap-2.5">
-            <ExclamationCircleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold">Checkout canceled</div>
-              <div className="text-[10px] mt-0.5">You can try again or continue with a different plan.</div>
-            </div>
-          </div>
-        )}
-
-        {/* Checkout Button for Contributor Plan */}
-        {!isFreePlan && !checkoutSuccess && selectedPlanSlug === 'contributor' && (
+        {/* Checkout Button for Contributor Plan and Testing Plan */}
+        {/* Show button if: not free plan, checkout not successful, and (plan is contributor/testing OR subscription is canceled) */}
+        {!isFreePlan && !checkoutSuccess && ((selectedPlanSlug === 'contributor' || selectedPlanSlug === 'testing') || account?.subscription_status === 'canceled') && (
           <div className="space-y-2.5 mb-4">
             <button
               type="button"
@@ -853,16 +845,8 @@ export default function PlanSelectorStepper({
                   setCurrentSubStep(4);
                   updateSubStepUrl(4);
                 } else if (checkoutSuccess && termsAgreed) {
-                  // Refresh account to ensure subscription is synced
-                  if (refreshAccount) {
-                    refreshAccount().then(() => {
-                      setCurrentSubStep(4);
-                      updateSubStepUrl(4);
-                    });
-                  } else {
-                    setCurrentSubStep(4);
-                    updateSubStepUrl(4);
-                  }
+                  setCurrentSubStep(4);
+                  updateSubStepUrl(4);
                 }
               }}
               disabled={!termsAgreed || (checkoutSuccess && !termsAgreed)}
@@ -873,8 +857,8 @@ export default function PlanSelectorStepper({
           </div>
         )}
 
-        {/* Legacy payment form button - only for non-Contributor paid plans */}
-        {!isFreePlan && !checkoutSuccess && selectedPlanSlug !== 'contributor' && (
+        {/* Legacy payment form button - only for non-Contributor and non-Testing paid plans */}
+        {!isFreePlan && !checkoutSuccess && selectedPlanSlug !== 'contributor' && selectedPlanSlug !== 'testing' && (
           <div className="space-y-2.5 pt-1">
             {!termsAgreed && (
               <p className="text-xs text-red-400 text-center font-medium">

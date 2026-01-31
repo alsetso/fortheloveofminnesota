@@ -5,7 +5,6 @@ import MapSearchInput from '@/components/layout/MapSearchInput';
 import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import ContributePageContent from './ContributePageContent';
-import ProtectedRouteGuard from '@/components/auth/ProtectedRouteGuard';
 
 interface ContributePageClientProps {
   mapId: string;
@@ -16,8 +15,7 @@ export default function ContributePageClient({ mapId, mapSlug }: ContributePageC
   const { openWelcome } = useAppModalContextSafe();
 
   return (
-    <ProtectedRouteGuard>
-      <PageWrapper
+    <PageWrapper
       headerContent={null}
       searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
       accountDropdownProps={{
@@ -28,6 +26,5 @@ export default function ContributePageClient({ mapId, mapSlug }: ContributePageC
     >
         <ContributePageContent mapId={mapId} mapSlug={mapSlug} />
       </PageWrapper>
-    </ProtectedRouteGuard>
   );
 }

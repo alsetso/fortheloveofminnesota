@@ -6,6 +6,28 @@ import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiErro
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 
 /**
+ * Get plan slug from Stripe price ID by querying billing.plans table
+ */
+async function getPlanSlugFromPriceId(priceId: string | null): Promise<string | null> {
+  if (!priceId) return null;
+  
+  const supabase = createServiceClient() as any;
+  
+  // Query billing.plans to find plan with matching price_id
+  const { data, error } = await supabase
+    .rpc('get_plan_slug_from_price_id', { p_price_id: priceId });
+  
+  if (error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`Failed to lookup plan for price_id ${priceId}:`, error);
+    }
+    return null;
+  }
+  
+  return data || null;
+}
+
+/**
  * Update accounts table with subscription data
  */
 async function updateAccountFromSubscription(
@@ -27,7 +49,16 @@ async function updateAccountFromSubscription(
   };
 
   if (!subscription) {
-    // No subscription - set to inactive
+    // No subscription - delete subscription record and set account to inactive
+    const { error: deleteSubError } = await supabase
+      .from('subscriptions')
+      .delete()
+      .eq('stripe_customer_id', customerId);
+
+    if (deleteSubError && process.env.NODE_ENV === 'development') {
+      console.warn('Failed to delete subscription record:', deleteSubError);
+    }
+
     const { error } = await supabase
       .from('accounts')
       .update({
@@ -45,16 +76,111 @@ async function updateAccountFromSubscription(
     return;
   }
 
-  // Determine plan and billing mode
-  const plan = 'contributor'; // If they have a subscription, they're on contributor plan
+  // Get price_id from subscription (first line item)
+  const priceId = subscription.items.data[0]?.price.id || null;
+  
+  // Validate price_id exists (should always be present for valid subscriptions)
+  if (!priceId) {
+    throw new Error(`Subscription ${subscription.id} has no price_id - invalid subscription data`);
+  }
+  
+  // Map price_id to plan slug using billing.plans table
+  let planSlug: string | null = null;
+  planSlug = await getPlanSlugFromPriceId(priceId);
+  
+  // Fallback to 'hobby' if no plan found (shouldn't happen for valid subscriptions)
+  // This could happen if price_id doesn't match any plan in billing.plans
+  const plan = planSlug || 'hobby';
   const billingMode = subscription.status === 'trialing' ? 'trial' : 'standard';
   const subscriptionStatus = statusMap[subscription.status] || subscription.status;
 
+  // Get payment method details if available
+  let cardBrand: string | null = null;
+  let cardLast4: string | null = null;
+  
+  if (subscription.default_payment_method) {
+    try {
+      const paymentMethod = typeof subscription.default_payment_method === 'string'
+        ? await stripe.paymentMethods.retrieve(subscription.default_payment_method)
+        : subscription.default_payment_method;
+      
+      if (paymentMethod && paymentMethod.type === 'card' && paymentMethod.card) {
+        cardBrand = paymentMethod.card.brand || null;
+        cardLast4 = paymentMethod.card.last4 || null;
+      }
+    } catch (error) {
+      // Payment method retrieval failed - continue without card info
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Failed to retrieve payment method details:', error);
+      }
+    }
+  }
+
+  // Convert Unix timestamps to ISO strings
+  // TypeScript assertion: subscription is non-null at this point due to early return above
+  const sub = subscription as Stripe.Subscription & {
+    current_period_start: number;
+    current_period_end: number;
+  };
+  const currentPeriodStart = new Date(sub.current_period_start * 1000).toISOString();
+  const currentPeriodEnd = new Date(sub.current_period_end * 1000).toISOString();
+  const trialEndDate = sub.trial_end 
+    ? new Date(sub.trial_end * 1000).toISOString() 
+    : null;
+
+  // Upsert subscription data to subscriptions table
+  // Note: price_id is validated above, so it's guaranteed to be non-null here
+  const { error: subscriptionError } = await supabase
+    .from('subscriptions')
+    .upsert(
+      {
+        stripe_customer_id: customerId,
+        subscription_id: sub.id,
+        status: sub.status,
+        price_id: priceId, // Guaranteed non-null after validation above
+        current_period_start: currentPeriodStart,
+        current_period_end: currentPeriodEnd,
+        trial_end_date: trialEndDate,
+        cancel_at_period_end: sub.cancel_at_period_end || false,
+        card_brand: cardBrand,
+        card_last4: cardLast4,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: 'stripe_customer_id',
+      }
+    );
+
+  if (subscriptionError) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Failed to update subscriptions table:', subscriptionError);
+    }
+    // Don't throw - accounts update is more critical
+  }
+
+  // Verify account exists before updating
+  const { data: existingAccount, error: checkError } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (checkError || !existingAccount) {
+    // Account doesn't exist - log warning but don't fail webhook
+    // This could happen if Stripe has a customer we don't know about
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`No account found for Stripe customer ${customerId} - skipping account update`);
+    }
+    // Still update subscriptions table if we have valid subscription data
+    return;
+  }
+
+  // Update accounts table
   const { error } = await supabase
     .from('accounts')
     .update({
       subscription_status: subscriptionStatus,
-      stripe_subscription_id: subscription.id,
+      stripe_subscription_id: sub.id,
       plan: plan,
       billing_mode: billingMode,
       updated_at: new Date().toISOString(),

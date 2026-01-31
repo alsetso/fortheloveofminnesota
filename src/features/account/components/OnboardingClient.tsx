@@ -392,7 +392,7 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
     }
   };
 
-  // Fetch Hobby and Contributor plans for step two
+  // Fetch Hobby and Contributor plans for step two (plus testing plan for admins)
   useEffect(() => {
     if (currentStep !== 'plans') return;
     setOnboardingPlansLoading(true);
@@ -400,14 +400,20 @@ And when you're ready, place your first pin — for the love of Minnesota.`;
       .then((res) => (res.ok ? res.json() : { plans: [] }))
       .then((data: { plans?: PlanWithFeatures[] }) => {
         const plans = data.plans || [];
+        const isAdmin = account?.role === 'admin';
         const hobbyAndContributor = plans.filter(
-          (p) => p.slug?.toLowerCase() === 'hobby' || p.slug?.toLowerCase() === 'contributor'
+          (p) => {
+            const slug = p.slug?.toLowerCase();
+            return slug === 'hobby' || 
+                   slug === 'contributor' || 
+                   (isAdmin && slug === 'testing');
+          }
         );
         setOnboardingPlans(hobbyAndContributor);
       })
       .catch(() => setOnboardingPlans([]))
       .finally(() => setOnboardingPlansLoading(false));
-  }, [currentStep]);
+  }, [currentStep, account?.role]);
 
   // Fuzzy search for cities/townships
   useEffect(() => {

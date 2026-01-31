@@ -55,6 +55,9 @@ export default function BillingAdminClient() {
   const [expandedInheritedPlanId, setExpandedInheritedPlanId] = useState<string | null>(null);
   const [expandedUpgradedPlanId, setExpandedUpgradedPlanId] = useState<string | null>(null);
   const [isUnassignedSidebarVisible, setIsUnassignedSidebarVisible] = useState(true);
+  const [activeTab, setActiveTab] = useState<'plans' | 'subscriptions'>('plans');
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
 
   // Sidebar toggle button for header (must be defined before early returns)
   const sidebarToggleButton = (
@@ -104,6 +107,28 @@ export default function BillingAdminClient() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Fetch subscriptions when tab is active
+  useEffect(() => {
+    if (activeTab === 'subscriptions') {
+      fetchSubscriptions();
+    }
+  }, [activeTab]);
+
+  const fetchSubscriptions = async () => {
+    setSubscriptionsLoading(true);
+    try {
+      const res = await fetch('/api/admin/billing/subscriptions?limit=200');
+      if (res.ok) {
+        const data = await res.json();
+        setSubscriptions(data.subscriptions || []);
+      }
+    } catch (error) {
+      console.error('Error fetching subscriptions:', error);
+    } finally {
+      setSubscriptionsLoading(false);
+    }
+  };
 
   const fetchData = async (options?: { silent?: boolean }) => {
     try {
@@ -747,7 +772,38 @@ export default function BillingAdminClient() {
         searchResultsComponent={<SearchResults />}
       >
         <div className="min-h-screen bg-gray-50 p-[10px]">
-          <div className="flex gap-3 h-[calc(100vh-4rem-20px)]">
+          {/* Tabs */}
+          <div className="mb-3 flex gap-2 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('plans')}
+              className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 ${
+                activeTab === 'plans'
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Plans & Features
+            </button>
+            <button
+              onClick={() => setActiveTab('subscriptions')}
+              className={`px-3 py-2 text-xs font-medium transition-colors border-b-2 ${
+                activeTab === 'subscriptions'
+                  ? 'border-gray-900 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Subscriptions
+            </button>
+          </div>
+
+          {activeTab === 'subscriptions' ? (
+            <SubscriptionsSection 
+              subscriptions={subscriptions} 
+              loading={subscriptionsLoading}
+              onRefresh={fetchSubscriptions}
+            />
+          ) : (
+          <div className="flex gap-3 h-[calc(100vh-4rem-80px)]">
         {/* Left Sidebar - Unassigned Features (Toggleable) */}
         {isUnassignedSidebarVisible && (
         <div className="w-[32rem] flex flex-col">
@@ -1070,6 +1126,7 @@ export default function BillingAdminClient() {
           })}
         </div>
       </div>
+          )}
 
       {/* Edit Feature Limits Modal */}
       {editingLimitsFeature && (
@@ -1113,6 +1170,137 @@ export default function BillingAdminClient() {
     </div>
       </PageWrapper>
     </>
+  );
+}
+
+// Subscriptions Management Section
+function SubscriptionsSection({ 
+  subscriptions, 
+  loading,
+  onRefresh 
+}: { 
+  subscriptions: any[]; 
+  loading: boolean;
+  onRefresh: () => void;
+}) {
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      active: 'bg-green-100 text-green-800',
+      trialing: 'bg-blue-100 text-blue-800',
+      canceled: 'bg-gray-100 text-gray-800',
+      past_due: 'bg-yellow-100 text-yellow-800',
+      unpaid: 'bg-red-100 text-red-800',
+      incomplete: 'bg-orange-100 text-orange-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+        <p className="text-xs text-gray-500 text-center py-8">Loading subscriptions...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-900">
+          Subscriptions ({subscriptions.length})
+        </h2>
+        <button
+          onClick={onRefresh}
+          className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Account</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Plan</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Status</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Trial End</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Period End</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Card</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Cancel At End</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {subscriptions.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
+                    No subscriptions found
+                  </td>
+                </tr>
+              ) : (
+                subscriptions.map((sub: any) => {
+                  const account = sub.accounts;
+                  return (
+                    <tr key={sub.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-gray-900">
+                            {account?.username ? `@${account.username}` : 'N/A'}
+                          </span>
+                          <span className="text-gray-500 text-[10px]">{sub.stripe_customer_id}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-gray-900">{account?.plan || 'N/A'}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(sub.status)}`}>
+                          {sub.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">
+                        {sub.trial_end_date ? formatDate(sub.trial_end_date) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">
+                        {formatDate(sub.current_period_end)}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">
+                        {sub.card_brand && sub.card_last4 
+                          ? `${sub.card_brand.toUpperCase()} •••• ${sub.card_last4}`
+                          : '—'}
+                      </td>
+                      <td className="px-3 py-2">
+                        {sub.cancel_at_period_end ? (
+                          <span className="text-yellow-600 font-medium">Yes</span>
+                        ) : (
+                          <span className="text-gray-400">No</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 text-[10px]">
+                        {formatDate(sub.created_at)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 

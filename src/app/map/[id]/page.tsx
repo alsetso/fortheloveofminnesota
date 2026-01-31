@@ -32,7 +32,6 @@ import MapActionUpgradePrompt from '@/components/maps/MapActionUpgradePrompt';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
 import ViewAsSelector from './components/ViewAsSelector';
 import type { MapData } from '@/types/map';
-import ProtectedRouteGuard from '@/components/auth/ProtectedRouteGuard';
 
 // Lazy load ContributeOverlay - only needed when #contribute hash is present
 const ContributeOverlay = lazy(() => import('./components/ContributeOverlay'));
@@ -861,8 +860,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
       {skipPageWrapper ? (
         mainContent
       ) : (
-        <ProtectedRouteGuard>
-          <PageWrapper
+        <PageWrapper
           mapSettings={mapData?.settings ? {
             ...mapData.settings,
             colors: {
@@ -923,7 +921,6 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
         >
             {mainContent}
           </PageWrapper>
-        </ProtectedRouteGuard>
       )}
 
       {/* Success Modal */}

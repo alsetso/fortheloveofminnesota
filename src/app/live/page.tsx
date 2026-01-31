@@ -19,7 +19,6 @@ import MapPage from '../map/[id]/page';
 import { generateUUID } from '@/lib/utils/uuid';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SignInGate from '@/components/auth/SignInGate';
-import ProtectedRouteGuard from '@/components/auth/ProtectedRouteGuard';
 
 function LiveHeaderThemeSync({ children }: { children: ReactNode }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -513,8 +512,7 @@ export default function LivePage() {
   const { openWelcome } = useAppModalContextSafe();
 
   return (
-    <ProtectedRouteGuard>
-      <LiveHeaderThemeSync>
+    <LiveHeaderThemeSync>
       <AppContainer>
         <MapPage
         params={Promise.resolve({ id: 'live' })}
@@ -552,6 +550,5 @@ export default function LivePage() {
       />
       </AppContainer>
       </LiveHeaderThemeSync>
-    </ProtectedRouteGuard>
   );
 }

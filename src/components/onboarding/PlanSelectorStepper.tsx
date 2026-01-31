@@ -7,6 +7,7 @@ import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outl
 import confetti from 'canvas-confetti';
 import Image from 'next/image';
 import type { Account } from '@/features/auth';
+import { useAuthStateSafe } from '@/features/auth';
 
 type PlanWithFeatures = {
   id: string;
@@ -65,6 +66,7 @@ export default function PlanSelectorStepper({
   refreshAccount,
   onSubStepChange,
 }: PlanSelectorStepperProps) {
+  const { signOut } = useAuthStateSafe();
   const router = useRouter();
   const searchParams = useSearchParams();
   const stripe = useStripe();
@@ -205,18 +207,38 @@ export default function PlanSelectorStepper({
   const renderAccountHeader = () => {
     if (!account?.image_url || !account?.username) return null;
     
+    const handleSignOut = async () => {
+      try {
+        await signOut();
+        router.replace('/');
+      } catch (error) {
+        console.error('Sign out error:', error);
+      }
+    };
+    
     return (
-      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-neutral-700/50">
-        <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
-          <Image
-            src={account.image_url}
-            alt={account.username}
-            fill
-            className="object-cover"
-            unoptimized
-          />
+      <div className="flex items-center justify-between gap-2 mb-3 pb-2 border-b border-neutral-700/50">
+        <div className="flex items-center gap-2">
+          <div className="relative w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+            <Image
+              src={account.image_url}
+              alt={account.username}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          </div>
+          <span className="text-xs font-medium text-neutral-300 truncate">@{account.username}</span>
         </div>
-        <span className="text-xs font-medium text-neutral-300 truncate">@{account.username}</span>
+        {currentSubStep === 2 && (
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="text-xs text-red-500 hover:text-red-400 transition-colors"
+          >
+            Sign out
+          </button>
+        )}
       </div>
     );
   };

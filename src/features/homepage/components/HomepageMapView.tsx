@@ -46,8 +46,7 @@ export default function HomepageMapView() {
           ],
           // Disable all interactions except zoom
           dragRotate: false,
-          touchRotate: false,
-          touchZoomRotate: true, // Allow pinch-to-zoom on touch
+          touchZoomRotate: true, // Allow pinch-to-zoom on touch (rotation is controlled by this)
           doubleClickZoom: true,
           scrollZoom: true,
           boxZoom: false,

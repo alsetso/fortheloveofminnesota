@@ -958,8 +958,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   }, [currentStep]);
 
   const handleSubmit = async (e?: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
-    console.log('handleSubmit called', { e, saving, account });
-    
     if (e) {
       e.preventDefault();
       // Only submit when user explicitly clicks the Complete button, not on Enter key
@@ -967,16 +965,10 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       if (e.type === 'submit') {
         const submitEvent = (e.nativeEvent as SubmitEvent);
         if (submitEvent.submitter == null) {
-          console.log('Form submitted via Enter key, ignoring');
           return; // Form was submitted via Enter key, not button click
         }
       }
       // For button clicks, always proceed
-    }
-    
-    if (saving) {
-      console.log('Already saving, ignoring');
-      return;
     }
     
     setSaving(true);
@@ -2580,7 +2572,7 @@ function OnboardingFooter({
     email: string;
     phone: string;
   };
-  onComplete?: () => void;
+  onComplete?: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   // Individual save states
   nameSaved?: boolean;
   savingName?: boolean;
@@ -3055,10 +3047,9 @@ function OnboardingFooter({
           </button>
           <button
             type="button"
-            onClick={(e) => {
-              console.log('Complete button clicked', { disabled, saving, allStepsComplete, hasOnComplete: !!onComplete });
+            onClick={() => {
               if (onComplete) {
-                onComplete(e);
+                onComplete();
               }
             }}
             disabled={disabled}

@@ -39,23 +39,6 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
       heading: 'Choose username',
       subtext: 'Pick a unique username for your account',
     },
-    plans: {
-      heading: 'Select a plan',
-      subtext: 'Choose the plan that works best for you',
-    },
-    // Dynamic plan substeps - format: plans_<stepNumber>_<stepName>
-    'plans_1_Customer account': {
-      heading: 'Step 1: Customer account',
-      subtext: 'Set up your billing account to continue',
-    },
-    'plans_2_Select a plan': {
-      heading: 'Step 2: Select a plan',
-      subtext: 'Choose the plan that works best for you',
-    },
-    'plans_3_Agree and continue': {
-      heading: 'Step 3: Agree and continue',
-      subtext: 'Review payment details and agree to terms',
-    },
     name: {
       heading: 'Your name',
       subtext: 'Tell us how you\'d like to be addressed',
@@ -100,15 +83,14 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
         return;
       }
 
-      // Use service to determine if billing is incomplete and get redirect URL
+      // Use service to determine current onboarding step
       if (!hasCheckedRedirect && initialAccount) {
         const onboardingState = determineOnboardingStep(initialAccount);
         
-        // If service determines we need to redirect to plans step
-        if (onboardingState.redirectUrl && onboardingState.currentStep === 'plans') {
+        // Handle any redirects if needed (currently not used, but keeping for future use)
+        if (onboardingState.redirectUrl) {
           const urlStep = searchParams.get('step');
-          const urlSubstep = searchParams.get('substep');
-          const isAlreadyOnTargetStep = urlStep === 'plans' && urlSubstep === String(onboardingState.plansSubStep);
+          const isAlreadyOnTargetStep = urlStep === onboardingState.currentStep;
           
           if (!isAlreadyOnTargetStep) {
             // Only redirect if not already there to prevent loops

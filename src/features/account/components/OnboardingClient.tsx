@@ -1479,7 +1479,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-center bg-transparent">
-      <div className="w-full max-w-[500px] px-4 space-y-3 flex-1 overflow-y-auto">
+      <div className="w-full max-w-[500px] px-4 space-y-3 flex-1 overflow-y-auto pb-24">
         {/* Step Content */}
       {currentStep === 'welcome' && (
         <div className="space-y-4">
@@ -2447,8 +2447,8 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       )}
       </div>
 
-      {/* OnboardingFooter — relative container at bottom */}
-      <div className="relative w-full flex justify-center mt-auto">
+      {/* OnboardingFooter — fixed container at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 w-full flex justify-center z-40">
         <div className="w-full max-w-[500px] bg-neutral-900 rounded-t-[10px] pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] px-4">
           <OnboardingFooter
               currentStep={currentStep}

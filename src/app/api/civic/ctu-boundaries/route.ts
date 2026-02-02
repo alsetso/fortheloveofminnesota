@@ -18,7 +18,8 @@ const ctuBoundariesQuerySchema = z.object({
   id: commonSchemas.uuid.optional(),
   ctu_class: z.enum(['CITY', 'TOWNSHIP', 'UNORGANIZED TERRITORY']).optional(),
   county_name: z.string().max(200).optional(),
-  limit: commonSchemas.positiveInt.max(1000).optional(),
+  // Coerce string to number for limit parameter (query params come as strings)
+  limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
 export async function GET(request: NextRequest) {

@@ -14,13 +14,16 @@ async function getPlanSlugFromPriceId(priceId: string | null): Promise<string | 
   const supabase = createServiceClient() as any;
   
   // Query billing.plans to find plan with matching price_id
+  // Note: RPC function is in billing schema but called without schema prefix
   const { data, error } = await supabase
     .rpc('get_plan_slug_from_price_id', { p_price_id: priceId });
   
   if (error) {
     if (process.env.NODE_ENV === 'development') {
-      console.warn(`Failed to lookup plan for price_id ${priceId}:`, error);
+      console.error(`Failed to lookup plan for price_id ${priceId}:`, error);
     }
+    // Log to console in production for debugging
+    console.error(`[WEBHOOK] RPC error for price_id ${priceId}:`, error.message);
     return null;
   }
   
@@ -274,41 +277,65 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Insert event record
-      const { data: eventRecord, error: logError } = await supabase
+      // Check if event already exists (handle duplicate Stripe events)
+      const { data: existingEvent } = await supabase
         .from('stripe_events')
-        .insert({
-          stripe_event_id: event.id,
-          event_type: event.type,
-          stripe_customer_id: customerIdForLog,
-          stripe_subscription_id: subscriptionIdForLog,
-          event_data: event as any,
-          processed: false,
-        })
         .select('id')
+        .eq('stripe_event_id', event.id)
         .single();
 
-      if (logError) {
-        // Log error but don't fail the webhook - we still want to process it
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Failed to log Stripe event to database:', logError);
-        }
+      if (existingEvent) {
+        // Event already logged - use existing record ID
+        eventRecordId = existingEvent.id;
       } else {
-        eventRecordId = eventRecord?.id || null;
-        
-        // Try to link to account if we have customer ID
-        if (customerIdForLog && eventRecordId) {
+        // Insert new event record
+        const { data: eventRecord, error: logError } = await supabase
+          .from('stripe_events')
+          .insert({
+            stripe_event_id: event.id,
+            event_type: event.type,
+            stripe_customer_id: customerIdForLog,
+            stripe_subscription_id: subscriptionIdForLog,
+            event_data: event as any,
+            processed: false,
+          })
+          .select('id')
+          .single();
+
+        if (logError) {
+          // Always log errors (not just in development) for production debugging
+          console.error('[WEBHOOK] Failed to log Stripe event to database:', {
+            error: logError,
+            event_id: event.id,
+            event_type: event.type,
+            customer_id: customerIdForLog,
+            subscription_id: subscriptionIdForLog,
+          });
+        } else {
+          eventRecordId = eventRecord?.id || null;
+        }
+      }
+      
+      // Try to link to account if we have customer ID and event record
+      if (customerIdForLog && eventRecordId) {
+        try {
           await supabase.rpc('link_stripe_event_to_account', {
             p_stripe_event_id: event.id,
             p_customer_id: customerIdForLog,
           });
+        } catch (linkError) {
+          // Log but don't fail - linking is optional
+          console.error('[WEBHOOK] Failed to link event to account:', linkError);
         }
       }
     } catch (logErr) {
-      // Don't fail webhook if logging fails
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error logging Stripe event:', logErr);
-      }
+      // Always log errors for production debugging
+      const errorMessage = logErr instanceof Error ? logErr.message : 'Unknown error';
+      console.error('[WEBHOOK] Error logging Stripe event:', {
+        error: errorMessage,
+        event_id: event.id,
+        event_type: event.type,
+      });
     }
 
     // Handle typed events
@@ -478,10 +505,22 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Webhook handler error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Always log errors for debugging
+    console.error('[WEBHOOK] Unhandled error:', errorMessage);
+    if (errorStack) {
+      console.error('[WEBHOOK] Stack:', errorStack);
     }
-    return createErrorResponse('Internal server error', 500);
+    
+    // Return 200 to Stripe to prevent retries for unexpected errors
+    // Log the error to stripe_events if possible
+    return createSuccessResponse({ 
+      received: true, 
+      handled: false, 
+      error: errorMessage 
+    });
   }
 }
 

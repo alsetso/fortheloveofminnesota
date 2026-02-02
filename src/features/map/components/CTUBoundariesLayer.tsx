@@ -89,13 +89,14 @@ export default function CTUBoundariesLayer({
         } catch (e) {
           // Ignore cleanup errors
         }
+        isAddingLayersRef.current = false;
       }
       return;
     }
 
+    // Prevent concurrent layer additions
     if (isAddingLayersRef.current) return;
-    isAddingLayersRef.current = true;
-
+    
     const mapboxMap = map as any;
     const sourceId = 'ctu-boundaries-source';
     const fillLayerId = 'ctu-boundaries-fill';
@@ -103,6 +104,57 @@ export default function CTUBoundariesLayer({
     const highlightFillLayerId = 'ctu-boundaries-highlight-fill';
     const highlightOutlineLayerId = 'ctu-boundaries-highlight-outline';
     const highlightSourceId = 'ctu-boundaries-highlight-source';
+    
+    // Check if layers already exist - if so, update data instead of re-adding (prevents flashing)
+    // More robust check: verify both layer and source exist, and source is a geojson source
+    const layerExists = mapboxMap.getLayer(fillLayerId);
+    const sourceExists = mapboxMap.getSource(sourceId);
+    
+    if (layerExists && sourceExists) {
+      // Layers already exist, just update the source data to prevent flashing
+      try {
+        // Combine all CTU geometries into a single FeatureCollection
+        const allFeatures: any[] = [];
+        ctus.forEach((ctu) => {
+          const featureCollection = ctu.geometry;
+          if (featureCollection && featureCollection.type === 'FeatureCollection' && featureCollection.features) {
+            featureCollection.features.forEach((feature: any) => {
+              allFeatures.push({
+                ...feature,
+                properties: {
+                  ...feature.properties,
+                  ctu_id: ctu.id,
+                  ctu_class: ctu.ctu_class,
+                  feature_name: ctu.feature_name,
+                  gnis_feature_id: ctu.gnis_feature_id,
+                  county_name: ctu.county_name,
+                  county_code: ctu.county_code,
+                  population: ctu.population,
+                  acres: ctu.acres,
+                },
+              });
+            });
+          }
+        });
+        
+        const combinedFeatureCollection = {
+          type: 'FeatureCollection',
+          features: allFeatures,
+        };
+        
+        const source = mapboxMap.getSource(sourceId) as any;
+        if (source && source.setData) {
+          source.setData(combinedFeatureCollection);
+          // Early return to prevent re-adding layers
+          return;
+        }
+      } catch (e) {
+        // If update fails, fall through to re-add layers
+        console.warn('[CTUBoundariesLayer] Failed to update existing source, will re-add layers:', e);
+      }
+    }
+    
+    isAddingLayersRef.current = true;
 
     // Combine all CTU geometries into a single FeatureCollection
     const allFeatures: any[] = [];
@@ -134,7 +186,7 @@ export default function CTUBoundariesLayer({
       features: allFeatures,
     };
 
-    // Remove existing layers/sources if they exist
+    // Remove existing layers/sources if they exist (only needed if layers weren't already there)
     try {
       if (mapboxMap.getLayer(fillLayerId)) mapboxMap.removeLayer(fillLayerId);
       if (mapboxMap.getLayer(outlineLayerId)) mapboxMap.removeLayer(outlineLayerId);

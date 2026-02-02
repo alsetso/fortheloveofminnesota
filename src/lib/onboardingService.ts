@@ -1,6 +1,6 @@
 import type { Account } from '@/features/auth';
 
-export type OnboardingStep = 'profile_photo' | 'username' | 'plans' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'maps' | 'location' | 'review';
+export type OnboardingStep = 'welcome' | 'profile_photo' | 'username' | 'plans' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'location' | 'review';
 
 export type PlansSubStep = 1 | 2 | 3 | 4;
 
@@ -33,28 +33,30 @@ export function hasIncompleteBilling(account: Account | null): boolean {
 }
 
 /**
- * Determines if account has completed mandatory steps 1-3
+ * Determines if account has completed mandatory steps 1-2
  * Step 1: Profile photo (image_url)
  * Step 2: Username
- * Step 3: Plans/Billing (stripe_customer_id + plan selected)
+ * Note: Plans/Billing is now step 10 (optional, can be completed later)
  */
 export function hasCompletedMandatorySteps(account: Account | null): boolean {
   if (!account) return false;
   
   const hasPhoto = !!account.image_url;
   const hasUsername = !!account.username;
-  const hasCustomerId = !!account.stripe_customer_id;
-  const hasPlan = !!account.plan && account.plan !== 'hobby';
   
-  return hasPhoto && hasUsername && hasCustomerId && hasPlan;
+  return hasPhoto && hasUsername;
 }
 
 /**
  * Determines the current onboarding step based on account state
  */
 export function determineOnboardingStep(account: Account | null): OnboardingState {
+  // Always start with welcome step for new users
+  // Welcome step is informational only, no validation needed
+  // The UI will handle navigation from welcome to profile_photo
+  
   if (!account) {
-    return { currentStep: 'profile_photo' };
+    return { currentStep: 'welcome' };
   }
   
   // Step 1: Profile photo
@@ -67,16 +69,21 @@ export function determineOnboardingStep(account: Account | null): OnboardingStat
     return { currentStep: 'username' };
   }
   
-  // Step 3: Plans/Billing
-  // If has customer ID but incomplete billing, redirect to plan selection (substep 2)
-  if (account.stripe_customer_id && hasIncompleteBilling(account)) {
-    return { 
-      currentStep: 'plans',
-      plansSubStep: 2, // Select a plan
-      redirectUrl: '/onboarding?step=plans&substep=2'
-    };
+  // Step 3: Location
+  if (!account.city_id) {
+    return { currentStep: 'location' };
   }
   
+  // Steps 4-8: Optional account information (name, bio, traits, etc.)
+  // Check each step in order and return first incomplete one
+  if (!account.first_name && !account.last_name) {
+    return { currentStep: 'name' };
+  }
+  
+  // Note: bio, traits, owns_business, contact are optional
+  // We'll let the UI handle progression through these
+  
+  // Step 10: Plans/Billing (moved to end, after collecting account info)
   // If no customer ID, start at substep 1
   if (!account.stripe_customer_id) {
     return { 
@@ -100,8 +107,12 @@ export function determineOnboardingStep(account: Account | null): OnboardingStat
     }
   }
   
-  // Steps 1-3 complete, proceed to step 4 (optional steps)
-  return { currentStep: 'name' };
+  // All steps complete, but stay on plans step (review only shows after Stripe checkout success)
+  // This prevents redirect logic from interfering with plans substep 3
+  return { 
+    currentStep: 'plans',
+    plansSubStep: 3 // Stay on payment & terms step
+  };
 }
 
 /**

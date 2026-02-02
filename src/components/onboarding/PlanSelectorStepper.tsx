@@ -73,12 +73,15 @@ export default function PlanSelectorStepper({
   const elements = useElements();
   
   // Check URL param for substep (e.g., ?substep=3)
+  // If returning from Stripe checkout with checkout=success, default to substep 3
   const urlSubstep = searchParams.get('substep');
+  const checkoutParam = searchParams.get('checkout');
   const parsedSubstep = urlSubstep ? parseInt(urlSubstep, 10) : null;
-  // Only allow valid substeps (1-4), default to 1
+  // Default to substep 3 if returning from checkout, otherwise use URL param or default to 1
+  const defaultSubstep = checkoutParam === 'success' ? 3 : 1;
   const initialSubStep: 1 | 2 | 3 | 4 = (parsedSubstep && parsedSubstep >= 1 && parsedSubstep <= 4) 
     ? parsedSubstep as 1 | 2 | 3 | 4 
-    : 1;
+    : defaultSubstep as 1 | 2 | 3 | 4;
   const [currentSubStep, setCurrentSubStep] = useState<1 | 2 | 3 | 4>(initialSubStep);
   const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
   const [cardComplete, setCardComplete] = useState(false);
@@ -93,6 +96,12 @@ export default function PlanSelectorStepper({
   // Helper to update URL when substep changes - preserves existing query params
   const updateSubStepUrl = (substep: 1 | 2 | 3 | 4) => {
     const currentUrl = new URL(window.location.href);
+    // Preserve checkout parameter if present (let cleanup useEffect handle it)
+    const checkoutParam = currentUrl.searchParams.get('checkout');
+    if (checkoutParam) {
+      // Don't update URL if checkout param exists - let cleanup handle it
+      return;
+    }
     currentUrl.searchParams.set('step', 'plans');
     currentUrl.searchParams.set('substep', substep.toString());
     router.replace(currentUrl.pathname + currentUrl.search, { scroll: false });
@@ -103,20 +112,20 @@ export default function PlanSelectorStepper({
     const checkoutStatus = searchParams.get('checkout');
     if (checkoutStatus === 'success') {
       setCheckoutSuccess(true);
-      // Clean up URL param
-      const newUrl = window.location.pathname + window.location.search.replace(/[?&]checkout=success/, '').replace(/[?&]checkout=canceled/, '');
-      window.history.replaceState({}, '', newUrl);
+      // Don't clean up checkout=success here - it's needed to show review step
+      // Cleanup will happen in OnboardingClient after review is shown
     } else if (checkoutStatus === 'canceled') {
       setCheckoutSuccess(false);
-      // Clean up URL param
+      // Clean up URL param immediately for canceled
       const newUrl = window.location.pathname + window.location.search.replace(/[?&]checkout=canceled/, '').replace(/[?&]checkout=success/, '');
       window.history.replaceState({}, '', newUrl);
     }
   }, [searchParams]);
 
-  // Handle checkout button click
+  // Handle checkout button click (now used from substep 3 for legacy flow)
+  // Primary checkout flow is now from substep 2 "Start Free Trial" buttons
   const handleCheckout = async () => {
-    if (!account?.stripe_customer_id || !selectedPlanSlug || selectedPlanSlug === 'hobby') {
+    if (!account?.stripe_customer_id || !selectedPlanSlug) {
       setSubscriptionError('Please select a plan and ensure billing is set up');
       return;
     }
@@ -131,7 +140,7 @@ export default function PlanSelectorStepper({
         body: JSON.stringify({
           plan: selectedPlanSlug,
           period: 'monthly',
-          returnUrl: '/onboarding?step=plans&substep=3',
+          returnUrl: '/onboarding?step=review', // Direct to review step
         }),
       });
 
@@ -448,31 +457,19 @@ export default function PlanSelectorStepper({
                 
                 <div className="grid grid-cols-2 gap-2">
                   {plans.map((plan) => {
-                    const priceDisplay =
-                      plan.price_monthly_cents === 0
-                        ? 'Free'
-                        : `$${(plan.price_monthly_cents / 100).toFixed(0)}/mo`;
+                    // All plans now have prices (hobby is $1/mo)
+                    const priceDisplay = `$${(plan.price_monthly_cents / 100).toFixed(0)}/mo`;
                     const directFeatures = plan.features.filter((f) => !f.isInherited);
-                    const isContributor = plan.slug?.toLowerCase() === 'contributor';
                     const isTesting = plan.slug?.toLowerCase() === 'testing';
-                    const hasTrial = isContributor || isTesting; // Both have 7-day free trial
-                    const isSelected = selectedPlanSlug === plan.slug?.toLowerCase();
+                    // All plans now have 7-day free trial
+                    const hasTrial = true;
+                    const planSlug = plan.slug?.toLowerCase() || null;
                     
                     return (
                       <div
                         key={plan.id}
-                        onClick={() => handlePlanSelect(plan.slug?.toLowerCase() || null)}
-                        className={`border-2 rounded-lg p-3 bg-neutral-900 flex flex-col cursor-pointer transition-all relative shadow-sm ${
-                          isSelected 
-                            ? 'border-[#007AFF] ring-2 ring-[#007AFF]/30 bg-[#007AFF]/5' 
-                            : 'border-neutral-700 hover:border-neutral-600 hover:bg-neutral-800/50'
-                        }`}
+                        className="border-2 rounded-lg p-3 bg-neutral-900 flex flex-col transition-all relative shadow-sm border-neutral-700"
                       >
-                        {isSelected && (
-                          <div className="absolute -top-2 -right-2 w-5 h-5 bg-[#007AFF] rounded-full flex items-center justify-center shadow-lg ring-2 ring-black/20">
-                            <CheckCircleIcon className="w-3 h-3 text-white" />
-                          </div>
-                        )}
                         <div className="flex items-start justify-between mb-1.5">
                           <h3 className="text-xs font-bold text-white leading-tight">{plan.name}</h3>
                           {isTesting && (
@@ -482,6 +479,7 @@ export default function PlanSelectorStepper({
                           )}
                         </div>
                         <p className="text-xs font-semibold text-neutral-100 mb-2">{priceDisplay}</p>
+                        {/* All plans show 7-day free trial badge */}
                         {hasTrial && (
                           <div className="rounded-md border border-neutral-700/50 p-2 bg-neutral-800/70 flex items-center justify-between gap-1.5 mb-2 backdrop-blur-sm">
                             <span className="text-[10px] font-bold text-white">7 Day Free Trial</span>
@@ -498,7 +496,7 @@ export default function PlanSelectorStepper({
                             {plan.description}
                           </p>
                         )}
-                        <div className="flex flex-wrap gap-1 mt-auto pt-2 border-t border-neutral-800">
+                        <div className="flex flex-wrap gap-1 mt-auto pt-2 border-t border-neutral-800 mb-2">
                           {directFeatures
                             .filter((f) => !f.limit_type || f.limit_type === 'boolean')
                             .slice(0, 4)
@@ -538,23 +536,32 @@ export default function PlanSelectorStepper({
                               );
                             })}
                         </div>
+                        {/* Continue button on each plan card */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!planSlug) return;
+                            setSelectedPlanSlug(planSlug);
+                            setSubscriptionError('');
+                            // Advance to substep 3 (Payment & Terms)
+                            setCurrentSubStep(3);
+                            updateSubStepUrl(3);
+                          }}
+                          className="w-full px-3 py-2 border border-transparent rounded-md text-[10px] font-semibold text-white bg-[#007AFF] hover:bg-[#0066D6] active:bg-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/50 focus:ring-offset-2 focus:ring-offset-black transition-all shadow-sm"
+                        >
+                          Continue
+                        </button>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* Continue Button */}
-                {selectedPlanSlug && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentSubStep(3);
-                      updateSubStepUrl(3);
-                    }}
-                    className="w-full px-4 py-3 border border-transparent rounded-lg text-xs font-semibold text-white bg-[#007AFF] hover:bg-[#0066D6] active:bg-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/50 focus:ring-offset-2 focus:ring-offset-black transition-all shadow-sm mt-4"
-                  >
-                    Continue
-                  </button>
+                {/* Show error if checkout fails */}
+                {subscriptionError && (
+                  <div className="rounded-lg border border-red-600/50 bg-red-900/20 backdrop-blur-sm px-4 py-3 text-xs text-red-300 flex items-start gap-2.5 shadow-sm mt-4">
+                    <ExclamationCircleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span className="leading-relaxed">{subscriptionError}</span>
+                  </div>
                 )}
               </>
             )}
@@ -741,8 +748,9 @@ export default function PlanSelectorStepper({
 
     const step1Confirmed = !!account?.stripe_customer_id;
     const step2Confirmed = !!selectedPlanSlug;
-    // Step 3 confirmed when: terms agreed AND (free plan OR checkout success OR card complete)
-    const step3Confirmed = termsAgreed && (isFreePlan || checkoutSuccess || cardComplete);
+    // Step 3 confirmed when: terms agreed AND (checkout success OR card complete)
+    // All plans now go through Stripe checkout for unified flow
+    const step3Confirmed = termsAgreed && (checkoutSuccess || cardComplete);
     
     return (
       <div className="space-y-4">
@@ -821,13 +829,14 @@ export default function PlanSelectorStepper({
         )}
 
         {/* Checkout Button for Contributor Plan and Testing Plan */}
-        {/* Show button if: not free plan, checkout not successful, and (plan is contributor/testing OR subscription is canceled) */}
-        {!isFreePlan && !checkoutSuccess && ((selectedPlanSlug === 'contributor' || selectedPlanSlug === 'testing') || account?.subscription_status === 'canceled') && (
+        {/* Show checkout button if: checkout not successful, and (plan is contributor/testing/hobby OR subscription is canceled) */}
+        {/* All plans (including hobby) now go through Stripe checkout for unified flow */}
+        {!checkoutSuccess && ((selectedPlanSlug === 'contributor' || selectedPlanSlug === 'testing' || selectedPlanSlug === 'hobby') || account?.subscription_status === 'canceled') && (
           <div className="space-y-2.5 mb-4">
             <button
               type="button"
               onClick={handleCheckout}
-              disabled={isProcessingCheckout || !account?.stripe_customer_id}
+              disabled={isProcessingCheckout || !account?.stripe_customer_id || !termsAgreed}
               className="w-full px-4 py-3 border border-transparent rounded-lg text-xs font-semibold text-white bg-[#007AFF] hover:bg-[#0066D6] active:bg-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/50 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
             >
               {isProcessingCheckout ? (
@@ -842,6 +851,11 @@ export default function PlanSelectorStepper({
             {selectedPlan && (
               <p className="text-xs text-neutral-400 text-center">
                 Due today $0 • 7-day free trial, then ${(selectedPlan.price_monthly_cents / 100).toFixed(0)}/month
+              </p>
+            )}
+            {!termsAgreed && (
+              <p className="text-xs text-red-400 text-center font-medium">
+                Please agree to the Terms of Service and Privacy Policy to continue
               </p>
             )}
           </div>
@@ -882,8 +896,8 @@ export default function PlanSelectorStepper({
           </div>
         )}
 
-        {/* Continue Button - Only show after checkout success or for free plan */}
-        {((isFreePlan && termsAgreed) || (checkoutSuccess && termsAgreed)) && (
+        {/* Continue Button - Show after checkout success (all plans now go through Stripe) */}
+        {checkoutSuccess && termsAgreed && (
           <div className="space-y-2.5 pt-1">
             {showConfetti && (
               <div className="flex items-center justify-center gap-2 text-green-400 mb-2">
@@ -893,50 +907,21 @@ export default function PlanSelectorStepper({
             )}
             <button
               type="button"
-              onClick={() => {
-                if (isFreePlan) {
-                  setCurrentSubStep(4);
-                  updateSubStepUrl(4);
-                } else if (checkoutSuccess && termsAgreed) {
-                  setCurrentSubStep(4);
-                  updateSubStepUrl(4);
-                }
+              onClick={async () => {
+                // Navigate directly to review step when returning from Stripe checkout success
+                // All plans (including hobby) now follow the same unified flow
+                const newUrl = new URL(window.location.href);
+                newUrl.searchParams.set('step', 'review');
+                newUrl.searchParams.set('checkout', 'success');
+                newUrl.searchParams.delete('substep');
+                router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+                // Mark plans step as complete
+                onComplete();
               }}
-              disabled={!termsAgreed || (checkoutSuccess && !termsAgreed)}
+              disabled={!termsAgreed}
               className="w-full px-4 py-3 border border-transparent rounded-lg text-xs font-semibold text-white bg-[#007AFF] hover:bg-[#0066D6] active:bg-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/50 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
             >
               Continue
-            </button>
-          </div>
-        )}
-
-        {/* Legacy payment form button - only for non-Contributor and non-Testing paid plans */}
-        {!isFreePlan && !checkoutSuccess && selectedPlanSlug !== 'contributor' && selectedPlanSlug !== 'testing' && (
-          <div className="space-y-2.5 pt-1">
-            {!termsAgreed && (
-              <p className="text-xs text-red-400 text-center font-medium">
-                Please agree to the terms to continue
-              </p>
-            )}
-            {!cardComplete && termsAgreed && (
-              <p className="text-xs text-red-400 text-center font-medium">
-                Please complete your payment information
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={processing || !termsAgreed || !cardComplete}
-              className="w-full px-4 py-3 border border-transparent rounded-lg text-xs font-semibold text-white bg-[#007AFF] hover:bg-[#0066D6] active:bg-[#0052CC] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/50 focus:ring-offset-2 focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-            >
-              {processing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Processing payment...
-                </span>
-              ) : (
-                'Confirm & Subscribe'
-              )}
             </button>
           </div>
         )}
@@ -944,12 +929,27 @@ export default function PlanSelectorStepper({
     );
   }
 
-  // Step 4: Confirmation
+  // Step 4: Confirmation - Navigate to review step only if returning from Stripe checkout success
   useEffect(() => {
     if (currentSubStep === 4) {
-      onComplete();
+      const checkoutParam = searchParams.get('checkout');
+      // Only navigate to review if we have checkout=success param
+      if (checkoutParam === 'success') {
+        // Navigate to review step with checkout=success preserved
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.set('step', 'review');
+        newUrl.searchParams.set('checkout', 'success');
+        // Remove substep param since we're leaving plans step
+        newUrl.searchParams.delete('substep');
+        router.replace(newUrl.pathname + newUrl.search, { scroll: false });
+        // Call onComplete to mark plans step as complete
+        onComplete();
+      } else {
+        // If no checkout success, just mark as complete but stay on plans step
+        onComplete();
+      }
     }
-  }, [currentSubStep, onComplete]);
+  }, [currentSubStep, onComplete, searchParams, router]);
 
   const confirmedPlan = plans.find(p => p.slug?.toLowerCase() === selectedPlanSlug);
   const confirmedPrice = confirmedPlan?.price_monthly_cents === 0 
@@ -959,8 +959,8 @@ export default function PlanSelectorStepper({
   const isFreePlan = confirmedPlan?.price_monthly_cents === 0;
   const step1Confirmed = !!account?.stripe_customer_id;
   const step2Confirmed = !!selectedPlanSlug;
-  const step3Confirmed = termsAgreed && (isFreePlan || cardComplete);
-  const step4Confirmed = true; // Step 4 is the confirmation step itself
+  const step3Confirmed = termsAgreed && (checkoutSuccess || cardComplete); // All plans go through Stripe checkout
+  const step4Confirmed = true; // Step 4 is the confirmation step itself (no longer used for navigation)
   
   return (
     <div className="space-y-4">

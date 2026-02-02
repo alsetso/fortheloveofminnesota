@@ -1,1 +1,0 @@
-https://gisdata.mn.gov/dataset/plan-parcels-open

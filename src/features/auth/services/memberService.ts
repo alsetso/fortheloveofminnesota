@@ -169,6 +169,7 @@ export interface Account {
   search_visibility: boolean;
   account_taggable?: boolean; // Whether this account can be tagged by other users in mentions
   owns_business?: boolean | null;
+  business_name?: string | null;
   created_at: string;
   updated_at: string;
   last_visit: string | null;
@@ -190,6 +191,7 @@ export interface UpdateAccountData {
   search_visibility?: boolean;
   account_taggable?: boolean; // Whether this account can be tagged by other users in mentions
   owns_business?: boolean | null;
+  business_name?: string | null;
 }
 
 export class AccountService {

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import OnboardingClient from '@/features/account/components/OnboardingClient';
 import type { Account } from '@/features/auth';
-import { hasIncompleteBilling, determineOnboardingStep } from '@/lib/onboardingService';
+import { determineOnboardingStep } from '@/lib/onboardingService';
 
 interface OnboardingBannerProps {
   initialAccount: Account | null;
@@ -75,10 +75,6 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
     contact: {
       heading: 'Contact information',
       subtext: 'How can others reach you?',
-    },
-    maps: {
-      heading: 'Live Map vs. Custom Maps',
-      subtext: 'Learn about the different map types',
     },
     location: {
       heading: 'Location',
@@ -162,7 +158,7 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
                 {/* Heading and Subtext - Floating absolute below stepper */}
                 {instructions && (
                   <div className="absolute top-full left-0 w-full mt-4 px-4">
-                    <h2 className="text-sm font-semibold text-white text-center mb-1">
+                    <h2 className="text-2xl font-semibold text-white text-center mb-1">
                       {instructions.heading}
                     </h2>
                     <p className="text-xs text-neutral-400 text-center">

@@ -41,12 +41,14 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/fav.png', type: 'image/png' },
-      { url: '/fav.png', sizes: '32x32', type: 'image/png' },
-      { url: '/fav.png', sizes: '16x16', type: 'image/png' },
+      { url: '/fav.png', type: 'image/png', sizes: 'any' },
     ],
-    shortcut: '/fav.png',
-    apple: '/fav.png',
+    shortcut: [
+      { url: '/fav.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/fav.png', type: 'image/png', sizes: '180x180' },
+    ],
   },
   openGraph: {
     title: 'For the Love of Minnesota',

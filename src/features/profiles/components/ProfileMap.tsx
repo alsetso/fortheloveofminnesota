@@ -213,9 +213,23 @@ export default function ProfileMap({
 
     const setupLayers = async () => {
       try {
+        // Ensure map is still available and fully ready
+        if (!mapInstanceRef.current) return;
+        const currentMap = mapInstanceRef.current as any;
+        
+        // Check if map is fully loaded and style is ready
+        if (!currentMap.loaded() || !currentMap.isStyleLoaded()) {
+          // Map not ready yet, wait and retry
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              setupLayers();
+            }
+          }, 100);
+          return;
+        }
         // Check if source already exists - if so, just update the data
         try {
-          const existingSource = mapboxMap.getSource(SOURCE_ID);
+          const existingSource = currentMap.getSource(SOURCE_ID);
           if (existingSource && existingSource.type === 'geojson') {
             // Update existing source data (no flash)
             existingSource.setData(geoJSON);
@@ -230,24 +244,24 @@ export default function ProfileMap({
         // IMPORTANT: Remove layers BEFORE removing source to avoid "source not found" errors
         try {
           // Remove layers first (they depend on the source)
-          if (mapboxMap.getLayer(LAYER_IDS.labels)) {
+          if (currentMap.getLayer(LAYER_IDS.labels)) {
             try {
-              mapboxMap.removeLayer(LAYER_IDS.labels);
+              currentMap.removeLayer(LAYER_IDS.labels);
             } catch (e) {
               // Layer may already be removed or source missing - ignore
             }
           }
-          if (mapboxMap.getLayer(LAYER_IDS.points)) {
+          if (currentMap.getLayer(LAYER_IDS.points)) {
             try {
-              mapboxMap.removeLayer(LAYER_IDS.points);
+              currentMap.removeLayer(LAYER_IDS.points);
             } catch (e) {
               // Layer may already be removed or source missing - ignore
             }
           }
           // Then remove source (only if it exists)
-          if (mapboxMap.getSource(SOURCE_ID)) {
+          if (currentMap.getSource(SOURCE_ID)) {
             try {
-              mapboxMap.removeSource(SOURCE_ID);
+              currentMap.removeSource(SOURCE_ID);
             } catch (e) {
               // Source may already be removed - ignore
             }
@@ -259,21 +273,48 @@ export default function ProfileMap({
 
         // Add source (no clustering)
         // Ensure source doesn't already exist before adding
+        let sourceAdded = false;
         try {
-          if (!mapboxMap.getSource(SOURCE_ID)) {
-            mapboxMap.addSource(SOURCE_ID, {
+          const existingSource = currentMap.getSource(SOURCE_ID);
+          if (existingSource && existingSource.type === 'geojson') {
+            // Source exists and is valid, just update data
+            const geojsonSource = existingSource as any;
+            if (geojsonSource.setData) {
+              geojsonSource.setData(geoJSON);
+              sourceAdded = true;
+            } else {
+              // Source exists but doesn't have setData - remove and re-add
+              try {
+                if (currentMap.getLayer(LAYER_IDS.labels)) {
+                  currentMap.removeLayer(LAYER_IDS.labels);
+                }
+                if (currentMap.getLayer(LAYER_IDS.points)) {
+                  currentMap.removeLayer(LAYER_IDS.points);
+                }
+                currentMap.removeSource(SOURCE_ID);
+              } catch (e) {
+                // Ignore cleanup errors
+              }
+            }
+          }
+          
+          if (!sourceAdded) {
+            // Add new source
+            currentMap.addSource(SOURCE_ID, {
               type: 'geojson',
               data: geoJSON,
             });
-          } else {
-            // Source exists, just update data
-            const existingSource = mapboxMap.getSource(SOURCE_ID) as any;
-            if (existingSource && existingSource.setData) {
-              existingSource.setData(geoJSON);
-            }
+            sourceAdded = true;
           }
         } catch (e) {
           console.error('[ProfileMap] Error adding/updating source:', e);
+          return;
+        }
+
+        // Verify source exists and is valid before proceeding
+        const source = currentMap.getSource(SOURCE_ID);
+        if (!source || source.type !== 'geojson') {
+          console.error('[ProfileMap] Source does not exist or is invalid before adding layer');
           return;
         }
 
@@ -281,7 +322,7 @@ export default function ProfileMap({
         const mentionImageId = 'profile-mention-icon';
         
         // Check if image already exists
-        if (!mapboxMap.hasImage(mentionImageId)) {
+        if (!currentMap.hasImage(mentionImageId)) {
           try {
             // Create an Image element and wait for it to load
             const img = new Image();
@@ -309,7 +350,7 @@ export default function ProfileMap({
               
               // Get ImageData and add to map with pixelRatio for retina displays
               const imageData = ctx.getImageData(0, 0, 64, 64);
-              mapboxMap.addImage(mentionImageId, imageData, { pixelRatio: 2 });
+              currentMap.addImage(mentionImageId, imageData, { pixelRatio: 2 });
             }
           } catch (error) {
             console.error('[ProfileMap] Failed to load mention icon:', error);
@@ -317,15 +358,15 @@ export default function ProfileMap({
           }
         }
 
-        // Verify source exists before adding layers
-        if (!mapboxMap.getSource(SOURCE_ID)) {
+        // Final verification: source must still exist before adding layers
+        if (!currentMap.getSource(SOURCE_ID)) {
           console.error('[ProfileMap] Source does not exist before adding layer');
           return;
         }
 
         // Add points as mention icons with zoom-based sizing
         try {
-          mapboxMap.addLayer({
+          currentMap.addLayer({
             id: LAYER_IDS.points,
             type: 'symbol',
             source: SOURCE_ID,
@@ -355,7 +396,7 @@ export default function ProfileMap({
 
         // Add labels for points (positioned above mention icon)
         try {
-          mapboxMap.addLayer({
+          currentMap.addLayer({
             id: LAYER_IDS.labels,
             type: 'symbol',
             source: SOURCE_ID,
@@ -387,8 +428,8 @@ export default function ProfileMap({
           console.error('[ProfileMap] Error adding label layer:', e);
           // Try to remove the point layer if label layer failed
           try {
-            if (mapboxMap.getLayer(LAYER_IDS.points)) {
-              mapboxMap.removeLayer(LAYER_IDS.points);
+            if (currentMap.getLayer(LAYER_IDS.points)) {
+              currentMap.removeLayer(LAYER_IDS.points);
             }
           } catch (removeError) {
             // Ignore removal errors
@@ -406,7 +447,7 @@ export default function ProfileMap({
           const maxLat = Math.max(...lats);
 
           if (minLng !== Infinity && maxLng !== -Infinity && minLat !== Infinity && maxLat !== -Infinity) {
-            mapboxMap.fitBounds(
+            currentMap.fitBounds(
               [
                 [minLng, minLat],
                 [maxLng, maxLat],
@@ -423,14 +464,14 @@ export default function ProfileMap({
         // Add click handlers for mention interactions (only once)
         if (!clickHandlersAddedRef.current) {
           const handleMentionClick = async (e: any) => {
-            if (!mapboxMap || !e || !e.point || typeof e.point.x !== 'number' || typeof e.point.y !== 'number' || typeof mapboxMap.queryRenderedFeatures !== 'function') return;
+            if (!currentMap || !e || !e.point || typeof e.point.x !== 'number' || typeof e.point.y !== 'number' || typeof currentMap.queryRenderedFeatures !== 'function') return;
             
             // Stop event propagation
             if (e.originalEvent) {
               e.originalEvent.stopPropagation();
             }
             
-            const features = mapboxMap.queryRenderedFeatures(e.point, {
+            const features = currentMap.queryRenderedFeatures(e.point, {
               layers: [LAYER_IDS.points, LAYER_IDS.labels],
             });
 
@@ -605,7 +646,7 @@ export default function ProfileMap({
             })
               .setLngLat([pin.lng, pin.lat])
               .setHTML(createPopupContent())
-              .addTo(mapboxMap);
+              .addTo(currentMap);
 
             // Add close button handler
             const setupPopupHandlers = () => {
@@ -636,13 +677,13 @@ export default function ProfileMap({
           };
 
           // Add click handlers
-          mapboxMap.on('click', LAYER_IDS.points, handleMentionClick);
-          mapboxMap.on('click', LAYER_IDS.labels, handleMentionClick);
+          currentMap.on('click', LAYER_IDS.points, handleMentionClick);
+          currentMap.on('click', LAYER_IDS.labels, handleMentionClick);
           
           // Clear pin selection when clicking on map (not on a pin)
           if (onPinSelect) {
             const handleMapClick = (e: any) => {
-              const features = mapboxMap.queryRenderedFeatures(e.point, {
+              const features = currentMap.queryRenderedFeatures(e.point, {
                 layers: [LAYER_IDS.points, LAYER_IDS.labels],
               });
               // If no features clicked, clear selection
@@ -651,30 +692,30 @@ export default function ProfileMap({
               }
             };
             mapClickHandlerRef.current = handleMapClick;
-            mapboxMap.on('click', handleMapClick);
+            currentMap.on('click', handleMapClick);
           }
           
           // Add cursor styles
-          mapboxMap.on('mouseenter', LAYER_IDS.points, () => {
-            const canvas = mapboxMap.getCanvas();
+          currentMap.on('mouseenter', LAYER_IDS.points, () => {
+            const canvas = currentMap.getCanvas();
             if (canvas) {
               canvas.style.cursor = 'pointer';
             }
           });
-          mapboxMap.on('mouseleave', LAYER_IDS.points, () => {
-            const canvas = mapboxMap.getCanvas();
+          currentMap.on('mouseleave', LAYER_IDS.points, () => {
+            const canvas = currentMap.getCanvas();
             if (canvas) {
               canvas.style.cursor = '';
             }
           });
-          mapboxMap.on('mouseenter', LAYER_IDS.labels, () => {
-            const canvas = mapboxMap.getCanvas();
+          currentMap.on('mouseenter', LAYER_IDS.labels, () => {
+            const canvas = currentMap.getCanvas();
             if (canvas) {
               canvas.style.cursor = 'pointer';
             }
           });
-          mapboxMap.on('mouseleave', LAYER_IDS.labels, () => {
-            const canvas = mapboxMap.getCanvas();
+          currentMap.on('mouseleave', LAYER_IDS.labels, () => {
+            const canvas = currentMap.getCanvas();
             if (canvas) {
               canvas.style.cursor = '';
             }
@@ -687,7 +728,22 @@ export default function ProfileMap({
       }
     };
 
-    setupLayers();
+    // Check if map is ready before calling setupLayers
+    if (mapboxMap.loaded() && mapboxMap.isStyleLoaded()) {
+      setupLayers();
+    } else {
+      // Wait for map to be ready, then call setupLayers
+      const checkReady = () => {
+        if (!mapInstanceRef.current) return;
+        const checkMap = mapInstanceRef.current as any;
+        if (checkMap.loaded() && checkMap.isStyleLoaded()) {
+          setupLayers();
+        } else {
+          setTimeout(checkReady, 50);
+        }
+      };
+      checkReady();
+    }
 
     // Cleanup handlers on unmount
     return () => {

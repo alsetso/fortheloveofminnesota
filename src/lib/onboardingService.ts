@@ -1,12 +1,9 @@
 import type { Account } from '@/features/auth';
 
-export type OnboardingStep = 'welcome' | 'profile_photo' | 'username' | 'location' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'plans' | 'review';
-
-export type PlansSubStep = 1 | 2 | 3 | 4;
+export type OnboardingStep = 'welcome' | 'profile_photo' | 'username' | 'location' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'review';
 
 export interface OnboardingState {
   currentStep: OnboardingStep;
-  plansSubStep?: PlansSubStep;
   redirectUrl?: string;
 }
 
@@ -36,7 +33,6 @@ export function hasIncompleteBilling(account: Account | null): boolean {
  * Determines if account has completed mandatory steps 1-2
  * Step 1: Profile photo (image_url)
  * Step 2: Username
- * Note: Plans/Billing is now step 10 (optional, can be completed later)
  */
 export function hasCompletedMandatorySteps(account: Account | null): boolean {
   if (!account) return false;
@@ -83,36 +79,8 @@ export function determineOnboardingStep(account: Account | null): OnboardingStat
   // Note: bio, traits, owns_business, contact are optional
   // We'll let the UI handle progression through these
   
-  // Step 10: Plans/Billing (moved to end, after collecting account info)
-  // If no customer ID, start at substep 1
-  if (!account.stripe_customer_id) {
-    return { 
-      currentStep: 'plans',
-      plansSubStep: 1 // Setup customer account
-    };
-  }
-  
-  // If has customer ID and plan, but subscription not active, go to substep 3
-  if (account.stripe_customer_id && account.plan && account.plan !== 'hobby') {
-    const hasActiveSubscription = 
-      account.subscription_status === 'active' || 
-      account.subscription_status === 'trialing';
-    
-    if (!hasActiveSubscription) {
-      return { 
-        currentStep: 'plans',
-        plansSubStep: 3, // Payment & Terms
-        redirectUrl: '/onboarding?step=plans&substep=3'
-      };
-    }
-  }
-  
-  // All steps complete, but stay on plans step (review only shows after Stripe checkout success)
-  // This prevents redirect logic from interfering with plans substep 3
-  return { 
-    currentStep: 'plans',
-    plansSubStep: 3 // Stay on payment & terms step
-  };
+  // All steps complete - return review step
+  return { currentStep: 'review' };
 }
 
 /**

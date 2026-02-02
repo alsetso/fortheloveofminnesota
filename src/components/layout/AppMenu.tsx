@@ -907,7 +907,7 @@ function AppMenuSubPageContent({
             aria-checked={pinDisplayGrouping}
             onClick={() => onPinDisplayGroupingChange?.(!pinDisplayGrouping)}
             className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border transition-colors ${
-              pinDisplayGrouping ? 'border-white/30 bg-white/20' : 'border-white/10 bg-white/5'
+              pinDisplayGrouping ? 'border-green-500 bg-green-500' : 'border-white/10 bg-white/5'
             }`}
           >
             <span
@@ -955,7 +955,7 @@ function AppMenuSubPageContent({
                 aria-checked={showOnlyMyPins}
                 onClick={() => onShowOnlyMyPinsChange?.(!showOnlyMyPins)}
                 className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border transition-colors ${
-                  showOnlyMyPins ? 'border-white/30 bg-white/20' : 'border-white/10 bg-white/5'
+                  showOnlyMyPins ? 'border-green-500 bg-green-500' : 'border-white/10 bg-white/5'
                 }`}
               >
                 <span
@@ -1270,7 +1270,7 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
         aria-label="Close menu"
         onClick={handleClose}
         onKeyDown={(e) => e.key === 'Escape' && handleClose()}
-        className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-200 ${
+        className={`fixed inset-0 z-[3000] bg-black/40 transition-opacity duration-200 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         style={{ touchAction: 'none' }}
@@ -1279,7 +1279,7 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
       <aside
         aria-hidden={!open}
         aria-label="App menu"
-        className={`fixed left-0 top-0 z-30 w-full max-w-[500px] bg-black flex flex-col transition-transform duration-200 ease-out ${
+        className={`fixed left-0 top-0 z-[3010] w-full max-w-[500px] bg-black flex flex-col transition-transform duration-200 ease-out ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ height: '100dvh' }}

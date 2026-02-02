@@ -105,10 +105,11 @@ export function useClickMarker({ map, mapLoaded, getMap }: UseClickMarkerOptions
         }
 
         // Create new marker with reused element
+        // Use 'bottom' anchor so marker sits above click point, avoiding footer/UI overlays
         const element = createMarkerElement();
         markerRef.current = new mapbox.Marker({
           element: element,
-          anchor: 'center',
+          anchor: 'bottom',
         })
           .setLngLat([coordinates.lng, coordinates.lat])
           .addTo(mapboxMap);

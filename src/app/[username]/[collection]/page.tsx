@@ -1,14 +1,16 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import Image from 'next/image';
+import Link from 'next/link';
 import type { ProfileAccount, ProfilePin, PinVisibility } from '@/types/profile';
 import type { Collection } from '@/types/collection';
 import { collectionTitleToSlug } from '@/features/collections/collectionSlug';
+import { getDisplayName } from '@/types/profile';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
-import ProfileLayout from '@/features/profiles/components/ProfileLayout';
-import ProfileMentionsList from '@/features/profiles/components/ProfileMentionsList';
-import CollectionPageHeader from './CollectionPageHeader';
+import CollectionPageClient from './CollectionPageClient';
 import UsernamePageShell from '../UsernamePageShell';
+import { UserIcon } from '@heroicons/react/24/outline';
 
 export const dynamic = 'force-dynamic';
 
@@ -164,7 +166,8 @@ export default async function UsernameCollectionPage({ params }: Props) {
   }
   let mentionsData: MapPinRow[] | null = null;
   if (profileMapIds.length > 0) {
-    const { data } = await supabase
+    // Build query - show all pins for owner, only public for visitors
+    let query = supabase
       .from('map_pins')
       .select(`
         id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
@@ -178,8 +181,14 @@ export default async function UsernameCollectionPage({ params }: Props) {
       .in('map_id', profileMapIds)
       .eq('archived', false)
       .eq('is_active', true)
-      .eq('visibility', 'public')
       .order('created_at', { ascending: false });
+    
+    // Only filter by visibility for non-owners
+    if (!isOwnProfile) {
+      query = query.eq('visibility', 'public');
+    }
+    
+    const { data } = await query;
     mentionsData = data as MapPinRow[] | null;
   }
 
@@ -215,22 +224,60 @@ export default async function UsernameCollectionPage({ params }: Props) {
     map: mention.map ? { id: mention.map.id, name: mention.map.name || null, slug: mention.map.slug } : undefined,
   }));
 
+  const displayName = getDisplayName(profileAccountData);
+
   return (
     <>
       <PageViewTracker page_url={`/${encodeURIComponent(username)}/${encodeURIComponent(collectionSlug)}`} />
-      <UsernamePageShell>
-        <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile}>
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <CollectionPageHeader
-                collection={selectedCollection}
-                username={username}
-                isOwnProfile={isOwnProfile}
-              />
-              <ProfileMentionsList pins={mentions} isOwnProfile={isOwnProfile} />
-            </div>
+      <UsernamePageShell isOwnProfile={isOwnProfile} showViewAsSelector={isOwnProfile}>
+        <div className="flex-1 flex flex-col gap-6 px-4 sm:px-6 lg:px-8 py-6 max-w-[600px] mx-auto w-full">
+          {/* Account Header - Simple */}
+          <div className="flex items-center gap-2">
+            <Link 
+              href={`/${encodeURIComponent(username)}`}
+              className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity"
+            >
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 flex-shrink-0">
+                {accountData.image_url ? (
+                  <Image
+                    src={accountData.image_url}
+                    alt={displayName}
+                    width={32}
+                    height={32}
+                    className="w-full h-full object-cover"
+                    unoptimized={accountData.image_url.startsWith('data:') || accountData.image_url.includes('supabase.co')}
+                  />
+                ) : (
+                  <UserIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-semibold text-gray-900 truncate">
+                  {displayName}
+                </span>
+                {accountData.username && (
+                  <span className="text-xs text-gray-500 truncate">
+                    @{accountData.username}
+                  </span>
+                )}
+              </div>
+            </Link>
           </div>
-        </ProfileLayout>
+
+          {/* Collections Container */}
+          <div className="space-y-6">
+            <CollectionPageClient
+              collection={selectedCollection}
+              username={username}
+              isOwnProfile={isOwnProfile}
+              pins={mentions}
+              accountId={accountData.id}
+              accountUsername={accountData.username}
+              accountImageUrl={accountData.image_url}
+              collections={collections}
+            />
+          </div>
+        </div>
       </UsernamePageShell>
     </>
   );

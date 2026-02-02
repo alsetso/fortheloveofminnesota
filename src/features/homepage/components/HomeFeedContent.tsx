@@ -5,7 +5,7 @@ import PinActivityFeed from './PinActivityFeed';
 import MentionTypeCards from './MentionTypeCards';
 import RecentAccountActivity from './RecentAccountActivity';
 import HeroSection from '@/components/landing/HeroSection';
-import PostCreationForm from '@/components/feed/PostCreationForm';
+import HomepageMapView from './HomepageMapView';
 import { useAuthStateSafe } from '@/features/auth';
 import type { FeedMap, FeedPinActivity } from '@/app/api/feed/pin-activity/route';
 
@@ -135,26 +135,21 @@ export default function HomeFeedContent() {
     fetchFeed();
   }, [fetchFeed]);
 
-  const handlePostCreated = () => {
-    // Refresh the feed after post is created
-    fetchFeed();
-  };
-
   return (
     <div className="w-full">
       {/* Main Content - Centered */}
       <div className="max-w-[600px] mx-auto space-y-3 px-4">
         {/* Show hero section only when user is not logged in */}
         {!account && <HeroSection />}
-        {/* Admin sections - shown only to admins, above the form */}
+        {/* Admin sections - shown only to admins */}
         {isAdmin && (
           <>
             <MentionTypeCards isAdmin={isAdmin} />
             <RecentAccountActivity isAdmin={isAdmin} />
           </>
         )}
-        {/* Post creation form - shown when user is logged in */}
-        {account && <PostCreationForm onPostCreated={handlePostCreated} />}
+        {/* Mapbox container showing all mentions */}
+        <HomepageMapView />
         <PinActivityFeed 
           maps={feedMaps} 
           activity={feedActivity} 

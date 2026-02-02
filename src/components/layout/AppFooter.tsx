@@ -12,12 +12,14 @@ interface AppFooterProps {
   isOpen?: boolean;
   /** Called when open state should change (optional, for controlled mode) */
   onOpenChange?: (open: boolean) => void;
+  /** Hide the spacer below the header (useful when status content is above) */
+  hideSpacer?: boolean;
 }
 
 /**
  * App footer: accordion-style. Click header to open/close content above it.
  */
-export default function AppFooter({ children, headerLabel = 'Footer', isOpen: controlledOpen, onOpenChange }: AppFooterProps) {
+export default function AppFooter({ children, headerLabel = 'Footer', isOpen: controlledOpen, onOpenChange, hideSpacer = false }: AppFooterProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = controlledOpen !== undefined && onOpenChange != null;
   const isOpen = isControlled ? controlledOpen : internalOpen;
@@ -52,8 +54,8 @@ export default function AppFooter({ children, headerLabel = 'Footer', isOpen: co
             </span>
           )}
         </button>
-        {/* 25px spacer always visible */}
-        <div className="h-[25px] flex-shrink-0" aria-hidden />
+        {/* 25px spacer always visible (unless hidden) */}
+        {!hideSpacer && <div className="h-[25px] flex-shrink-0" aria-hidden />}
       </div>
       {/* Accordion content (above header when open) */}
       {hasContent && isOpen && (

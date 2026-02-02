@@ -141,7 +141,7 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
         <div className="flex-1 flex flex-col items-center w-full">
           {/* Stepper Container */}
           {stepperState && (
-            <div className="w-full max-w-[500px] bg-transparent relative">
+            <div className="w-full max-w-[500px] bg-transparent relative z-10">
               <div className="flex-shrink-0 px-4 py-3">
                 <div className="h-5" />
                 <div className="flex items-center gap-1">
@@ -154,24 +154,24 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
                     />
                   ))}
                 </div>
-                
-                {/* Heading and Subtext - Floating absolute below stepper */}
-                {instructions && (
-                  <div className="absolute top-full left-0 w-full mt-4 px-4">
-                    <h2 className="text-2xl font-semibold text-white text-center mb-1">
-                      {instructions.heading}
-                    </h2>
-                    <p className="text-xs text-neutral-400 text-center">
-                      {instructions.subtext}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
+          {/* Heading and Subtext - Floating fixed below stepper */}
+          {stepperState && instructions && (
+            <div className="fixed top-[calc(1.25rem+0.75rem+0.25rem+1rem)] left-0 right-0 w-full max-w-[500px] mx-auto px-4 z-10">
+              <h2 className="text-2xl font-semibold text-white text-center mb-1">
+                {instructions.heading}
+              </h2>
+              <p className="text-xs text-neutral-400 text-center">
+                {instructions.subtext}
+              </p>
+            </div>
+          )}
+
           {/* Content Container */}
-          <div className={`flex-1 w-full max-w-[500px] overflow-y-auto scrollbar-hide ${stepperState && instructions ? 'pt-20' : ''}`}>
+          <div className={`flex-1 w-full max-w-[500px] overflow-y-auto scrollbar-hide ${stepperState && instructions ? 'pt-24' : ''}`}>
             <OnboardingClient 
               initialAccount={initialAccount}
               redirectTo={redirectTo}

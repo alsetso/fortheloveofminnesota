@@ -419,7 +419,7 @@ export default function MenuAccountSettingsForm({
             onClick={handleToggleSearchable}
             disabled={isUpdatingSearchable}
             className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-50 ${
-              account.search_visibility ? 'bg-white/30' : 'bg-white/10'
+              account.search_visibility ? 'bg-green-500' : 'bg-white/10'
             }`}
             role="switch"
             aria-checked={account.search_visibility}
@@ -441,7 +441,7 @@ export default function MenuAccountSettingsForm({
             onClick={handleToggleTaggable}
             disabled={isUpdatingTaggable}
             className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 disabled:opacity-50 ${
-              account.account_taggable ? 'bg-white/30' : 'bg-white/10'
+              account.account_taggable ? 'bg-green-500' : 'bg-white/10'
             }`}
             role="switch"
             aria-checked={account.account_taggable}

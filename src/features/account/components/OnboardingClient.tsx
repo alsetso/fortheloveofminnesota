@@ -10,22 +10,12 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getPaidPlanBorderClasses } from '@/lib/billing/planHelpers';
 import type { OnboardingClientProps } from '../types';
-import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
-import { TRAIT_OPTIONS, type TraitId } from '@/types/profile';
-import PlanSelectorStepper from '@/components/onboarding/PlanSelectorStepper';
+import { TRAIT_OPTIONS, type TraitId, getDisplayName, formatJoinDate } from '@/types/profile';
 import { type OnboardingStep, determineOnboardingStep, hasCompletedMandatorySteps } from '@/lib/onboardingService';
 import CTUBoundariesLayer from '@/features/map/components/CTUBoundariesLayer';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-
-type PlanWithFeatures = BillingPlan & {
-  features: (BillingFeature & {
-    isInherited: boolean;
-    limit_value?: number | null;
-    limit_type?: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null;
-  })[];
-};
 
 export default function OnboardingClient({ initialAccount, redirectTo, onComplete, onWelcomeShown, onStepperChange }: OnboardingClientProps) {
   const router = useRouter();
@@ -50,7 +40,14 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     // URL params take precedence (but review is only allowed with checkout=success)
     if (urlStep && urlStep !== 'review') {
       // Validate step is a valid OnboardingStep
-      const validSteps: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business', 'contact', 'plans'];
+      // Contact step is only valid if user owns a business
+      const validSteps: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business'];
+      if (urlStep === 'contact' && initialAccount?.owns_business === true) {
+        validSteps.push('contact');
+      } else if (urlStep === 'contact') {
+        // If trying to access contact step but doesn't own business, redirect to owns_business step
+        return 'owns_business';
+      }
       if (validSteps.includes(urlStep as OnboardingStep)) {
         return urlStep as OnboardingStep;
       }
@@ -135,20 +132,17 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   const [locationSaveError, setLocationSaveError] = useState<string | null>(null);
   const [locationEditing, setLocationEditing] = useState(false);
   
-  const [ensureCustomerLoading, setEnsureCustomerLoading] = useState(false);
-  const [ensureCustomerError, setEnsureCustomerError] = useState<string | null>(null);
-  const [onboardingPlans, setOnboardingPlans] = useState<PlanWithFeatures[]>([]);
-  const [onboardingPlansLoading, setOnboardingPlansLoading] = useState(false);
-  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
-  const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
-  const [planStepperComplete, setPlanStepperComplete] = useState(false);
+  const [ensuringCustomer, setEnsuringCustomer] = useState(false);
+  const [customerEnsured, setCustomerEnsured] = useState(false);
+  const [customerError, setCustomerError] = useState<string | null>(null);
+  
   
   // Map state for location step
   const locationMapContainerRef = useRef<HTMLDivElement>(null);
   const locationMapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [locationMapLoaded, setLocationMapLoaded] = useState(false);
 
-  const totalSteps = 11;
+  const totalSteps = 10;
   const stepIndexMap: Record<OnboardingStep, number> = {
     welcome: 0,
     profile_photo: 1,
@@ -159,8 +153,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     traits: 6,
     owns_business: 7,
     contact: 8,
-    plans: 9,
-    review: 10,
+    review: 9,
   };
   const stepIndex = stepIndexMap[currentStep];
 
@@ -257,112 +250,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     }
   }, [currentStep, account?.username, formData.username]);
 
-  const ensureBilling = useCallback(async () => {
-    if (!account?.id) return;
-    setEnsureCustomerError(null);
-    setEnsureCustomerLoading(true);
-    try {
-      const response = await fetch('/api/billing/ensure-customer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setEnsureCustomerError(data.error || 'Failed to set up billing');
-        return;
-      }
-      if (data.customerId && refreshAccount) {
-        await refreshAccount();
-        const updated = await AccountService.getCurrentAccount();
-        if (updated) setAccount(updated);
-      }
-    } catch (err) {
-      setEnsureCustomerError(err instanceof Error ? err.message : 'Failed to set up billing');
-    } finally {
-      setEnsureCustomerLoading(false);
-    }
-  }, [account?.id, refreshAccount]);
-
-  // Reset plan stepper when leaving plans step
-  useEffect(() => {
-    if (currentStep !== 'plans') {
-      setPlanStepperComplete(false);
-    }
-  }, [currentStep]);
-
-  // Ensure Stripe customer when entering plans step (for billing setup)
-  useEffect(() => {
-    if (currentStep !== 'plans' || !account?.id) return;
-    if (account.stripe_customer_id) {
-      setEnsureCustomerError(null);
-      return;
-    }
-    ensureBilling();
-  }, [currentStep, account?.id, account?.stripe_customer_id, ensureBilling]);
-
-  // Handle checkout flow for free trial
-  const handleCheckout = async () => {
-    if (!account || isProcessingCheckout) return;
-
-    setIsProcessingCheckout(true);
-    try {
-      // Return URL should go directly to review step after checkout success
-      // The checkout API will append &checkout=success to this URL
-      const returnUrl = `/onboarding?step=review`;
-      
-      const response = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan: 'contributor',
-          period: 'monthly',
-          returnUrl,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create checkout session');
-      }
-
-      const { url } = await response.json();
-      if (url) {
-        // Redirect to Stripe checkout
-        window.location.href = url;
-      } else {
-        throw new Error('No checkout URL returned');
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to start checkout. Please try again.');
-      setIsProcessingCheckout(false);
-    }
-  };
-
-  // Fetch Hobby and Contributor plans for step two (plus testing plan for admins)
-  useEffect(() => {
-    if (currentStep !== 'plans') return;
-    setOnboardingPlansLoading(true);
-    fetch('/api/billing/plans')
-      .then((res) => (res.ok ? res.json() : { plans: [] }))
-      .then((data: { plans?: PlanWithFeatures[] }) => {
-        const plans = data.plans || [];
-        const isAdmin = account?.role === 'admin';
-        const hobbyAndContributor = plans.filter(
-          (p) => {
-            const slug = p.slug?.toLowerCase();
-            return slug === 'hobby' || 
-                   slug === 'contributor' || 
-                   (isAdmin && slug === 'testing');
-          }
-        );
-        setOnboardingPlans(hobbyAndContributor);
-      })
-      .catch(() => setOnboardingPlans([]))
-      .finally(() => setOnboardingPlansLoading(false));
-  }, [currentStep, account?.role]);
 
   // Fuzzy search for cities/townships
   useEffect(() => {
@@ -646,6 +533,17 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
         setAccount(updatedAccount);
         setOwnsBusinessSaved(true);
         setOwnsBusinessEditing(false);
+        
+        // If user is on contact step but changed owns_business to false, redirect to review step
+        if (currentStep === 'contact' && ownsBusiness !== true) {
+          setCurrentStep('review');
+          updateStepUrl('review');
+        }
+        // If user selected owns_business = true, navigate to contact step
+        else if (ownsBusiness === true && currentStep === 'owns_business') {
+          setCurrentStep('contact');
+          updateStepUrl('contact');
+        }
       }
     } catch (err) {
       setOwnsBusinessSaveError(err instanceof Error ? err.message : 'Failed to save business status');
@@ -828,6 +726,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   }, [currentStep, account?.image_url, pendingPhotoPreview]);
 
   // Cleanup checkout param after review step is shown (only when checkout=success)
+  // Also ensure Stripe customer ID exists
   useEffect(() => {
     if (currentStep === 'review') {
       const checkoutParam = searchParams.get('checkout');
@@ -839,8 +738,46 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
           router.replace(newUrl.pathname + newUrl.search, { scroll: false });
         }, 500);
       }
+      
+      // Ensure Stripe customer ID exists when entering review step
+      if (account?.id && !account.stripe_customer_id && !ensuringCustomer && !customerEnsured) {
+        setEnsuringCustomer(true);
+        setCustomerError(null);
+        
+        fetch('/api/billing/ensure-customer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              const data = await res.json();
+              throw new Error(data.error || 'Failed to set up billing');
+            }
+            return res.json();
+          })
+          .then(async (data) => {
+            if (data.customerId) {
+              // Refresh account to get updated stripe_customer_id
+              const updatedAccount = await AccountService.getCurrentAccount();
+              if (updatedAccount) {
+                setAccount(updatedAccount);
+              }
+              setCustomerEnsured(true);
+            }
+          })
+          .catch((err) => {
+            setCustomerError(err instanceof Error ? err.message : 'Failed to set up billing');
+          })
+          .finally(() => {
+            setEnsuringCustomer(false);
+          });
+      } else if (account?.stripe_customer_id) {
+        setCustomerEnsured(true);
+      }
     }
-  }, [currentStep, searchParams, router]);
+  }, [currentStep, searchParams, router, account?.id, account?.stripe_customer_id, ensuringCustomer, customerEnsured]);
   
   // Cleanup preview URL on unmount
   useEffect(() => {
@@ -922,6 +859,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     }
   }, [currentStep, account?.owns_business, account?.business_name]);
 
+
   // Initialize contact step
   useEffect(() => {
     if (currentStep === 'contact') {
@@ -970,6 +908,45 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     }
   }, [currentStep, account?.city_id, selectedCityName]);
 
+  // Initialize all saved states when entering review step
+  // This ensures the review step can properly check completion status
+  useEffect(() => {
+    if (currentStep === 'review' && account) {
+      // Initialize saved states based on account data
+      if (account.image_url) {
+        setPhotoConfirmed(true);
+      }
+      
+      if (account.username && formData.username === account.username) {
+        setUsernameSaved(true);
+      }
+      
+      if (account.first_name || account.last_name) {
+        setNameSaved(true);
+      }
+      
+      if (account.bio && account.bio.trim().length > 0) {
+        setBioSaved(true);
+      }
+      
+      if (account.traits && Array.isArray(account.traits) && account.traits.length >= 1 && account.traits.length <= 5) {
+        setTraitsSaved(true);
+      }
+      
+      if (account.owns_business !== null && account.owns_business !== undefined) {
+        setOwnsBusinessSaved(true);
+      }
+      
+      if (account.owns_business === true && (account.email || account.phone)) {
+        setContactSaved(true);
+      }
+      
+      if (account.city_id) {
+        setLocationSaved(true);
+      }
+    }
+  }, [currentStep, account, formData.username]);
+
   // Reset editing states when leaving steps
   useEffect(() => {
     if (currentStep !== 'name') setNameEditing(false);
@@ -980,15 +957,28 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     if (currentStep !== 'location') setLocationEditing(false);
   }, [currentStep]);
 
-  const handleSubmit = async (e?: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e?: FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>) => {
+    console.log('handleSubmit called', { e, saving, account });
+    
     if (e) {
       e.preventDefault();
       // Only submit when user explicitly clicks the Complete button, not on Enter key
-      const submitEvent = e.nativeEvent as SubmitEvent;
-      if (submitEvent.submitter == null) {
-        return;
+      // For form submissions, check if there's a submitter (button click)
+      if (e.type === 'submit') {
+        const submitEvent = (e.nativeEvent as SubmitEvent);
+        if (submitEvent.submitter == null) {
+          console.log('Form submitted via Enter key, ignoring');
+          return; // Form was submitted via Enter key, not button click
+        }
       }
+      // For button clicks, always proceed
     }
+    
+    if (saving) {
+      console.log('Already saving, ignoring');
+      return;
+    }
+    
     setSaving(true);
     setError('');
 
@@ -1045,7 +1035,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
 
       setSaving(false);
 
-      // Refresh and redirect
+      // Refresh and redirect to homepage
       if (refreshAccount) {
         await refreshAccount();
       }
@@ -1057,7 +1047,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       if (onComplete) {
         await onComplete();
       }
-      router.push(redirectTo || '/');
+      router.push('/');
       router.refresh();
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -1287,36 +1277,35 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     }
   };
 
-  // Memoized callback for plan substep changes to prevent infinite loops
-  const handlePlanSubStepChange = useCallback((subStep: number, stepName: string) => {
-    if (onStepperChange) {
-      // Pass the substep info as a custom step name
-      onStepperChange(stepIndex, totalSteps, `plans_${subStep}_${stepName}`);
-    }
-  }, [onStepperChange, stepIndex, totalSteps]);
+  // Helper to update URL when step changes
+  const updateStepUrl = useCallback((step: OnboardingStep) => {
+    const params = new URLSearchParams({ step });
+    router.replace(`/onboarding?${params.toString()}`, { scroll: false });
+  }, [router]);
 
-  // Helper to update URL when step changes - preserves checkout param
-  const updateStepUrl = (step: OnboardingStep, substep?: number) => {
-    const currentUrl = new URL(window.location.href);
-    const checkoutParam = currentUrl.searchParams.get('checkout');
-    
-    if (step === 'plans') {
-      // Use provided substep or keep existing, preserve checkout param
-      const currentSubstep = searchParams.get('substep');
-      const substepValue = substep !== undefined ? String(substep) : (currentSubstep || '1');
-      const params = new URLSearchParams({ step: 'plans', substep: substepValue });
-      if (checkoutParam) {
-        params.set('checkout', checkoutParam);
-      }
-      router.replace(`/onboarding?${params.toString()}`, { scroll: false });
-    } else {
-      // For non-plans steps, preserve checkout param if present
-      const params = new URLSearchParams({ step });
-      if (checkoutParam) {
-        params.set('checkout', checkoutParam);
-      }
-      router.replace(`/onboarding?${params.toString()}`, { scroll: false });
+  // Redirect away from contact step if user doesn't own a business
+  useEffect(() => {
+    if (currentStep === 'contact' && account?.owns_business !== true) {
+      // If on contact step but doesn't own business, redirect to review step
+      setCurrentStep('review');
+      updateStepUrl('review');
     }
+  }, [currentStep, account?.owns_business, updateStepUrl]);
+
+  // Helper function to get step order based on business selection
+  const getStepOrder = (includeReview = false): OnboardingStep[] => {
+    const baseSteps: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business'];
+    
+    // Only include contact step if user owns a business
+    if (account?.owns_business === true) {
+      baseSteps.push('contact');
+    }
+    
+    if (includeReview) {
+      baseSteps.push('review');
+    }
+    
+    return baseSteps;
   };
 
   // Unified step completion validation
@@ -1337,35 +1326,29 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       case 'name':
         return nameSaved && !!(account.first_name || account.last_name);
       case 'bio':
-        return bioSaved && !!account.bio && account.bio.trim().length > 0;
+        // Bio is optional - if bio exists, it must be saved; if no bio, step is complete (skipped)
+        if (!account.bio || account.bio.trim().length === 0) {
+          return true; // No bio = step skipped = complete
+        }
+        return bioSaved && account.bio.trim().length > 0;
       case 'traits':
-        return !!traitsSaved && !!account.traits && Array.isArray(account.traits) && account.traits.length >= 1 && account.traits.length <= 5;
+        // Traits are optional - if traits exist, they must be saved; if no traits, step is complete (skipped)
+        if (!account.traits || !Array.isArray(account.traits) || account.traits.length === 0) {
+          return true; // No traits = step skipped = complete
+        }
+        return traitsSaved && account.traits.length >= 1 && account.traits.length <= 5;
       case 'owns_business':
         return ownsBusinessSaved && account.owns_business !== null && account.owns_business !== undefined && 
                (account.owns_business === false || (account.owns_business === true && !!account.business_name));
       case 'contact':
+        // Contact step should only be checked if owns_business is true
+        if (account.owns_business !== true) return true; // Skip validation if not a business owner
         return contactSaved && !!(account.email || account.phone);
       case 'location':
         return locationSaved && !!account.city_id;
-      case 'plans':
-        // Plans step is complete when:
-        // 1. Has stripe_customer_id (billing set up)
-        // 2. Has a plan selected (not null and not 'hobby' unless explicitly set)
-        // 3. For paid plans: has active/trialing subscription OR planStepperComplete (completed flow)
-        // 4. For hobby/free: planStepperComplete (completed flow)
-        if (!account.stripe_customer_id) return false;
-        if (!account.plan || account.plan === 'hobby') {
-          // For hobby plan, require planStepperComplete to ensure user went through the flow
-          return planStepperComplete;
-        }
-        // For paid plans, check subscription status or planStepperComplete
-        const hasActiveSubscription = 
-          account.subscription_status === 'active' || 
-          account.subscription_status === 'trialing';
-        return hasActiveSubscription || planStepperComplete;
       case 'review':
         // Review is complete when all previous steps are complete
-        const stepOrder: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business', 'contact', 'plans'];
+        const stepOrder = getStepOrder(false);
         return stepOrder.every(s => isStepComplete(s));
       default:
         return false;
@@ -1373,7 +1356,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   };
 
   const handleNext = () => {
-    const stepOrder: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business', 'contact', 'plans', 'review'];
+    const stepOrder = getStepOrder(true);
     const currentIndex = stepOrder.indexOf(currentStep);
     
     // Can only proceed if current step is complete
@@ -1381,41 +1364,17 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       return;
     }
     
-    // Special handling: plans step never auto-advances to review
-    // Review step only shows after Stripe checkout success
-    if (currentStep === 'plans') {
-      // Plans step handles its own navigation via PlanSelectorStepper
-      // Don't auto-advance to review
-      return;
-    }
-    
     // Can only proceed to next step if it exists
     if (currentIndex < stepOrder.length - 1) {
       const nextStep = stepOrder[currentIndex + 1];
-      // Skip review step unless explicitly navigating to it with checkout=success
-      if (nextStep === 'review') {
-        const checkoutParam = searchParams.get('checkout');
-        if (checkoutParam !== 'success') {
-          // Don't navigate to review unless checkout=success is present
-          return;
-        }
-      }
       setCurrentStep(nextStep);
       updateStepUrl(nextStep);
     }
   };
 
   const handleBack = () => {
-    const stepOrder: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business', 'contact', 'plans', 'review'];
+    const stepOrder = getStepOrder(true);
     const currentIndex = stepOrder.indexOf(currentStep);
-    
-    // Special handling: if on review step, go back to plans step substep 3
-    // This preserves context since user was on payment/terms step before Stripe checkout
-    if (currentStep === 'review') {
-      setCurrentStep('plans');
-      updateStepUrl('plans', 3); // Preserve substep 3 context
-      return;
-    }
     
     if (currentIndex > 0) {
       const prevStep = stepOrder[currentIndex - 1];
@@ -1527,8 +1486,8 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   }
 
   return (
-    <div className={`w-full h-full flex ${currentStep === 'plans' ? 'items-start' : 'items-center'} justify-center bg-transparent`}>
-      <div className="w-full max-w-[500px] px-4 space-y-3">
+    <div className="w-full h-full flex flex-col items-center justify-center bg-transparent">
+      <div className="w-full max-w-[500px] px-4 space-y-3 flex-1 overflow-y-auto">
         {/* Step Content */}
       {currentStep === 'welcome' && (
         <div className="space-y-4">
@@ -1548,31 +1507,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
         </div>
       )}
 
-      {currentStep === 'plans' && (
-        <div className="space-y-3">
-          <PlanSelectorStepper
-            account={account}
-            plans={onboardingPlans}
-            plansLoading={onboardingPlansLoading}
-            onBillingSetup={ensureBilling}
-            ensureCustomerLoading={ensureCustomerLoading}
-            ensureCustomerError={ensureCustomerError}
-            onComplete={() => {
-              setPlanStepperComplete(true);
-              // Refresh account to get latest plan/subscription data
-              refreshAccount?.().then(() => {
-                AccountService.getCurrentAccount().then(updatedAccount => {
-                  if (updatedAccount) {
-                    setAccount(updatedAccount);
-                  }
-                });
-              });
-            }}
-            refreshAccount={refreshAccount}
-            onSubStepChange={handlePlanSubStepChange}
-          />
-        </div>
-      )}
 
       {currentStep === 'name' && (
         <div className="space-y-3">
@@ -1937,7 +1871,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
         </div>
       )}
 
-      {currentStep === 'contact' && (
+      {currentStep === 'contact' && account?.owns_business === true && (
         <div className="space-y-2">
           {contactSaved && (account?.email || account?.phone) && !contactEditing ? (
             <div className="space-y-2">
@@ -2426,113 +2360,87 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
         </div>
       )}
 
-      {currentStep === 'review' && (
+      {currentStep === 'review' && account && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-white mb-3">Review Your Account</h2>
           
-          <div className="bg-neutral-900 border border-neutral-700 rounded-md p-[10px] space-y-3">
-            {/* Profile Image */}
-            {account?.image_url && (
+          {/* Profile Card - Matching public ProfileCard styling */}
+          <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
+            <div className="space-y-3 p-3">
+              {/* Profile Photo and Name/Username - Above Cover */}
               <div className="flex items-center gap-2">
-                <div className="relative w-12 h-12 rounded-full overflow-hidden bg-neutral-800 border border-neutral-700">
-                  <Image
-                    src={account.image_url}
-                    alt="Profile"
-                    fill
-                    sizes="48px"
-                    className="object-cover"
-                    unoptimized={account.image_url.includes('supabase.co')}
-                  />
+                <div className={`relative w-14 h-14 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 ${getPaidPlanBorderClasses(account.plan)}`}>
+                  <div className="w-full h-full rounded-full overflow-hidden bg-white">
+                    {account.image_url ? (
+                      <Image
+                        src={account.image_url}
+                        alt={getDisplayName(account as any)}
+                        width={56}
+                        height={56}
+                        className="w-full h-full object-cover rounded-full"
+                        unoptimized={account.image_url.startsWith('data:') || account.image_url.includes('supabase.co')}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-full">
+                        <UserIcon className="w-7 h-7 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-white">Profile Photo</p>
-                  <p className="text-xs text-neutral-500">Uploaded</p>
-                </div>
-              </div>
-            )}
-
-            {/* Username */}
-            {account?.username && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Username</p>
-                <p className="text-xs text-white">@{account.username}</p>
-              </div>
-            )}
-
-            {/* Name */}
-            {(account?.first_name || account?.last_name) && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Name</p>
-                <p className="text-xs text-white">
-                  {[account.first_name, account.last_name].filter(Boolean).join(' ') || 'Not set'}
-                </p>
-              </div>
-            )}
-
-            {/* Bio */}
-            {account?.bio && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Bio</p>
-                <p className="text-xs text-white">{account.bio}</p>
-              </div>
-            )}
-
-            {/* Traits */}
-            {account?.traits && account.traits.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Traits</p>
-                <div className="flex flex-wrap gap-1">
-                  {account.traits.map((trait) => {
-                    const traitOption = TRAIT_OPTIONS.find((t) => t.id === trait);
-                    return traitOption ? (
-                      <span
-                        key={trait}
-                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-[10px] text-neutral-200"
-                      >
-                        <span>{traitOption.label.split(' ')[0]}</span>
-                        <span>{traitOption.label.split(' ').slice(1).join(' ')}</span>
-                      </span>
-                    ) : null;
-                  })}
+                
+                {/* Name and Username - To the right of profile image */}
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-sm font-semibold text-gray-900 leading-tight truncate">
+                    {getDisplayName(account as any)}
+                  </h1>
+                  {account.username && (
+                    <p className="text-xs text-gray-500 truncate">@{account.username}</p>
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Business */}
-            {account?.owns_business !== null && account?.owns_business !== undefined && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Business Owner</p>
-                <p className="text-xs text-white">{account.owns_business ? 'Yes' : 'No'}</p>
-                {account.owns_business && account.business_name && (
-                  <p className="text-xs text-neutral-400 mt-0.5">{account.business_name}</p>
-                )}
-              </div>
-            )}
 
-            {/* Contact */}
-            {(account?.email || account?.phone) && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Contact</p>
-                {account.email && <p className="text-xs text-white">Email: {account.email}</p>}
-                {account.phone && <p className="text-xs text-white">Phone: {account.phone}</p>}
-              </div>
-            )}
 
-            {/* Location */}
-            {account?.city_id && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Location</p>
-                <p className="text-xs text-white">{selectedCityName || 'City selected'}</p>
-              </div>
-            )}
+              {/* Bio */}
+              {account.bio && (
+                <p className="text-xs text-gray-600 leading-relaxed">{account.bio}</p>
+              )}
 
-            {/* Plan */}
-            {account?.plan && account.plan !== 'hobby' && (
-              <div>
-                <p className="text-xs font-medium text-neutral-500 mb-0.5">Plan</p>
-                <p className="text-xs text-white capitalize">{account.plan}</p>
+              {/* Location */}
+              {selectedCityName && (
+                <div className="text-[10px] text-gray-500">
+                  📍 {selectedCityName}
+                </div>
+              )}
+
+              {/* Traits */}
+              <div className="pt-1">
+                <div className="flex flex-wrap gap-1 items-center">
+                  {account.traits && account.traits.length > 0 ? (
+                    account.traits
+                      .map(traitId => TRAIT_OPTIONS.find(opt => opt.id === traitId))
+                      .filter(Boolean)
+                      .map((trait) => (
+                        <span
+                          key={trait!.id}
+                          className="px-1.5 py-0.5 bg-white border border-gray-200 text-[10px] text-gray-900 rounded"
+                        >
+                          {trait!.label}
+                        </span>
+                      ))
+                  ) : (
+                    <span className="text-[10px] text-gray-400">No traits selected</span>
+                  )}
+                </div>
               </div>
-            )}
+
+              {/* Join Date */}
+              {account.created_at && (
+                <div className="text-[10px] text-gray-500">
+                  Joined {formatJoinDate(account.created_at)}
+                </div>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -2547,8 +2455,8 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       )}
       </div>
 
-      {/* OnboardingFooter — floating container at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 w-full flex justify-center">
+      {/* OnboardingFooter — relative container at bottom */}
+      <div className="relative w-full flex justify-center mt-auto">
         <div className="w-full max-w-[500px] bg-neutral-900 rounded-t-[10px] pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] px-4">
           <OnboardingFooter
               currentStep={currentStep}
@@ -2563,17 +2471,11 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
               savingUsername={savingUsername}
               photoConfirmed={photoConfirmed}
               profileFormId="onboarding-profile-form"
-              plansStepContinueDisabled={!isStepComplete('plans')}
-              plansStepButtonLabel="Next"
               traitsStepContinueDisabled={formData.traits.length === 0}
-              selectedPlanSlug={selectedPlanSlug}
-              onCheckout={handleCheckout}
-              isProcessingCheckout={isProcessingCheckout}
               account={account}
               formData={formData}
               onComplete={handleSubmit}
               isStepComplete={isStepComplete}
-              planStepperComplete={planStepperComplete}
               // Individual save states
               nameSaved={nameSaved}
               savingName={savingName}
@@ -2620,12 +2522,7 @@ function OnboardingFooter({
   savingUsername,
   photoConfirmed,
   profileFormId,
-  plansStepContinueDisabled,
-  plansStepButtonLabel,
   traitsStepContinueDisabled,
-  selectedPlanSlug,
-  onCheckout,
-  isProcessingCheckout,
   account,
   formData,
   onComplete,
@@ -2656,7 +2553,6 @@ function OnboardingFooter({
   onSaveContact,
   onSaveLocation,
   isStepComplete,
-  planStepperComplete,
 }: {
   currentStep: OnboardingStep;
   onNext: () => void;
@@ -2670,12 +2566,7 @@ function OnboardingFooter({
   savingUsername: boolean;
   photoConfirmed: boolean;
   profileFormId: string;
-  plansStepContinueDisabled?: boolean;
-  plansStepButtonLabel?: string;
   traitsStepContinueDisabled?: boolean;
-  selectedPlanSlug?: string | null;
-  onCheckout?: () => void;
-  isProcessingCheckout?: boolean;
   account?: Account | null;
   formData?: {
     username: string;
@@ -2717,7 +2608,6 @@ function OnboardingFooter({
   onSaveContact?: () => void;
   onSaveLocation?: () => void;
   isStepComplete?: (step: OnboardingStep) => boolean;
-  planStepperComplete?: boolean;
 }) {
   // Welcome step footer - show Next button
   if (currentStep === 'welcome') {
@@ -2740,65 +2630,6 @@ function OnboardingFooter({
     );
   }
 
-  if (currentStep === 'plans') {
-    // Enforce plan selection: must have a plan set in account (not null, not 'hobby' unless explicitly confirmed)
-    // OR must have completed the plan stepper flow
-    const hasPlan = account?.plan && account.plan !== 'hobby';
-    const hasHobbyPlanConfirmed = account?.plan === 'hobby' && planStepperComplete;
-    const hasActiveSubscription = 
-      account?.subscription_status === 'active' || 
-      account?.subscription_status === 'trialing';
-    const canContinue = (hasPlan && (hasActiveSubscription || planStepperComplete)) || hasHobbyPlanConfirmed;
-    
-    const disabled = plansStepContinueDisabled ?? !canContinue;
-    const label = plansStepButtonLabel ?? 'Next';
-    const isContributorSelected = selectedPlanSlug === 'contributor';
-    
-    return (
-      <footer className="pt-2 space-y-2">
-        {isContributorSelected && onCheckout && (
-          <button
-            type="button"
-            onClick={onCheckout}
-            disabled={isProcessingCheckout || !account}
-            className="w-full px-[10px] py-[10px] text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessingCheckout ? 'Processing...' : 'Start Free Trial'}
-          </button>
-        )}
-        <div className="flex items-center gap-2 justify-between">
-          <button
-            type="button"
-            onClick={onBack}
-            className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-neutral-200 bg-transparent hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-black transition-colors"
-          >
-            <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">
-              <ArrowLeftIcon className="w-3 h-3 flex-shrink-0" />
-              <span className="min-w-[6px] flex-shrink-0" />
-            </span>
-            Back
-          </button>
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={disabled}
-            className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {label}
-            <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">
-              <span className="min-w-[6px] flex-shrink-0" />
-              <ArrowRightIcon className="w-3 h-3 flex-shrink-0" />
-            </span>
-          </button>
-        </div>
-        {isContributorSelected && canContinue && (
-          <p className="text-xs text-neutral-500 text-center">
-            7-day free trial • Cancel anytime
-          </p>
-        )}
-      </footer>
-    );
-  }
 
   // Individual step handlers
   if (currentStep === 'name') {
@@ -3198,20 +3029,16 @@ function OnboardingFooter({
 
   if (currentStep === 'review') {
     // Require all steps to be complete - check via account state and props
-    const stepOrder: OnboardingStep[] = ['profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business', 'contact', 'plans'];
+    // Build step order conditionally (contact only if owns_business is true)
+    const stepOrder: OnboardingStep[] = ['profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business'];
+    if (account?.owns_business === true) {
+      stepOrder.push('contact');
+    }
+    
     // Check each step's completion state
-    const allStepsComplete = 
-      !!account?.image_url && photoConfirmed && // profile_photo
-      !!account?.username && usernameSaved && // username
-      locationSaved && !!account?.city_id && // location
-      nameSaved && !!(account?.first_name || account?.last_name) && // name
-      bioSaved && !!account?.bio && account.bio.trim().length > 0 && // bio
-      !!traitsSaved && !!account?.traits && Array.isArray(account.traits) && account.traits.length >= 1 && account.traits.length <= 5 && // traits
-      ownsBusinessSaved && account.owns_business !== null && account.owns_business !== undefined && 
-        (account.owns_business === false || (account.owns_business === true && !!account.business_name)) && // owns_business
-      contactSaved && !!(account?.email || account?.phone) && // contact
-      (planStepperComplete ?? false); // plans
+    const allStepsComplete = isStepComplete ? stepOrder.every((s: OnboardingStep) => isStepComplete!(s)) : false;
     const disabled = saving || !allStepsComplete;
+    
     return (
       <footer className="pt-2">
         <div className="flex items-center gap-2 justify-between">
@@ -3228,7 +3055,12 @@ function OnboardingFooter({
           </button>
           <button
             type="button"
-            onClick={onComplete}
+            onClick={(e) => {
+              console.log('Complete button clicked', { disabled, saving, allStepsComplete, hasOnComplete: !!onComplete });
+              if (onComplete) {
+                onComplete(e);
+              }
+            }}
             disabled={disabled}
             className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >

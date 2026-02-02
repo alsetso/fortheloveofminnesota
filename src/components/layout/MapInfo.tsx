@@ -219,29 +219,27 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
             <span className="text-xs font-medium text-gray-900 truncate">{mentionType.name}</span>
           </div>
         )}
-        {zoom !== undefined && zoom >= ZOOM_FOR_PINS && (
-          isAuthenticated && onAddToMap ? (
-            <button
-              type="button"
-              onClick={() => onAddToMap({ ...location, lat, lng }, mentionType?.id)}
-              className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-              aria-label={mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
-            >
-              <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-              {mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
-            </button>
-          ) : !isAuthenticated ? (
-            <button
-              type="button"
-              onClick={openWelcome}
-              className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-              aria-label="Sign in to add to map"
-            >
-              <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-              Sign in to add to map
-            </button>
-          ) : null
-        )}
+        {isAuthenticated && onAddToMap ? (
+          <button
+            type="button"
+            onClick={() => onAddToMap({ ...location, lat, lng }, mentionType?.id)}
+            className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+            aria-label={mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
+          >
+            <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+            {mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
+          </button>
+        ) : !isAuthenticated && onAddToMap ? (
+          <button
+            type="button"
+            onClick={openWelcome}
+            className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            aria-label="Sign in to add to map"
+          >
+            <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+            Sign in to add to map
+          </button>
+        ) : null}
       </div>
     </div>
   );

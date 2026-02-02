@@ -57,27 +57,27 @@ function getClientIP(request: Request): string {
 export const RATE_LIMITS = {
   // Public routes (no auth)
   public: {
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 20 * 1000, // 20 seconds
     maxRequests: 100,
   },
   // Authenticated routes
   authenticated: {
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 20 * 1000, // 20 seconds
     maxRequests: 200,
   },
   // Admin routes
   admin: {
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 20 * 1000, // 20 seconds
     maxRequests: 500,
   },
   // Webhook routes (no rate limiting, signature verified)
   webhook: {
-    windowMs: 60 * 1000,
+    windowMs: 20 * 1000,
     maxRequests: Infinity,
   },
   // Strict rate limit for sensitive operations
   strict: {
-    windowMs: 60 * 1000, // 1 minute
+    windowMs: 20 * 1000, // 20 seconds
     maxRequests: 10,
   },
 } as const;

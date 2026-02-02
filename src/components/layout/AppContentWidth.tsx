@@ -68,6 +68,7 @@ export default function AppContentWidth({
             headerLabel={footerHeaderLabel}
             isOpen={footerOpen}
             onOpenChange={onFooterOpenChange}
+            hideSpacer={footerStatusContent != null}
           >
             {footerContent}
           </AppFooter>

@@ -91,17 +91,33 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   // Reset state when modal opens/closes and load stored email
   useEffect(() => {
     if (isOpen) {
-      // Always show getting started screen when modal opens
-      setShowGettingStarted(true);
+      // Check if opened from "Sign in with Email" button (should skip remembered account UI)
+      const wasClearedForEmailSignIn = typeof window !== 'undefined' && sessionStorage.getItem('temp_cleared_email') === 'true';
+      
+      if (wasClearedForEmailSignIn) {
+        // Skip "Getting Started" screen and go straight to email input
+        // Don't show remembered account info
+        sessionStorage.removeItem('temp_cleared_email');
+        setShowGettingStarted(false);
+        setLastAccountUsername(null);
+        setLastAccountImage(null);
+        setEmail('');
+        setIsEmailValid(false);
+      } else {
+        // Normal flow - show getting started screen
+        setShowGettingStarted(true);
+      }
+      
       setAuthState('email');
       setOtp('');
       setMessage('');
       setMessageType(null);
       setEmailError('');
       
-      // Load stored email and last account info from localStorage
-      if (typeof window !== 'undefined') {
+      // Load stored email and last account info from localStorage (only if not cleared)
+      if (typeof window !== 'undefined' && !wasClearedForEmailSignIn) {
         const storedEmail = localStorage.getItem(STORED_EMAIL_KEY);
+        
         if (storedEmail) {
           setEmail(storedEmail);
           setIsEmailValid(isValidEmail(storedEmail));

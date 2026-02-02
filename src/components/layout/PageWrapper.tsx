@@ -413,12 +413,23 @@ export default function PageWrapper({
       icon: typeof HomeIcon;
       iconSolid: typeof HomeIconSolid;
       onClick?: (e: React.MouseEvent) => void;
+      isGold?: boolean; // Special flag for gold styling (Analytics)
     }> = [
       { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
       { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
       { label: 'Contribute', href: '/contribute', icon: PlusCircleIcon, iconSolid: PlusCircleIconSolid },
-      { label: 'Analytics', href: '/analytics', icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
     ];
+    
+    // Only show Analytics to admins
+    if (account?.role === 'admin') {
+      items.push({ 
+        label: 'Analytics', 
+        href: '/analytics', 
+        icon: ChartBarIcon, 
+        iconSolid: ChartBarIconSolid,
+        isGold: true,
+      });
+    }
     
     // Only show "People" link when on a map page
     // Links to current map page with #people hash to show members sidebar
@@ -439,9 +450,10 @@ export default function PageWrapper({
     }
 
     // Profile: link to /:username when username is set
+    // On contribute page, label is "Add to map" instead of "Profile"
     if (account?.username) {
       items.push({
-        label: 'Profile',
+        label: pathname === '/contribute' ? 'Add to map' : 'Profile',
         href: `/${encodeURIComponent(account.username)}`,
         icon: UserCircleIcon,
         iconSolid: UserCircleIconSolid,
@@ -449,7 +461,7 @@ export default function PageWrapper({
     }
 
     return items;
-  }, [isMapPage, mapIdOrSlug, account?.username]);
+  }, [isMapPage, mapIdOrSlug, account?.username, account?.role, pathname]);
 
   // Page name for mobile header when bottom nav is visible (replaces logo)
   const mobilePageTitle = useMemo(() => {
@@ -457,6 +469,7 @@ export default function PageWrapper({
     if (pathname === '/') return 'Home';
     if (pathname === '/maps' || pathname === '/map') return 'Maps';
     if (pathname === '/settings') return 'Settings';
+    if (pathname === '/contribute' || pathname.startsWith('/contribute')) return 'Contribute';
     if (isMapPage && mapInfo?.name) return mapInfo.name;
     if (isMapPage) return 'Map';
     if (pathname.startsWith('/news')) return 'News';
@@ -466,8 +479,9 @@ export default function PageWrapper({
     if (pathname.startsWith('/admin')) return 'Admin';
     if (pathname.startsWith('/onboarding')) return 'Onboarding';
     // Single segment (e.g. /username) - profile
+    // Explicitly exclude /contribute to prevent it from being treated as a profile
     const segment = pathname.replace(/^\/|\/$/g, '').split('/')[0];
-    if (segment && !pathname.startsWith('/map') && !pathname.startsWith('/news') && !pathname.startsWith('/gov') && !pathname.startsWith('/settings') && !pathname.startsWith('/analytics') && !pathname.startsWith('/billing') && !pathname.startsWith('/upgrade') && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) return 'Profile';
+    if (segment && segment !== 'contribute' && !pathname.startsWith('/map') && !pathname.startsWith('/news') && !pathname.startsWith('/gov') && !pathname.startsWith('/settings') && !pathname.startsWith('/analytics') && !pathname.startsWith('/billing') && !pathname.startsWith('/upgrade') && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/signup') && !pathname.startsWith('/contribute')) return 'Profile';
     return 'Home';
   }, [pathname, isMapPage, mapInfo?.name]);
 
@@ -828,6 +842,10 @@ export default function PageWrapper({
                         ? (mounted && currentHash === item.href)
                         : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
                       const Icon = isActive ? item.iconSolid : item.icon;
+                      // Gold styling for Analytics when active
+                      const iconClassName = isActive && (item as any).isGold
+                        ? 'w-5 h-5 text-yellow-500'
+                        : `w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`;
                       
                       // Handle items with onClick (e.g., hash-based navigation)
                       if ((item as any).onClick) {
@@ -837,7 +855,7 @@ export default function PageWrapper({
                             onClick={(item as any).onClick}
                             className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
                           >
-                            <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                            <Icon className={iconClassName} />
                           </button>
                         );
                       }
@@ -848,7 +866,7 @@ export default function PageWrapper({
                           href={item.href!}
                           className={`flex items-center justify-center w-full h-10 transition-colors ${headerHover} rounded-md`}
                         >
-                          <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                          <Icon className={iconClassName} />
                         </Link>
                       );
                     })}
@@ -1002,6 +1020,10 @@ export default function PageWrapper({
                     ? (mounted && currentHash === item.href)
                     : (item.href && (pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href))));
                   const Icon = isActive ? item.iconSolid : item.icon;
+                  // Gold styling for Analytics when active
+                  const iconClassName = isActive && (item as any).isGold
+                    ? 'w-5 h-5 text-yellow-500'
+                    : `w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`;
                   
                   // Handle items with onClick (e.g., hash-based navigation)
                   if ((item as any).onClick) {
@@ -1012,7 +1034,7 @@ export default function PageWrapper({
                         className="group flex items-center justify-center flex-1 transition-colors rounded-xl py-1"
                         aria-label={item.label}
                       >
-                        <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                        <Icon className={iconClassName} />
                       </button>
                     );
                   }
@@ -1024,7 +1046,7 @@ export default function PageWrapper({
                       className="group flex items-center justify-center flex-1 transition-colors rounded-xl py-1"
                       aria-label={item.label}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? headerIcon : headerIconMuted}`} />
+                      <Icon className={iconClassName} />
                     </Link>
                   );
                 })}

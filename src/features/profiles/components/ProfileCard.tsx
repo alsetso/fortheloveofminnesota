@@ -46,6 +46,7 @@ export default function ProfileCard({
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isProfileImageModalOpen, setIsProfileImageModalOpen] = useState(false);
+  const [cityName, setCityName] = useState<string | null>(null);
   
   // Hide "View Profile" button if we're already on this account's profile page (/:username)
   const isOnProfilePage = !!(account?.username && pathname === `/${account.username}`);
@@ -57,6 +58,24 @@ export default function ProfileCard({
   useEffect(() => {
     setAccount(initialAccount);
   }, [initialAccount]);
+
+  // Fetch city name when city_id is available
+  useEffect(() => {
+    if (account.city_id) {
+      fetch(`/api/civic/ctu-boundaries?id=${account.city_id}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && (data.feature_name || data.name)) {
+            setCityName(data.feature_name || data.name);
+          }
+        })
+        .catch(() => {
+          setCityName(null);
+        });
+    } else {
+      setCityName(null);
+    }
+  }, [account.city_id]);
 
   const displayName = getDisplayName(account);
   const joinDate = formatJoinDate(account.created_at);
@@ -200,56 +219,18 @@ export default function ProfileCard({
           </div>
         )}
 
-        {/* Cover Image */}
-        <div className="relative h-32 bg-gradient-to-r from-gray-800 to-gray-900 rounded-md overflow-hidden group">
-          {account.cover_image_url ? (
-            <Image
-              src={account.cover_image_url}
-              alt="Cover"
-              fill
-              className="object-cover"
-              unoptimized={account.cover_image_url.includes('supabase.co')}
-            />
-          ) : null}
-          {isOwnProfile && (
-            <>
-              <input
-                ref={coverInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageUpload(file, 'cover_image_url', setIsUploadingCover);
-                }}
-              />
-              <button
-                onClick={() => coverInputRef.current?.click()}
-                disabled={isUploadingCover}
-                className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-              >
-                {isUploadingCover ? (
-                  <div className="text-xs text-white">Uploading...</div>
-                ) : (
-                  <ArrowUpTrayIcon className="w-4 h-4 text-white" />
-                )}
-              </button>
-            </>
-          )}
-        </div>
 
-        {/* Account Plan */}
-        {account.plan && (
-          <div className="pt-2">
-            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium rounded bg-yellow-50 text-yellow-700 border border-yellow-200">
-              {account.plan === 'contributor' ? '⭐ Contributor' : account.plan === 'plus' ? '⭐ Plus' : account.plan}
-            </span>
-          </div>
-        )}
 
         {/* Bio */}
         {account.bio && (
           <p className="text-xs text-gray-600 leading-relaxed">{account.bio}</p>
+        )}
+
+        {/* Location */}
+        {cityName && (
+          <div className="text-[10px] text-gray-500">
+            📍 {cityName}
+          </div>
         )}
 
         {/* Traits */}

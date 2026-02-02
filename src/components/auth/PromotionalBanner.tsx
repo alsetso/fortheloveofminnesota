@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { MapPinIcon, HeartIcon, UserPlusIcon, XMarkIcon, SparklesIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, HeartIcon, UserPlusIcon, XMarkIcon, SparklesIcon, ChevronLeftIcon, ChevronRightIcon, UserIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 
 interface MentionType {
@@ -1343,6 +1343,22 @@ export default function PromotionalBanner({ isOpen, onClose }: PromotionalBanner
                         Log back in
                       </div>
                     </div>
+                  </button>
+                  
+                  {/* Sign in with Email Button - Only show when remembered account exists */}
+                  <button
+                    onClick={() => {
+                      // Set flag to skip pre-filling email when opening welcome modal
+                      // This allows user to enter a different email
+                      if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('temp_cleared_email', 'true');
+                      }
+                      openWelcome();
+                    }}
+                    className="w-full px-6 py-3 text-base font-medium text-gray-900 bg-white border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-md transition-colors flex items-center justify-center gap-2"
+                  >
+                    <EnvelopeIcon className="w-5 h-5 text-gray-600" />
+                    Sign in with Email
                   </button>
                   
                   {/* Google Auth Button */}

@@ -20,20 +20,21 @@ interface AnalyticsPageProps {
 }
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
-  const auth = await getServerAuth();
-  
-  if (!auth) {
-    redirect('/');
-  }
+  try {
+    const auth = await getServerAuth();
+    
+    if (!auth) {
+      redirect('/');
+    }
 
-  // Get time filter from URL, default to '24h'
-  const resolvedSearchParams = await searchParams;
-  const timeFilter = (resolvedSearchParams.time as TimeFilter) || '24h';
+    // Get time filter from URL, default to '24h'
+    const resolvedSearchParams = await searchParams;
+    const timeFilter = (resolvedSearchParams.time as TimeFilter) || '24h';
 
-  const supabase = await createServerClientWithAuth();
-  
-  // Get active account (respects account dropdown selection)
-  const accountId = await getAccountIdForUser(auth, supabase);
+    const supabase = await createServerClientWithAuth();
+    
+    // Get active account (respects account dropdown selection)
+    const accountId = await getAccountIdForUser(auth, supabase);
 
   const { data: account, error: accountError } = await supabase
     .from('accounts')
@@ -49,23 +50,29 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   // Get mention IDs for filtering
   // Get live map ID first
-  const { data: liveMap } = await supabase
+  const { data: liveMap, error: liveMapError } = await supabase
     .from('map')
     .select('id')
     .eq('slug', 'live')
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
 
   const liveMapId = liveMap && typeof liveMap === 'object' && 'id' in liveMap ? (liveMap as { id: string }).id : null;
   
-  // Get live mentions (pins on live map)
-  const { data: liveMentionsData, error: liveMentionsError } = await supabase
-    .from('map_pins')
-    .select('id', { count: 'exact', head: false })
-    .eq('map_id', liveMapId || '')
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .eq('archived', false);
+  // Get live mentions (pins on live map) - only if live map exists
+  let liveMentionsData: Array<{ id: string }> | null = null;
+  let liveMentionsError = null;
+  if (liveMapId) {
+    const result = await supabase
+      .from('map_pins')
+      .select('id', { count: 'exact', head: false })
+      .eq('map_id', liveMapId)
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .eq('archived', false);
+    liveMentionsData = result.data;
+    liveMentionsError = result.error;
+  }
 
   const liveMentionsCount = liveMentionsData?.length || 0;
   const liveMentionIds = ((liveMentionsData || []) as Array<{ id: string }>).map(m => m.id);
@@ -681,20 +688,26 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         account_id: null,
       }));
 
-  return (
-    <AnalyticsClient
-      profileViews={profileViewsAccurate}
-      pinViews={pinViewsAccurate}
-      mentionPageViews={mentionPageViewsAccurate}
-      postViews={postViewsAccurate}
-      mapViews={mapViewsAccurate}
-      liveMentions={liveMentionsCount}
-      totalPins={totalPinsCount}
-      userVisitHistory={userVisitHistory}
-      mapViewsList={sanitizedMapViews}
-      hasVisitorIdentitiesAccess={canSeeViewerIdentities}
-      timeFilter={timeFilter}
-      isAdmin={isAdmin || false}
-    />
-  );
+    return (
+      <AnalyticsClient
+        profileViews={profileViewsAccurate}
+        pinViews={pinViewsAccurate}
+        mentionPageViews={mentionPageViewsAccurate}
+        postViews={postViewsAccurate}
+        mapViews={mapViewsAccurate}
+        liveMentions={liveMentionsCount}
+        totalPins={totalPinsCount}
+        userVisitHistory={userVisitHistory}
+        mapViewsList={sanitizedMapViews}
+        hasVisitorIdentitiesAccess={canSeeViewerIdentities}
+        timeFilter={timeFilter}
+        isAdmin={isAdmin || false}
+      />
+    );
+  } catch (error) {
+    console.error('[AnalyticsPage] Error loading analytics:', error);
+    // Log the error and rethrow so error boundary can handle it
+    // This will show the error page instead of silently redirecting
+    throw error;
+  }
 }

@@ -104,9 +104,10 @@ export function usePinMarker({
         el.appendChild(dot);
 
         // Create marker
+        // Use 'bottom' anchor so marker sits above click point, avoiding footer/UI overlays
         const marker = new mapbox.Marker({
           element: el,
-          anchor: 'center',
+          anchor: 'bottom',
         })
           .setLngLat([coordinates.lng, coordinates.lat])
           .addTo(mapboxMap);

@@ -1,6 +1,6 @@
 import type { Account } from '@/features/auth';
 
-export type OnboardingStep = 'welcome' | 'profile_photo' | 'username' | 'plans' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'location' | 'review';
+export type OnboardingStep = 'welcome' | 'profile_photo' | 'username' | 'location' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'plans' | 'review';
 
 export type PlansSubStep = 1 | 2 | 3 | 4;
 

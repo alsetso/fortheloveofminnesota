@@ -1533,16 +1533,9 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       {currentStep === 'welcome' && (
         <div className="space-y-4">
           <div className="flex flex-col items-center space-y-4">
-            {/* Logo */}
+            {/* Heart Emoji */}
             <div className="flex justify-center">
-              <Image
-                src="/white-logo.png"
-                alt="For the Love of Minnesota"
-                width={200}
-                height={200}
-                className="object-contain"
-                priority
-              />
+              <span className="text-8xl">❤️</span>
             </div>
 
             {/* Description Text */}

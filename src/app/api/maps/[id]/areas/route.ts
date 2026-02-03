@@ -210,8 +210,6 @@ export async function POST(
               const PLAN_ORDER: Record<string, number> = {
                 hobby: 1,
                 contributor: 2,
-                professional: 3,
-                business: 4,
               };
               
               const typedAccount = userAccount as { plan: string | null; subscription_status: string | null };

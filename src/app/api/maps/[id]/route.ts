@@ -166,16 +166,16 @@ const updateMapSchema = z.object({
       allow_posts: z.boolean().optional(),
       allow_clicks: z.boolean().optional(),
       pin_permissions: z.object({
-        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+        required_plan: z.enum(['hobby', 'contributor']).nullable().optional(),
       }).optional(),
       area_permissions: z.object({
-        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+        required_plan: z.enum(['hobby', 'contributor']).nullable().optional(),
       }).optional(),
       post_permissions: z.object({
-        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+        required_plan: z.enum(['hobby', 'contributor']).nullable().optional(),
       }).optional(),
       click_permissions: z.object({
-        required_plan: z.enum(['hobby', 'contributor', 'professional', 'business']).nullable().optional(),
+        required_plan: z.enum(['hobby', 'contributor']).nullable().optional(),
       }).optional(),
       role_overrides: z.object({
         managers_can_edit: z.boolean().optional(),

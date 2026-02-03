@@ -31,8 +31,6 @@ export default function MapActionUpgradePrompt({
   const planLabels: Record<PlanLevel, string> = {
     hobby: 'Hobby',
     contributor: 'Contributor',
-    professional: 'Professional',
-    business: 'Business',
   };
 
   return (

@@ -142,7 +142,7 @@ export type AccountTrait =
   | 'trend-aware'
   | 'place-value-oriented';
 
-export type Plan = 'hobby' | 'contributor' | 'plus' | 'business' | 'gov';
+export type Plan = 'hobby' | 'contributor' | 'plus' | 'gov';
 export type BillingMode = 'standard' | 'trial';
 
 export interface Account {
@@ -164,7 +164,6 @@ export interface Account {
   plan: Plan;
   billing_mode: BillingMode;
   subscription_status: string | null;
-  stripe_subscription_id: string | null;
   onboarded: boolean;
   search_visibility: boolean;
   account_taggable?: boolean; // Whether this account can be tagged by other users in mentions

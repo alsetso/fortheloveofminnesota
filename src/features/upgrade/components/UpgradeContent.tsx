@@ -10,7 +10,7 @@ import PaymentScreen from './PaymentScreen';
 import CreditsPaymentScreen from './CreditsPaymentScreen';
 import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
 
-type PlanTab = 'contributor' | 'business' | 'government';
+type PlanTab = 'contributor' | 'government';
 
 interface PlanWithFeatures extends BillingPlan {
   features: (BillingFeature & { isInherited: boolean })[];
@@ -47,9 +47,8 @@ export default function UpgradeContent() {
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
   
-  // Check if user has a paid plan (contributor, plus, professional, or business)
-  // Note: account.plan type may not include all values, so we use string comparison
-  const isPro = account?.plan === 'contributor' || account?.plan === 'plus' || (account?.plan as string) === 'professional' || account?.plan === 'business';
+  // Check if user has a paid plan (contributor or plus)
+  const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
   const isActive = account?.subscription_status === 'active' || account?.subscription_status === 'trialing';
   const isAuthenticated = !!user;
 
@@ -76,7 +75,7 @@ export default function UpgradeContent() {
           plan = 'government';
         }
         const planTab = plan as PlanTab;
-        if (['contributor', 'business', 'government'].includes(planTab)) {
+        if (['contributor', 'government'].includes(planTab)) {
           setSelectedPlan(planTab);
           setShowPaymentScreen(true);
           setSelectedPlanSlug(null);
@@ -142,9 +141,6 @@ export default function UpgradeContent() {
     await handleApplyPlan('contributor');
   };
 
-  const handleApplyBusiness = async () => {
-    await handleApplyPlan('business');
-  };
 
   const handleApplyGovernment = async () => {
     await handleApplyPlan('government');
@@ -604,8 +600,6 @@ export default function UpgradeContent() {
             const planDescription = plan.description || 
               (plan.slug === 'hobby' ? 'Get started with basic features.' :
                plan.slug === 'contributor' ? 'Unlock advanced analytics and unlimited maps.' :
-               plan.slug === 'professional' ? 'Everything in Contributor, plus premium features.' :
-               plan.slug === 'business' ? 'Connect your business with Minnesota.' :
                'Premium features for your needs.');
             
             // Get direct features count
@@ -621,7 +615,7 @@ export default function UpgradeContent() {
               ? 'View Details' 
               : plan.slug === 'hobby' 
                 ? 'View Details' 
-                : plan.slug === 'business' || plan.slug === 'government' || plan.slug === 'gov'
+                : plan.slug === 'government' || plan.slug === 'gov'
                   ? 'View Details'
                   : 'View Details';
             

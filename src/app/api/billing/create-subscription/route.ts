@@ -238,7 +238,6 @@ export async function POST(request: NextRequest) {
               .from('accounts')
               .update({
                 subscription_status: subscription.status === 'trialing' ? 'trialing' : 'active',
-                stripe_subscription_id: subscription.id,
                 plan: planSlug,
                 billing_mode: subscription.status === 'trialing' ? 'trial' : 'standard',
                 updated_at: new Date().toISOString(),

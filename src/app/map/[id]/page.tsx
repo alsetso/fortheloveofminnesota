@@ -67,9 +67,13 @@ interface MapPageProps {
   showOnlyMyPins?: boolean;
   /** When on /live: time filter for pins (24h, 7d, or null = all time). */
   timeFilter?: '24h' | '7d' | null;
+  /** Called when map instance is available (for /live footer nearby pins). */
+  onMapInstanceReady?: (map: any) => void;
+  /** Called when GeolocateControl is ready (for /live user location). */
+  onGeolocateControlReady?: (control: any) => void;
 }
 
-export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null }: MapPageProps) {
+export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null, onMapInstanceReady, onGeolocateControlReady }: MapPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account, activeAccountId } = useAuthStateSafe();
@@ -286,7 +290,8 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   const handleMapLoad = useCallback((map: any) => {
     mapInstanceRef.current = map;
     setMapLoaded(true);
-  }, []);
+    onMapInstanceReady?.(map);
+  }, [onMapInstanceReady]);
 
   // Zoom to pin when ?pin=id or ?lat=&lng= in URL (e.g. from homepage feed). Do not remove params — pin stays in URL until user closes footer. Re-apply zoom when pins load so we run after layers and avoid reset.
   const urlPinFlownRef = useRef<string | null>(null);
@@ -784,6 +789,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     mapData={mapData}
                     onLocationPopupChange={setLocationSelectPopup}
                     onMapLoad={handleMapLoad}
+                    onGeolocateControlReady={onGeolocateControlReady}
                     onMapUpdate={updateMapData}
                     viewAsRole={isOwner ? viewAsRole : undefined}
                     onOpenContributeOverlay={(coordinates, mapMeta, fullAddress) => {
@@ -883,7 +889,33 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
               auto_approve_members: mapData.auto_approve_members || false,
               membership_questions: mapData.membership_questions || [],
               membership_rules: mapData.membership_rules || null,
-              settings: mapData.settings || undefined,
+              settings: mapData.settings ? {
+                ...mapData.settings,
+                collaboration: mapData.settings.collaboration ? {
+                  ...mapData.settings.collaboration,
+                  pin_permissions: mapData.settings.collaboration.pin_permissions ? {
+                    required_plan: (mapData.settings.collaboration.pin_permissions.required_plan === 'professional' || mapData.settings.collaboration.pin_permissions.required_plan === 'business') 
+                      ? 'contributor' 
+                      : (mapData.settings.collaboration.pin_permissions.required_plan === 'hobby' || mapData.settings.collaboration.pin_permissions.required_plan === 'contributor' 
+                        ? mapData.settings.collaboration.pin_permissions.required_plan 
+                        : null)
+                  } : null,
+                  area_permissions: mapData.settings.collaboration.area_permissions ? {
+                    required_plan: (mapData.settings.collaboration.area_permissions.required_plan === 'professional' || mapData.settings.collaboration.area_permissions.required_plan === 'business') 
+                      ? 'contributor' 
+                      : (mapData.settings.collaboration.area_permissions.required_plan === 'hobby' || mapData.settings.collaboration.area_permissions.required_plan === 'contributor' 
+                        ? mapData.settings.collaboration.area_permissions.required_plan 
+                        : null)
+                  } : null,
+                  post_permissions: mapData.settings.collaboration.post_permissions ? {
+                    required_plan: (mapData.settings.collaboration.post_permissions.required_plan === 'professional' || mapData.settings.collaboration.post_permissions.required_plan === 'business') 
+                      ? 'contributor' 
+                      : (mapData.settings.collaboration.post_permissions.required_plan === 'hobby' || mapData.settings.collaboration.post_permissions.required_plan === 'contributor' 
+                        ? mapData.settings.collaboration.post_permissions.required_plan 
+                        : null)
+                  } : null,
+                } : undefined
+              } : undefined,
             } : null,
             onJoinSuccess: () => {
               // Membership will refresh automatically via useMapMembership hook

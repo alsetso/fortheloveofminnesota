@@ -104,9 +104,9 @@ interface PageWrapperProps {
           allow_pins?: boolean;
           allow_areas?: boolean;
           allow_posts?: boolean;
-          pin_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
-          area_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
-          post_permissions?: { required_plan: 'hobby' | 'contributor' | 'professional' | 'business' | null } | null;
+          pin_permissions?: { required_plan: 'hobby' | 'contributor' | null } | null;
+          area_permissions?: { required_plan: 'hobby' | 'contributor' | null } | null;
+          post_permissions?: { required_plan: 'hobby' | 'contributor' | null } | null;
         };
       };
     } | null;

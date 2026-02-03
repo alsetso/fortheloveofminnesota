@@ -94,19 +94,19 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
   const accountQuery = activeAccountId
     ? supabase
         .from('accounts')
-        .select('plan, billing_mode, subscription_status, stripe_subscription_id')
+        .select('plan, billing_mode, subscription_status, stripe_customer_id')
         .eq('id', activeAccountId)
         .eq('user_id', user.id)
         .maybeSingle()
     : supabase
         .from('accounts')
-        .select('plan, billing_mode, subscription_status, stripe_subscription_id')
+        .select('plan, billing_mode, subscription_status, stripe_customer_id')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
 
   const { data: account, error: accountError } = (await accountQuery) as {
-    data: { plan: string; billing_mode: string; subscription_status: string | null; stripe_subscription_id: string | null } | null;
+    data: { plan: string; billing_mode: string; subscription_status: string | null; stripe_customer_id: string | null } | null;
     error: any;
   };
 
@@ -122,7 +122,19 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
     };
   }
 
+  // Check if subscription exists (for comped accounts)
+  let hasSubscription = false;
+  if (account.stripe_customer_id) {
+    const { data: subscription } = await supabase
+      .from('subscriptions')
+      .select('id')
+      .eq('stripe_customer_id', account.stripe_customer_id)
+      .maybeSingle();
+    hasSubscription = !!subscription;
+  }
+
   // Normalize plan (ensure it's 'hobby', 'contributor', or 'plus')
+  // Note: professional and business plans have been removed - migrated to contributor
   const plan: Plan = account.plan === 'plus' ? 'plus' : account.plan === 'contributor' ? 'contributor' : 'hobby';
   
   // Normalize billing mode (ensure it's 'standard' or 'trial')
@@ -132,9 +144,9 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
   const subscriptionStatus = account.subscription_status || null;
   const isActive = subscriptionStatus === 'active' || subscriptionStatus === 'trialing';
   
-  // Determine if account is comped (has subscription_id but status might be inactive)
+  // Determine if account is comped (has subscription but status might be inactive)
   // Comped accounts have a subscription but may not be actively paying
-  const isComped = !!account.stripe_subscription_id && !isActive;
+  const isComped = hasSubscription && !isActive;
   
   // Determine if in trial
   const isTrial = billingMode === 'trial' || subscriptionStatus === 'trialing';

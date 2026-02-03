@@ -66,7 +66,6 @@ async function updateAccountFromSubscription(
       .from('accounts')
       .update({
         subscription_status: 'inactive',
-        stripe_subscription_id: null,
         plan: 'hobby',
         billing_mode: 'standard',
         updated_at: new Date().toISOString(),
@@ -183,7 +182,6 @@ async function updateAccountFromSubscription(
     .from('accounts')
     .update({
       subscription_status: subscriptionStatus,
-      stripe_subscription_id: sub.id,
       plan: plan,
       billing_mode: billingMode,
       updated_at: new Date().toISOString(),

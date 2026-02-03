@@ -14,11 +14,15 @@ RETURNS TEXT AS $$
       -- Legacy: plus behaves like contributor in billing schema
       WHEN a.plan = 'plus' THEN
         CASE
-          WHEN a.subscription_status IN ('active', 'trialing') OR a.stripe_subscription_id IS NOT NULL THEN 'contributor'
+          WHEN a.subscription_status IN ('active', 'trialing') OR EXISTS (
+            SELECT 1 FROM public.subscriptions s WHERE s.stripe_customer_id = a.stripe_customer_id
+          ) THEN 'contributor'
           ELSE 'hobby'
         END
-      -- Paid plans require active/trialing or comped (subscription id present)
-      WHEN a.subscription_status IN ('active', 'trialing') OR a.stripe_subscription_id IS NOT NULL THEN a.plan
+      -- Paid plans require active/trialing or comped (subscription exists)
+      WHEN a.subscription_status IN ('active', 'trialing') OR EXISTS (
+        SELECT 1 FROM public.subscriptions s WHERE s.stripe_customer_id = a.stripe_customer_id
+      ) THEN a.plan
       -- Subscription lapsed: drop to hobby
       ELSE 'hobby'
     END

@@ -54,8 +54,8 @@ export default function PaymentScreen({ plan, account, user, onBack }: PaymentSc
   const getPlanName = (plan: PlanTab) => {
     switch (plan) {
       case 'contributor': return 'Contributor';
-      case 'business': return 'Business';
       case 'government': return 'Government';
+      default: return 'Plan';
     }
   };
 

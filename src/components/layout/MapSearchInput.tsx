@@ -64,9 +64,11 @@ interface MapSearchInputProps {
     closeDynamicSearch: () => void;
     isModalOpen: (type: 'account' | 'mapStyles' | 'dynamicSearch') => boolean;
   };
+  /** Whether search input should show active styling (when footer is in tall state) */
+  isActive?: boolean;
 }
 
-export default function MapSearchInput({ map, onLocationSelect, modalState }: MapSearchInputProps) {
+export default function MapSearchInput({ map, onLocationSelect, modalState, isActive }: MapSearchInputProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -476,7 +478,7 @@ export default function MapSearchInput({ map, onLocationSelect, modalState }: Ma
   return (
     <div ref={containerRef} className="relative w-full">
       {/* Search Bar */}
-      <div className="rounded-xl shadow-lg px-2 py-1 flex items-center gap-1.5 relative bg-white h-8">
+      <div className="rounded-xl px-2 py-1 flex items-center gap-1.5 relative bg-gray-100 h-8">
         {/* Search Input */}
         <div className="flex-1 min-w-0 relative flex items-center gap-1.5 h-full">
           <div className="flex-1 relative">

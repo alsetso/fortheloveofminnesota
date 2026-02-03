@@ -131,7 +131,7 @@ export async function createCheckoutSession(accountId: string): Promise<string> 
  * 
  * Fetches the customer's subscription from Stripe and upserts it into:
  * 1. subscriptions table (detailed subscription data)
- * 2. accounts table (subscription_status, plan, billing_mode, stripe_subscription_id)
+ * 2. accounts table (subscription_status, plan, billing_mode)
  * 
  * Handles cases where:
  * - Customer has no subscription (deletes existing record if any)
@@ -177,7 +177,6 @@ export async function syncStripeData(customerId: string): Promise<void> {
       .from('accounts')
       .update({
         subscription_status: 'inactive',
-        stripe_subscription_id: null,
         plan: 'hobby',
         billing_mode: 'standard',
         updated_at: new Date().toISOString(),
@@ -313,7 +312,6 @@ export async function syncStripeData(customerId: string): Promise<void> {
     .from('accounts')
     .update({
       subscription_status: subscriptionStatus,
-      stripe_subscription_id: subscription.id,
       plan: plan,
       billing_mode: billingMode,
       updated_at: new Date().toISOString(),

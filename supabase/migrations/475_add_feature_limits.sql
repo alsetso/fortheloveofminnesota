@@ -154,7 +154,13 @@ RETURNS TABLE(
     SELECT a.plan
     FROM accounts a
     WHERE a.user_id = user_id
-      AND (a.subscription_status = 'active' OR a.subscription_status = 'trialing' OR a.stripe_subscription_id IS NOT NULL)
+      AND (
+        a.subscription_status = 'active' 
+        OR a.subscription_status = 'trialing' 
+        OR EXISTS (
+          SELECT 1 FROM public.subscriptions s WHERE s.stripe_customer_id = a.stripe_customer_id
+        )
+      )
     LIMIT 1
   )
   SELECT 

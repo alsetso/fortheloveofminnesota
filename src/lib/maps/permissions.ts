@@ -11,13 +11,11 @@
 
 import type { MapData } from '@/types/map';
 
-export type PlanLevel = 'hobby' | 'contributor' | 'professional' | 'business';
+export type PlanLevel = 'hobby' | 'contributor';
 
 const PLAN_ORDER: Record<PlanLevel, number> = {
   hobby: 1,
   contributor: 2,
-  professional: 3,
-  business: 4,
 };
 
 export interface PermissionCheckResult {
@@ -94,6 +92,11 @@ export function canUserPerformMapAction(
     };
   }
   
+  // Normalize requiredPlan to valid PlanLevel (handle legacy professional/business plans)
+  const normalizedRequiredPlan: PlanLevel = requiredPlan === 'professional' || requiredPlan === 'business' 
+    ? 'contributor' 
+    : (requiredPlan === 'hobby' || requiredPlan === 'contributor' ? requiredPlan : 'contributor');
+  
   // Check subscription status
   const isActive = user.subscription_status === 'active' || user.subscription_status === 'trialing';
   
@@ -108,7 +111,7 @@ export function canUserPerformMapAction(
     return {
       allowed: false,
       reason: 'subscription_inactive',
-      requiredPlan,
+      requiredPlan: normalizedRequiredPlan,
       currentPlan: user.plan,
       message: `Your subscription is not active. Please activate your ${user.plan} plan to ${actionLabels[action]}.`,
     };
@@ -116,7 +119,7 @@ export function canUserPerformMapAction(
   
   // Check if user's plan meets requirement
   const userPlanOrder = PLAN_ORDER[user.plan] || 0;
-  const requiredPlanOrder = PLAN_ORDER[requiredPlan];
+  const requiredPlanOrder = PLAN_ORDER[normalizedRequiredPlan];
   
   if (userPlanOrder < requiredPlanOrder) {
     const actionLabels = {
@@ -129,9 +132,9 @@ export function canUserPerformMapAction(
     return {
       allowed: false,
       reason: 'plan_required',
-      requiredPlan,
+      requiredPlan: normalizedRequiredPlan,
       currentPlan: user.plan,
-      message: `This map requires a ${requiredPlan} plan to ${actionLabels[action]}.`,
+      message: `This map requires a ${normalizedRequiredPlan} plan to ${actionLabels[action]}.`,
     };
   }
   

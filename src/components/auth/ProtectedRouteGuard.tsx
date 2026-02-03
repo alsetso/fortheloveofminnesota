@@ -38,6 +38,9 @@ export default function ProtectedRouteGuard({
     // Homepage is always allowed
     if (pathname === '/') return true;
     
+    // Live map page is temporarily allowed for anonymous users
+    if (pathname === '/live') return true;
+    
     // Mention detail pages are allowed
     if (pathname.startsWith('/mention/')) {
       // Extract the ID part and check if it's a valid UUID format
@@ -53,8 +56,9 @@ export default function ProtectedRouteGuard({
     if (segments.length === 1) {
       const firstSegment = segments[0];
       // Exclude known routes that aren't usernames
+      // Note: 'live' is allowed above, so it's excluded here to prevent username conflicts
       const excludedRoutes = [
-        'live', 'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
+        'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
         'billing', 'admin', 'login', 'signup', 'onboarding', 'contribute',
         'contact', 'privacy', 'terms', 'download', 'api', '_next', 'favicon.ico'
       ];

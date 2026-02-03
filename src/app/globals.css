@@ -333,6 +333,11 @@ body {
 }
 
 /* Hide Mapbox attribution (including "Improve this map" text) */
+/* Hide Mapbox controls when search is active (handled via inline style in AppContentWidth) */
+.mapboxgl-ctrl-top-right {
+  transition: opacity 0.2s ease-out;
+}
+
 .mapboxgl-ctrl-attrib {
   display: none !important;
 }

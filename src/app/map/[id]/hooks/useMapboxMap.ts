@@ -14,11 +14,13 @@ interface UseMapboxMapOptions {
     zoom?: number;
   } | null;
   onMapLoad?: (map: MapboxMapInstance) => void;
+  /** Called when GeolocateControl is added to the map */
+  onGeolocateControlReady?: (control: any) => void;
   /** When false, omit maxBounds and allow minZoom 0 (e.g. /live map). Default true. */
   restrictToMinnesota?: boolean;
 }
 
-export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, restrictToMinnesota = true }: UseMapboxMapOptions) {
+export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, onGeolocateControlReady, restrictToMinnesota = true }: UseMapboxMapOptions) {
   const mapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const hasInitializedRef = useRef(false);
@@ -125,6 +127,35 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, restrict
             if (loadTimeoutId) {
               clearTimeout(loadTimeoutId);
             }
+            
+            // Add default Mapbox controls (NavigationControl and GeolocateControl)
+            // Add navigation controls (zoom, compass)
+            const navControl = new mapbox.NavigationControl({
+              showCompass: true,
+              showZoom: true,
+              visualizePitch: true,
+            });
+            mapInstance.addControl(navControl, 'top-right');
+
+            // Add geolocate control
+            const geolocateControl = new mapbox.GeolocateControl({
+              positionOptions: {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 1000,
+              },
+              trackUserLocation: true,
+              showUserHeading: true,
+              showAccuracyCircle: true,
+              fitBoundsOptions: { maxZoom: 15 },
+            });
+            mapInstance.addControl(geolocateControl, 'top-right');
+            
+            // Notify parent that geolocate control is ready
+            if (onGeolocateControlReady) {
+              onGeolocateControlReady(geolocateControl);
+            }
+            
             // Use double rAF so resize runs after layout; then mark loaded (faster than fixed 100ms)
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
@@ -195,7 +226,7 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, restrict
       mapLoadedRef.current = false;
       setMapLoaded(false);
     };
-  }, [mapStyle, containerRef, meta, onMapLoad, restrictToMinnesota]);
+  }, [mapStyle, containerRef, meta, onMapLoad, onGeolocateControlReady, restrictToMinnesota]);
 
   return {
     mapInstance: mapInstanceRef.current,

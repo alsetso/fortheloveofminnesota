@@ -216,7 +216,6 @@ export default function EntityDetailSidebar({
                     plan: (pin.account.plan || 'hobby') as Account['plan'],
                     billing_mode: 'standard',
                     subscription_status: null,
-                    stripe_subscription_id: null,
                     onboarded: false,
                     search_visibility: false,
                     created_at: '',

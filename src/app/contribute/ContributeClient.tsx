@@ -209,7 +209,6 @@ export default function ContributeClient({ auth }: ContributeClientProps) {
                 plan: 'hobby',
                 billing_mode: 'standard',
                 subscription_status: null,
-                stripe_subscription_id: null,
                 onboarded: false,
                 search_visibility: false,
                 created_at: '',

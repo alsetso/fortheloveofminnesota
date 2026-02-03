@@ -87,6 +87,7 @@ interface MapIDBoxProps {
   viewCount?: number | null;
   hideCreator?: boolean;
   onMapLoad?: (map: MapboxMapInstance) => void;
+  onGeolocateControlReady?: (control: any) => void;
   onMapUpdate?: (updatedData: any) => void;
   map_account_id?: string | null;
   current_account_id?: string | null;
@@ -237,6 +238,7 @@ export default function MapIDBox({
   hideCreator = false,
   onMapLoad,
   onMapUpdate,
+  onGeolocateControlReady,
   map_account_id,
   current_account_id,
   created_at,
@@ -344,6 +346,7 @@ export default function MapIDBox({
     containerRef: mapContainer as React.RefObject<HTMLDivElement>,
     meta,
     onMapLoad,
+    onGeolocateControlReady,
     restrictToMinnesota: !isLiveMap,
   });
   const [currentZoom, setCurrentZoom] = useState(0);

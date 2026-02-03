@@ -281,10 +281,13 @@ export async function middleware(req: NextRequest) {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
   // ALLOWED ROUTES FOR NON-AUTHENTICATED USERS
-  // Homepage, mention detail pages, and profile pages are accessible without auth
+  // Homepage, live map, mention detail pages, and profile pages are accessible without auth
   const isAllowedRouteForAnonymous = (() => {
     // Homepage is always allowed
     if (pathname === '/') return true;
+    
+    // Live map page is allowed for all users
+    if (pathname === '/live') return true;
     
     // Mention detail pages are allowed
     if (pathname.startsWith('/mention/')) {
@@ -301,7 +304,7 @@ export async function middleware(req: NextRequest) {
       const firstSegment = segments[0];
       // Exclude known routes that aren't usernames
       const excludedRoutes = [
-        'live', 'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
+        'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
         'billing', 'admin', 'login', 'signup', 'onboarding', 'contribute',
         'contact', 'privacy', 'terms', 'download', 'api', '_next', 'favicon.ico'
       ];
@@ -314,7 +317,7 @@ export async function middleware(req: NextRequest) {
   })();
 
   // REDIRECT NON-AUTHENTICATED USERS TO HOMEPAGE
-  // Only allow homepage, mention pages, and profile pages for logged-out users
+  // Only allow homepage, live map, mention pages, and profile pages for logged-out users
   if (!user && !isAllowedRouteForAnonymous) {
     return NextResponse.redirect(new URL('/', req.url));
   }

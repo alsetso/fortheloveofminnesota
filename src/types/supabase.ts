@@ -104,10 +104,9 @@ export type Database = {
           view_count: number
           onboarded: boolean
           stripe_customer_id: string | null
-          plan: 'hobby' | 'contributor' | 'plus' | 'business' | 'gov' | null
+          plan: 'hobby' | 'contributor' | 'plus' | 'gov' | null
           billing_mode: 'standard' | 'trial' | null
           subscription_status: string | null
-          stripe_subscription_id: string | null
           guest_id: string | null
           created_at: string
           updated_at: string

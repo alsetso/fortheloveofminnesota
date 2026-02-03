@@ -102,7 +102,6 @@ export default function CreatePostModal({
   // Check if user can upload videos
   const canUploadVideo = account?.plan === 'contributor' || 
                          (account?.plan as string) === 'plus' || 
-                         (account?.plan as string) === 'business' || 
                          account?.plan === 'gov';
 
   // Fetch accessible maps when modal opens
@@ -201,7 +200,7 @@ export default function CreatePostModal({
         }, 300);
       } else if (initialAction === 'upload_video') {
         if (!canUploadVideo) {
-          setError('Video uploads are only available for Contributor, Professional, and Business plans.');
+          setError('Video uploads are only available for Contributor plan.');
         } else {
           setTimeout(() => {
             fileInputRef.current?.click();
@@ -433,7 +432,7 @@ export default function CreatePostModal({
 
       if (isImage || isVideo) {
         if (isVideo && !canUploadVideo) {
-          setError('Video uploads are only available for Contributor, Professional, and Business plans.');
+          setError('Video uploads are only available for Contributor plan.');
           return;
         }
 

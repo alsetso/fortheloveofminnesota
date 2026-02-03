@@ -165,6 +165,17 @@ export interface MyPinItem {
   mention_type?: { id: string; emoji: string; name: string } | null;
 }
 
+/** Pin item for Pin Activity list (all pins from live map). */
+export interface PinActivityItem {
+  id: string;
+  map_id: string;
+  description: string | null;
+  created_at: string;
+  account_id?: string | null;
+  mention_type?: { id: string; emoji: string; name: string } | null;
+  accounts?: { image_url: string | null; username: string | null; first_name: string | null; last_name: string | null } | null;
+}
+
 function accountToProfileAccount(account: NonNullable<DisplayAccount>, userEmail: string): ProfileAccount {
   return {
     ...account,
@@ -200,7 +211,7 @@ interface PlanCardData {
   features?: PlanFeatureItem[];
 }
 
-const COMING_SOON_PLAN_SLUGS = ['professional', 'business'];
+const COMING_SOON_PLAN_SLUGS: string[] = [];
 function isComingSoonPlan(slug: string | null | undefined): boolean {
   return COMING_SOON_PLAN_SLUGS.includes((slug ?? '').toLowerCase());
 }
@@ -651,6 +662,26 @@ function AppMenuSubPageContent({
   onSelectPlan,
   onBackToPlanList,
 }: AppMenuSubPageContentProps) {
+  const { signOut } = useAuthStateSafe();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+      localStorage.removeItem('freemap_sessions');
+      localStorage.removeItem('freemap_current_session');
+      onClose();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+    } catch (error) {
+      console.error('Sign out error:', error);
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   if (subPage === 'profile') {
     return (
       <div className="space-y-3">
@@ -727,6 +758,19 @@ function AppMenuSubPageContent({
             </Link>
           </div>
         </div>
+        {account && (
+          <div className="rounded-md border border-white/10 bg-white/5 p-3">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-60 disabled:pointer-events-none"
+            >
+              <ArrowRightOnRectangleIcon className="w-4 h-4" />
+              {isSigningOut ? 'Signing out...' : 'Sign out'}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -1065,7 +1109,10 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
   const setTimeFilter = onTimeFilterChange ?? setInternalTimeFilter;
   const [myPinsList, setMyPinsList] = useState<MyPinItem[]>([]);
   const [myPinsLoading, setMyPinsLoading] = useState(false);
+  const [pinActivityList, setPinActivityList] = useState<PinActivityItem[]>([]);
+  const [pinActivityLoading, setPinActivityLoading] = useState(false);
   const [metricsExpanded, setMetricsExpanded] = useState(false);
+  const [pinActivityExpanded, setPinActivityExpanded] = useState(false);
   const [metrics, setMetrics] = useState<MenuMetrics>(DEFAULT_METRICS);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [liveMapInfo, setLiveMapInfo] = useState<LiveMapInfo>(DEFAULT_LIVE_MAP_INFO);
@@ -1238,6 +1285,64 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
     };
   }, [open, subPage, account?.id]);
 
+  // Fetch all pins for Pin Activity accordion (live map only)
+  useEffect(() => {
+    if (!open || !pinActivityExpanded) {
+      if (!pinActivityExpanded) setPinActivityList([]);
+      return;
+    }
+    let cancelled = false;
+    setPinActivityLoading(true);
+    
+    // First get the live map ID
+    fetch('/api/maps?slug=live')
+      .then((res) => (res.ok ? res.json() : { maps: [] }))
+      .then((data: { maps?: Array<{ id: string }> }) => {
+        if (cancelled) return;
+        const liveMap = data.maps?.[0];
+        if (!liveMap?.id) {
+          setPinActivityList([]);
+          setPinActivityLoading(false);
+          return;
+        }
+        
+        // Then fetch all pins from the live map
+        return fetch(`/api/maps/${liveMap.id}/pins`, { credentials: 'include' });
+      })
+      .then((res) => {
+        if (cancelled || !res) return null;
+        return res.ok ? res.json() : { pins: [] };
+      })
+      .then((data: { pins?: Array<{ id: string; map_id: string; description: string | null; created_at: string; account_id?: string | null; account?: { id: string; username: string | null; first_name: string | null; last_name: string | null; image_url: string | null } | null; mention_type?: { id: string; emoji: string; name: string } | null }> } | null) => {
+        if (cancelled || !data) return;
+        setPinActivityList(
+          (data.pins || []).map((p) => ({
+            id: p.id,
+            map_id: p.map_id,
+            description: p.description ?? null,
+            created_at: p.created_at,
+            account_id: p.account_id ?? null,
+            mention_type: p.mention_type ?? null,
+            accounts: p.account ? {
+              image_url: p.account.image_url,
+              username: p.account.username,
+              first_name: p.account.first_name,
+              last_name: p.account.last_name,
+            } : null,
+          }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setPinActivityList([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPinActivityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, pinActivityExpanded]);
+
   useEffect(() => {
     if (open) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = '';
@@ -1369,6 +1474,88 @@ export default function AppMenu({ open, onClose, liveBoundaryLayer, onLiveBounda
                 )}
               </div>
             )}
+            {/* Pin Activity: collapsible accordion */}
+            <div className="flex-shrink-0 border-b border-white/10">
+              <button
+                type="button"
+                onClick={() => setPinActivityExpanded((e) => !e)}
+                className="w-full flex items-center justify-between gap-2 p-3 text-left hover:bg-white/5 transition-colors"
+                aria-expanded={pinActivityExpanded}
+              >
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pin Activity</span>
+                {pinActivityExpanded ? (
+                  <ChevronUpIcon className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+                )}
+              </button>
+              {pinActivityExpanded && (
+                <div className="px-3 pb-3 pt-0">
+                  {pinActivityLoading ? (
+                    <p className="text-xs text-gray-500">Loading…</p>
+                  ) : pinActivityList.length === 0 ? (
+                    <p className="text-xs text-gray-500">No pins on the live map.</p>
+                  ) : (
+                    <ul className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                      {pinActivityList.map((pin) => {
+                        const formatDate = (s: string) => {
+                          try {
+                            const d = new Date(s);
+                            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                          } catch {
+                            return '';
+                          }
+                        };
+                        const accountDisplayName = pin.accounts
+                          ? pin.accounts.username || 
+                            (pin.accounts.first_name || pin.accounts.last_name
+                              ? `${pin.accounts.first_name || ''} ${pin.accounts.last_name || ''}`.trim()
+                              : 'Anonymous')
+                          : null;
+                        return (
+                          <li
+                            key={pin.id}
+                            className="rounded-md border border-white/10 bg-white/5 p-2 flex flex-col gap-0.5"
+                          >
+                            <div className="flex items-start gap-2">
+                              {pin.accounts?.image_url && (
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full overflow-hidden bg-white/10">
+                                  <Image
+                                    src={pin.accounts.image_url}
+                                    alt={accountDisplayName || ''}
+                                    width={24}
+                                    height={24}
+                                    className="w-full h-full object-cover"
+                                    unoptimized={pin.accounts.image_url.includes('supabase.co')}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  {pin.mention_type?.emoji && (
+                                    <span className="text-sm flex-shrink-0" aria-hidden>{pin.mention_type.emoji}</span>
+                                  )}
+                                  <span className="text-xs font-medium text-white truncate">
+                                    {pin.mention_type?.name ?? 'Pin'}
+                                  </span>
+                                </div>
+                                {accountDisplayName && (
+                                  <p className="text-[10px] text-gray-500 mb-0.5">@{accountDisplayName}</p>
+                                )}
+                                {pin.description && (
+                                  <p className="text-[11px] text-gray-400 line-clamp-2 mb-0.5">{pin.description}</p>
+                                )}
+                                <p className="text-[10px] text-gray-500">{formatDate(pin.created_at)}</p>
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
             {/* Live map info: views, members, pins */}
             <div className="flex-shrink-0 border-b border-white/10 p-3">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Live map</p>

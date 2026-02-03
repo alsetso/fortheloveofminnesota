@@ -19,8 +19,6 @@ const PLAN_LABELS: Record<string, string> = {
   hobby: 'Hobby',
   contributor: 'Contributor',
   plus: 'Pro+',
-  professional: 'Professional',
-  business: 'Business',
   gov: 'Government',
 };
 

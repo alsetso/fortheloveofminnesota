@@ -740,7 +740,7 @@ export default function LivePage() {
         hasPinSelection={Boolean(pinIdFromUrl || selectedPin)}
         hasLocationSelection={Boolean(selectedLocation)}
         hasMentionTypeFilter={Boolean(typeSlugFromUrl && !isContributeOpen)}
-        isModalOpen={isModalOpen}
+        isModalOpen={isModalOpen || isContributeOpen}
       />
       <AppMenu
         open={menuOpen}

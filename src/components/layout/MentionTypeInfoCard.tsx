@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { MapIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 type MentionType = { id: string; emoji: string; name: string };
 
@@ -21,6 +23,9 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = useSupabaseClient();
+  const { account, activeAccountId } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
+  const isAuthenticated = Boolean(account || activeAccountId);
   const [type, setType] = useState<MentionType | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -62,9 +67,17 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
 
   if (loading || !type) return null;
 
+  const handleButtonClick = () => {
+    if (isAuthenticated) {
+      handleAddToMap();
+    } else {
+      openWelcome();
+    }
+  };
+
   return (
     <div
-      className="p-3 border-b border-gray-200 bg-white"
+      className="p-[10px] border-b border-gray-200 bg-white"
       data-container="mention-type-info-card"
       aria-label={`Add ${type.name} to map`}
     >
@@ -74,15 +87,27 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
         </span>
         <span className="text-xs font-medium text-gray-900 truncate flex-1">{type.name}</span>
       </div>
-      <button
-        type="button"
-        onClick={handleAddToMap}
-        className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-        aria-label={`Add ${type.name} to map`}
-      >
-        <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-        Add {type.name} to map
-      </button>
+      {isAuthenticated ? (
+        <button
+          type="button"
+          onClick={handleAddToMap}
+          className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+          aria-label={`Add ${type.name} to map`}
+        >
+          <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+          Add {type.name} to map
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={openWelcome}
+          className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+          aria-label="Sign in to see all events"
+        >
+          <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+          Sign in to see all events
+        </button>
+      )}
     </div>
   );
 }

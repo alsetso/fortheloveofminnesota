@@ -155,7 +155,7 @@ export default function LiveMapFooterStatus({ status, onItemClick }: LiveMapFoot
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="w-full h-[25px] min-h-[25px] flex items-center justify-between gap-2 px-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white/5 transition-colors text-left rounded-md"
+        className={`w-full h-[25px] min-h-[25px] flex items-center justify-between gap-2 px-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white/5 transition-colors text-left ${expanded ? 'rounded-t-md' : 'rounded-md'}`}
         aria-expanded={expanded}
         aria-controls="live-map-footer-status-content"
         id="live-map-footer-status-toggle"
@@ -181,7 +181,7 @@ export default function LiveMapFooterStatus({ status, onItemClick }: LiveMapFoot
         role="region"
         aria-labelledby="live-map-footer-status-toggle"
         hidden={!expanded}
-        className={expanded ? 'px-3 pb-2' : undefined}
+        className={expanded ? 'px-3 pb-2 rounded-b-md' : undefined}
       >
         <ul className="space-y-0.5 list-none p-0 m-0">
           {items.map(({ label, state, type, clickedItem: item }, index) => {

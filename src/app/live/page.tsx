@@ -19,6 +19,8 @@ import MapPage from '../map/[id]/page';
 import { generateUUID } from '@/lib/utils/uuid';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SignInGate from '@/components/auth/SignInGate';
+import type { MapInstance } from '@/components/layout/types';
+import { MentionService } from '@/features/mentions/services/mentionService';
 
 function LiveHeaderThemeSync({ children }: { children: ReactNode }) {
   const [isSearchActive, setIsSearchActive] = useState(false);
@@ -66,6 +68,7 @@ export default function LivePage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<MapInfoLocation | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
+  const [footerTargetState, setFooterTargetState] = useState<'low' | 'main' | 'tall' | null>(null);
   /** Single boundary layer visible on live map; only one at a time. Toggled from main menu Live map section. */
   const [liveBoundaryLayer, setLiveBoundaryLayer] = useState<LiveBoundaryLayerId | null>(null);
   /** Pin display grouping: when true cluster pins; when false (default) show all pins. */
@@ -86,6 +89,50 @@ export default function LivePage() {
     mapLoaded: false,
     loadingPins: false,
   });
+  const [mapInstance, setMapInstance] = useState<MapInstance | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Track map center from liveStatus updates
+  useEffect(() => {
+    if (liveStatus.mapLoaded && mapInstance) {
+      try {
+        const center = mapInstance.getCenter();
+        if (center) {
+          setMapCenter({ lat: center.lat, lng: center.lng });
+        }
+      } catch (err) {
+        // Ignore errors
+      }
+    }
+  }, [liveStatus.mapLoaded, mapInstance]);
+
+  // Store GeolocateControl reference
+  const geolocateControlRef = useRef<any>(null);
+
+  const handleGeolocateControlReady = useCallback((control: any) => {
+    geolocateControlRef.current = control;
+  }, []);
+
+  // Listen for map move events to update center
+  useEffect(() => {
+    if (!mapInstance || !liveStatus.mapLoaded) return;
+    
+    const updateCenter = () => {
+      try {
+        const center = mapInstance.getCenter();
+        if (center) {
+          setMapCenter({ lat: center.lat, lng: center.lng });
+        }
+      } catch (err) {
+        // Ignore errors
+      }
+    };
+
+    mapInstance.on('moveend', updateCenter);
+    return () => {
+      mapInstance.off('moveend', updateCenter);
+    };
+  }, [mapInstance, liveStatus.mapLoaded]);
 
   // Track page view for analytics
   useEffect(() => {
@@ -178,12 +225,13 @@ export default function LivePage() {
     [searchParams]
   );
 
-  useEffect(() => {
-    if (pinIdFromUrl) setFooterOpen(true);
-  }, [pinIdFromUrl]);
+  // Removed - pin state is handled by the useEffect below that sets 'tall'
 
   useEffect(() => {
-    if (typeSlugFromUrl && !isContributeOpen) setFooterOpen(true);
+    if (typeSlugFromUrl && !isContributeOpen) {
+      setFooterOpen(true);
+      setFooterTargetState('main'); // MentionTypeInfoCard → 'main' state
+    }
   }, [typeSlugFromUrl, isContributeOpen]);
 
   // Resolve boundary from URL (layer + id) and set footer MapInfo; one entity at a time.
@@ -200,6 +248,7 @@ export default function LivePage() {
         if (!cancelled && loc) {
           setSelectedLocation(loc);
           setFooterOpen(true);
+          setFooterTargetState('main');
         }
       })
       .catch(() => {
@@ -332,53 +381,192 @@ export default function LivePage() {
   }, [pinIdFromUrl, fetchPinData]); // Only depend on pinIdFromUrl, not selectedPin
 
   const handleLocationSelect = useCallback(
-    (info: { lat: number; lng: number; address: string | null; isOpen: boolean; mapMeta?: Record<string, any> | null }) => {
+    async (info: { lat: number; lng: number; address: string | null; isOpen: boolean; mapMeta?: Record<string, any> | null }) => {
       if (!info.isOpen) return;
       const lat = Number(info.lat);
       const lng = Number(info.lng);
       const layer = info.mapMeta?.boundaryLayer as string | undefined;
       const entityId = info.mapMeta?.boundaryEntityId != null ? String(info.mapMeta.boundaryEntityId).trim() : '';
       
-      // Clear pin selection when selecting location
-      setSelectedPin(null);
-      setIsLoadingPin(false);
-      
       // If it's a boundary, we need to fetch boundary data
       if (layer && entityId) {
         // Boundary data will be resolved by the useEffect that watches layerFromUrl/entityIdFromUrl
+        setFooterOpen(true);
+        setFooterTargetState('main');
+        router.replace(
+          buildLiveUrl({ layer, id: entityId })
+        );
+        return;
+      }
+
+      // Map click - check if mention type is selected and user is authenticated
+      if (typeSlugFromUrl && resolvedMentionType && isAuthenticated && currentAccountId) {
+        // Create pin immediately with selected mention type
+        try {
+          setIsLoadingPin(true);
+          const mention = await MentionService.createMention({
+            lat: Number.isFinite(lat) ? lat : 0,
+            lng: Number.isFinite(lng) ? lng : 0,
+            mention_type_id: resolvedMentionType.id,
+            description: null, // No description yet - user can add later
+            visibility: 'public',
+            full_address: info.address || undefined,
+            map_meta: info.mapMeta || undefined,
+          }, currentAccountId);
+
+          // Dispatch event for MentionsLayer to refresh
+          window.dispatchEvent(new CustomEvent('mention-created', {
+            detail: { mention }
+          }));
+
+          // Show the newly created pin
+          const pinData: LivePinData = {
+            id: mention.id,
+            map_id: mention.map_id,
+            lat: mention.lat,
+            lng: mention.lng,
+            description: mention.description,
+            caption: (mention as any).caption || null, // caption may exist but not in type
+            emoji: null,
+            image_url: mention.image_url || null,
+            video_url: (mention as any).video_url || null, // video_url may exist but not in type
+            account_id: mention.account_id,
+            created_at: mention.created_at,
+            account: mention.account,
+            mention_type: mention.mention_type,
+            tagged_accounts: null,
+          };
+          
+          setSelectedPin(pinData);
+          setSelectedLocation(null);
+          setIsLoadingPin(false);
+          setFooterOpen(true);
+          setFooterTargetState('tall');
+          router.replace(buildLiveUrl({ pin: mention.id }));
+        } catch (err) {
+          console.error('[LivePage] Error creating pin:', err);
+          setIsLoadingPin(false);
+          // Fall through to show location selection
+          setSelectedLocation({
+            lat: Number.isFinite(lat) ? lat : 0,
+            lng: Number.isFinite(lng) ? lng : 0,
+            address: info.address,
+            mapMeta: info.mapMeta ?? null,
+          });
+          setFooterOpen(true);
+          setFooterTargetState('main');
+          router.replace(buildLiveUrl({ clearSelection: true }));
+        }
       } else {
-        // Map click - set location immediately (no fetch needed)
+        // No mention type selected or not authenticated - show location selection
+        setSelectedPin(null);
+        setIsLoadingPin(false);
         setSelectedLocation({
           lat: Number.isFinite(lat) ? lat : 0,
           lng: Number.isFinite(lng) ? lng : 0,
           address: info.address,
           mapMeta: info.mapMeta ?? null,
         });
+        setFooterOpen(true);
+        setFooterTargetState('main');
+        router.replace(buildLiveUrl({ clearSelection: true }));
       }
-      
-      setFooterOpen(true);
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[LiveBoundary] Live handleLocationSelect', {
-          boundaryLayer: layer,
-          boundaryEntityId: info.mapMeta?.boundaryEntityId,
-          entityIdTrimmed: entityId,
-          willSetUrl: !!(layer && entityId),
+    },
+    [router, buildLiveUrl, typeSlugFromUrl, resolvedMentionType, isAuthenticated, currentAccountId]
+  );
+
+  // Listen for GeolocateControl geolocate event to show user location in footer
+  // Must be after handleLocationSelect is defined
+  useEffect(() => {
+    if (!geolocateControlRef.current) return;
+
+    const handleGeolocate = async (e: any) => {
+      const coords = e.coords;
+      if (!coords) return;
+
+      const lat = coords.latitude;
+      const lng = coords.longitude;
+
+      // Reverse geocode to get address
+      try {
+        const { MAP_CONFIG } = await import('@/features/map/config');
+        const token = MAP_CONFIG.MAPBOX_TOKEN;
+        if (!token) return;
+
+        const url = `${MAP_CONFIG.GEOCODING_BASE_URL}/${lng},${lat}.json`;
+        const params = new URLSearchParams({
+          access_token: token,
+          types: 'address,poi,neighborhood,locality,place,postcode,district,region',
+          limit: '1',
+        });
+
+        const response = await fetch(`${url}?${params}`);
+        if (response.ok) {
+          const data = await response.json();
+          const address = data.features && data.features.length > 0
+            ? data.features[0].place_name || null
+            : null;
+
+          // Show user location in footer
+          handleLocationSelect({
+            lat,
+            lng,
+            address,
+            isOpen: true,
+            mapMeta: {
+              isUserLocation: true,
+              feature: data.features?.[0] || null,
+            },
+          });
+        } else {
+          // Still show location even if reverse geocoding fails
+          handleLocationSelect({
+            lat,
+            lng,
+            address: null,
+            isOpen: true,
+            mapMeta: {
+              isUserLocation: true,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('[LivePage] Failed to reverse geocode user location:', err);
+        // Still show location even if reverse geocoding fails
+        handleLocationSelect({
+          lat,
+          lng,
+          address: null,
+          isOpen: true,
+          mapMeta: {
+            isUserLocation: true,
+          },
         });
       }
-      router.replace(
-        buildLiveUrl(
-          layer && entityId ? { layer, id: entityId } : { clearSelection: true }
-        )
-      );
-    },
-    [router, buildLiveUrl]
-  );
+    };
+
+    const control = geolocateControlRef.current;
+    control.on('geolocate', handleGeolocate);
+
+    return () => {
+      control.off('geolocate', handleGeolocate);
+    };
+  }, [handleLocationSelect]);
+
+  // Set footer to tall state when pin is selected
+  useEffect(() => {
+    if (pinIdFromUrl) {
+      setFooterTargetState('tall');
+    }
+  }, [pinIdFromUrl]);
 
   const handleLivePinSelect = useCallback(
     (pinId: string, pinData?: Record<string, unknown> | null) => {
       // Clear location selection
       setSelectedLocation(null);
       setFooterOpen(true);
+      // Set footer to tall state when pin is selected (LivePinCard)
+      setFooterTargetState('tall');
       
       // If pinData provided, use it immediately
       if (pinData) {
@@ -423,12 +611,11 @@ export default function LivePage() {
     setSelectedPin(null);
     setIsLoadingPin(false);
     setFooterOpen(false);
+    // Set footer to low state when closing
+    setFooterTargetState('low');
     clearMapSelectionRef.current?.();
   }, [router, buildLiveUrl]);
 
-  const handlePinCardClose = useCallback(() => {
-    handleClearSelection();
-  }, [handleClearSelection]);
 
   const handleAddToMap = useCallback((loc: MapInfoLocation, mentionTypeId?: string) => {
     window.dispatchEvent(
@@ -489,7 +676,6 @@ export default function LivePage() {
         <LivePinCard
           pinId={pinIdFromUrl}
           pin={pin}
-          onClose={handlePinCardClose}
           currentAccountId={currentAccountId}
         />
       );
@@ -503,13 +689,12 @@ export default function LivePage() {
           zoom={liveStatus.currentZoom}
           onAddToMap={handleAddToMap}
           mentionType={showMentionTypeCard && resolvedMentionType ? resolvedMentionType : null}
-          onClose={handleClearSelection}
         />
       </>
     );
-  }, [pinIdFromUrl, selectedPin, currentAccountId, typeSlugFromUrl, isContributeOpen, selectedLocation, resolvedMentionType, liveStatus.currentZoom, handlePinCardClose, handleClearSelection, handleAddToMap]);
+  }, [pinIdFromUrl, selectedPin, currentAccountId, typeSlugFromUrl, isContributeOpen, selectedLocation, resolvedMentionType, liveStatus.currentZoom, handleClearSelection, handleAddToMap]);
 
-  const { openWelcome } = useAppModalContextSafe();
+  const { openWelcome, isModalOpen } = useAppModalContextSafe();
 
   return (
     <LiveHeaderThemeSync>
@@ -527,6 +712,8 @@ export default function LivePage() {
         onRegisterClearSelection={(fn) => {
           clearMapSelectionRef.current = fn;
         }}
+        onMapInstanceReady={setMapInstance}
+        onGeolocateControlReady={handleGeolocateControlReady}
       />
       <AppContentWidth
         footerHeaderLabel={footerHeaderLabel}
@@ -535,6 +722,25 @@ export default function LivePage() {
         onFooterOpenChange={setFooterOpen}
         footerStatusContent={<LiveMapFooterStatus status={liveStatus} onItemClick={handleClickedItemClick} />}
         onAccountImageClick={() => setMenuOpen(true)}
+        map={mapInstance || undefined}
+        currentZoom={liveStatus.currentZoom}
+        mapCenter={mapCenter}
+        footerTargetState={footerTargetState}
+        onFooterStateChange={(state) => {
+          // Update footerOpen based on state
+          setFooterOpen(state !== 'low' && state !== 'hidden');
+          // Clear targetState after state change completes (allows new targetState to be set)
+          // Only clear if not explicitly set to 'low' (user closed)
+          if (state === footerTargetState && footerTargetState !== 'low') {
+            setTimeout(() => setFooterTargetState(null), 200);
+          }
+        }}
+        onUniversalClose={handleClearSelection}
+        hasSelection={Boolean(selectedPin || selectedLocation || (typeSlugFromUrl && !isContributeOpen))}
+        hasPinSelection={Boolean(pinIdFromUrl || selectedPin)}
+        hasLocationSelection={Boolean(selectedLocation)}
+        hasMentionTypeFilter={Boolean(typeSlugFromUrl && !isContributeOpen)}
+        isModalOpen={isModalOpen}
       />
       <AppMenu
         open={menuOpen}

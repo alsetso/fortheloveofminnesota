@@ -376,7 +376,14 @@ export function useUnifiedMapClickHandler({
   }, []);
 
   /**
-   * Check if clicks should be rejected (non-member or collaboration tool disabled)
+   * Check if clicks should be rejected (for empty map clicks only)
+   * Uses map visibility (public/private) to control access:
+   * - Public maps: Allow clicks (show sign-in prompt if not authenticated)
+   * - Private maps: Require membership (show join prompt if not member, sign-in if not authenticated)
+   * 
+   * Rejects if:
+   * 1. Collaboration tool (allow_clicks) is disabled AND user is not owner
+   * 2. Map is private AND user is not owner AND not effective member
    */
   const shouldRejectClick = useCallback(() => {
     const currentMapData = mapDataRef.current;
@@ -389,7 +396,15 @@ export function useUnifiedMapClickHandler({
       return true;
     }
     
-    // Check if user is non-member (not owner and not effective member)
+    // Use visibility to control access: public maps allow clicks, private maps require membership
+    const isPublic = currentMapData?.visibility === 'public';
+    
+    if (isPublic) {
+      // Public maps: allow clicks (authentication/membership handled by UI prompts)
+      return false;
+    }
+    
+    // Private maps: require membership (not owner and not effective member)
     if (!currentIsOwner && !currentEffectiveIsMember) {
       return true;
     }
@@ -431,10 +446,19 @@ export function useUnifiedMapClickHandler({
 
     // Reject only when clicking empty map. Never reject for entity/boundary clicks (viewing is always allowed).
     if (target === 'map' && shouldRejectClick()) {
-      addToast(createToast('error', 'Map clicks disabled', {
-        message: 'You must be a member and the collaboration tool must be enabled to interact with the map.',
-        duration: 3000,
-      }));
+      const currentMapData = mapDataRef.current;
+      const isPublic = currentMapData?.visibility === 'public';
+      
+      if (isPublic) {
+        // Public map: show sign-in prompt (handled by UI components)
+        // Don't show error toast - let the UI handle the prompt
+      } else {
+        // Private map: require membership
+        addToast(createToast('error', 'Map clicks disabled', {
+          message: 'You must be a member to interact with this private map.',
+          duration: 3000,
+        }));
+      }
       isProcessingClickRef.current = false;
       return;
     }

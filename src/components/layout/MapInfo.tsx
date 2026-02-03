@@ -112,7 +112,7 @@ function getEmptyLabel(zoom: number | undefined, explicitEmptyLabel: string | un
 
 export function MapInfoSkeleton({ onClose }: { onClose?: () => void }) {
   return (
-    <div className="p-3 space-y-3" data-container="map-info-skeleton" aria-label="Loading map info">
+    <div className="p-[10px] space-y-3" data-container="map-info-skeleton" aria-label="Loading map info">
       <div className="flex items-center justify-between gap-2">
         <div className="h-4 w-32 rounded bg-gray-200 animate-pulse" aria-hidden />
         {onClose && (
@@ -141,16 +141,8 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
   const isAuthenticated = Boolean(account || activeAccountId);
 
   if (!location) {
-    const label = getEmptyLabel(zoom, emptyLabel);
-    return (
-      <div
-        className="p-3 text-xs text-gray-500"
-        data-container="map-info"
-        aria-label="Map info"
-      >
-        {label}
-      </div>
-    );
+    // Hide helper text - return null when no location is selected
+    return null;
   }
 
   const { lat, lng } = safeLatLng(location.lat, location.lng);
@@ -162,11 +154,11 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
 
   return (
     <div
-      className="p-3 space-y-3"
+      className="p-[10px] space-y-3"
       data-container="map-info"
       aria-label="Map info"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
         {mapMetaCard ? (
           <div
             className="flex items-center gap-2 min-w-0 flex-1"
@@ -180,16 +172,6 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
           </div>
         ) : (
           <span className="text-xs font-medium text-gray-900 truncate flex-1">Location selected</span>
-        )}
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="w-4 h-4" />
-          </button>
         )}
       </div>
       {detailRows.length > 0 && (
@@ -234,10 +216,10 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
             type="button"
             onClick={openWelcome}
             className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-            aria-label="Sign in to add to map"
+            aria-label={mentionType ? `Sign in to add ${mentionType.name}` : 'Sign in to add to map'}
           >
             <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-            Sign in to add to map
+            {mentionType ? `Sign in to add ${mentionType.name}` : 'Sign in to add to map'}
           </button>
         ) : null}
       </div>

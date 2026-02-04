@@ -863,7 +863,8 @@ function LivePageContent() {
     );
   }, [activeSelectionType, effectivePinId, selectedPin, currentAccountId, typeSlugFromUrl, isContributeOpen, selectedLocation, resolvedMentionType, liveStatus.currentZoom, handleClearSelection, handleAddToMap]);
 
-  const { openWelcome, isModalOpen } = useAppModalContextSafe();
+  const { openWelcome, isModalOpen, modal } = useAppModalContextSafe();
+  const isWelcomeModalOpen = modal.type === 'welcome';
 
   const handleLocationSelectForFooter = useCallback(
     (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: any) => {
@@ -1058,17 +1059,19 @@ function LivePageContent() {
         onMapInstanceReady={setMapInstance}
         onGeolocateControlReady={handleGeolocateControlReady}
       />
-      {/* MapControls - replaces AppFooter */}
-      <MapControls
-        children={footerContent}
-        statusContent={undefined}
-        onAccountImageClick={() => setMenuOpen(true)}
-        onUniversalClose={handleClearSelection}
-        showCloseIcon={hasSelection}
-        map={mapInstance || undefined}
-        onLocationSelect={handleLocationSelectForFooter}
-        showMentionTypes={showMentionTypes}
-      />
+      {/* MapControls - replaces AppFooter - hidden when welcome modal is open */}
+      {!isWelcomeModalOpen && (
+        <MapControls
+          children={footerContent}
+          statusContent={undefined}
+          onAccountImageClick={() => setMenuOpen(true)}
+          onUniversalClose={handleClearSelection}
+          showCloseIcon={hasSelection}
+          map={mapInstance || undefined}
+          onLocationSelect={handleLocationSelectForFooter}
+          showMentionTypes={showMentionTypes}
+        />
+      )}
       <AppMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}

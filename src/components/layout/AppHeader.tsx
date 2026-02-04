@@ -1,8 +1,8 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useHeaderTheme } from '@/contexts/HeaderThemeContext';
+import { useSearchState } from '@/contexts/SearchStateContext';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import MapSearchInput from './MapSearchInput';
 
@@ -14,15 +14,19 @@ interface AppHeaderProps {
   /** Whether to show the universal close icon (when search is active or selection exists) */
   showCloseIcon?: boolean;
   /** Current footer state - used for reactive styling */
-  currentFooterState?: 'hidden' | 'low' | 'main' | 'tall';
+  currentFooterState?: 'hidden' | 'tiny' | 'low' | 'main' | 'tall';
+  /** Map instance for flying to locations */
+  map?: any;
+  /** Callback when a location is selected */
+  onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: any) => void;
 }
 
 /**
  * App header for the live overlay: account image + search.
  */
-export default function AppHeader({ onAccountImageClick, onUniversalClose, showCloseIcon, currentFooterState }: AppHeaderProps) {
-  const pathname = usePathname();
+export default function AppHeader({ onAccountImageClick, onUniversalClose, showCloseIcon, currentFooterState, map, onLocationSelect }: AppHeaderProps) {
   const { isSearchActive } = useHeaderTheme();
+  const { deactivateSearch, clearSearch } = useSearchState();
   
   // Determine if search input should show active styling
   const isSearchInputActive = isSearchActive || currentFooterState === 'tall';
@@ -30,11 +34,7 @@ export default function AppHeader({ onAccountImageClick, onUniversalClose, showC
   const handleClose = () => {
     // Close search if active
     if (isSearchActive) {
-      const newUrl = pathname + (typeof window !== 'undefined' ? window.location.search : '');
-      if (typeof window !== 'undefined') {
-        window.history.pushState({}, '', newUrl);
-        window.dispatchEvent(new HashChangeEvent('hashchange'));
-      }
+      clearSearch();
     }
     // Call universal close handler (clears selections, collapses footer)
     onUniversalClose?.();
@@ -46,11 +46,15 @@ export default function AppHeader({ onAccountImageClick, onUniversalClose, showC
       data-container="app-header"
       aria-label="App header"
     >
+      <div className="flex-1 min-w-0">
+        <MapSearchInput 
+          map={map}
+          onLocationSelect={onLocationSelect}
+          isActive={isSearchInputActive} 
+        />
+      </div>
       <div className="flex-shrink-0">
         <AccountDropdown variant="light" onTriggerClick={onAccountImageClick} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <MapSearchInput isActive={isSearchInputActive} />
       </div>
       {showCloseIcon && (
         <button

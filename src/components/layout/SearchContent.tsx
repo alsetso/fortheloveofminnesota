@@ -1,160 +1,295 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { MapPinIcon } from '@heroicons/react/24/outline';
-import { usePathname } from 'next/navigation';
-import type { PinData } from './types';
+import { useState, useEffect, type ReactElement } from 'react';
+import { MapPinIcon, MagnifyingGlassIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
+import { useSearchState } from '@/contexts/SearchStateContext';
+import { useToast } from '@/features/ui/hooks/useToast';
 
-type PinPeriod = '24h' | '7d' | 'all';
+interface CityResult {
+  id: string;
+  ctu_class: 'CITY' | 'TOWNSHIP' | 'UNORGANIZED TERRITORY';
+  feature_name: string;
+  county_name: string;
+  county_code: string | null;
+  population: number | null;
+  geometry: any; // GeoJSON geometry
+}
 
 interface SearchContentProps {
-  /** Callback when a pin is clicked */
+  /** Callback when a city is clicked */
+  onCityClick?: (city: { lat: number; lng: number }) => void;
+  /** Callback when a pin is clicked (for backward compatibility) */
   onPinClick?: (pin: { lat: number; lng: number }) => void;
 }
 
 /**
- * Search content component - displays pin period filter and search results
+ * Search content component - displays city search results inline in main content area
  */
-export default function SearchContent({ onPinClick }: SearchContentProps) {
-  const pathname = usePathname();
-  const [searchPins, setSearchPins] = useState<PinData[]>([]);
-  const [pinsLoading, setPinsLoading] = useState(false);
-  const [pinsError, setPinsError] = useState<string | null>(null);
-  const [pinPeriod, setPinPeriod] = useState<PinPeriod>('all');
+export default function SearchContent({ onCityClick, onPinClick }: SearchContentProps) {
+  const { searchQuery } = useSearchState();
+  const [cities, setCities] = useState<CityResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [currentQuery, setCurrentQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const { success, info } = useToast();
 
-  const fetchLivePins = useCallback(async () => {
-    setPinsLoading(true);
-    setPinsError(null);
-    try {
-      const params = new URLSearchParams();
-      if (pinPeriod !== 'all') params.set('period', pinPeriod);
-      const res = await fetch(`/api/maps/live/pins${params.toString() ? `?${params}` : ''}`, { credentials: 'include' });
-      if (!res.ok) {
-        setPinsError('Failed to load pins');
-        setSearchPins([]);
-        return;
-      }
-      const data = await res.json();
-      setSearchPins(data.pins ?? []);
-    } catch {
-      setPinsError('Failed to load pins');
-      setSearchPins([]);
-    } finally {
-      setPinsLoading(false);
-    }
-  }, [pinPeriod]);
-
-  useEffect(() => {
-    fetchLivePins();
-  }, [fetchLivePins]);
-
-  const getRelativeTime = (date: string): string => {
-    const now = new Date();
-    const then = new Date(date);
-    const diffSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-    if (diffSeconds < 60) return 'just now';
-    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-    if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
-    if (diffSeconds < 604800) return `${Math.floor(diffSeconds / 86400)}d ago`;
-    if (diffSeconds < 2592000) return `${Math.floor(diffSeconds / 604800)}w ago`;
-    if (diffSeconds < 31536000) return `${Math.floor(diffSeconds / 2592000)}mo ago`;
-    return `${Math.floor(diffSeconds / 31536000)}y ago`;
-  };
-
-  const pinTitle = (pin: PinData): string => {
-    const text = (pin.caption ?? pin.description ?? pin.full_address ?? '').trim();
-    return text || 'Pin';
-  };
-
-  const handlePinClick = (pin: PinData) => {
-    if (typeof pin.lat !== 'number' || typeof pin.lng !== 'number') return;
+  // Calculate center from GeoJSON geometry (handles Polygon, MultiPolygon, FeatureCollection, or direct geometry)
+  const getCenterFromGeometry = (geometry: any): { lat: number; lng: number } | null => {
+    if (!geometry) return null;
     
-    const url = `${pathname}${typeof window !== 'undefined' ? window.location.search : ''}`;
-    if (typeof window !== 'undefined') {
-      window.history.replaceState(null, '', url);
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-      onPinClick?.({ lat: pin.lat, lng: pin.lng });
+    try {
+      // Handle FeatureCollection
+      if (geometry.type === 'FeatureCollection' && geometry.features && geometry.features.length > 0) {
+        return getCenterFromGeometry(geometry.features[0].geometry);
+      }
+      
+      // Handle Feature
+      if (geometry.type === 'Feature' && geometry.geometry) {
+        return getCenterFromGeometry(geometry.geometry);
+      }
+      
+      // Handle Point
+      if (geometry.type === 'Point' && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+        return { lng: geometry.coordinates[0], lat: geometry.coordinates[1] };
+      }
+      
+      // Handle Polygon
+      if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+        const ring = geometry.coordinates[0]; // First ring (exterior ring)
+        if (Array.isArray(ring) && ring.length > 0) {
+          let sumLng = 0;
+          let sumLat = 0;
+          let count = 0;
+          
+          for (const coord of ring) {
+            if (Array.isArray(coord) && coord.length >= 2) {
+              sumLng += coord[0];
+              sumLat += coord[1];
+              count++;
+            }
+          }
+          
+          if (count > 0) {
+            return { lng: sumLng / count, lat: sumLat / count };
+          }
+        }
+      }
+      
+      // Handle MultiPolygon
+      if (geometry.type === 'MultiPolygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+        const firstPolygon = geometry.coordinates[0];
+        if (Array.isArray(firstPolygon) && firstPolygon.length > 0) {
+          const ring = firstPolygon[0];
+          if (Array.isArray(ring) && ring.length > 0) {
+            let sumLng = 0;
+            let sumLat = 0;
+            let count = 0;
+            
+            for (const coord of ring) {
+              if (Array.isArray(coord) && coord.length >= 2) {
+                sumLng += coord[0];
+                sumLat += coord[1];
+                count++;
+              }
+            }
+            
+            if (count > 0) {
+              return { lng: sumLng / count, lat: sumLat / count };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating center from geometry:', error, geometry);
     }
+    
+    return null;
+  };
+
+  // Listen for search results updates from MapSearchInput
+  useEffect(() => {
+    const handleResultsUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        cities: CityResult[];
+        isSearching: boolean;
+        query: string;
+      }>;
+      setCities(customEvent.detail.cities || []);
+      setIsSearching(customEvent.detail.isSearching || false);
+      setCurrentQuery(customEvent.detail.query || '');
+      setSelectedIndex(-1);
+    };
+
+    window.addEventListener('search-results-updated', handleResultsUpdated);
+    return () => {
+      window.removeEventListener('search-results-updated', handleResultsUpdated);
+    };
+  }, []);
+
+  const handleCityClick = (city: CityResult) => {
+    const center = getCenterFromGeometry(city.geometry);
+    if (!center) {
+      info('Error', 'Could not calculate city center');
+      return;
+    }
+
+    // Show toast notification
+    success('City selected', `${city.feature_name}, ${city.county_name}`);
+
+    // Trigger city click callback (for map interaction)
+    if (onCityClick) {
+      onCityClick({ lat: center.lat, lng: center.lng });
+    }
+    
+    // Also support onPinClick for backward compatibility
+    if (onPinClick) {
+      onPinClick({ lat: center.lat, lng: center.lng });
+    }
+    
+    // Dispatch city selected event (for MapSearchInput to handle boundary rendering)
+    window.dispatchEvent(
+      new CustomEvent('city-selected', {
+        detail: { city, center },
+      })
+    );
+  };
+
+  // Get all results as a flat array for keyboard navigation
+  const allResults = cities.map(c => ({ type: 'city' as const, data: c }));
+
+  // Handle keyboard navigation for results
+  useEffect(() => {
+    if (allResults.length === 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => 
+          prev < allResults.length - 1 ? prev + 1 : prev
+        );
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
+      } else if (e.key === 'Enter' && selectedIndex >= 0 && selectedIndex < allResults.length) {
+        e.preventDefault();
+        const result = allResults[selectedIndex];
+        if (result.type === 'city') {
+          handleCityClick(result.data as CityResult);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [allResults, selectedIndex, handleCityClick]);
+
+  const getCityDisplayName = (city: CityResult): string => {
+    return `${city.feature_name}, ${city.county_name}`;
+  };
+
+  const getCityTypeLabel = (ctuClass: string): string => {
+    switch (ctuClass) {
+      case 'CITY':
+        return 'City';
+      case 'TOWNSHIP':
+        return 'Township';
+      case 'UNORGANIZED TERRITORY':
+        return 'Unorganized Territory';
+      default:
+        return ctuClass;
+    }
+  };
+
+  const highlightText = (text: string, query: string) => {
+    if (!query || !text) return <>{text}</>;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase().trim();
+    if (!lowerQuery) return <>{text}</>;
+    
+    const parts: (string | ReactElement)[] = [];
+    let lastIndex = 0;
+    let searchIndex = lowerText.indexOf(lowerQuery, lastIndex);
+    
+    while (searchIndex !== -1) {
+      // Add text before match
+      if (searchIndex > lastIndex) {
+        parts.push(text.substring(lastIndex, searchIndex));
+      }
+      // Add highlighted match
+      parts.push(
+        <span key={searchIndex} className="bg-gray-200">
+          {text.substring(searchIndex, searchIndex + lowerQuery.length)}
+        </span>
+      );
+      lastIndex = searchIndex + lowerQuery.length;
+      searchIndex = lowerText.indexOf(lowerQuery, lastIndex);
+    }
+    
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+    
+    return <>{parts}</>;
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* Pin period filter */}
-      <div className="flex-shrink-0 border-b border-gray-200 p-2 bg-gray-50">
-        <div className="flex gap-1 rounded-md bg-gray-100 p-0.5">
-          {(['24h', '7d', 'all'] as const).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPinPeriod(p)}
-              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                pinPeriod === p ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {p === '24h' ? '24h' : p === '7d' ? '7 day' : 'All time'}
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="flex flex-col h-full">
+      {/* Search results */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-[10px] space-y-3">
+        {isSearching && cities.length === 0 && (
+          <div className="flex items-center gap-2 py-2">
+            <div className="w-3 h-3 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin" />
+            <p className="text-xs text-gray-600">Searching...</p>
+          </div>
+        )}
 
-      {/* Pins list */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2 bg-gray-50">
-        {pinsLoading && (
-          <div className="p-[10px] border border-gray-200 rounded-md bg-white">
-            <p className="text-xs text-gray-500">Loading…</p>
+        {!isSearching && cities.length === 0 && currentQuery.length >= 2 && (
+          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+            <MagnifyingGlassIcon className="w-5 h-5 mb-2" />
+            <p className="text-xs text-center">No cities found</p>
           </div>
         )}
-        {!pinsLoading && pinsError && (
-          <div className="p-[10px] border border-gray-200 rounded-md bg-white">
-            <p className="text-xs text-gray-500">{pinsError}</p>
+
+        {!isSearching && cities.length === 0 && currentQuery.length < 2 && (
+          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+            <MagnifyingGlassIcon className="w-5 h-5 mb-2" />
+            <p className="text-xs text-center">Start typing to search cities</p>
           </div>
         )}
-        {!pinsLoading && !pinsError && searchPins.length === 0 && (
-          <div className="p-[10px] border border-gray-200 rounded-md bg-white">
-            <p className="text-xs text-gray-500">No pins in this period.</p>
+
+        {/* Cities section */}
+        {cities.length > 0 && (
+          <div className="space-y-1">
+            {cities.map((city, index) => {
+              const isSelected = selectedIndex === index;
+              const displayName = getCityDisplayName(city);
+              return (
+                <button
+                  key={`city-${city.id}`}
+                  type="button"
+                  onClick={() => handleCityClick(city)}
+                  className={`w-full flex items-start gap-2 p-[10px] border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors text-left ${
+                    isSelected ? 'bg-gray-100' : ''
+                  }`}
+                >
+                  <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center">
+                    <BuildingOfficeIcon className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-900 truncate">
+                      {highlightText(displayName, currentQuery)}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
+                      {getCityTypeLabel(city.ctu_class)}
+                      {city.population ? ` · ${city.population.toLocaleString()} people` : ''}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
-        {!pinsLoading && !pinsError && searchPins.length > 0 && searchPins.map((pin) => {
-          const mediaImageUrl = pin.image_url ?? pin.media_url ?? null;
-          const hasLocation = typeof pin.lat === 'number' && typeof pin.lng === 'number';
-          
-          return (
-            <button
-              key={pin.id}
-              type="button"
-              onClick={() => handlePinClick(pin)}
-              disabled={!hasLocation}
-              className="w-full flex items-center gap-2 p-[10px] border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="flex-shrink-0 w-8 h-8 rounded-md bg-gray-100 flex items-center justify-center overflow-hidden">
-                {mediaImageUrl ? (
-                  <img
-                    src={mediaImageUrl}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <MapPinIcon className="w-4 h-4 text-gray-500" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {pinTitle(pin)}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {pin.account?.username ? (
-                    <>@{pin.account.username}</>
-                  ) : null}
-                  {pin.account?.username ? ' · ' : null}
-                  Live map · {getRelativeTime(pin.created_at)}
-                  {typeof pin.view_count === 'number' && pin.view_count >= 0 && (
-                    <> · {pin.view_count} {pin.view_count === 1 ? 'view' : 'views'}</>
-                  )}
-                </p>
-              </div>
-            </button>
-          );
-        })}
       </div>
     </div>
   );

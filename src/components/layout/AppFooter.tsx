@@ -6,6 +6,7 @@ import HeaderMentionTypeCards from './HeaderMentionTypeCards';
 import SearchContent from './SearchContent';
 import NearbyPinsSection from './NearbyPinsSection';
 import { useHeaderTheme } from '@/contexts/HeaderThemeContext';
+import { useSearchState } from '@/contexts/SearchStateContext';
 import { getFooterHeights, type FooterState } from './footerConfig';
 import { useFooterStateManager } from './useFooterStateManager';
 import type { MapInstance, NearbyPin } from './types';
@@ -31,10 +32,10 @@ interface AppFooterProps {
   currentZoom?: number;
   /** Map center coordinates */
   mapCenter?: { lat: number; lng: number } | null;
-  /** Programmatically set footer state: 'hidden' | 'low' | 'main' | 'tall' */
-  targetState?: 'hidden' | 'low' | 'main' | 'tall' | null;
+  /** Programmatically set footer state: 'hidden' | 'tiny' | 'low' | 'main' | 'tall' */
+  targetState?: 'hidden' | 'tiny' | 'low' | 'main' | 'tall' | null;
   /** Called when footer state changes */
-  onStateChange?: (state: 'hidden' | 'low' | 'main' | 'tall') => void;
+  onStateChange?: (state: 'hidden' | 'tiny' | 'low' | 'main' | 'tall') => void;
   /** Universal close handler - clears selections and collapses footer */
   onUniversalClose?: () => void;
   /** Whether there's a selection active (determines if close icon should show) */
@@ -47,6 +48,8 @@ interface AppFooterProps {
   hasMentionTypeFilter?: boolean;
   /** Whether a modal is open (should hide footer) */
   isModalOpen?: boolean;
+  /** Callback when a location is selected */
+  onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: any) => void;
 }
 
 /**
@@ -74,8 +77,10 @@ export default function AppFooter({
   hasLocationSelection = false,
   hasMentionTypeFilter = false,
   isModalOpen = false,
+  onLocationSelect,
 }: AppFooterProps) {
   const { isSearchActive } = useHeaderTheme();
+  const { isSearching } = useSearchState();
   const [internalOpen, setInternalOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartY, setDragStartY] = useState(0);
@@ -85,8 +90,16 @@ export default function AppFooter({
   const panelRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   
-  // Get footer heights from config
-  const { HIDDEN_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT } = getFooterHeights();
+  // Get footer heights from config - use state to avoid hydration mismatch
+  // Initialize with safe defaults, update after mount
+  const [footerHeights, setFooterHeights] = useState(() => getFooterHeights());
+  
+  useEffect(() => {
+    // Update heights after mount to match actual viewport
+    setFooterHeights(getFooterHeights());
+  }, []);
+  
+  const { HIDDEN_HEIGHT, TINY_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT } = footerHeights;
   
   // Panel height state - initialize to LOW_HEIGHT
   const [panelHeight, setPanelHeight] = useState(LOW_HEIGHT);
@@ -108,7 +121,7 @@ export default function AppFooter({
     isModalOpen,
     panelHeight,
     targetState,
-    heights: { HIDDEN_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT },
+    heights: { HIDDEN_HEIGHT, TINY_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT },
   });
   
   const currentState = stateManager.currentState;
@@ -206,42 +219,42 @@ export default function AppFooter({
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const deltaY = dragStartY - clientY; // Positive = dragging up
     const maxHeight = (isSearchActive || currentState === 'tall') ? TALL_HEIGHT : MAIN_HEIGHT;
-    const newHeight = Math.max(LOW_HEIGHT, Math.min(maxHeight, dragStartHeight + deltaY));
+    const newHeight = Math.max(TINY_HEIGHT, Math.min(maxHeight, dragStartHeight + deltaY));
     
     setPanelHeight(newHeight);
     
     // Update open state based on height
-    if (newHeight <= LOW_HEIGHT + 20) {
+    if (newHeight <= TINY_HEIGHT + 20) {
       setIsOpen(false);
     } else {
       setIsOpen(true);
     }
-  }, [isDragging, dragStartY, dragStartHeight, setIsOpen, isSearchActive, currentState, TALL_HEIGHT, MAIN_HEIGHT, LOW_HEIGHT]);
+  }, [isDragging, dragStartY, dragStartHeight, setIsOpen, isSearchActive, currentState, TINY_HEIGHT, TALL_HEIGHT, MAIN_HEIGHT]);
 
   // Handle drag end - snap to nearest state
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
     
     const currentHeight = panelHeight;
-    const lowThreshold = LOW_HEIGHT + 30;
-    const mainThreshold = (LOW_HEIGHT + MAIN_HEIGHT) / 2;
-    const tallThreshold = (MAIN_HEIGHT + TALL_HEIGHT) / 2;
+    const tinyThreshold = (TINY_HEIGHT + LOW_HEIGHT) / 2; // ~110px
+    const lowThreshold = (LOW_HEIGHT + MAIN_HEIGHT) / 2; // Between low and main
+    const mainThreshold = (MAIN_HEIGHT + TALL_HEIGHT) / 2; // Between main and tall
     
     // Snap to nearest state
-    if (currentHeight <= lowThreshold) {
-      // Snap to low state
+    if (currentHeight <= tinyThreshold) {
+      // Snap to tiny state (80px)
+      setPanelHeight(TINY_HEIGHT);
+      setIsOpen(false);
+    } else if (currentHeight <= lowThreshold) {
+      // Snap to low state (140px)
       setPanelHeight(LOW_HEIGHT);
       setIsOpen(false);
-    } else if ((isSearchActive || currentState === 'tall') && currentHeight >= tallThreshold) {
-      // Snap to tall state (90vh)
+    } else if (currentState === 'tall' && currentHeight >= mainThreshold) {
+      // Snap to tall state (90vh) - only for pin selection, not search
       setPanelHeight(TALL_HEIGHT);
       setIsOpen(true);
-    } else if (currentHeight < mainThreshold) {
-      // Snap to low state
-      setPanelHeight(LOW_HEIGHT);
-      setIsOpen(false);
     } else {
-      // Snap to main state (40vh)
+      // Snap to main state (40vh) - used for search and other main content
       setPanelHeight(MAIN_HEIGHT);
       setIsOpen(true);
     }
@@ -250,7 +263,7 @@ export default function AppFooter({
     setTimeout(() => {
       isManualDragRef.current = false;
     }, 100);
-  }, [panelHeight, setIsOpen, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT, isSearchActive, currentState]);
+  }, [panelHeight, setIsOpen, TINY_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT, currentState]);
 
   // Set up drag listeners
   useEffect(() => {
@@ -281,11 +294,12 @@ export default function AppFooter({
         setPanelHeight(LOW_HEIGHT);
         setIsOpen(false);
       } else {
-        setPanelHeight((isSearchActive || currentState === 'tall') ? TALL_HEIGHT : MAIN_HEIGHT);
+        // Use main height for search, tall height for pin selection
+        setPanelHeight(currentState === 'tall' ? TALL_HEIGHT : MAIN_HEIGHT);
         setIsOpen(true);
       }
     }
-  }, [hasContent, isOpen, setIsOpen, isSearchActive, currentState, LOW_HEIGHT, TALL_HEIGHT, MAIN_HEIGHT]);
+  }, [hasContent, isOpen, setIsOpen, currentState, LOW_HEIGHT, TALL_HEIGHT, MAIN_HEIGHT]);
 
   // Calculate actual height for rendering based on state
   const getActualHeight = (): number => {
@@ -293,8 +307,17 @@ export default function AppFooter({
     if (currentState === 'hidden') {
       return HIDDEN_HEIGHT;
     }
-    if ((isSearchActive || currentState === 'tall') && isOpen) {
+    // Tiny state uses TINY_HEIGHT
+    if (currentState === 'tiny') {
+      return TINY_HEIGHT;
+    }
+    // Tall state (pin selection) uses TALL_HEIGHT
+    if (currentState === 'tall' && isOpen) {
       return TALL_HEIGHT;
+    }
+    // Search active uses MAIN_HEIGHT
+    if (isSearchActive && currentState === 'main' && isOpen) {
+      return MAIN_HEIGHT;
     }
     if (panelHeight > LOW_HEIGHT) {
       return panelHeight;
@@ -313,7 +336,7 @@ export default function AppFooter({
       }`}
       style={{ 
         height: `${actualHeight}px`,
-        maxHeight: `${TALL_HEIGHT}px`,
+        maxHeight: '90vh', // Use viewport unit to avoid hydration mismatch
       }}
       data-container="app-footer"
       aria-label="App footer"
@@ -345,17 +368,19 @@ export default function AppFooter({
             onUniversalClose={onUniversalClose}
             showCloseIcon={stateManager.shouldShowCloseIcon}
             currentFooterState={currentState}
+            map={map}
+            onLocationSelect={onLocationSelect}
           />
         </div>
-        {stateManager.shouldShowMentionTypes && (
+        {stateManager.shouldShowMentionTypes && !isSearching && (
           <div className="px-[10px]">
             <HeaderMentionTypeCards />
           </div>
         )}
       </div>
 
-      {/* Content area (scrollable) - shows when panel is expanded beyond low state */}
-      {currentState !== 'low' && currentState !== 'hidden' && (
+      {/* Content area (scrollable) - shows when panel is expanded beyond low/tiny state */}
+      {currentState !== 'low' && currentState !== 'tiny' && currentState !== 'hidden' && (
         <div
           className="flex-1 overflow-y-auto min-h-0"
           data-container="app-footer-content"
@@ -381,18 +406,35 @@ export default function AppFooter({
             </>
           ) : (
             <>
-              {/* Main state: Main action container + pins */}
+              {/* Main state: Search results, main action container, or pins */}
               {currentState === 'main' && (
                 <>
-                  {/* Main action container */}
-                  {children && (
-                    <div className="flex-shrink-0">
-                      {children}
-                    </div>
+                  {/* Search results card - shown when search is active */}
+                  {isSearchActive ? (
+                    <SearchContent
+                      onPinClick={(coords) => {
+                        window.dispatchEvent(
+                          new CustomEvent('live-search-pin-select', {
+                            detail: coords,
+                          })
+                        );
+                      }}
+                    />
+                  ) : (
+                    <>
+                      {/* Main action container */}
+                      {children && (
+                        <div className="flex-shrink-0">
+                          {children}
+                        </div>
+                      )}
+                      
+                      {/* Nearby pins section - hide when searching */}
+                      {!isSearching && (
+                        <NearbyPinsSection pins={nearbyPins} loading={loadingNearby} />
+                      )}
+                    </>
                   )}
-                  
-                  {/* Nearby pins section */}
-                  <NearbyPinsSection pins={nearbyPins} loading={loadingNearby} />
                 </>
               )}
               

@@ -67,7 +67,7 @@ function pinTitle(pin: LiveMapPin): string {
 }
 
 /**
- * Full-screen search overlay below the app header. Shows when #search.
+ * Full-screen search overlay below the app header. Shows when search is active.
  * People: all live map members. Pins: live map pins with 24h / 7d / all time filter.
  */
 function isAccountReady(account: LiveMapMemberAccount | null): boolean {

@@ -1,24 +1,96 @@
 /**
  * Map Style Preloader Service
  * Preloads map styles to enable instant switching
+ * 
+ * Performance optimizations:
+ * - Caches style JSON in localStorage (7-day TTL)
+ * - Preloads sprites and glyphs
+ * - Falls back to API if cache is stale or missing
  */
 
 import { MAP_CONFIG } from '../config';
 
-type MapStyle = 'streets' | 'satellite';
+type MapStyle = 'streets' | 'satellite' | 'light' | 'dark';
 
 interface PreloadedStyle {
   styleUrl: string;
   loaded: boolean;
   error?: Error;
+  cached?: boolean;
 }
+
+interface CachedStyleData {
+  styleData: any;
+  timestamp: number;
+  version: string; // Style version from Mapbox
+}
+
+const STYLE_CACHE_PREFIX = 'mapbox_style_';
+const STYLE_CACHE_VERSION = '1.0';
+const STYLE_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 class MapStylePreloader {
   private preloadedStyles: Map<MapStyle, PreloadedStyle> = new Map();
   private preloadPromises: Map<MapStyle, Promise<void>> = new Map();
+  
+  /**
+   * Get cache key for a style
+   */
+  private getCacheKey(style: MapStyle): string {
+    return `${STYLE_CACHE_PREFIX}${style}`;
+  }
+  
+  /**
+   * Check if cached style data is still valid
+   */
+  private isCacheValid(cached: CachedStyleData | null): boolean {
+    if (!cached) return false;
+    const age = Date.now() - cached.timestamp;
+    return age < STYLE_CACHE_TTL;
+  }
+  
+  /**
+   * Load style from localStorage cache
+   */
+  private loadFromCache(style: MapStyle): CachedStyleData | null {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      const cacheKey = this.getCacheKey(style);
+      const cached = localStorage.getItem(cacheKey);
+      if (!cached) return null;
+      
+      const parsed: CachedStyleData = JSON.parse(cached);
+      return this.isCacheValid(parsed) ? parsed : null;
+    } catch (error) {
+      console.debug(`[MapStylePreloader] Failed to load cache for ${style}:`, error);
+      return null;
+    }
+  }
+  
+  /**
+   * Save style to localStorage cache
+   */
+  private saveToCache(style: MapStyle, styleData: any): void {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      const cacheKey = this.getCacheKey(style);
+      const cached: CachedStyleData = {
+        styleData,
+        timestamp: Date.now(),
+        version: styleData.version || STYLE_CACHE_VERSION,
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(cached));
+    } catch (error) {
+      // localStorage quota exceeded or disabled - silently fail
+      console.debug(`[MapStylePreloader] Failed to save cache for ${style}:`, error);
+    }
+  }
 
   /**
    * Preload a map style by fetching its style JSON
+   * Checks localStorage cache first, then falls back to API
    */
   private async preloadStyle(style: MapStyle): Promise<void> {
     if (this.preloadedStyles.has(style) && this.preloadedStyles.get(style)!.loaded) {
@@ -30,8 +102,42 @@ class MapStylePreloader {
     }
 
     const styleUrl = MAP_CONFIG.STRATEGIC_STYLES[style];
+    if (!styleUrl) {
+      console.warn(`[MapStylePreloader] No style URL configured for ${style}`);
+      return;
+    }
+
     const preloadPromise = (async () => {
       try {
+        // Check cache first
+        const cached = this.loadFromCache(style);
+        if (cached) {
+          const styleData = cached.styleData;
+          
+          // Preload sprite and glyphs from cached data
+          if (styleData.sprite) {
+            const spriteUrl = typeof styleData.sprite === 'string' 
+              ? styleData.sprite 
+              : styleData.sprite[0];
+            
+            try {
+              await fetch(`${spriteUrl}.json`, { cache: 'force-cache' });
+            } catch (e) {
+              // Sprite preload is optional
+              console.debug(`[MapStylePreloader] Sprite preload failed for ${style}:`, e);
+            }
+          }
+
+          this.preloadedStyles.set(style, {
+            styleUrl,
+            loaded: true,
+            cached: true,
+          });
+
+          this.preloadPromises.delete(style);
+          return;
+        }
+
         // Extract style ID from Mapbox style URL
         // Format: mapbox://styles/mapbox/streets-v12 or mapbox://styles/mapbox/satellite-streets-v12
         // The URL format is: mapbox://styles/mapbox/STYLE_ID
@@ -43,13 +149,16 @@ class MapStylePreloader {
         const styleId = styleMatch[1];
         const apiUrl = `https://api.mapbox.com/styles/v1/mapbox/${styleId}?access_token=${MAP_CONFIG.MAPBOX_TOKEN}`;
 
-        // Fetch style JSON to preload
+        // Fetch style JSON from API
         const response = await fetch(apiUrl);
         if (!response.ok) {
           throw new Error(`Failed to preload style: ${response.statusText}`);
         }
 
         const styleData = await response.json();
+        
+        // Cache the style JSON
+        this.saveToCache(style, styleData);
 
         // Preload sprite and glyphs if available
         if (styleData.sprite) {
@@ -69,6 +178,7 @@ class MapStylePreloader {
         this.preloadedStyles.set(style, {
           styleUrl,
           loaded: true,
+          cached: false,
         });
 
         this.preloadPromises.delete(style);
@@ -92,8 +202,25 @@ class MapStylePreloader {
    * Preload all map styles
    */
   async preloadAllStyles(): Promise<void> {
-    const styles: MapStyle[] = ['streets', 'satellite'];
+    const styles: MapStyle[] = ['streets', 'satellite', 'light', 'dark'];
     await Promise.all(styles.map(style => this.preloadStyle(style)));
+  }
+  
+  /**
+   * Clear cached styles (useful for testing or cache invalidation)
+   */
+  clearCache(): void {
+    if (typeof window === 'undefined') return;
+    
+    const styles: MapStyle[] = ['streets', 'satellite', 'light', 'dark'];
+    styles.forEach(style => {
+      try {
+        const cacheKey = this.getCacheKey(style);
+        localStorage.removeItem(cacheKey);
+      } catch (error) {
+        console.debug(`[MapStylePreloader] Failed to clear cache for ${style}:`, error);
+      }
+    });
   }
 
   /**
@@ -117,6 +244,8 @@ class MapStylePreloader {
     return {
       streets: this.isPreloaded('streets'),
       satellite: this.isPreloaded('satellite'),
+      light: this.isPreloaded('light'),
+      dark: this.isPreloaded('dark'),
     };
   }
 }

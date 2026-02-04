@@ -1,8 +1,15 @@
 'use client';
 
-import { MapIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
+import { MapIcon, XMarkIcon, CameraIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { MentionService } from '@/features/mentions/services/mentionService';
+import { supabase } from '@/lib/supabase';
+import confetti from 'canvas-confetti';
+
+type MentionType = { id: string; emoji: string; name: string };
 
 export interface MapInfoLocation {
   lat: number;
@@ -42,6 +49,8 @@ interface MapInfoProps {
   mentionType?: MapInfoMentionType | null;
   /** When set, show close icon on the card; called when user closes (clears selection and URL on live). */
   onClose?: () => void;
+  /** Called when mention is successfully created */
+  onMentionCreated?: (mention: any) => void;
 }
 
 function getMapMetaCardInfo(mapMeta: Record<string, any> | null | undefined): { emoji: string; name: string } | null {
@@ -135,10 +144,281 @@ export function MapInfoSkeleton({ onClose }: { onClose?: () => void }) {
   );
 }
 
-export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentionType, onClose }: MapInfoProps) {
-  const { account, activeAccountId } = useAuthStateSafe();
+export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentionType, onClose, onMentionCreated }: MapInfoProps) {
+  const { user, account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const isAuthenticated = Boolean(account || activeAccountId);
+  const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mentionTypes, setMentionTypes] = useState<MentionType[]>([]);
+  const [loadingMentionTypes, setLoadingMentionTypes] = useState(true);
+  const [selectedMentionTypeId, setSelectedMentionTypeId] = useState<string | null>(
+    mentionType?.id || null
+  );
+  const [showMentionTypeDropdown, setShowMentionTypeDropdown] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const mentionTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const lastSubmitTimeRef = useRef<number>(0);
+
+  // Fetch mention types
+  useEffect(() => {
+    const fetchMentionTypes = async () => {
+      setLoadingMentionTypes(true);
+      try {
+        const { data, error } = await supabase
+          .from('mention_types')
+          .select('id, emoji, name')
+          .eq('is_active', true)
+          .order('name');
+        
+        if (error) throw error;
+        setMentionTypes((data || []) as MentionType[]);
+      } catch (err) {
+        console.error('[MapInfo] Failed to fetch mention types:', err);
+      } finally {
+        setLoadingMentionTypes(false);
+      }
+    };
+
+    fetchMentionTypes();
+  }, []);
+
+  // Close mention type dropdown when clicking outside
+  useEffect(() => {
+    if (!showMentionTypeDropdown) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mentionTypeDropdownRef.current && !mentionTypeDropdownRef.current.contains(event.target as Node)) {
+        setShowMentionTypeDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMentionTypeDropdown]);
+
+  // Update selected mention type when prop changes
+  useEffect(() => {
+    if (mentionType?.id) {
+      setSelectedMentionTypeId(mentionType.id);
+    }
+  }, [mentionType]);
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!user) {
+      openWelcome();
+      return;
+    }
+
+    // Validate file type - only images allowed
+    if (!file.type.startsWith('image/')) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Validate file size (max 5MB for images)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    setImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile || !user) return null;
+
+    setIsUploadingImage(true);
+    try {
+      const fileExt = imageFile.name.split('.').pop() || 'jpg';
+      const fileName = `${user.id}/mentions/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      // Upload to Supabase storage
+      const { error: uploadError } = await supabase.storage
+        .from('mentions-media')
+        .upload(fileName, imageFile, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (uploadError) {
+        throw new Error(uploadError.message);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('mentions-media')
+        .getPublicUrl(fileName);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get image URL');
+      }
+
+      return urlData.publicUrl;
+    } catch (err) {
+      console.error('[MapInfo] Error uploading image:', err);
+      throw err;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!user || !activeAccountId) {
+      openWelcome();
+      return;
+    }
+
+    if (!location) {
+      return;
+    }
+
+    // Rate limit: only one pin every 10 seconds
+    const now = Date.now();
+    const timeSinceLastSubmit = now - lastSubmitTimeRef.current;
+    if (timeSinceLastSubmit < 10000) {
+      const secondsRemaining = Math.ceil((10000 - timeSinceLastSubmit) / 1000);
+      setError(`Please wait ${secondsRemaining} second${secondsRemaining > 1 ? 's' : ''} before submitting again`);
+      return;
+    }
+
+    // Validate description is required
+    if (!description.trim()) {
+      setError('Please enter a description');
+      return;
+    }
+
+    // Validate mention type is required
+    if (!selectedMentionTypeId) {
+      setError('Please select a mention type');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const { lat, lng } = safeLatLng(location.lat, location.lng);
+
+      // Upload image if present
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        try {
+          imageUrl = await uploadImage();
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
+          setError(errorMessage);
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // Create mention
+      const mention = await MentionService.createMention({
+        lat,
+        lng,
+        description: description.trim(),
+        mention_type_id: selectedMentionTypeId,
+        visibility: 'public',
+        image_url: imageUrl || undefined,
+        media_type: imageUrl ? 'image' : undefined,
+        full_address: location.address || undefined,
+        map_meta: location.mapMeta || undefined,
+      }, activeAccountId);
+
+      // Update rate limit timestamp
+      lastSubmitTimeRef.current = Date.now();
+
+      // Dispatch events for MentionsLayer to refresh immediately
+      window.dispatchEvent(new CustomEvent('mention-created', {
+        detail: { mention }
+      }));
+      // Also trigger reload-mentions event for MentionsLayer
+      window.dispatchEvent(new CustomEvent('reload-mentions'));
+
+      // Call onMentionCreated callback if provided
+      if (onMentionCreated) {
+        onMentionCreated(mention);
+      }
+
+      // Trigger confetti celebration
+      const duration = 3000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+      
+      const interval = setInterval(() => {
+        const timeLeft = animationEnd - Date.now();
+        if (timeLeft <= 0) {
+          clearInterval(interval);
+          return;
+        }
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+        });
+        confetti({
+          ...defaults,
+          particleCount,
+          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+        });
+      }, 250);
+
+      // Cleanup interval after duration
+      setTimeout(() => {
+        clearInterval(interval);
+      }, duration);
+
+      // Clear form and close
+      setDescription('');
+      setImageFile(null);
+      setImagePreview(null);
+      setSelectedMentionTypeId(mentionType?.id || null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      // Close MapInfo
+      if (onClose) {
+        onClose();
+      }
+    } catch (err) {
+      console.error('[MapInfo] Error creating mention:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create mention';
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!location) {
     // Hide helper text - return null when no location is selected
@@ -158,22 +438,6 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
       data-container="map-info"
       aria-label="Map info"
     >
-      <div className="flex items-center gap-2">
-        {mapMetaCard ? (
-          <div
-            className="flex items-center gap-2 min-w-0 flex-1"
-            data-container="map-meta-card"
-            aria-label="Map meta card"
-          >
-            <span className="text-base flex-shrink-0" aria-hidden>
-              {mapMetaCard.emoji}
-            </span>
-            <span className="text-xs font-medium text-gray-900 truncate">{mapMetaCard.name}</span>
-          </div>
-        ) : (
-          <span className="text-xs font-medium text-gray-900 truncate flex-1">Location selected</span>
-        )}
-      </div>
       {detailRows.length > 0 && (
         <div className="space-y-1">
           <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Entity details</div>
@@ -187,41 +451,180 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
           </ul>
         </div>
       )}
+      
+      {/* Image preview - full width with no outer padding */}
+      {imagePreview && (
+        <div className="relative -mx-[10px] w-[calc(100%+20px)]">
+          <div className="relative w-full aspect-video overflow-hidden bg-gray-100">
+            <Image
+              src={imagePreview}
+              alt="Image preview"
+              fill
+              className="object-cover"
+              unoptimized
+            />
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+              aria-label="Remove image"
+            >
+              <XMarkIcon className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
+          {error}
+        </div>
+      )}
+      
       <div className="space-y-1">
-        <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Location selected</div>
         <div className="text-xs text-gray-900 break-words">{display}</div>
+        
+        {/* Map meta - above coordinates */}
+        {mapMetaCard && (
+          <div className="flex items-center gap-1.5" data-container="map-meta-card" aria-label="Map meta card">
+            <span className="text-base flex-shrink-0" aria-hidden>
+              {mapMetaCard.emoji}
+            </span>
+            <span className="text-xs font-medium text-gray-900 truncate">{mapMetaCard.name}</span>
+          </div>
+        )}
+        
         <div className="text-[10px] text-gray-500">
           {lat.toFixed(5)}, {lng.toFixed(5)}
         </div>
-        {mentionType && (
-          <div className="flex items-center gap-2 pt-1" data-container="map-info-mention-type-card">
-            <span className="text-base flex-shrink-0" aria-hidden>
-              {mentionType.emoji}
-            </span>
-            <span className="text-xs font-medium text-gray-900 truncate">{mentionType.name}</span>
+        
+        {/* What's going on here textarea */}
+        <div>
+          <label htmlFor="map-info-description" className="sr-only">
+            What's going on here
+          </label>
+          <textarea
+            id="map-info-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="What's going on here"
+            rows={3}
+            className="w-full py-1.5 text-[20px] font-bold text-gray-900 placeholder-gray-400 resize-none focus:outline-none"
+            style={{ paddingLeft: 0, paddingRight: 0 }}
+          />
+        </div>
+        
+        {/* Hidden file input for image upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          className="hidden"
+          disabled={isUploadingImage}
+        />
+
+        <div className="flex items-center justify-between gap-2">
+          {/* Left side: Label and camera button */}
+          <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+            {/* Camera Icon Button - Upload image from device */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingImage}
+              className="flex-shrink-0 flex items-center justify-center h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Upload image"
+            >
+              <CameraIcon className="w-4 h-4" />
+            </button>
+            
+            {/* Mention Type Selector */}
+            <div className="relative" ref={mentionTypeDropdownRef}>
+              {selectedMentionTypeId ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
+                    className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                    aria-label="Change mention type"
+                  >
+                    <span className="text-base">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.emoji}</span>
+                    <span className="truncate">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMentionTypeId(null)}
+                    className="flex-shrink-0 h-8 w-8 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
+                    aria-label="Remove mention type"
+                  >
+                    <XMarkIcon className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
+                  className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                  aria-label="Select mention type"
+                >
+                  <span className="text-xs">#</span>
+                  <span>Add tag</span>
+                </button>
+              )}
+              
+              {showMentionTypeDropdown && (
+                <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-[300px] overflow-y-auto min-w-[200px]">
+                  {loadingMentionTypes ? (
+                    <div className="px-3 py-2 text-xs text-gray-500">Loading...</div>
+                  ) : (
+                    <div className="p-1">
+                      {mentionTypes.map((type) => (
+                        <button
+                          key={type.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedMentionTypeId(type.id);
+                            setShowMentionTypeDropdown(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left hover:bg-gray-50 rounded transition-colors"
+                        >
+                          <span className="text-base">{type.emoji}</span>
+                          <span className="text-gray-900">{type.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-        {isAuthenticated && onAddToMap ? (
-          <button
-            type="button"
-            onClick={() => onAddToMap({ ...location, lat, lng }, mentionType?.id)}
-            className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
-            aria-label={mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
-          >
-            <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-            {mentionType ? `Add ${mentionType.name} to map` : 'Add to map'}
-          </button>
-        ) : !isAuthenticated && onAddToMap ? (
-          <button
-            type="button"
-            onClick={openWelcome}
-            className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-            aria-label={mentionType ? `Sign in to add ${mentionType.name}` : 'Sign in to add to map'}
-          >
-            <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-            {mentionType ? `Sign in to add ${mentionType.name}` : 'Sign in to add to map'}
-          </button>
-        ) : null}
+          
+          {/* Right side: Button */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {isAuthenticated ? (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting || isUploadingImage || !selectedMentionTypeId || !description.trim()}
+                className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label={selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map'}
+              >
+                <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+                {isSubmitting ? 'Submitting...' : (selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map')}
+              </button>
+            ) : !isAuthenticated && onAddToMap ? (
+              <button
+                type="button"
+                onClick={openWelcome}
+                className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                aria-label="Sign in to add to map"
+              >
+                <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+                Sign in to add to map
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { XMarkIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import type { Account } from '@/features/auth';
@@ -16,7 +16,7 @@ function getTimeAgo(isoDate: string): string {
 }
 
 /** Same structure as loaded card: three sections with 1:1 skeleton per element. ProfilePhoto sm = w-8 h-8. */
-function PinCardSkeleton({ onClose }: { onClose?: () => void }) {
+function PinCardSkeleton() {
   return (
     <div className="border-b border-gray-100 last:border-0">
       <div className="p-[10px] space-y-2">
@@ -33,16 +33,6 @@ function PinCardSkeleton({ onClose }: { onClose?: () => void }) {
               <div className="h-2.5 w-20 rounded bg-gray-100 animate-pulse" aria-hidden />
             </div>
           </div>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label="Close"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -81,13 +71,11 @@ interface LivePinCardProps {
   pinId: string;
   /** When provided (from MapPage initialPins or MapIDBox fetch), no API call — single source of truth. */
   pin?: LivePinData | null;
-  /** Optional close handler - if not provided, close icon is hidden */
-  onClose?: () => void;
   /** Current viewer's account id (from auth). When equal to pin.account_id, the owner is viewing. */
   currentAccountId?: string | null;
 }
 
-export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccountId }: LivePinCardProps) {
+export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: LivePinCardProps) {
   const { account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const isAuthenticated = Boolean(account || activeAccountId);
@@ -103,7 +91,7 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
 
   // If loading, show skeleton
   if (loading) {
-    return <PinCardSkeleton onClose={onClose} />;
+    return <PinCardSkeleton />;
   }
 
   if (!pin) {
@@ -111,16 +99,6 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
       <div className="border-b border-gray-100 last:border-0">
         <div className="p-[10px] flex items-center justify-between gap-2">
           <span className="text-xs text-gray-500">Pin not found</span>
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
-              aria-label="Close"
-            >
-              <XMarkIcon className="w-4 h-4" />
-            </button>
-          )}
         </div>
       </div>
     );
@@ -257,14 +235,6 @@ export default function LivePinCard({ pinId, pin: pinProp, onClose, currentAccou
               </Link>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="w-4 h-4" />
-          </button>
         </div>
         {!isAuthenticated && (
           <div className="mt-2 pt-2 border-t border-gray-100">

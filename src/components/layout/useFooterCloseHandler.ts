@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useSearchState } from '@/contexts/SearchStateContext';
 
 interface FooterCloseHandlerOptions {
   /** Callback to clear pin selection */
@@ -32,13 +33,12 @@ export function useFooterCloseHandler({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { isSearchActive, deactivateSearch } = useSearchState();
 
   const handleClose = useCallback(() => {
-    // 1. Close search if active (remove #search hash)
-    if (typeof window !== 'undefined' && window.location.hash === '#search') {
-      const newUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
-      window.history.pushState({}, '', newUrl);
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    // 1. Close search if active (state-based, no hash)
+    if (isSearchActive) {
+      deactivateSearch();
     }
 
     // 2. Clear all selections
@@ -57,7 +57,7 @@ export function useFooterCloseHandler({
 
     // 4. Collapse footer to low state
     onCollapseFooter?.();
-  }, [router, pathname, searchParams, onClearPinSelection, onClearLocationSelection, onCollapseFooter, onClearMapSelection]);
+  }, [router, pathname, searchParams, isSearchActive, deactivateSearch, onClearPinSelection, onClearLocationSelection, onCollapseFooter, onClearMapSelection]);
 
   // Determine if close icon should be shown
   // This will be enhanced by FooterStateManager, but provides basic logic
@@ -65,10 +65,9 @@ export function useFooterCloseHandler({
     const hasPin = searchParams.get('pin');
     const hasLayer = searchParams.get('layer');
     const hasId = searchParams.get('id');
-    const isSearchActive = typeof window !== 'undefined' && window.location.hash === '#search';
     
     return Boolean(hasPin || hasLayer || hasId || isSearchActive);
-  }, [searchParams]);
+  }, [searchParams, isSearchActive]);
 
   return {
     handleClose,

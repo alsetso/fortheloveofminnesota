@@ -51,7 +51,7 @@ export default function ContentTypeFilters() {
     // Always delete content_types param (legacy support)
     params.delete('content_types');
 
-    router.push(`${pathname}?${params.toString()}#search`);
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   const selectedClass = isDefaultLightBg

@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef, useTransition, type ReactNode } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { HeaderThemeProvider } from '@/contexts/HeaderThemeContext';
+import { SearchStateProvider, useSearchState } from '@/contexts/SearchStateContext';
 import AppContainer from '@/components/layout/AppContainer';
-import AppContentWidth from '@/components/layout/AppContentWidth';
 import AppMenu from '@/components/layout/AppMenu';
 import MapInfo, { MapInfoSkeleton, type MapInfoLocation, type MapInfoMentionType } from '@/components/layout/MapInfo';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
@@ -21,18 +21,23 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import SignInGate from '@/components/auth/SignInGate';
 import type { MapInstance } from '@/components/layout/types';
 import { MentionService } from '@/features/mentions/services/mentionService';
+import MapControls from '@/components/layout/MapControls';
+import type { NearbyPin } from '@/components/layout/types';
+import ContributeOverlay from '@/app/map/[id]/components/ContributeOverlay';
 
 function LiveHeaderThemeSync({ children }: { children: ReactNode }) {
-  const [isSearchActive, setIsSearchActive] = useState(false);
-  useEffect(() => {
-    const read = () => setIsSearchActive(typeof window !== 'undefined' && window.location.hash === '#search');
-    read();
-    window.addEventListener('hashchange', read);
-    return () => window.removeEventListener('hashchange', read);
-  }, []);
+  const { isSearchActive, isSearching, searchQuery } = useSearchState();
+  
   return (
     <HeaderThemeProvider value={{ isDefaultLightBg: false, isSearchActive }}>
       {children}
+      {/* Search overlay - covers map when actively searching (typing), behind footer/sidebar */}
+      {isSearching && (
+        <div 
+          className="fixed inset-0 bg-black/40 z-[1995] pointer-events-none"
+          aria-hidden="true"
+        />
+      )}
     </HeaderThemeProvider>
   );
 }
@@ -59,12 +64,13 @@ function getFooterHeaderLabel(selectedLocation: MapInfoLocation | null): string 
  * Changing selection: click another pin, boundary, or map → buildLiveUrl clears previous and sets new.
  * Removing selection: close icon → handleClearSelection clears pin/layer/id and state, preserves type.
  */
-export default function LivePage() {
+function LivePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account, activeAccountId } = useAuthStateSafe();
   const currentAccountId = activeAccountId || account?.id || null;
   const isAuthenticated = Boolean(account || activeAccountId);
+  const { isSearchActive, isSearching } = useSearchState();
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<MapInfoLocation | null>(null);
   const [footerOpen, setFooterOpen] = useState(false);
@@ -91,6 +97,13 @@ export default function LivePage() {
   });
   const [mapInstance, setMapInstance] = useState<MapInstance | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyPins, setNearbyPins] = useState<NearbyPin[]>([]);
+  const [loadingNearby, setLoadingNearby] = useState(false);
+  const [showContributeOverlay, setShowContributeOverlay] = useState(false);
+  const [contributeLocation, setContributeLocation] = useState<MapInfoLocation | null>(null);
+  const [contributeMentionTypeId, setContributeMentionTypeId] = useState<string | undefined>();
+  const [liveMapId, setLiveMapId] = useState<string | null>(null);
+  const lastAddToMapTimeRef = useRef<number>(0);
 
   // Track map center from liveStatus updates
   useEffect(() => {
@@ -134,22 +147,24 @@ export default function LivePage() {
     };
   }, [mapInstance, liveStatus.mapLoaded]);
 
-  // Track page view for analytics
-  useEffect(() => {
-    // Record view for live map - fetch map data using 'live' slug
-    let sessionId: string | null = null;
-    if (typeof window !== 'undefined') {
-      sessionId = localStorage.getItem('analytics_device_id') || generateUUID();
-      if (!localStorage.getItem('analytics_device_id')) {
-        localStorage.setItem('analytics_device_id', sessionId);
-      }
-    }
 
-    // Fetch live map data to get the map ID, then record view
+  // Fetch live map ID
+  useEffect(() => {
     fetch('/api/maps/live')
       .then((res) => res.json())
       .then((data) => {
         if (data?.id) {
+          setLiveMapId(data.id);
+          
+          // Record view for analytics
+          let sessionId: string | null = null;
+          if (typeof window !== 'undefined') {
+            sessionId = localStorage.getItem('analytics_device_id') || generateUUID();
+            if (!localStorage.getItem('analytics_device_id')) {
+              localStorage.setItem('analytics_device_id', sessionId);
+            }
+          }
+          
           fetch('/api/analytics/map-view', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -182,10 +197,29 @@ export default function LivePage() {
     };
   }, []);
 
+  // Extract URL parameters - only one selection type at a time (priority: pin > layer+id > lat+lng)
   const pinIdFromUrl = searchParams.get('pin');
   const typeSlugFromUrl = searchParams.get('type');
   const layerFromUrl = searchParams.get('layer');
   const entityIdFromUrl = searchParams.get('id');
+  const latFromUrl = searchParams.get('lat');
+  const lngFromUrl = searchParams.get('lng');
+  
+  // Determine which selection type is active (only one at a time)
+  const activeSelectionType = pinIdFromUrl 
+    ? 'pin' 
+    : (layerFromUrl && entityIdFromUrl) 
+      ? 'boundary' 
+      : (latFromUrl && lngFromUrl) 
+        ? 'location' 
+        : null;
+  
+  // Clear other selections when one is active
+  const effectivePinId = activeSelectionType === 'pin' ? pinIdFromUrl : null;
+  const effectiveLayer = activeSelectionType === 'boundary' ? layerFromUrl : null;
+  const effectiveEntityId = activeSelectionType === 'boundary' ? entityIdFromUrl : null;
+  const effectiveLat = activeSelectionType === 'location' ? latFromUrl : null;
+  const effectiveLng = activeSelectionType === 'location' ? lngFromUrl : null;
   const [selectedPin, setSelectedPin] = useState<LivePinData | null>(null);
   const [isLoadingPin, setIsLoadingPin] = useState(false);
   const [isContributeOpen, setIsContributeOpen] = useState(false);
@@ -234,16 +268,19 @@ export default function LivePage() {
     }
   }, [typeSlugFromUrl, isContributeOpen]);
 
-  // Resolve boundary from URL (layer + id) and set footer MapInfo; one entity at a time.
+  // Resolve boundary from URL (layer + id) - only if it's the active selection
   useEffect(() => {
-    if (pinIdFromUrl || !layerFromUrl || !entityIdFromUrl) {
+    if (activeSelectionType !== 'boundary' || !effectiveLayer || !effectiveEntityId) {
+      if (activeSelectionType !== 'boundary') {
+        setSelectedLocation(null);
+      }
       return;
     }
     // Clear pin selection when boundary is selected
     setSelectedPin(null);
     setIsLoadingPin(false);
     let cancelled = false;
-    resolveBoundaryByLayerId(layerFromUrl, entityIdFromUrl)
+    resolveBoundaryByLayerId(effectiveLayer, effectiveEntityId)
       .then((loc) => {
         if (!cancelled && loc) {
           setSelectedLocation(loc);
@@ -259,7 +296,7 @@ export default function LivePage() {
     return () => {
       cancelled = true;
     };
-  }, [layerFromUrl, entityIdFromUrl, pinIdFromUrl]);
+  }, [activeSelectionType, effectiveLayer, effectiveEntityId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -326,19 +363,28 @@ export default function LivePage() {
     return promise;
   }, []);
 
-  // When URL has ?pin=, fetch pin data if needed
+  // When URL has ?pin=, fetch pin data if needed - only if it's the active selection
   useEffect(() => {
-    if (!pinIdFromUrl) {
-      setSelectedPin(null);
+    if (activeSelectionType !== 'pin' || !effectivePinId) {
+      if (activeSelectionType !== 'pin') {
+        setSelectedPin(null);
+        setIsLoadingPin(false);
+        setSelectedLocation(null);
+      }
+      return;
+    }
+
+    // Type guard: effectivePinId is guaranteed to be non-null here
+    const pinId = effectivePinId;
+
+    // If we already have this pin loaded, don't refetch
+    if (selectedPin && String(selectedPin.id) === pinId) {
       setIsLoadingPin(false);
       return;
     }
 
-    // If we already have this pin loaded, don't refetch
-    if (selectedPin && String(selectedPin.id) === pinIdFromUrl) {
-      setIsLoadingPin(false);
-      return;
-    }
+    // Clear location selection when pin is selected
+    setSelectedLocation(null);
 
     // Helper to check if pin has content
     const hasContent = (pin: LivePinData | null) => {
@@ -347,7 +393,7 @@ export default function LivePage() {
     };
 
     // Check cache - if cached pin has no description, don't show skeleton
-    const cached = pinCacheRef.current.get(pinIdFromUrl);
+    const cached = pinCacheRef.current.get(pinId);
     if (cached) {
       setSelectedPin(cached);
       setIsLoadingPin(false);
@@ -360,7 +406,7 @@ export default function LivePage() {
     setSelectedPin(null);
 
     let cancelled = false;
-    fetchPinData(pinIdFromUrl)
+    fetchPinData(pinId)
       .then((data: LivePinData | null) => {
         if (!cancelled) {
           setSelectedPin(data);
@@ -378,7 +424,38 @@ export default function LivePage() {
     return () => {
       cancelled = true;
     };
-  }, [pinIdFromUrl, fetchPinData]); // Only depend on pinIdFromUrl, not selectedPin
+  }, [activeSelectionType, effectivePinId, fetchPinData]);
+  
+  // Handle lat+lng location selection - only if it's the active selection
+  useEffect(() => {
+    if (activeSelectionType !== 'location' || !effectiveLat || !effectiveLng) {
+      if (activeSelectionType !== 'location') {
+        setSelectedLocation(null);
+      }
+      return;
+    }
+    
+    // Clear pin selection when location is selected
+    setSelectedPin(null);
+    setIsLoadingPin(false);
+    
+    const lat = parseFloat(effectiveLat);
+    const lng = parseFloat(effectiveLng);
+    
+    if (isNaN(lat) || isNaN(lng)) {
+      setSelectedLocation(null);
+      return;
+    }
+    
+    setSelectedLocation({
+      lat,
+      lng,
+      address: null,
+      mapMeta: null,
+    });
+    setFooterOpen(true);
+    setFooterTargetState('main');
+  }, [activeSelectionType, effectiveLat, effectiveLng]);
 
   const handleLocationSelect = useCallback(
     async (info: { lat: number; lng: number; address: string | null; isOpen: boolean; mapMeta?: Record<string, any> | null }) => {
@@ -606,7 +683,8 @@ export default function LivePage() {
   );
 
   const handleClearSelection = useCallback(() => {
-    router.replace(buildLiveUrl({ clearSelection: true }));
+    // Clear all URL parameters
+    router.replace('/live');
     setSelectedLocation(null);
     setSelectedPin(null);
     setIsLoadingPin(false);
@@ -614,22 +692,105 @@ export default function LivePage() {
     // Set footer to low state when closing
     setFooterTargetState('low');
     clearMapSelectionRef.current?.();
-  }, [router, buildLiveUrl]);
+  }, [router]);
 
 
   const handleAddToMap = useCallback((loc: MapInfoLocation, mentionTypeId?: string) => {
-    window.dispatchEvent(
-      new CustomEvent('open-contribute-overlay', {
-        detail: {
-          lat: loc.lat,
-          lng: loc.lng,
-          mapMeta: loc.mapMeta ?? null,
-          address: loc.address ?? null,
-          mentionTypeId: mentionTypeId ?? undefined,
-        },
+    // Rate limit: 1 per 3 seconds
+    const now = Date.now();
+    const timeSinceLastAdd = now - lastAddToMapTimeRef.current;
+    if (timeSinceLastAdd < 3000) {
+      return; // Ignore if less than 3 seconds since last add
+    }
+    lastAddToMapTimeRef.current = now;
+
+    if (!liveMapId) {
+      // Wait for live map ID to be loaded
+      return;
+    }
+
+    // Store location data in sessionStorage for ContributeOverlay to read
+    const dataKey = `contribute_${Date.now()}`;
+    sessionStorage.setItem(
+      dataKey,
+      JSON.stringify({
+        mapMeta: loc.mapMeta || null,
+        fullAddress: loc.address || null,
       })
     );
-  }, []);
+
+    // Set coordinates and mention type in URL for ContributeOverlay
+    const params = new URLSearchParams();
+    params.set('lat', String(loc.lat));
+    params.set('lng', String(loc.lng));
+    if (mentionTypeId) {
+      params.set('mention_type_id', mentionTypeId);
+    }
+    params.set('data_key', dataKey);
+    
+    // Update URL without navigation
+    router.replace(`/live?${params.toString()}`, { scroll: false });
+
+    // Show contribute overlay
+    setContributeLocation(loc);
+    setContributeMentionTypeId(mentionTypeId);
+    setShowContributeOverlay(true);
+  }, [liveMapId, router]);
+
+  const handleContributeClose = useCallback(() => {
+    setShowContributeOverlay(false);
+    setContributeLocation(null);
+    setContributeMentionTypeId(undefined);
+    
+    // Clean up URL params
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('lat');
+    params.delete('lng');
+    params.delete('mention_type_id');
+    params.delete('data_key');
+    const qs = params.toString();
+    router.replace(qs ? `/live?${qs}` : '/live', { scroll: false });
+  }, [router, searchParams]);
+
+  const handleMentionCreated = useCallback(
+    (mention: any) => {
+      // Dispatch event for MentionsLayer to refresh
+      window.dispatchEvent(
+        new CustomEvent('mention-created', {
+          detail: { mention },
+        })
+      );
+
+      // Show the newly created pin
+      const pinData: LivePinData = {
+        id: mention.id,
+        map_id: mention.map_id,
+        lat: mention.lat,
+        lng: mention.lng,
+        description: mention.description,
+        caption: (mention as any).caption || null,
+        emoji: null,
+        image_url: mention.image_url || null,
+        video_url: (mention as any).video_url || null,
+        account_id: mention.account_id,
+        created_at: mention.created_at,
+        account: mention.account,
+        mention_type: mention.mention_type,
+        tagged_accounts: null,
+      };
+
+      setSelectedPin(pinData);
+      setSelectedLocation(null);
+      setIsLoadingPin(false);
+      setShowContributeOverlay(false);
+      setContributeLocation(null);
+      setContributeMentionTypeId(undefined);
+      setFooterOpen(true);
+      setFooterTargetState('tall');
+      router.replace(buildLiveUrl({ pin: mention.id }));
+    },
+    [router, buildLiveUrl]
+  );
 
   const handleClickedItemClick = useCallback((item: { type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null }) => {
     // Clear previous selection state
@@ -662,19 +823,19 @@ export default function LivePage() {
 
   const footerHeaderLabel = useMemo(
     () =>
-      pinIdFromUrl
+      activeSelectionType === 'pin'
         ? 'Pin'
         : getFooterHeaderLabel(selectedLocation),
-    [pinIdFromUrl, selectedLocation]
+    [activeSelectionType, selectedLocation]
   );
 
   const footerContent = useMemo(() => {
-    if (pinIdFromUrl) {
-      const pin = selectedPin && String(selectedPin.id) === pinIdFromUrl ? selectedPin : null;
+    if (activeSelectionType === 'pin' && effectivePinId) {
+      const pin = selectedPin && String(selectedPin.id) === effectivePinId ? selectedPin : null;
       // LivePinCard shows skeleton when pin is null (handles loading state internally)
       return (
         <LivePinCard
-          pinId={pinIdFromUrl}
+          pinId={effectivePinId}
           pin={pin}
           currentAccountId={currentAccountId}
         />
@@ -689,16 +850,198 @@ export default function LivePage() {
           zoom={liveStatus.currentZoom}
           onAddToMap={handleAddToMap}
           mentionType={showMentionTypeCard && resolvedMentionType ? resolvedMentionType : null}
+          onMentionCreated={(mention) => {
+            // Set footer to low state after successful submission
+            setFooterTargetState('low');
+            // Clear location selection
+            setSelectedLocation(null);
+            // Close MapInfo
+            handleClearSelection();
+          }}
         />
       </>
     );
-  }, [pinIdFromUrl, selectedPin, currentAccountId, typeSlugFromUrl, isContributeOpen, selectedLocation, resolvedMentionType, liveStatus.currentZoom, handleClearSelection, handleAddToMap]);
+  }, [activeSelectionType, effectivePinId, selectedPin, currentAccountId, typeSlugFromUrl, isContributeOpen, selectedLocation, resolvedMentionType, liveStatus.currentZoom, handleClearSelection, handleAddToMap]);
 
   const { openWelcome, isModalOpen } = useAppModalContextSafe();
 
+  const handleLocationSelectForFooter = useCallback(
+    (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: any) => {
+      handleLocationSelect({
+        lat: coordinates.lat,
+        lng: coordinates.lng,
+        address: placeName || null,
+        isOpen: true,
+        mapMeta: mapboxMetadata || null,
+      });
+    },
+    [handleLocationSelect]
+  );
+
+  // Listen for city boundary selection from search (must be after handleLocationSelect is defined)
+  useEffect(() => {
+    const handleCityBoundarySelect = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        layer: 'ctu';
+        id: string;
+        name: string;
+        city: any;
+      }>;
+      
+      const { id, name, city } = customEvent.detail;
+      
+      // Enable CTU layer if not already enabled
+      if (liveBoundaryLayer !== 'ctu') {
+        setLiveBoundaryLayer('ctu');
+      }
+      
+      // Calculate center from geometry
+      const getCenterFromGeometry = (geometry: any): { lat: number; lng: number } | null => {
+        if (!geometry) return null;
+        
+        try {
+          // Handle FeatureCollection
+          if (geometry.type === 'FeatureCollection' && geometry.features && geometry.features.length > 0) {
+            return getCenterFromGeometry(geometry.features[0].geometry);
+          }
+          
+          // Handle Feature
+          if (geometry.type === 'Feature' && geometry.geometry) {
+            return getCenterFromGeometry(geometry.geometry);
+          }
+          
+          // Handle Point
+          if (geometry.type === 'Point' && Array.isArray(geometry.coordinates) && geometry.coordinates.length >= 2) {
+            return { lng: geometry.coordinates[0], lat: geometry.coordinates[1] };
+          }
+          
+          // Handle Polygon
+          if (geometry.type === 'Polygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+            const ring = geometry.coordinates[0];
+            if (Array.isArray(ring) && ring.length > 0) {
+              let sumLng = 0;
+              let sumLat = 0;
+              let count = 0;
+              
+              for (const coord of ring) {
+                if (Array.isArray(coord) && coord.length >= 2) {
+                  sumLng += coord[0];
+                  sumLat += coord[1];
+                  count++;
+                }
+              }
+              
+              if (count > 0) {
+                return { lng: sumLng / count, lat: sumLat / count };
+              }
+            }
+          }
+          
+          // Handle MultiPolygon
+          if (geometry.type === 'MultiPolygon' && Array.isArray(geometry.coordinates) && geometry.coordinates.length > 0) {
+            const firstPolygon = geometry.coordinates[0];
+            if (Array.isArray(firstPolygon) && firstPolygon.length > 0) {
+              const ring = firstPolygon[0];
+              if (Array.isArray(ring) && ring.length > 0) {
+                let sumLng = 0;
+                let sumLat = 0;
+                let count = 0;
+                
+                for (const coord of ring) {
+                  if (Array.isArray(coord) && coord.length >= 2) {
+                    sumLng += coord[0];
+                    sumLat += coord[1];
+                    count++;
+                  }
+                }
+                
+                if (count > 0) {
+                  return { lng: sumLng / count, lat: sumLat / count };
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error calculating center from geometry:', error);
+        }
+        
+        return null;
+      };
+      
+      const center = getCenterFromGeometry(city.geometry);
+      if (center) {
+        // Update URL with boundary selection
+        router.replace(
+          buildLiveUrl({ layer: 'ctu', id })
+        );
+        
+        // Trigger location select to update footer
+        handleLocationSelect({
+          lat: center.lat,
+          lng: center.lng,
+          address: name,
+          isOpen: true,
+          mapMeta: {
+            boundaryLayer: 'ctu',
+            boundaryName: name,
+            boundaryEntityId: id,
+            feature: { name },
+            boundaryDetails: { ...city, geometry: undefined },
+          },
+        });
+      }
+    };
+
+    window.addEventListener('city-boundary-select', handleCityBoundarySelect);
+    return () => {
+      window.removeEventListener('city-boundary-select', handleCityBoundarySelect);
+    };
+  }, [liveBoundaryLayer, router, handleLocationSelect, buildLiveUrl]);
+
+  // Fetch nearby pins when search is active (moved from AppFooter)
+  useEffect(() => {
+    if (!isSearchActive || !mapCenter) {
+      setNearbyPins([]);
+      setLoadingNearby(false);
+      return;
+    }
+
+    const fetchNearbyPins = async () => {
+      setLoadingNearby(true);
+      try {
+        const radiusInKm = 20 * 1.60934; // 20 miles in km
+        const response = await fetch(
+          `/api/mentions/nearby?lat=${mapCenter.lat}&lng=${mapCenter.lng}&radius=${radiusInKm}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          setNearbyPins((data.mentions || []).slice(0, 20) as NearbyPin[]);
+        }
+      } catch (err) {
+        console.error('Error fetching nearby pins:', err);
+        setNearbyPins([]);
+      } finally {
+        setLoadingNearby(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchNearbyPins, 300);
+    return () => clearTimeout(timeoutId);
+  }, [isSearchActive, mapCenter]);
+
+  // Compute visibility flags for MapControls
+  const hasPinSelection = activeSelectionType === 'pin' && Boolean(effectivePinId || selectedPin);
+  const hasLocationSelection = (activeSelectionType === 'boundary' || activeSelectionType === 'location') && Boolean(selectedLocation);
+  const hasMentionTypeFilter = Boolean(typeSlugFromUrl && !isContributeOpen);
+  const hasSelection = Boolean(hasPinSelection || hasLocationSelection || (typeSlugFromUrl && !isContributeOpen));
+  const showSearchResults = isSearchActive;
+  // Hide mention types when location is selected (when location selected card is shown)
+  const showMentionTypes = !isSearching && !hasPinSelection && !hasLocationSelection;
+  const showNearbyPins = !isSearching && !hasPinSelection && !hasLocationSelection && !hasMentionTypeFilter;
+
   return (
-    <LiveHeaderThemeSync>
-      <AppContainer>
+    <AppContainer>
         <MapPage
         params={Promise.resolve({ id: 'live' })}
         skipPageWrapper
@@ -715,32 +1058,16 @@ export default function LivePage() {
         onMapInstanceReady={setMapInstance}
         onGeolocateControlReady={handleGeolocateControlReady}
       />
-      <AppContentWidth
-        footerHeaderLabel={footerHeaderLabel}
-        footerContent={footerContent}
-        footerOpen={footerOpen}
-        onFooterOpenChange={setFooterOpen}
-        footerStatusContent={<LiveMapFooterStatus status={liveStatus} onItemClick={handleClickedItemClick} />}
+      {/* MapControls - replaces AppFooter */}
+      <MapControls
+        children={footerContent}
+        statusContent={undefined}
         onAccountImageClick={() => setMenuOpen(true)}
-        map={mapInstance || undefined}
-        currentZoom={liveStatus.currentZoom}
-        mapCenter={mapCenter}
-        footerTargetState={footerTargetState}
-        onFooterStateChange={(state) => {
-          // Update footerOpen based on state
-          setFooterOpen(state !== 'low' && state !== 'hidden');
-          // Clear targetState after state change completes (allows new targetState to be set)
-          // Only clear if not explicitly set to 'low' (user closed)
-          if (state === footerTargetState && footerTargetState !== 'low') {
-            setTimeout(() => setFooterTargetState(null), 200);
-          }
-        }}
         onUniversalClose={handleClearSelection}
-        hasSelection={Boolean(selectedPin || selectedLocation || (typeSlugFromUrl && !isContributeOpen))}
-        hasPinSelection={Boolean(pinIdFromUrl || selectedPin)}
-        hasLocationSelection={Boolean(selectedLocation)}
-        hasMentionTypeFilter={Boolean(typeSlugFromUrl && !isContributeOpen)}
-        isModalOpen={isModalOpen || isContributeOpen}
+        showCloseIcon={hasSelection}
+        map={mapInstance || undefined}
+        onLocationSelect={handleLocationSelectForFooter}
+        showMentionTypes={showMentionTypes}
       />
       <AppMenu
         open={menuOpen}
@@ -754,7 +1081,26 @@ export default function LivePage() {
         timeFilter={timeFilter}
         onTimeFilterChange={setTimeFilter}
       />
-      </AppContainer>
-      </LiveHeaderThemeSync>
+      {/* Contribute Overlay */}
+      {liveMapId && showContributeOverlay && (
+        <ContributeOverlay
+          isOpen={showContributeOverlay}
+          onClose={handleContributeClose}
+          mapId={liveMapId}
+          mapSlug="live"
+          onMentionCreated={handleMentionCreated}
+        />
+      )}
+        </AppContainer>
+  );
+}
+
+export default function LivePage() {
+  return (
+    <LiveHeaderThemeSync>
+      <SearchStateProvider>
+        <LivePageContent />
+      </SearchStateProvider>
+    </LiveHeaderThemeSync>
   );
 }

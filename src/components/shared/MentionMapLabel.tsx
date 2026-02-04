@@ -25,7 +25,7 @@ export default function MentionMapLabel({
   className = '',
   maxWidth = 'max-w-[120px]',
 }: MentionMapLabelProps) {
-  const baseClasses = 'inline-flex items-center gap-1.5 max-h-[28px] px-3 py-1 rounded-full border text-xs font-medium whitespace-nowrap flex-shrink-0 transition-colors';
+  const baseClasses = 'inline-flex items-center gap-1.5 max-h-[28px] px-3 py-1 rounded-full border text-[10px] font-medium whitespace-nowrap flex-shrink-0 transition-colors';
   
   const selectedClasses = isSelected
     ? 'border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-200'

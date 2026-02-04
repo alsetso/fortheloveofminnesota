@@ -19,6 +19,7 @@ interface FooterStateManagerOptions {
   /** Height constants */
   heights: {
     HIDDEN_HEIGHT: number;
+    TINY_HEIGHT: number;
     LOW_HEIGHT: number;
     MAIN_HEIGHT: number;
     TALL_HEIGHT: number;
@@ -52,16 +53,17 @@ export function useFooterStateManager({
   targetState,
   heights,
 }: FooterStateManagerOptions): FooterStateManagerResult {
-  const { HIDDEN_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT } = heights;
+  const { HIDDEN_HEIGHT, TINY_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT } = heights;
 
   // Determine current state with priority:
   // 1. Modal open → hidden (highest priority, overrides everything)
   // 2. Explicit targetState
-  // 3. Search active → tall
+  // 3. Search active → main
   // 4. Pin selected → tall
   // 5. Panel height indicates tall state
-  // 6. Location/mention type selected → main
-  // 7. Default → low
+  // 6. Panel height indicates tiny state
+  // 7. Location/mention type selected → main
+  // 8. Default → low
   const currentState = useMemo((): FooterState => {
     // Modal open always hides footer (highest priority)
     if (isModalOpen) {
@@ -73,9 +75,9 @@ export function useFooterStateManager({
       return targetState;
     }
 
-    // Search active always triggers tall state
+    // Search active triggers main state (shows search results card)
     if (isSearchActive) {
-      return 'tall';
+      return 'main';
     }
 
     // Pin selection triggers tall state
@@ -88,6 +90,11 @@ export function useFooterStateManager({
       return 'tall';
     }
 
+    // Panel height indicates tiny state (within threshold)
+    if (panelHeight <= TINY_HEIGHT + 10) {
+      return 'tiny';
+    }
+
     // Location or mention type selection triggers main state
     if (hasLocationSelection || hasMentionTypeFilter) {
       return 'main';
@@ -98,7 +105,7 @@ export function useFooterStateManager({
 
     // Default to low
     return 'low';
-  }, [targetState, isSearchActive, hasPinSelection, hasLocationSelection, hasMentionTypeFilter, isModalOpen, panelHeight, TALL_HEIGHT]);
+  }, [targetState, isSearchActive, hasPinSelection, hasLocationSelection, hasMentionTypeFilter, isModalOpen, panelHeight, TINY_HEIGHT, TALL_HEIGHT]);
 
   // Determine if close icon should be shown
   const shouldShowCloseIcon = useMemo(() => {
@@ -114,12 +121,14 @@ export function useFooterStateManager({
     // Hide mention types when:
     // - Search is active (tall state with search)
     // - Footer is in tall state (pin selected or search)
-    return !isSearchActive && currentState !== 'tall';
-  }, [isSearchActive, currentState]);
+    // - Footer is in tiny state
+    // - Pin is selected (hasPinSelection)
+    return !isSearchActive && currentState !== 'tall' && currentState !== 'tiny' && !hasPinSelection;
+  }, [isSearchActive, currentState, hasPinSelection]);
 
   // Determine if footer should be open
   const shouldBeOpen = useMemo(() => {
-    return currentState !== 'low' && currentState !== 'hidden';
+    return currentState !== 'low' && currentState !== 'tiny' && currentState !== 'hidden';
   }, [currentState]);
 
   // Determine target height for current state
@@ -127,6 +136,8 @@ export function useFooterStateManager({
     switch (currentState) {
       case 'hidden':
         return HIDDEN_HEIGHT;
+      case 'tiny':
+        return TINY_HEIGHT;
       case 'tall':
         return TALL_HEIGHT;
       case 'main':
@@ -135,7 +146,7 @@ export function useFooterStateManager({
       default:
         return LOW_HEIGHT;
     }
-  }, [currentState, HIDDEN_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT]);
+  }, [currentState, HIDDEN_HEIGHT, TINY_HEIGHT, LOW_HEIGHT, MAIN_HEIGHT, TALL_HEIGHT]);
 
   return {
     currentState,

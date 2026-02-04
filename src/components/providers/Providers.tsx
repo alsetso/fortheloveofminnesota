@@ -10,6 +10,7 @@ import { BillingEntitlementsProvider } from '@/contexts/BillingEntitlementsConte
 import { AdminImpersonationProvider } from '@/contexts/AdminImpersonationContext';
 import { StripeProvider } from './StripeProvider';
 import { GlobalErrorHandler } from '@/components/utils/GlobalErrorHandler';
+import MapboxPreloader from '@/components/utils/MapboxPreloader';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -29,6 +30,7 @@ export function Providers({ children, initialAuth }: ProvidersProps) {
             <ProfileProvider>
               <ToastProvider>
                 <GlobalErrorHandler />
+                <MapboxPreloader />
                 <WindowManagerProvider>
                   <Suspense fallback={null}>
                     <AppModalProvider>

@@ -1,159 +1,359 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { GlobeAltIcon, MapPinIcon } from '@heroicons/react/24/outline';
-import { useMapboxGeolocate } from './useMapboxGeolocate';
+import { ReactNode, useState, useCallback, useEffect, useRef } from 'react';
+import AppHeader from './AppHeader';
+import HeaderMentionTypeCards from './HeaderMentionTypeCards';
+import { useSearchState } from '@/contexts/SearchStateContext';
+import type { MapInstance, NearbyPin } from './types';
 
 interface MapControlsProps {
-  /** Map instance for controlling map style and location */
-  map?: any;
-  /** Whether controls should be visible */
-  visible: boolean;
+  /** Dynamic content (LivePinCard, MapInfo, MentionTypeInfoCard, etc.) */
+  children?: ReactNode;
+  /** Status content (e.g. LiveMapFooterStatus) - shown above header */
+  statusContent?: ReactNode;
+  /** When set, account image in header opens this (e.g. AppMenu) instead of account dropdown */
+  onAccountImageClick?: () => void;
+  /** Universal close handler - clears selections */
+  onUniversalClose?: () => void;
+  /** Whether close icon should be shown (auto-shown when children exist) */
+  showCloseIcon?: boolean;
+  /** Map instance for AppHeader */
+  map?: MapInstance;
+  /** Callback when a location is selected */
+  onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string) => void;
+  /** Whether to show mention types */
+  showMentionTypes?: boolean;
 }
 
+const CONTAINER_WIDTH = 500;
+const HEADER_HEIGHT = 60;
+
 /**
- * Map controls component - shows map style and user location buttons
- * Positioned in top-right corner (outside AppContentWidth overlay)
- * iOS Maps-style rounded buttons
+ * MapControls - Draggable slide-up panel for map controls
+ * 
+ * Structure:
+ * 1. Status Content (optional)
+ * 2. AppHeader (always visible, draggable)
+ * 3. HeaderMentionTypeCards (when showMentionTypes && !isSearching)
+ * 4. Content Area: Shows children (LivePinCard, MapInfo, etc.) when provided
  */
-export default function MapControls({ map, visible }: MapControlsProps) {
-  const [mapStyle, setMapStyle] = useState<'street' | 'satellite'>('street');
-  const [showUserLocation, setShowUserLocation] = useState(false);
-  const locationButtonRef = useRef<HTMLButtonElement>(null);
-  const geolocateTriggerRef = useRef<(() => void) | null>(null);
-
-  // Use Mapbox's built-in GeolocateControl
-  const geolocateResult = useMapboxGeolocate({
-    map: map || null,
-    enabled: showUserLocation && visible,
-    buttonEl: locationButtonRef.current,
-  });
+export default function MapControls({
+  children,
+  statusContent,
+  onAccountImageClick,
+  onUniversalClose,
+  showCloseIcon = false,
+  map,
+  onLocationSelect,
+  showMentionTypes = false,
+}: MapControlsProps) {
+  const { isSearching } = useSearchState();
   
-  // Store trigger function
-  useEffect(() => {
-    console.log('[MapControls] geolocateResult changed:', geolocateResult);
-    if (geolocateResult?.trigger) {
-      console.log('[MapControls] Setting trigger function');
-      geolocateTriggerRef.current = geolocateResult.trigger;
-      
-      // Test that the trigger function is callable
-      console.log('[MapControls] Trigger function type:', typeof geolocateResult.trigger);
-      console.log('[MapControls] Trigger function:', geolocateResult.trigger.toString().substring(0, 100));
-    } else {
-      console.warn('[MapControls] No trigger function in geolocateResult');
-    }
-  }, [geolocateResult]);
+  // Calculate "low" position (second snap position)
+  const getLowHeight = useCallback(() => {
+    if (typeof window === 'undefined') return 140;
+    const viewportHeight = window.innerHeight;
+    const availableHeight = viewportHeight - HEADER_HEIGHT;
+    const sectionHeight = availableHeight / 4;
+    return HEADER_HEIGHT + sectionHeight; // Second snap position (low)
+  }, []);
   
-  // Debug: Log when button ref is set
+  // Drag state - initialize to "low" position
+  const [heightFromBottom, setHeightFromBottom] = useState(140); // Temporary, will update on mount
+  
+  // Set initial height to "low" on mount
   useEffect(() => {
-    console.log('[MapControls] locationButtonRef.current:', locationButtonRef.current);
-    if (locationButtonRef.current) {
-      console.log('[MapControls] Button element found, onClick should be attached');
-    }
-  }, [locationButtonRef.current]);
+    setHeightFromBottom(getLowHeight());
+  }, [getLowHeight]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartY, setDragStartY] = useState(0);
+  const [dragStartHeight, setDragStartHeight] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [leftPosition, setLeftPosition] = useState(0);
 
-  // Detect current map style
+  // Calculate left position to center the container
   useEffect(() => {
-    if (!map || !visible) return;
-    
-    try {
-      const style = (map as any).getStyle();
-      if (style) {
-        const styleUrl = style.sources?.['mapbox-satellite'] ? 'satellite' : 'street';
-        setMapStyle(styleUrl);
+    const updateLeftPosition = () => {
+      if (typeof window !== 'undefined') {
+        setLeftPosition((window.innerWidth - CONTAINER_WIDTH) / 2);
       }
-    } catch {
-      // Ignore errors
+    };
+    
+    updateLeftPosition();
+    window.addEventListener('resize', updateLeftPosition);
+    return () => window.removeEventListener('resize', updateLeftPosition);
+  }, []);
+
+  // Calculate snap positions
+  const getSnapPositions = useCallback(() => {
+    if (typeof window === 'undefined') return [60, 140, 220, 300, 380];
+    
+    const viewportHeight = window.innerHeight;
+    const availableHeight = viewportHeight - HEADER_HEIGHT;
+    const sectionHeight = availableHeight / 4;
+    
+    return [
+      HEADER_HEIGHT,
+      HEADER_HEIGHT + sectionHeight,
+      HEADER_HEIGHT + sectionHeight * 2,
+      HEADER_HEIGHT + sectionHeight * 3,
+      HEADER_HEIGHT + sectionHeight * 4,
+    ];
+  }, []);
+
+  // Find closest snap position
+  const findClosestSnapPosition = useCallback((currentHeight: number) => {
+    const snapPositions = getSnapPositions();
+    let closest = snapPositions[0];
+    let minDistance = Math.abs(currentHeight - closest);
+    
+    for (const snapPos of snapPositions) {
+      const distance = Math.abs(currentHeight - snapPos);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = snapPos;
+      }
     }
-  }, [map, visible]);
+    
+    return closest;
+  }, [getSnapPositions]);
 
-  if (!visible) return null;
-
-  const handleMapStyleToggle = () => {
-    if (!map) return;
+  // Handle close - animate to position 1 (handle only - HEADER_HEIGHT) then call onUniversalClose
+  const handleClose = useCallback(() => {
+    const handleOnlyHeight = HEADER_HEIGHT; // First snap position (handle only)
     
-    const mapboxMap = map as any;
-    if (!mapboxMap || mapboxMap.removed) return;
+    setIsAnimating(true);
+    const startHeight = heightFromBottom;
+    const distance = handleOnlyHeight - startHeight;
+    const duration = 300;
+    const startTime = Date.now();
     
-    // Toggle between street and satellite
-    const newStyle = mapStyle === 'street' ? 'satellite' : 'street';
-    
-    // Import MAP_CONFIG to get style URLs
-    import('@/features/map/config').then(({ MAP_CONFIG }) => {
-      const styleUrl = newStyle === 'satellite' 
-        ? MAP_CONFIG.STRATEGIC_STYLES.satellite
-        : MAP_CONFIG.STRATEGIC_STYLES.streets;
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentHeight = startHeight + (distance * easeOut);
+      setHeightFromBottom(currentHeight);
       
-      mapboxMap.setStyle(styleUrl);
-      setMapStyle(newStyle);
-    }).catch((err) => {
-      console.error('Error toggling map style:', err);
-    });
-  };
-
-  const handleUserLocationToggle = async () => {
-    console.log('[MapControls] handleUserLocationToggle clicked');
-    console.log('[MapControls] showUserLocation:', showUserLocation);
-    console.log('[MapControls] geolocateTriggerRef.current:', geolocateTriggerRef.current);
-    console.log('[MapControls] map:', map);
-    console.log('[MapControls] visible:', visible);
-    
-    const newState = !showUserLocation;
-    setShowUserLocation(newState);
-    
-    // Always trigger geolocation when button is clicked (even if already enabled)
-    // This ensures it flies to user location on every click
-    if (geolocateTriggerRef.current) {
-      console.log('[MapControls] Calling trigger function...');
-      try {
-        await geolocateTriggerRef.current();
-        console.log('[MapControls] Trigger function completed');
-      } catch (err) {
-        console.error('[MapControls] Error calling trigger:', err);
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        setHeightFromBottom(handleOnlyHeight);
+        // Call onUniversalClose after animation completes
+        onUniversalClose?.();
       }
-    } else {
-      console.warn('[MapControls] Trigger function not available');
+    };
+    
+    requestAnimationFrame(animate);
+  }, [heightFromBottom, onUniversalClose]);
+
+  // Drag handlers
+  const handleDragStart = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    setIsDragging(true);
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    setDragStartY(clientY);
+    setDragStartHeight(heightFromBottom);
+    e.preventDefault();
+  }, [heightFromBottom]);
+
+  const handleDragMove = useCallback((e: MouseEvent | TouchEvent) => {
+    if (!isDragging || isAnimating) return;
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const deltaY = dragStartY - clientY;
+    const newHeight = dragStartHeight + deltaY;
+    
+    const minHeight = HEADER_HEIGHT;
+    const maxHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    
+    setHeightFromBottom(Math.max(minHeight, Math.min(maxHeight, newHeight)));
+  }, [isDragging, dragStartY, dragStartHeight, isAnimating]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    
+    const snapPositions = getSnapPositions();
+    const targetHeight = findClosestSnapPosition(heightFromBottom);
+    const isFirstSection = targetHeight === snapPositions[0];
+    
+    if (Math.abs(heightFromBottom - targetHeight) < 5) {
+      if (isFirstSection) {
+        onUniversalClose?.();
+      }
+      return;
     }
-  };
+    
+    setIsAnimating(true);
+    
+    const startHeight = heightFromBottom;
+    const distance = targetHeight - startHeight;
+    const duration = 300;
+    const startTime = Date.now();
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      const currentHeight = startHeight + (distance * easeOut);
+      setHeightFromBottom(currentHeight);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        setIsAnimating(false);
+        setHeightFromBottom(targetHeight);
+        
+        if (isFirstSection) {
+          onUniversalClose?.();
+        }
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [heightFromBottom, findClosestSnapPosition, getSnapPositions, onUniversalClose]);
+
+  // Set up document-level event listeners when dragging
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => handleDragMove(e);
+    const handleTouchMove = (e: TouchEvent) => handleDragMove(e);
+    const handleMouseUp = () => handleDragEnd();
+    const handleTouchEnd = () => handleDragEnd();
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
+  // Calculate actual header height (includes mention types if visible and no children)
+  const actualHeaderHeight = showMentionTypes && !children ? HEADER_HEIGHT + 60 : HEADER_HEIGHT;
+  
+  // Determine if content should be visible
+  const shouldShowContent = heightFromBottom > actualHeaderHeight + 20;
 
   return (
-    <div className="fixed top-4 right-4 z-50 pointer-events-auto flex flex-col gap-2">
-      {/* Map Style Button */}
-      <button
-        type="button"
-        onClick={handleMapStyleToggle}
-        className="w-10 h-10 rounded-lg bg-white/95 backdrop-blur-sm border border-gray-200 shadow-md flex items-center justify-center hover:bg-white active:bg-gray-50 transition-colors"
-        aria-label="Toggle map style"
-      >
-        <GlobeAltIcon className="w-5 h-5 text-gray-700" />
-      </button>
+    <div
+      ref={containerRef}
+      className={`fixed z-[3000] select-none ${
+        isDragging ? 'cursor-grabbing' : 'cursor-move'
+      } ${isAnimating ? 'transition-none' : ''}`}
+      style={{
+        left: `${leftPosition}px`,
+        bottom: 0,
+        width: `${CONTAINER_WIDTH}px`,
+        height: `${heightFromBottom}px`,
+        maxWidth: `${CONTAINER_WIDTH}px`,
+        maxHeight: '100vh',
+        borderTopLeftRadius: '8px',
+        borderTopRightRadius: '8px',
+        borderBottomLeftRadius: '0px',
+        borderBottomRightRadius: '0px',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(2px)',
+        WebkitBackdropFilter: 'blur(2px)',
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
+        borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+        borderLeft: '1px solid rgba(0, 0, 0, 0.1)',
+        borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+        userSelect: 'none',
+        transition: isAnimating ? 'none' : undefined,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }}
+    >
+      {/* 1. Status Content (optional) */}
+      {statusContent && (
+        <div 
+          className="flex-shrink-0 px-[10px] rounded-t-md"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(2px)',
+            WebkitBackdropFilter: 'blur(2px)',
+          }}
+        >
+          {statusContent}
+        </div>
+      )}
 
-      {/* User Location Button - Toggle */}
-      <button
-        ref={locationButtonRef}
-        type="button"
-        onClick={(e) => {
-          console.log('[MapControls] Button onClick fired!', e);
-          e.preventDefault();
-          e.stopPropagation();
-          handleUserLocationToggle();
+      {/* 2. AppHeader (always visible, draggable) */}
+      <div
+        className="w-full flex-shrink-0 cursor-grab active:cursor-grabbing"
+        data-draggable-container="true"
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(2px)',
+          WebkitBackdropFilter: 'blur(2px)',
         }}
-        onMouseDown={(e) => {
-          console.log('[MapControls] Button onMouseDown fired!', e);
-        }}
-        className={`w-10 h-10 rounded-lg backdrop-blur-sm border shadow-md flex items-center justify-center hover:bg-white active:bg-gray-50 transition-colors ${
-          showUserLocation
-            ? 'bg-blue-50 border-blue-300'
-            : 'bg-white/95 border-gray-200'
-        }`}
-        aria-label={showUserLocation ? 'Hide my location' : 'Show my location'}
-        aria-pressed={showUserLocation}
-        style={{ pointerEvents: 'auto', zIndex: 1000 }}
+        onMouseDown={handleDragStart}
+        onTouchStart={handleDragStart}
       >
-        <MapPinIcon className={`w-5 h-5 ${
-          showUserLocation ? 'text-blue-600' : 'text-gray-700'
-        }`} />
-      </button>
+        <div className="px-[10px]">
+          <AppHeader 
+            onAccountImageClick={onAccountImageClick}
+            onUniversalClose={handleClose}
+            showCloseIcon={false}
+            currentFooterState="main"
+            map={map}
+            onLocationSelect={onLocationSelect}
+          />
+        </div>
+      </div>
+      
+      {/* 3. HeaderMentionTypeCards (when showMentionTypes and no children) */}
+      {showMentionTypes && shouldShowContent && !children && (
+        <div 
+          className="flex-shrink-0 px-[10px]"
+          style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(2px)',
+            WebkitBackdropFilter: 'blur(2px)',
+          }}
+        >
+          <HeaderMentionTypeCards />
+        </div>
+      )}
+      
+      {/* 4. Content Area - Shows children when provided */}
+      {shouldShowContent && children && (
+        <div 
+          ref={contentRef}
+          className="flex-1 min-h-0 overflow-y-auto flex flex-col scrollbar-hide"
+          style={{
+            maxHeight: heightFromBottom > actualHeaderHeight 
+              ? `${heightFromBottom - actualHeaderHeight}px` 
+              : 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(2px)',
+            WebkitBackdropFilter: 'blur(2px)',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+          }}
+        >
+          <div 
+            className="flex-1 min-h-0"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
+            }}
+          >
+            {children}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

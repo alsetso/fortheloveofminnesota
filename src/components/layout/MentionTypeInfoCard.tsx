@@ -91,7 +91,7 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
         <button
           type="button"
           onClick={handleAddToMap}
-          className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+          className="mt-2 flex items-center justify-center gap-1.5 max-w-fit py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
           aria-label={`Add ${type.name} to map`}
         >
           <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
@@ -101,7 +101,7 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
         <button
           type="button"
           onClick={openWelcome}
-          className="mt-2 flex items-center justify-center gap-1.5 w-full py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+          className="mt-2 flex items-center justify-center gap-1.5 max-w-fit py-1.5 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
           aria-label="Sign in to see all events"
         >
           <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />

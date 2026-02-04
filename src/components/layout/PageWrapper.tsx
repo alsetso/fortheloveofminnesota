@@ -13,6 +13,7 @@ import { useNativeIOSApp } from '@/hooks/useNativeIOSApp';
 import { supabase } from '@/lib/supabase';
 import { useAuthStateSafe } from '@/features/auth';
 import { HeaderThemeProvider } from '@/contexts/HeaderThemeContext';
+import { useSearchState } from '@/contexts/SearchStateContext';
 import MapsSelectorDropdown from './MapsSelectorDropdown';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { XCircleIcon, EyeIcon, UserPlusIcon, UserIcon, MapPinIcon, Square3Stack3DIcon, DocumentTextIcon, GlobeAltIcon, LockClosedIcon, XMarkIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -128,9 +129,9 @@ const CONTENT_INSET_DESKTOP = '10px';
 
 /**
  * Global page wrapper with 10vh header and 90vh content area
- * - Header: 10vh, default iOS light gray background (or 20vh when #search is active; custom map overrides via mapSettings.colors)
- * - Content: 90vh, white background, rounded top corners, scrollable (or 80vh when #search is active)
- * - When #search is active: Header expands to 20vh with full-width search and mention type filters
+ * - Header: 10vh, default iOS light gray background (or 20vh when search is active; custom map overrides via mapSettings.colors)
+ * - Content: 90vh, white background, rounded top corners, scrollable (or 80vh when search is active)
+ * - When search is active: Header expands to 20vh with full-width search and mention type filters
  */
 export default function PageWrapper({ 
   children, 
@@ -153,8 +154,7 @@ export default function PageWrapper({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  // Initialize as false to avoid hydration mismatch - will be set correctly on client mount
-  const [isSearchMode, setIsSearchMode] = useState(false);
+  const { isSearchActive } = useSearchState();
   const [mounted, setMounted] = useState(false);
   const isNativeIOSApp = useNativeIOSApp();
   const { account, activeAccountId } = useAuthStateSafe();
@@ -490,28 +490,7 @@ export default function PageWrapper({
     setMounted(true);
   }, []);
 
-  // Consolidated hash checking - handles all hash change scenarios in one effect
-  useEffect(() => {
-    if (!mounted || typeof window === 'undefined') return;
-
-    const checkHash = () => {
-      setIsSearchMode(window.location.hash === '#search');
-    };
-
-    // Initial check
-    checkHash();
-
-    // Listen for hashchange events (browser navigation and manual dispatches)
-    window.addEventListener('hashchange', checkHash);
-    
-    // Listen for popstate (browser back/forward)
-    window.addEventListener('popstate', checkHash);
-
-    return () => {
-      window.removeEventListener('hashchange', checkHash);
-      window.removeEventListener('popstate', checkHash);
-    };
-  }, [mounted, pathname]); // Include pathname to check hash when route changes
+  // Search mode is now managed by SearchStateContext (no hash dependency)
 
   // Track Facebook Pixel page views on route changes
   useEffect(() => {
@@ -632,13 +611,13 @@ export default function PageWrapper({
       >
         <HeaderThemeProvider value={{ isDefaultLightBg, isSearchActive: false }}>
         {/* Notification window placeholder - 30px height, only on iOS native app */}
-        {!isSearchMode && isNativeIOSApp && (
+        {!isSearchActive && isNativeIOSApp && (
           <div className="w-full" style={{ height: '30px' }} />
         )}
         
         <div className="w-full px-4 sm:px-6 lg:px-[10px]">
           {/* Top Row: Logo, Search, Nav, Account - full width with horizontal padding */}
-          {!isSearchMode && (
+          {!isSearchActive && (
             <div className="grid grid-cols-12 gap-6 items-center transition-all duration-300 h-14">
             {/* 1st Column: Back button (settings subpage) or Logo/Page name (default) */}
             <div className={`hidden lg:flex lg:col-span-3 ${isSettingsSubpage ? 'justify-start' : ''} items-center ${isSettingsSubpage ? '' : 'gap-3'} min-w-0 ${(headerBackHref && headerTitle) || isSettingsSubpage ? 'lg:ml-4' : ''}`}>
@@ -931,7 +910,7 @@ export default function PageWrapper({
         </div>
 
         {/* Search Mode Header: logo + full-width search; same horizontal inset as main content */}
-        {isSearchMode && (
+        {isSearchActive && (
           <div className="w-full px-4 sm:px-6 lg:px-[10px] flex flex-col animate-in fade-in slide-in-from-top-2 duration-300 pt-1">
             {/* Row 1: Logo + full-width search input (+ Cancel on mobile) */}
             <div className="flex items-center gap-2 h-14">
@@ -995,13 +974,13 @@ export default function PageWrapper({
           }`}
           style={{ minHeight: 0 }}
         >
-          {isSearchMode && searchResultsComponent ? searchResultsComponent : children}
+          {isSearchActive && searchResultsComponent ? searchResultsComponent : children}
         </div>
         </div>
       </div>
 
       {/* Bottom nav (mobile) - fixed at bottom of screen */}
-      {!isSearchMode && !isOnboardingPage && (
+      {!isSearchActive && !isOnboardingPage && (
         <div
           className="fixed bottom-0 left-0 right-0 z-50 lg:hidden flex flex-col items-stretch"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}

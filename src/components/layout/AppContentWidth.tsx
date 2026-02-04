@@ -24,10 +24,10 @@ interface AppContentWidthProps {
   currentZoom?: number;
   /** Map center coordinates */
   mapCenter?: { lat: number; lng: number } | null;
-  /** Programmatically set footer state: 'hidden' | 'low' | 'main' | 'tall' */
-  footerTargetState?: 'hidden' | 'low' | 'main' | 'tall' | null;
+  /** Programmatically set footer state: 'hidden' | 'tiny' | 'low' | 'main' | 'tall' */
+  footerTargetState?: 'hidden' | 'tiny' | 'low' | 'main' | 'tall' | null;
   /** Called when footer state changes */
-  onFooterStateChange?: (state: 'hidden' | 'low' | 'main' | 'tall') => void;
+  onFooterStateChange?: (state: 'hidden' | 'tiny' | 'low' | 'main' | 'tall') => void;
   /** Universal close handler - clears selections and collapses footer */
   onUniversalClose?: () => void;
   /** Whether there's a selection active (determines if close icon should show) */
@@ -40,13 +40,15 @@ interface AppContentWidthProps {
   hasMentionTypeFilter?: boolean;
   /** Whether a modal is open (should hide footer) */
   isModalOpen?: boolean;
+  /** Callback when a location is selected */
+  onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: any) => void;
 }
 
 /**
  * Overlay container (max-width 500px, 100dvh) over the map.
  * Header (account + search + mention types) is now inside the footer panel.
  * Footer slides up iOS Maps-style with draggable handle.
- * When #search, LiveSearch overlay covers everything.
+ * When search is active, LiveSearch overlay covers everything.
  */
 export default function AppContentWidth({
   footerContent,
@@ -66,6 +68,7 @@ export default function AppContentWidth({
   hasLocationSelection,
   hasMentionTypeFilter,
   isModalOpen = false,
+  onLocationSelect,
 }: AppContentWidthProps) {
   const { isSearchActive } = useHeaderTheme();
   
@@ -130,6 +133,7 @@ export default function AppContentWidth({
             hasLocationSelection={hasLocationSelection}
             hasMentionTypeFilter={hasMentionTypeFilter}
             isModalOpen={isModalOpen}
+            onLocationSelect={onLocationSelect}
           >
             {footerContent}
           </AppFooter>

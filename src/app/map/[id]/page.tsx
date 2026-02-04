@@ -574,7 +574,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     return () => window.removeEventListener('open-contribute-overlay', handler as EventListener);
   }, [openOverlay]);
 
-  // Listen for live-search-pin-select (close #search and fly to pin on /live)
+  // Listen for live-search-pin-select (fly to pin on /live)
   useEffect(() => {
     const handler = (e: Event) => {
       const d = (e as CustomEvent).detail;

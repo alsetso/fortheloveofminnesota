@@ -60,9 +60,9 @@ export default function HeaderMentionTypeCards() {
   if (loading) {
     return (
       <div className="flex-shrink-0 px-[10px] pb-2">
-        <div className="flex gap-2 overflow-hidden">
+        <div className="flex flex-wrap gap-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[28px] w-24 bg-gray-100 rounded-full animate-pulse flex-shrink-0" />
+            <div key={i} className="h-[28px] w-24 bg-gray-100 rounded-full animate-pulse" />
           ))}
         </div>
       </div>
@@ -79,7 +79,7 @@ export default function HeaderMentionTypeCards() {
     const slug = mentionTypeNameToSlug(selectedType.name);
     return (
       <div className="flex-shrink-0 px-[10px] pb-2">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex flex-wrap gap-2">
           <MentionMapLabel
             emoji={selectedType.emoji}
             name={selectedType.name}
@@ -95,7 +95,7 @@ export default function HeaderMentionTypeCards() {
 
   return (
     <div className="flex-shrink-0 px-[10px] pb-2">
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+      <div className="flex flex-wrap gap-2">
         {mentionTypes.map((type) => {
           const slug = mentionTypeNameToSlug(type.name);
           return (

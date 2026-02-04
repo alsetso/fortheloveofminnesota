@@ -28,6 +28,14 @@ interface MapControlsProps {
 const CONTAINER_WIDTH = 500;
 const HEADER_HEIGHT = 60;
 
+// Calculate responsive container width
+const getContainerWidth = (): number => {
+  if (typeof window === 'undefined') return CONTAINER_WIDTH;
+  const viewportWidth = window.innerWidth;
+  // Full width on mobile (< 640px), max 500px on larger screens
+  return Math.min(viewportWidth - 16, CONTAINER_WIDTH); // 16px for padding on mobile
+};
+
 /**
  * MapControls - Draggable slide-up panel for map controls
  * 
@@ -71,19 +79,28 @@ export default function MapControls({
   const [isAnimating, setIsAnimating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(CONTAINER_WIDTH);
   const [leftPosition, setLeftPosition] = useState(0);
 
-  // Calculate left position to center the container
+  // Calculate responsive container width and left position
   useEffect(() => {
-    const updateLeftPosition = () => {
+    const updateDimensions = () => {
       if (typeof window !== 'undefined') {
-        setLeftPosition((window.innerWidth - CONTAINER_WIDTH) / 2);
+        const width = getContainerWidth();
+        setContainerWidth(width);
+        // Center on larger screens, full width on mobile
+        const viewportWidth = window.innerWidth;
+        if (viewportWidth >= 640) {
+          setLeftPosition((viewportWidth - width) / 2);
+        } else {
+          setLeftPosition(8); // 8px padding on mobile
+        }
       }
     };
     
-    updateLeftPosition();
-    window.addEventListener('resize', updateLeftPosition);
-    return () => window.removeEventListener('resize', updateLeftPosition);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
   // Calculate snap positions
@@ -252,7 +269,7 @@ export default function MapControls({
       style={{
         left: `${leftPosition}px`,
         bottom: 0,
-        width: `${CONTAINER_WIDTH}px`,
+        width: `${containerWidth}px`,
         height: `${heightFromBottom}px`,
         maxWidth: `${CONTAINER_WIDTH}px`,
         maxHeight: '100vh',

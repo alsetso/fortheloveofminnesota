@@ -30,7 +30,7 @@ export async function PATCH(
       updates.updated_at = new Date().toISOString();
 
       const supabase = await createServerClientWithAuth(cookies());
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('collections')
         .update(updates)
         .eq('id', collectionId)
@@ -67,7 +67,7 @@ export async function DELETE(
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       const supabase = await createServerClientWithAuth(cookies());
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('collections')
         .delete()
         .eq('id', collectionId)

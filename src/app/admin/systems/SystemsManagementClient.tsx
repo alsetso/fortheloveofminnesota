@@ -69,7 +69,7 @@ export default function SystemsManagementClient() {
   const [coverage, setCoverage] = useState<{
     totalRoutes: number;
     coveredRoutes: number;
-    uncoveredRoutes: number;
+    uncoveredCount: number;
     uncoveredRoutes: string[];
   } | null>(null);
   const [loadingCoverage, setLoadingCoverage] = useState(false);
@@ -85,11 +85,12 @@ export default function SystemsManagementClient() {
       const res = await fetch('/api/admin/systems/coverage');
       if (res.ok) {
         const data = await res.json();
+        const routes = data.uncoveredRoutes || [];
         setCoverage({
           totalRoutes: data.totalRoutes,
           coveredRoutes: data.coveredRoutes,
-          uncoveredRoutes: data.uncoveredRoutes,
-          uncoveredRoutes: data.uncoveredRoutes || [],
+          uncoveredCount: routes.length,
+          uncoveredRoutes: routes,
         });
       }
     } catch (error) {
@@ -233,10 +234,10 @@ export default function SystemsManagementClient() {
       </div>
 
       {/* Coverage Alert */}
-      {coverage && coverage.uncoveredRoutes > 0 && (
+      {coverage && coverage.uncoveredCount > 0 && (
         <div className="bg-orange-50 border border-orange-200 rounded-md p-[10px] mb-3">
           <div className="text-xs font-semibold text-orange-900 mb-1">
-            ⚠️ {coverage.uncoveredRoutes} routes not covered by systems
+            ⚠️ {coverage.uncoveredCount} routes not covered by systems
           </div>
           <div className="text-[10px] text-orange-700 mb-2">
             Coverage: {coverage.coveredRoutes}/{coverage.totalRoutes} routes ({Math.round((coverage.coveredRoutes / coverage.totalRoutes) * 100)}%)

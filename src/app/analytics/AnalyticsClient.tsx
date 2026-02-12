@@ -9,6 +9,7 @@ import LeftSidebar from '@/components/layout/LeftSidebar';
 import RightSidebar from '@/components/layout/RightSidebar';
 import Image from 'next/image';
 import { isCardVisible, type AnalyticsCardId } from '@/lib/analytics/cardVisibility';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 interface View {
   id: string;

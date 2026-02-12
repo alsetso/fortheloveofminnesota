@@ -92,22 +92,24 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const mentionIds = ((allPinsData || []) as Array<{ id: string }>).map(m => m.id);
 
   // Get post IDs for filtering
-  const { data: postsData, error: postsError } = await (supabase as any)
+  const postsResult = await (supabase as any)
     .schema('content')
     .from('posts')
     .select('id')
-    .eq('account_id', accountId)
-    .returns<Array<{ id: string }>>();
+    .eq('account_id', accountId);
+  const postsData = postsResult.data as Array<{ id: string }> | null;
+  const postsError = postsResult.error;
 
-  const postIds = postsData?.map(p => p.id) || [];
+  const postIds = postsData?.map((p: { id: string }) => p.id) || [];
 
   // Get map IDs for filtering (both UUID and custom_slug)
-  const { data: mapsData, error: mapsError } = await (supabase as any)
+  const mapsResult = await (supabase as any)
     .schema('maps')
     .from('maps')
     .select('id, custom_slug')
-    .eq('account_id', accountId)
-    .returns<Array<{ id: string; custom_slug: string | null }>>();
+    .eq('account_id', accountId);
+  const mapsData = mapsResult.data as Array<{ id: string; custom_slug: string | null }> | null;
+  const mapsError = mapsResult.error;
 
   const mapIds = mapsData?.map(m => m.id) || [];
   const mapSlugs = mapsData?.filter(m => m.custom_slug).map(m => m.custom_slug!).filter(Boolean) || [];
@@ -385,7 +387,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       }
     }
 
-    const mentionsMap = new Map((mentionsData.data || []).map((m: any) => [
+    type MentionMapValue = { description: string; account_id: string | null; owner_username: string | null; owner_image_url: string | null };
+    type PostMapValue = { title: string | null; content: string; account_id: string | null; owner_username: string | null; owner_image_url: string | null };
+    const mentionsMap = new Map<string, MentionMapValue>((mentionsData.data || []).map((m: any) => [
       m.id,
       {
         description: m.description || '',
@@ -394,7 +398,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         owner_image_url: m.account?.image_url || null,
       }
     ]));
-    const postsMap = new Map((postsData.data || []).map((p: any) => [
+    const postsMap = new Map<string, PostMapValue>((postsData.data || []).map((p: any) => [
       p.id,
       {
         title: p.title || null,
@@ -404,8 +408,10 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         owner_image_url: p.account?.image_url || null,
       }
     ]));
-    const mapsByIdMap = new Map((mapsByIdData.data || []).map((m: any) => [m.id, { title: m.title || null, description: m.description || null }]));
-    const mapsBySlugMap = new Map((mapsBySlugData.data || []).map((m: any) => [m.custom_slug, { title: m.title || null, description: m.description || null, id: m.id }]));
+    type MapInfoValue = { title: string | null; description: string | null };
+    type MapBySlugValue = MapInfoValue & { id: string };
+    const mapsByIdMap = new Map<string, MapInfoValue>((mapsByIdData.data || []).map((m: any) => [m.id, { title: m.title || null, description: m.description || null }]));
+    const mapsBySlugMap = new Map<string, MapBySlugValue>((mapsBySlugData.data || []).map((m: any) => [m.custom_slug, { title: m.title || null, description: m.description || null, id: m.id }]));
 
     // Build user visit history, filtering out visits to own content
     for (const visit of userVisits as UrlVisit[]) {
@@ -591,7 +597,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       const mapsContent: Array<{ id: string; title: string | null; description: string | null; custom_slug: string | null }> = [];
       
       if (uniqueMapIds.length > 0) {
-        const { data: mapsById } = await supabase
+        const { data: mapsById } = await (supabase as any)
           .schema('maps')
           .from('maps')
           .select('id, title, description, custom_slug')

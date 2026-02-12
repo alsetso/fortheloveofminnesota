@@ -4,7 +4,7 @@
  * Replaces: createServerClient, createServerClientWithAuth, createServiceClient
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createServerClient as createSSRClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
@@ -43,7 +43,7 @@ interface SupabaseClientOptions {
  * // Service client (bypasses RLS, admin only)
  * const client = createSupabaseClient({ service: true });
  */
-export async function createSupabaseClient(options: SupabaseClientOptions = {}) {
+export async function createSupabaseClient(options: SupabaseClientOptions = {}): Promise<SupabaseClient<Database>> {
   const { auth = false, service = false, cookieStore } = options;
 
   // Service role client (bypasses RLS)

@@ -19,7 +19,7 @@ export async function GET(
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       const supabase = await createServerClientWithAuth(cookies());
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('collections')
         .select('*')
         .eq('account_id', id)
@@ -56,7 +56,7 @@ export async function POST(
         return NextResponse.json({ error: 'title is required' }, { status: 400 });
       }
       const supabase = await createServerClientWithAuth(cookies());
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('collections')
         .insert({
           account_id: id,

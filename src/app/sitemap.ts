@@ -30,7 +30,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Fetch cities and counties
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   // Fetch all cities with slugs
   const { data: cities } = await supabase

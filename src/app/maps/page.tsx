@@ -2,13 +2,17 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
 import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import MapInfo, { type MapInfoLocation } from '@/components/layout/MapInfo';
 import LivePinCard, { type LivePinData } from '@/components/layout/LivePinCard';
 import MapPage from '../map/[id]/page';
 import MapsPageFooter from '@/components/maps/MapsPageFooter';
 import MentionTypeFilter from './components/MentionTypeFilter';
+import MapStylesPopup from '@/components/layout/MapStylesPopup';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -22,12 +26,19 @@ export interface LiveMapData {
 function MapsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeAccountId } = useAuthStateSafe();
+  const { activeAccountId, account } = useAuthStateSafe();
   const currentAccountId = activeAccountId ?? null;
   const { modal } = useAppModalContextSafe();
   const isWelcomeModalOpen = modal.type === 'welcome';
 
   const [liveData, setLiveData] = useState<LiveMapData | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('7d');
+  const [showDistricts, setShowDistricts] = useState(false);
+  const [showCTU, setShowCTU] = useState(false);
+  const [showStateBoundary, setShowStateBoundary] = useState(false);
+  const [showCountyBoundaries, setShowCountyBoundaries] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<MapInfoLocation | null>(null);
   const [liveStatus, setLiveStatus] = useState({ loadingData: true, mapLoaded: false, loadingPins: false, currentZoom: 0 });
@@ -226,9 +237,24 @@ function MapsPageContent() {
   return (
     <>
       <PageViewTracker />
-      <NewPageWrapper>
+      <NewPageWrapper leftSidebar={<LeftSidebar />} rightSidebar={<RightSidebar />}>
         <div className="relative w-full h-[calc(100vh-3.5rem)] overflow-hidden">
-          {showMentionTypes && <MentionTypeFilter tags={liveData.tags} visible={showMentionTypes} />}
+          {showMentionTypes && (
+            <MentionTypeFilter
+              tags={liveData.tags}
+              visible={showMentionTypes}
+              leftSlot={
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-gray-600 hover:bg-white/90 hover:text-gray-900 transition-colors border border-gray-200 bg-white/90"
+                  aria-label="Map settings"
+                >
+                  <Cog6ToothIcon className="w-4 h-4" />
+                </button>
+              }
+            />
+          )}
           <MapPage
             params={Promise.resolve({ id: 'public' })}
             skipPageWrapper
@@ -237,6 +263,14 @@ function MapsPageContent() {
             onLivePinSelect={handleLivePinSelect}
             onRegisterClearSelection={(fn) => { clearMapSelectionRef.current = fn; }}
             initialData={initialData}
+            onMapInstanceReady={setMapInstance}
+            timeFilter={timeFilter === 'all' ? null : timeFilter}
+            controlledBoundaryState={{
+              showDistricts,
+              showCTU,
+              showStateBoundary,
+              showCountyBoundaries,
+            }}
           />
           {!isWelcomeModalOpen && hasSelection && (
             <MapsPageFooter
@@ -245,6 +279,20 @@ function MapsPageContent() {
               showCloseIcon={hasSelection}
             />
           )}
+          <MapStylesPopup
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            map={mapInstance}
+            timeFilter={timeFilter}
+            onTimeFilterChange={(f) => setTimeFilter(f)}
+            account={account ?? undefined}
+            onUpgrade={() => router.push('/billing')}
+            onProToast={(feature) => { /* no-op on maps page */ }}
+            districtsState={{ showDistricts, setShowDistricts }}
+            ctuState={{ showCTU, setShowCTU }}
+            stateBoundaryState={{ showStateBoundary, setShowStateBoundary }}
+            countyBoundariesState={{ showCountyBoundaries, setShowCountyBoundaries }}
+          />
         </div>
       </NewPageWrapper>
     </>

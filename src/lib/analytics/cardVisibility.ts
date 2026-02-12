@@ -11,6 +11,8 @@ export type AnalyticsCardId =
   | 'profileViews'
   | 'totalPinViews'
   | 'totalMentionViews'
+  | 'postViews'
+  | 'mapViews'
   | 'likes'
   | 'collections'
   | 'uniqueVisitors'
@@ -30,6 +32,8 @@ export const CORE_CARDS: AnalyticsCardId[] = [
   'profileViews',
   'totalPinViews',
   'totalMentionViews',
+  'postViews',
+  'mapViews',
 ];
 
 /**

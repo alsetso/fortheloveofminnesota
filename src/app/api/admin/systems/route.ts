@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
 import { cookies } from 'next/headers';
-import { analyzeSystem } from '@/lib/admin/systemAnalyzer';
 
 /**
  * GET /api/admin/systems
- * Get all systems and their visibility settings
+ * Get all systems and their visibility settings.
+ * Analysis is fetched on-demand via /api/admin/systems/[id]/analyze when user expands a system.
  */
 export async function GET(request: NextRequest) {
   return withSecurity(
@@ -16,7 +16,6 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerClientWithAuth(cookies());
         
         // Use RPC function to query admin schema tables
-        // This works around Supabase JS client limitations with non-public schemas
         const { data: systemsResult, error: systemsError } = await (supabase.rpc as any)('query_table', {
           p_schema_name: 'admin',
           p_table_name: 'system_visibility',
@@ -47,11 +46,10 @@ export async function GET(request: NextRequest) {
           );
         }
         
-        // Get route visibility settings and analyze each system
-        const systemsWithDetails = await Promise.all(
+        // Get route visibility settings for each system (DB only; analysis fetched on expand)
+        const systemsWithRoutes = await Promise.all(
           systems.map(async (system: any) => {
-            // Get route visibility settings from database
-            const { data: routesResult, error: routesError } = await (supabase.rpc as any)('query_table', {
+            const { data: routesResult } = await (supabase.rpc as any)('query_table', {
               p_schema_name: 'admin',
               p_table_name: 'route_visibility',
               p_limit: 1000,
@@ -66,22 +64,14 @@ export async function GET(request: NextRequest) {
             const routesArray = routesRow?.data || [];
             const routeVisibilitySettings = Array.isArray(routesArray) ? routesArray : [];
             
-            // Analyze system to find all routes, files, components, services, etc.
-            const systemAnalysis = analyzeSystem(
-              system.schema_name,
-              system.system_name,
-              system.primary_route
-            );
-            
             return {
               ...system,
-              routeVisibilitySettings: routeVisibilitySettings,
-              analysis: systemAnalysis,
+              routeVisibilitySettings,
             };
           })
         );
         
-        return NextResponse.json({ systems: systemsWithDetails });
+        return NextResponse.json({ systems: systemsWithRoutes });
       } catch (error) {
         console.error('[Admin Systems API] Unexpected error:', error);
         return NextResponse.json(

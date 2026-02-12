@@ -67,9 +67,16 @@ interface MapPageProps {
   onGeolocateControlReady?: (control: any) => void;
   /** When provided (e.g. from /maps), skip data fetch and use this. */
   initialData?: { map: MapData; pins?: any[]; areas?: any[]; members?: any[] | null; tags?: { id: string; emoji: string; name: string }[] } | null;
+  /** When skipPageWrapper: controlled boundary layer state from parent (e.g. /maps settings modal). */
+  controlledBoundaryState?: {
+    showDistricts: boolean;
+    showCTU: boolean;
+    showStateBoundary: boolean;
+    showCountyBoundaries: boolean;
+  };
 }
 
-export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null, onMapInstanceReady, onGeolocateControlReady, initialData }: MapPageProps) {
+export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null, onMapInstanceReady, onGeolocateControlReady, initialData, controlledBoundaryState }: MapPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account, activeAccountId } = useAuthStateSafe();
@@ -109,7 +116,12 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   // Boundary layers state (consolidated)
   // For custom maps, boundary layers come from mapData.settings.appearance.map_layers (source of truth)
   // For live map, boundary layers can be overridden by liveBoundaryLayer prop
-  const { showDistricts, showCTU, showStateBoundary, showCountyBoundaries } = useBoundaryLayers(mapData);
+  // When skipPageWrapper and controlledBoundaryState provided (e.g. /maps), use parent state
+  const internalBoundary = useBoundaryLayers(mapData);
+  const effectiveBoundary = skipPageWrapper && controlledBoundaryState
+    ? controlledBoundaryState
+    : internalBoundary;
+  const { showDistricts, showCTU, showStateBoundary, showCountyBoundaries } = effectiveBoundary;
 
   // Other state
   const [hasPendingRequest, setHasPendingRequest] = useState(false);

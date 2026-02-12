@@ -10,12 +10,14 @@ interface MentionTypeFilterProps {
   tags: Tag[];
   /** When false, filter is hidden */
   visible?: boolean;
+  /** Renders to the left of the scrollable chips */
+  leftSlot?: React.ReactNode;
 }
 
 /**
  * Horizontal filter chips for maps page. Updates URL ?type=slug for MentionsLayer filtering.
  */
-export default function MentionTypeFilter({ tags, visible = true }: MentionTypeFilterProps) {
+export default function MentionTypeFilter({ tags, visible = true, leftSlot }: MentionTypeFilterProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -48,10 +50,11 @@ export default function MentionTypeFilter({ tags, visible = true }: MentionTypeF
 
   return (
     <div
-      className="absolute top-0 left-0 right-0 z-[100] px-2 pb-2 overflow-x-auto scrollbar-hide bg-[hsl(var(--header)/0.9)] backdrop-blur-sm"
+      className="absolute top-0 left-0 right-0 z-[100] px-2 pb-2 flex items-center gap-2 bg-[hsl(var(--header)/0.9)] backdrop-blur-sm"
       style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
     >
-      <div className="flex gap-2 min-w-max">
+      {leftSlot}
+      <div className="flex gap-2 min-w-max flex-1 overflow-x-auto scrollbar-hide">
         {tags.map((tag) => {
           const slug = mentionTypeNameToSlug(tag.name);
           const isSelected = selectedSlugs.includes(slug);

@@ -9,6 +9,7 @@ import {
   MapIcon, 
   UsersIcon,
   UserCircleIcon,
+  ChartBarIcon,
   EllipsisHorizontalIcon,
   BookmarkIcon,
   ClockIcon,
@@ -23,6 +24,7 @@ import {
   MapIcon as MapIconSolid, 
   UsersIcon as UsersIconSolid,
   UserCircleIcon as UserCircleIconSolid,
+  ChartBarIcon as ChartBarIconSolid,
 } from '@heroicons/react/24/solid';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
@@ -123,6 +125,16 @@ export default function NewPageWrapper({
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
   ];
+
+  // Add Analytics for admins
+  if (account?.role === 'admin') {
+    navItems.push({
+      label: 'Analytics',
+      href: '/analytics',
+      icon: ChartBarIcon,
+      iconSolid: ChartBarIconSolid,
+    });
+  }
 
   // Add Profile if username exists
   if (account?.username) {

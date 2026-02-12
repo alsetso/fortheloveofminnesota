@@ -38,7 +38,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   const { data: account, error: accountError } = await supabase
     .from('accounts')
-    .select('id, username, view_count, role')
+    .select('id, username, view_count, role, image_url, plan')
     .eq('id', accountId)
     .maybeSingle();
 
@@ -69,7 +69,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       .from('pins')
       .select('id', { count: 'exact', head: false })
       .eq('map_id', liveMapId)
-      .eq('account_id', accountId)
+      .eq('author_account_id', accountId)
       .eq('is_active', true)
       .eq('archived', false);
     liveMentionsData = result.data;
@@ -84,7 +84,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     .schema('maps')
     .from('pins')
     .select('id', { count: 'exact', head: false })
-    .eq('account_id', accountId)
+    .eq('author_account_id', accountId)
     .eq('is_active', true)
     .eq('archived', false);
 
@@ -284,21 +284,10 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const fetchLimit = timeFilter === 'all' ? 10000 : timeFilter === '90d' ? 5000 : timeFilter === '30d' ? 3000 : timeFilter === '7d' ? 2000 : 1000;
 
   // Get URL Visit History: Where the current user visited (account_id = current user)
+  // Note: url_visits is a view - avoid embeds; we use current account for viewer since it's the user's own visits
   let userVisitsQuery = supabase
     .from('url_visits')
-    .select(`
-      id,
-      url,
-      viewed_at,
-      account_id,
-      referrer_url,
-      user_agent,
-      viewer:accounts!url_visits_account_id_fkey(
-        username,
-        image_url,
-        plan
-      )
-    `)
+    .select('id, url, viewed_at, account_id, referrer_url, user_agent')
     .eq('account_id', accountId) // Current user's visits
     .order('viewed_at', { ascending: false })
     .limit(fetchLimit);
@@ -349,7 +338,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     // Batch fetch content data with account_id to check ownership and get owner info
     const [mentionsData, postsData, mapsByIdData, mapsBySlugData] = await Promise.all([
       mentionIdsToFetch.length > 0
-        ? (supabase as any).schema('maps').from('pins').select('id, description, account_id, account:accounts!map_pins_account_id_fkey(username, image_url)').in('id', [...new Set(mentionIdsToFetch)])
+        ? (supabase as any).schema('maps').from('pins').select('id, description, author_account_id, account:accounts!map_pins_author_account_id_fkey(username, image_url)').in('id', [...new Set(mentionIdsToFetch)])
         : Promise.resolve({ data: [] }),
       postIdsToFetch.length > 0
         ? (supabase as any).schema('content').from('posts').select('id, title, content, account_id, account:accounts!posts_account_id_fkey(username, image_url)').in('id', [...new Set(postIdsToFetch)])
@@ -393,7 +382,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       m.id,
       {
         description: m.description || '',
-        account_id: m.account_id,
+        account_id: m.author_account_id ?? null,
         owner_username: m.account?.username || null,
         owner_image_url: m.account?.image_url || null,
       }
@@ -520,9 +509,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           url: visit.url,
           viewed_at: visit.viewed_at,
           account_id: visit.account_id,
-          viewer_username: visit.viewer?.username || null,
-          viewer_image_url: visit.viewer?.image_url || null,
-          viewer_plan: visit.viewer?.plan || null,
+          viewer_username: (account as any)?.username ?? null,
+          viewer_image_url: (account as any)?.image_url ?? null,
+          viewer_plan: (account as any)?.plan ?? null,
           referrer_url: visit.referrer_url,
           user_agent: visit.user_agent,
           view_type: viewType,
@@ -533,6 +522,139 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         });
       }
     }
+  }
+
+  // Profile + Pin Viewers: Who viewed the current user's profile and pins (visits by others)
+  type ProfilePinView = {
+    id: string;
+    url: string;
+    viewed_at: string;
+    account_id: string | null;
+    viewer_username: string | null;
+    viewer_image_url: string | null;
+    viewer_plan: string | null;
+    referrer_url: string | null;
+    user_agent: string | null;
+    view_type: 'profile' | 'mention' | 'pin_click';
+    content_title: string | null;
+    content_preview: string | null;
+  };
+  let profileAndPinViewersList: ProfilePinView[] = [];
+
+  if (username) {
+    const allProfilePinVisits: Array<{ id: string; url: string; viewed_at: string; account_id: string | null; referrer_url: string | null; user_agent: string | null }> = [];
+
+    // 1. Profile views: url like /{username}%
+    let profileQuery = supabase
+      .from('url_visits')
+      .select('id, url, viewed_at, account_id, referrer_url, user_agent')
+      .like('url', `/${username}%`)
+      .or(nonSelfOrFilter)
+      .order('viewed_at', { ascending: false })
+      .limit(fetchLimit);
+    if (cutoffIso) profileQuery = profileQuery.gte('viewed_at', cutoffIso);
+    const { data: profileVisits } = await profileQuery;
+    if (profileVisits) allProfilePinVisits.push(...profileVisits);
+
+    // 2. Mention detail + map pin clicks: batch by URL
+    const mentionDetailUrls = mentionIds.map((id) => `/mention/${id}`);
+    const mapPinUrls = mentionIds.flatMap((id) => [`/map?pin=${id}`, `/map?pinId=${id}`]);
+    const allPinUrls = [...new Set([...mentionDetailUrls, ...mapPinUrls])];
+
+    for (const batch of chunk(allPinUrls, 150)) {
+      let pinQuery = supabase
+        .from('url_visits')
+        .select('id, url, viewed_at, account_id, referrer_url, user_agent')
+        .in('url', batch)
+        .or(nonSelfOrFilter)
+        .order('viewed_at', { ascending: false })
+        .limit(fetchLimit);
+      if (cutoffIso) pinQuery = pinQuery.gte('viewed_at', cutoffIso);
+      const { data: pinVisits } = await pinQuery;
+      if (pinVisits) allProfilePinVisits.push(...pinVisits);
+    }
+
+    // Dedupe by id, sort desc
+    const seen = new Set<string>();
+    const uniqueVisits = allProfilePinVisits
+      .filter((v) => {
+        if (seen.has(v.id)) return false;
+        seen.add(v.id);
+        return true;
+      })
+      .sort((a, b) => new Date(b.viewed_at).getTime() - new Date(a.viewed_at).getTime())
+      .slice(0, fetchLimit);
+
+    // Fetch viewer accounts and pin descriptions
+    const viewerIds = [...new Set(uniqueVisits.map((v) => v.account_id).filter(Boolean))] as string[];
+    const accountLookup = new Map<string, { username: string | null; image_url: string | null; plan: string | null }>();
+    if (viewerIds.length > 0) {
+      const { data: viewers } = await supabase
+        .from('accounts')
+        .select('id, username, image_url, plan')
+        .in('id', viewerIds);
+      if (viewers) {
+        for (const a of viewers) {
+          accountLookup.set(a.id, { username: a.username ?? null, image_url: a.image_url ?? null, plan: a.plan ?? null });
+        }
+      }
+    }
+
+    // Fetch pin descriptions for content_title
+    const pinIdsFromUrls = uniqueVisits
+      .map((v) => extractMentionId(v.url))
+      .filter((id): id is string => !!id && mentionIds.includes(id));
+    const uniquePinIds = [...new Set(pinIdsFromUrls)];
+    const pinsLookup = new Map<string, string>();
+    if (uniquePinIds.length > 0) {
+      const { data: pinsData } = await (supabase as any)
+        .schema('maps')
+        .from('pins')
+        .select('id, description')
+        .in('id', uniquePinIds);
+      if (pinsData) {
+        for (const p of pinsData) {
+          pinsLookup.set(p.id, (p.description || '').slice(0, 60));
+        }
+      }
+    }
+
+    profileAndPinViewersList = uniqueVisits.map((visit: any) => {
+      const viewer = visit.account_id ? accountLookup.get(visit.account_id) : null;
+      const url = visit.url;
+      let viewType: 'profile' | 'mention' | 'pin_click' = 'profile';
+      let contentTitle: string | null = `Profile: ${username}`;
+
+      if (url.includes('/mention/')) {
+        viewType = 'mention';
+        const mid = extractMentionId(url);
+        contentTitle = mid ? (pinsLookup.get(mid) || 'Mention') : 'Mention';
+      } else if (url.includes('?pin=') || url.includes('?pinId=')) {
+        viewType = 'pin_click';
+        const mid = extractMentionId(url);
+        contentTitle = mid ? (pinsLookup.get(mid) || 'Pin') : 'Pin';
+      } else if (url.match(/^\/[^/?#]+$/)) {
+        viewType = 'profile';
+        contentTitle = `Profile: ${username}`;
+      } else if (url.match(/^\/[^/]+\/[^/?#]+/)) {
+        contentTitle = `Collection: ${url.split('/')[2]}`;
+      }
+
+      return {
+        id: visit.id,
+        url: visit.url,
+        viewed_at: visit.viewed_at,
+        account_id: visit.account_id,
+        viewer_username: viewer?.username ?? null,
+        viewer_image_url: viewer?.image_url ?? null,
+        viewer_plan: viewer?.plan ?? null,
+        referrer_url: visit.referrer_url,
+        user_agent: visit.user_agent,
+        view_type: viewType,
+        content_title: contentTitle,
+        content_preview: null,
+      };
+    });
   }
 
   // Map Views: Views OF the current user's maps (where others viewed their maps)
@@ -554,19 +676,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   if (mapIds.length > 0 || mapSlugs.length > 0) {
     let allMapVisitsQuery = supabase
       .from('url_visits')
-      .select(`
-        id,
-        url,
-        viewed_at,
-        account_id,
-        referrer_url,
-        user_agent,
-        viewer:accounts!url_visits_account_id_fkey(
-          username,
-          image_url,
-          plan
-        )
-      `)
+      .select('id, url, viewed_at, account_id, referrer_url, user_agent')
       .like('url', '/map/%')
       .order('viewed_at', { ascending: false })
       .limit(fetchLimit);
@@ -638,21 +748,41 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         ])
       );
 
+      // Batch fetch viewer accounts (url_visits is a view, so we fetch accounts separately)
+      const visitorAccountIds = [...new Set(mapVisitsWithIds.map((v: any) => v.account_id).filter(Boolean))];
+      const accountLookup = new Map<string, { username: string | null; image_url: string | null; plan: string | null }>();
+      if (visitorAccountIds.length > 0) {
+        const { data: visitors } = await supabase
+          .from('accounts')
+          .select('id, username, image_url, plan')
+          .in('id', visitorAccountIds);
+        if (visitors) {
+          for (const a of visitors) {
+            accountLookup.set(a.id, {
+              username: a.username ?? null,
+              image_url: a.image_url ?? null,
+              plan: a.plan ?? null,
+            });
+          }
+        }
+      }
+
       mapViewsList = mapVisitsWithIds.map((visit: any) => {
         const mapData = visit.isSlug 
           ? mapsBySlugMap.get(visit.mapId)
           : mapsByIdMap.get(visit.mapId);
         
         const title = mapData?.title || 'Map';
+        const viewer = visit.account_id ? accountLookup.get(visit.account_id) : null;
         
         return {
           id: visit.id,
           url: visit.url,
           viewed_at: visit.viewed_at,
           account_id: visit.account_id,
-          viewer_username: visit.viewer?.username || null,
-          viewer_image_url: visit.viewer?.image_url || null,
-          viewer_plan: visit.viewer?.plan || null,
+          viewer_username: viewer?.username ?? null,
+          viewer_image_url: viewer?.image_url ?? null,
+          viewer_plan: viewer?.plan ?? null,
           referrer_url: visit.referrer_url,
           user_agent: visit.user_agent,
           view_type: 'map' as const,
@@ -687,10 +817,20 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   // Limit to reasonable number for initial load (pagination will handle more)
   const initialLoadLimit = timeFilter === 'all' ? 1000 : 500;
   userVisitHistory = userVisitHistory.slice(0, initialLoadLimit);
+  profileAndPinViewersList = profileAndPinViewersList.slice(0, initialLoadLimit);
   mapViewsList = mapViewsList.slice(0, initialLoadLimit);
 
   // For user visit history, viewer info is the current user (they're viewing their own history)
-  // For map views, sanitize viewer details if user doesn't have access
+  // For profile/pin and map views, sanitize viewer details if user doesn't have access
+  const sanitizedProfilePinViewers = canSeeViewerIdentities
+    ? profileAndPinViewersList
+    : profileAndPinViewersList.map((v) => ({
+        ...v,
+        viewer_username: null,
+        viewer_image_url: null,
+        viewer_plan: null,
+        account_id: null,
+      }));
   const sanitizedMapViews = canSeeViewerIdentities
     ? mapViewsList
     : mapViewsList.map(view => ({
@@ -711,16 +851,32 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         liveMentions={liveMentionsCount}
         totalPins={totalPinsCount}
         userVisitHistory={userVisitHistory}
+        profileAndPinViewersList={sanitizedProfilePinViewers}
         mapViewsList={sanitizedMapViews}
         hasVisitorIdentitiesAccess={canSeeViewerIdentities}
         timeFilter={timeFilter}
         isAdmin={isAdmin || false}
       />
     );
-  } catch (error) {
-    console.error('[AnalyticsPage] Error loading analytics:', error);
-    // Log the error and rethrow so error boundary can handle it
-    // This will show the error page instead of silently redirecting
-    throw error;
+  } catch (error: unknown) {
+    const err =
+      error instanceof Error
+        ? { message: error.message, name: error.name, stack: error.stack }
+        : typeof error === 'object' && error !== null
+          ? {
+              message: (error as { message?: string }).message ?? '(no message)',
+              details: (error as { details?: string }).details,
+              hint: (error as { hint?: string }).hint,
+              code: (error as { code?: string }).code,
+              raw: error,
+            }
+          : { message: String(error) };
+    console.error('[AnalyticsPage] Error loading analytics:', err);
+    throw error instanceof Error ? error : new Error(
+      (err as { message?: string }).message ||
+        (typeof error === 'object' && error !== null && 'code' in error
+          ? `Analytics error: ${(error as { code?: string }).code || 'unknown'}`
+          : 'Failed to load analytics')
+    );
   }
 }

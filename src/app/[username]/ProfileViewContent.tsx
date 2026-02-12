@@ -6,6 +6,7 @@ import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import ProfileLeftSidebar from '@/features/profiles/components/ProfileLeftSidebar';
 import ProfilePinsMap, { type LocationPopupState } from '@/features/profiles/components/ProfilePinsMap';
 import ProfileCardSlideDown from '@/features/profiles/components/ProfileCardSlideDown';
+import FinishPinModal from '@/components/modals/FinishPinModal';
 import { useProfileFollow } from '@/features/profiles/hooks/useProfileFollow';
 import { useAuthStateSafe } from '@/features/auth';
 import { useReverseGeocode } from '@/hooks/useReverseGeocode';
@@ -51,6 +52,8 @@ export default function ProfileViewContent({
     address: null,
     mapMeta: null,
   });
+  const [finishPinModalPin, setFinishPinModalPin] = useState<ProfilePin | null>(null);
+  const [finishPinModalAddress, setFinishPinModalAddress] = useState<string | null>(null);
 
   const { account: viewerAccount } = useAuthStateSafe();
   const { followSlot } = useProfileFollow(account.id, isOwnProfile, viewerAccount?.id);
@@ -83,6 +86,7 @@ export default function ProfileViewContent({
 
   const handleAddPin = useCallback(
     async (coordinates: { lat: number; lng: number }, _mapMeta?: Record<string, unknown> | null, _mentionTypeId?: string | null) => {
+      const addressToUse = locationPopup.address;
       const res = await fetch(`/api/accounts/${account.id}/pins`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,11 +94,13 @@ export default function ProfileViewContent({
         credentials: 'include',
       });
       if (res.ok) {
+        const { pin: createdPin } = await res.json();
         handleLocationPopupClose();
-        router.refresh();
+        setFinishPinModalAddress(addressToUse);
+        setFinishPinModalPin(createdPin);
       }
     },
-    [account.id, router, handleLocationPopupClose]
+    [account.id, handleLocationPopupClose, locationPopup.address]
   );
 
   const visiblePins = useMemo(
@@ -163,6 +169,22 @@ export default function ProfileViewContent({
           )}
         </div>
       </div>
+
+      {finishPinModalPin && (
+        <FinishPinModal
+          isOpen={!!finishPinModalPin}
+          onClose={() => {
+            setFinishPinModalPin(null);
+            setFinishPinModalAddress(null);
+            router.refresh();
+          }}
+          pin={finishPinModalPin}
+          accountId={account.id}
+          address={finishPinModalAddress}
+          onPinUpdated={() => router.refresh()}
+          collections={collections}
+        />
+      )}
     </NewPageWrapper>
   );
 }

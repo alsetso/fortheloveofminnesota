@@ -72,6 +72,12 @@ export async function PATCH(
       if (body.media_type === 'image' || body.media_type === 'video' || body.media_type === 'none') updates.media_type = body.media_type;
       if (body.full_address !== undefined) updates.full_address = typeof body.full_address === 'string' ? body.full_address : null;
       if (body.city_id !== undefined) updates.city_id = typeof body.city_id === 'string' ? body.city_id : null;
+      if (body.tagged_account_ids !== undefined) {
+        const raw = body.tagged_account_ids;
+        updates.tagged_account_ids = Array.isArray(raw) && raw.every((id: unknown) => typeof id === 'string')
+          ? raw
+          : [];
+      }
 
       if (Object.keys(updates).length <= 1) {
         return NextResponse.json({ error: 'No fields to update' }, { status: 400 });

@@ -35,7 +35,7 @@ export default function AnalyticsError({
           <div className="mt-4 flex justify-center">
             <button
               onClick={reset}
-              className="text-xs text-gray-600 hover:text-gray-900 underline"
+              className="text-xs text-foreground-muted hover:text-foreground underline"
             >
               Try again
             </button>

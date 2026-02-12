@@ -58,13 +58,13 @@ export function ErrorContent({
     <div className="min-h-full flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full text-center space-y-4">
         <Icon className={`w-16 h-16 ${content.iconColor} mx-auto`} />
-        <h1 className="text-2xl font-bold text-gray-900">{content.title}</h1>
-        <p className="text-gray-600 text-sm leading-relaxed">
+        <h1 className="text-2xl font-bold text-foreground">{content.title}</h1>
+        <p className="text-foreground-muted text-sm leading-relaxed">
           {message || content.message}
         </p>
         {error && process.env.NODE_ENV === 'development' && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
-            <p className="text-xs font-mono text-red-800 break-words">
+          <div className="mt-6 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 rounded-lg text-left">
+            <p className="text-xs font-mono text-red-800 dark:text-red-300 break-words">
               {typeof error === 'string' ? error : error.toString()}
             </p>
           </div>
@@ -73,7 +73,7 @@ export function ErrorContent({
           <div className="flex flex-col sm:flex-row gap-2 justify-center pt-4">
             <button
               onClick={() => router.push('/')}
-              className="inline-flex items-center px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-900 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-foreground text-surface rounded-lg font-medium hover:opacity-90 transition-opacity"
             >
               {homeButtonText}
             </button>
@@ -84,7 +84,7 @@ export function ErrorContent({
                   url.searchParams.set('redirect', window.location.pathname);
                   router.push(`/?redirect=${encodeURIComponent(window.location.pathname)}&message=Please sign in to access this page`);
                 }}
-                className="inline-flex items-center px-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-surface text-foreground border border-border-muted dark:border-white/10 rounded-lg font-medium hover:bg-surface-accent dark:hover:bg-white/10 transition-colors"
               >
                 Sign In
               </button>

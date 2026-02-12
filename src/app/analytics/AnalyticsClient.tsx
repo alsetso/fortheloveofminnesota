@@ -179,16 +179,16 @@ export default function AnalyticsClient({
   const getViewTypeColor = (type: string) => {
     switch (type) {
       case 'profile':
-        return 'bg-blue-100 text-blue-700 border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/50';
       case 'mention':
       case 'pin_click':
-        return 'bg-green-100 text-green-700 border-green-200';
+        return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800/50';
       case 'post':
-        return 'bg-purple-100 text-purple-700 border-purple-200';
+        return 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800/50';
       case 'map':
-        return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+        return 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/50';
       default:
-        return 'bg-gray-100 text-gray-700 border-gray-200';
+        return 'bg-surface-accent dark:bg-white/5 text-foreground-muted border-border-muted dark:border-white/10';
     }
   };
 
@@ -316,19 +316,19 @@ export default function AnalyticsClient({
   const getStatCardColor = (color: string) => {
     switch (color) {
       case 'blue':
-        return 'border-blue-200 bg-blue-50';
+        return 'border-blue-200 dark:border-blue-800/50 bg-blue-50 dark:bg-blue-950/30';
       case 'green':
-        return 'border-green-200 bg-green-50';
+        return 'border-green-200 dark:border-green-800/50 bg-green-50 dark:bg-green-950/30';
       case 'orange':
-        return 'border-orange-200 bg-orange-50';
+        return 'border-orange-200 dark:border-orange-800/50 bg-orange-50 dark:bg-orange-950/30';
       case 'teal':
-        return 'border-teal-200 bg-teal-50';
+        return 'border-teal-200 dark:border-teal-800/50 bg-teal-50 dark:bg-teal-950/30';
       case 'purple':
-        return 'border-purple-200 bg-purple-50';
+        return 'border-purple-200 dark:border-purple-800/50 bg-purple-50 dark:bg-purple-950/30';
       case 'indigo':
-        return 'border-indigo-200 bg-indigo-50';
+        return 'border-indigo-200 dark:border-indigo-800/50 bg-indigo-50 dark:bg-indigo-950/30';
       default:
-        return 'border-gray-200 bg-white';
+        return 'border-border-muted dark:border-white/10 bg-surface';
     }
   };
 
@@ -337,62 +337,62 @@ export default function AnalyticsClient({
     const contentLink = getContentLink(view);
     
     return (
-      <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+      <tr className="border-b border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/5 transition-colors">
         {/* Type Column */}
-        <td className="p-[10px] border-r border-gray-200 align-middle">
+        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border inline-block ${getViewTypeColor(view.view_type)}`}>
             {getViewTypeLabel(view.view_type, view.url)}
           </span>
         </td>
         
         {/* Content Column */}
-        <td className="p-[10px] border-r border-gray-200 align-middle">
+        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
           <div className="min-w-[180px]">
             {view.content_title && contentLink ? (
               <Link
                 href={contentLink}
-                className="text-xs font-semibold text-gray-900 leading-snug truncate hover:text-blue-600 hover:underline transition-colors block"
+                className="text-xs font-semibold text-foreground leading-snug truncate hover:text-lake-blue hover:underline transition-colors block"
                 title={view.content_title}
               >
                 {view.content_title}
               </Link>
             ) : view.content_title ? (
-              <p className="text-xs font-semibold text-gray-900 leading-snug truncate" title={view.content_title}>
+              <p className="text-xs font-semibold text-foreground leading-snug truncate" title={view.content_title}>
                 {view.content_title}
               </p>
             ) : (
-              <p className="text-xs text-gray-400">—</p>
+              <p className="text-xs text-foreground-muted">—</p>
             )}
           </div>
         </td>
         
         {/* URL Column */}
-        <td className="p-[10px] border-r border-gray-200 align-middle">
+        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
           <div className="min-w-[200px]">
             {view.url ? (
               <Link
                 href={view.url}
-                className="text-xs text-gray-600 hover:text-blue-600 hover:underline transition-colors break-all font-mono"
+                className="text-xs text-foreground-muted hover:text-lake-blue hover:underline transition-colors break-all font-mono"
                 title={view.url}
               >
                 {formatUrl(view.url)}
               </Link>
             ) : (
-              <p className="text-xs text-gray-400">—</p>
+              <p className="text-xs text-foreground-muted">—</p>
             )}
           </div>
         </td>
         
         {/* Date Column */}
-        <td className="p-[10px] border-r border-gray-200 align-middle">
-          <time className="text-xs text-gray-600 whitespace-nowrap">
+        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+          <time className="text-xs text-foreground-muted whitespace-nowrap">
             {formatDate(view.viewed_at)}
           </time>
         </td>
         
         {/* Viewer Column - For Paid Users (hidden for "where you visited" - viewer is always you) */}
         {showViewerColumns && hasVisitorIdentitiesAccess && (
-          <td className="p-[10px] border-r border-gray-200 align-middle">
+          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
             <div className="w-[150px]">
               {view.viewer_username ? (
                 <Link
@@ -409,16 +409,16 @@ export default function AnalyticsClient({
                       unoptimized={view.viewer_image_url.startsWith('data:') || view.viewer_image_url.includes('supabase.co')}
                     />
                   ) : (
-                    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                      <UserIcon className="w-3 h-3 text-gray-500" />
+                    <div className="w-5 h-5 rounded-full bg-surface-accent dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                      <UserIcon className="w-3 h-3 text-foreground-muted" />
                     </div>
                   )}
-                  <span className="text-xs text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                  <span className="text-xs text-foreground truncate group-hover:text-lake-blue transition-colors">
                     @{view.viewer_username}
                   </span>
                 </Link>
               ) : (
-                <span className="text-xs text-gray-500">Anonymous</span>
+                <span className="text-xs text-foreground-muted">Anonymous</span>
               )}
             </div>
           </td>
@@ -426,7 +426,7 @@ export default function AnalyticsClient({
         
         {/* Admin Viewer Column - Shows viewer info + plan */}
         {showViewerColumns && isAdmin && (
-          <td className={`p-[10px] align-middle border-l-2 border-r-2 ${isLastRow ? 'border-b-2' : ''} border-yellow-500`}>
+          <td className={`p-[10px] align-middle border-l-2 border-r-2 ${isLastRow ? 'border-b-2' : ''} border-yellow-500 dark:border-yellow-600`}>
             <div className="w-[180px] space-y-1">
               {view.viewer_username ? (
                 <>
@@ -444,22 +444,22 @@ export default function AnalyticsClient({
                         unoptimized={view.viewer_image_url.startsWith('data:') || view.viewer_image_url.includes('supabase.co')}
                       />
                     ) : (
-                      <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                        <UserIcon className="w-3 h-3 text-gray-500" />
+                      <div className="w-5 h-5 rounded-full bg-surface-accent dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                        <UserIcon className="w-3 h-3 text-foreground-muted" />
                       </div>
                     )}
-                    <span className="text-xs text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                    <span className="text-xs text-foreground truncate group-hover:text-lake-blue transition-colors">
                       @{view.viewer_username}
                     </span>
                   </Link>
                   {view.viewer_plan && (
-                    <div className="text-[10px] text-gray-500 capitalize">
+                    <div className="text-[10px] text-foreground-muted capitalize">
                       {view.viewer_plan}
                     </div>
                   )}
                 </>
               ) : (
-                <span className="text-xs text-gray-500">Anonymous</span>
+                <span className="text-xs text-foreground-muted">Anonymous</span>
               )}
             </div>
           </td>
@@ -478,31 +478,31 @@ export default function AnalyticsClient({
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <ChartBarIcon className="w-4 h-4 text-gray-700" />
-              <h1 className="text-sm font-semibold text-gray-900">Analytics</h1>
+              <ChartBarIcon className="w-4 h-4 text-foreground-muted" />
+              <h1 className="text-sm font-semibold text-foreground">Analytics</h1>
             </div>
             <div className="relative" ref={timeFilterRef}>
               <button
                 type="button"
                 onClick={() => setIsTimeFilterOpen((o) => !o)}
-                className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-foreground bg-surface border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent dark:hover:bg-white/10 transition-colors"
               >
-                <ClockIcon className="w-3 h-3 text-gray-500" />
+                <ClockIcon className="w-3 h-3 text-foreground-muted" />
                 {getTimeFilterLabel(timeFilter)}
                 {isTimeFilterOpen ? (
-                  <ChevronUpIcon className="w-3 h-3 text-gray-500" />
+                  <ChevronUpIcon className="w-3 h-3 text-foreground-muted" />
                 ) : (
-                  <ChevronDownIcon className="w-3 h-3 text-gray-500" />
+                  <ChevronDownIcon className="w-3 h-3 text-foreground-muted" />
                 )}
               </button>
               {isTimeFilterOpen && (
-                <div className="absolute right-0 mt-1 py-1 bg-white border border-gray-200 rounded-md z-10 min-w-[140px]">
+                <div className="absolute right-0 mt-1 py-1 bg-surface border border-border-muted dark:border-white/10 rounded-md z-10 min-w-[140px]">
                   {(['24h', '7d', '30d', '90d', 'all'] as TimeFilter[]).map((tf) => (
                     <button
                       key={tf}
                       type="button"
                       onClick={() => handleTimeFilterChange(tf)}
-                      className={`block w-full text-left px-3 py-1.5 text-xs ${timeFilter === tf ? 'font-semibold text-gray-900 bg-gray-50' : 'text-gray-600 hover:bg-gray-50'}`}
+                      className={`block w-full text-left px-3 py-1.5 text-xs ${timeFilter === tf ? 'font-semibold text-foreground bg-surface-accent dark:bg-white/10' : 'text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'}`}
                     >
                       {getTimeFilterLabel(tf)}
                     </button>
@@ -519,13 +519,13 @@ export default function AnalyticsClient({
                 key={stat.id}
                 className={`border rounded-md p-[10px] ${getStatCardColor(stat.color)}`}
               >
-                <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wide">
                   {stat.label}
                 </p>
-                <p className="text-sm font-semibold text-gray-900 mt-0.5">
+                <p className="text-sm font-semibold text-foreground mt-0.5">
                   {stat.value}
                 </p>
-                <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
+                <p className="text-[10px] text-foreground-muted mt-0.5 leading-tight">
                   {stat.description}
                 </p>
               </div>
@@ -534,10 +534,10 @@ export default function AnalyticsClient({
 
           {/* Who Viewed Your Account & Pins */}
           {profileAndPinViewersList.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-              <div className="p-[10px] border-b border-gray-200">
-                <h2 className="text-sm font-semibold text-gray-900">Who viewed your account & pins</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+            <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+              <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+                <h2 className="text-sm font-semibold text-foreground">Who viewed your account & pins</h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
                   People who viewed your profile or pins
                 </p>
                 <div className="flex gap-1 mt-3">
@@ -546,7 +546,7 @@ export default function AnalyticsClient({
                       key={f}
                       type="button"
                       onClick={() => setProfilePinViewFilter(f)}
-                      className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${profilePinViewFilter === f ? 'border-gray-400 bg-gray-100 text-gray-900' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                      className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${profilePinViewFilter === f ? 'border-border-muted dark:border-white/20 bg-surface-accent dark:bg-white/10 text-foreground' : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'}`}
                     >
                       {f === 'all' ? 'All' : f === 'profile' ? 'Profile' : f === 'mention' ? 'Mention' : 'Map Pin'} ({f === 'all' ? profilePinViewCounts.all : profilePinViewCounts[f]})
                     </button>
@@ -556,15 +556,15 @@ export default function AnalyticsClient({
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Type</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Content</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">When</th>
+                    <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Type</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Content</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">When</th>
                       {hasVisitorIdentitiesAccess && (
-                        <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Viewer</th>
+                        <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Viewer</th>
                       )}
                       {isAdmin && (
-                        <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Admin</th>
+                        <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">Admin</th>
                       )}
                     </tr>
                   </thead>
@@ -572,43 +572,43 @@ export default function AnalyticsClient({
                     {filteredProfilePinViewers.map((view) => {
                       const contentLink = getContentLink(view);
                       return (
-                        <tr key={view.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="p-[10px] border-r border-gray-200 align-middle">
+                        <tr key={view.id} className="border-b border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/5 transition-colors">
+                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border inline-block ${getViewTypeColor(view.view_type)}`}>
                               {getViewTypeLabel(view.view_type, view.url)}
                             </span>
                           </td>
-                          <td className="p-[10px] border-r border-gray-200 align-middle">
+                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
                             <div className="min-w-[180px]">
                               {view.content_title && contentLink ? (
-                                <Link href={contentLink} className="text-xs font-semibold text-gray-900 hover:text-blue-600 hover:underline truncate block" title={view.content_title}>
+                                <Link href={contentLink} className="text-xs font-semibold text-foreground hover:text-lake-blue hover:underline truncate block" title={view.content_title}>
                                   {view.content_title}
                                 </Link>
                               ) : view.content_title ? (
-                                <p className="text-xs font-semibold text-gray-900 truncate" title={view.content_title}>{view.content_title}</p>
+                                <p className="text-xs font-semibold text-foreground truncate" title={view.content_title}>{view.content_title}</p>
                               ) : (
-                                <p className="text-xs text-gray-400">—</p>
+                                <p className="text-xs text-foreground-muted">—</p>
                               )}
                             </div>
                           </td>
-                          <td className="p-[10px] border-r border-gray-200 align-middle">
-                            <time className="text-xs text-gray-600 whitespace-nowrap">{formatDate(view.viewed_at)}</time>
+                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+                            <time className="text-xs text-foreground-muted whitespace-nowrap">{formatDate(view.viewed_at)}</time>
                           </td>
                           {hasVisitorIdentitiesAccess && (
-                            <td className="p-[10px] border-r border-gray-200 align-middle">
+                            <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
                               {view.viewer_username ? (
                                 <Link href={`/${view.viewer_username}`} className="flex items-center gap-1.5 min-w-0 hover:opacity-80">
                                   {view.viewer_image_url ? (
                                     <Image src={view.viewer_image_url} alt={view.viewer_username} width={20} height={20} className="w-5 h-5 rounded-full object-cover flex-shrink-0" unoptimized={view.viewer_image_url.startsWith('data:') || view.viewer_image_url.includes('supabase.co')} />
                                   ) : (
-                                    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                      <UserIcon className="w-3 h-3 text-gray-500" />
+                                    <div className="w-5 h-5 rounded-full bg-surface-accent dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                                      <UserIcon className="w-3 h-3 text-foreground-muted" />
                                     </div>
                                   )}
-                                  <span className="text-xs text-gray-900 truncate">@{view.viewer_username}</span>
+                                  <span className="text-xs text-foreground truncate">@{view.viewer_username}</span>
                                 </Link>
                               ) : (
-                                <span className="text-xs text-gray-500">Anonymous</span>
+                                <span className="text-xs text-foreground-muted">Anonymous</span>
                               )}
                             </td>
                           )}
@@ -616,11 +616,11 @@ export default function AnalyticsClient({
                             <td className="p-[10px] align-middle">
                               {view.viewer_username ? (
                                 <>
-                                  <span className="text-xs text-gray-900 block">@{view.viewer_username}</span>
-                                  {view.viewer_plan && <span className="text-[10px] text-gray-500 capitalize">{view.viewer_plan}</span>}
+                                  <span className="text-xs text-foreground block">@{view.viewer_username}</span>
+                                  {view.viewer_plan && <span className="text-[10px] text-foreground-muted capitalize">{view.viewer_plan}</span>}
                                 </>
                               ) : (
-                                <span className="text-xs text-gray-500">Anonymous</span>
+                                <span className="text-xs text-foreground-muted">Anonymous</span>
                               )}
                             </td>
                           )}
@@ -631,8 +631,8 @@ export default function AnalyticsClient({
                 </table>
               </div>
               {filteredProfilePinViewers.length >= profilePinDisplayLimit && profileAndPinViewersList.length > profilePinDisplayLimit && (
-                <div className="p-[10px] border-t border-gray-200">
-                  <button type="button" onClick={() => setProfilePinDisplayLimit((l) => l + 50)} className="text-xs text-gray-600 hover:text-gray-900 underline">
+                <div className="p-[10px] border-t border-border-muted dark:border-white/10">
+                  <button type="button" onClick={() => setProfilePinDisplayLimit((l) => l + 50)} className="text-xs text-foreground-muted hover:text-foreground underline">
                     Load more
                   </button>
                 </div>
@@ -641,13 +641,13 @@ export default function AnalyticsClient({
           )}
 
           {/* Where You Visited */}
-          <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-            <div className="p-[10px] border-b border-gray-200">
+          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+            <div className="p-[10px] border-b border-border-muted dark:border-white/10">
               <div className="flex items-start gap-2">
-                <InformationCircleIcon className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                <InformationCircleIcon className="w-4 h-4 text-foreground-muted flex-shrink-0 mt-0.5" />
                 <div>
-                  <h2 className="text-sm font-semibold text-gray-900">Where you visited</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <h2 className="text-sm font-semibold text-foreground">Where you visited</h2>
+                  <p className="text-xs text-foreground-muted mt-0.5">
                     Pages you viewed. Your visit may count toward others' analytics.
                   </p>
                 </div>
@@ -658,7 +658,7 @@ export default function AnalyticsClient({
                     key={f}
                     type="button"
                     onClick={() => setUrlVisitFilter(f)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${urlVisitFilter === f ? 'border-gray-400 bg-gray-100 text-gray-900' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${urlVisitFilter === f ? 'border-border-muted dark:border-white/20 bg-surface-accent dark:bg-white/10 text-foreground' : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'}`}
                   >
                     {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({f === 'all' ? urlVisitCounts.all : urlVisitCounts[f]})
                   </button>
@@ -669,11 +669,11 @@ export default function AnalyticsClient({
               {filteredUrlVisitHistory.length > 0 ? (
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Type</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Content</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">URL</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide">When</th>
+                    <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Type</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Content</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">URL</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">When</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -689,16 +689,16 @@ export default function AnalyticsClient({
                 </table>
               ) : (
                 <div className="p-6 text-center">
-                  <p className="text-xs text-gray-500">No visits in this period</p>
+                  <p className="text-xs text-foreground-muted">No visits in this period</p>
                 </div>
               )}
             </div>
             {filteredUrlVisitHistory.length >= displayLimit && userVisitHistory.length > displayLimit && (
-              <div className="p-[10px] border-t border-gray-200">
+              <div className="p-[10px] border-t border-border-muted dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setDisplayLimit((l) => l + 50)}
-                  className="text-xs text-gray-600 hover:text-gray-900 underline"
+                  className="text-xs text-foreground-muted hover:text-foreground underline"
                 >
                   Load more
                 </button>
@@ -708,51 +708,51 @@ export default function AnalyticsClient({
 
           {/* Map Views */}
           {mapViewsList.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-              <div className="p-[10px] border-b border-gray-200">
-                <h2 className="text-sm font-semibold text-gray-900">Map views</h2>
-                <p className="text-xs text-gray-500 mt-0.5">
+            <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+              <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+                <h2 className="text-sm font-semibold text-foreground">Map views</h2>
+                <p className="text-xs text-foreground-muted mt-0.5">
                   Visits to your maps by others
                 </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Map</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">URL</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">When</th>
+                    <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Map</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">URL</th>
+                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">When</th>
                       {hasVisitorIdentitiesAccess && (
-                        <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-r border-gray-200">Viewer</th>
+                        <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Viewer</th>
                       )}
                       {isAdmin && (
-                        <th className="p-[10px] text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Admin</th>
+                        <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">Admin</th>
                       )}
                     </tr>
                   </thead>
                   <tbody>
                     {mapViewsList.map((view, idx) => (
-                      <tr key={view.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                        <td className="p-[10px] border-r border-gray-200 align-middle">
-                          <span className="text-xs font-semibold text-gray-900">
+                      <tr key={view.id} className="border-b border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/5 transition-colors">
+                        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+                          <span className="text-xs font-semibold text-foreground">
                             {view.content_title || 'Map'}
                           </span>
                         </td>
-                        <td className="p-[10px] border-r border-gray-200 align-middle">
+                        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
                           <Link
                             href={view.url}
-                            className="text-xs text-gray-600 hover:text-blue-600 hover:underline break-all font-mono"
+                            className="text-xs text-foreground-muted hover:text-lake-blue hover:underline break-all font-mono"
                           >
                             {formatUrl(view.url)}
                           </Link>
                         </td>
-                        <td className="p-[10px] border-r border-gray-200 align-middle">
-                          <time className="text-xs text-gray-600 whitespace-nowrap">
+                        <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+                          <time className="text-xs text-foreground-muted whitespace-nowrap">
                             {formatDate(view.viewed_at)}
                           </time>
                         </td>
                         {hasVisitorIdentitiesAccess && (
-                          <td className="p-[10px] border-r border-gray-200 align-middle">
+                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
                             {view.viewer_username ? (
                               <Link
                                 href={`/${view.viewer_username}`}
@@ -768,14 +768,14 @@ export default function AnalyticsClient({
                                     unoptimized={view.viewer_image_url.startsWith('data:') || view.viewer_image_url.includes('supabase.co')}
                                   />
                                 ) : (
-                                  <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                                    <UserIcon className="w-3 h-3 text-gray-500" />
+                                  <div className="w-5 h-5 rounded-full bg-surface-accent dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                                    <UserIcon className="w-3 h-3 text-foreground-muted" />
                                   </div>
                                 )}
-                                <span className="text-xs text-gray-900 truncate">@{view.viewer_username}</span>
+                                <span className="text-xs text-foreground truncate">@{view.viewer_username}</span>
                               </Link>
                             ) : (
-                              <span className="text-xs text-gray-500">Anonymous</span>
+                              <span className="text-xs text-foreground-muted">Anonymous</span>
                             )}
                           </td>
                         )}
@@ -783,13 +783,13 @@ export default function AnalyticsClient({
                           <td className="p-[10px] align-middle">
                             {view.viewer_username ? (
                               <>
-                                <span className="text-xs text-gray-900 block">@{view.viewer_username}</span>
+                                <span className="text-xs text-foreground block">@{view.viewer_username}</span>
                                 {view.viewer_plan && (
-                                  <span className="text-[10px] text-gray-500 capitalize">{view.viewer_plan}</span>
+                                  <span className="text-[10px] text-foreground-muted capitalize">{view.viewer_plan}</span>
                                 )}
                               </>
                             ) : (
-                              <span className="text-xs text-gray-500">Anonymous</span>
+                              <span className="text-xs text-foreground-muted">Anonymous</span>
                             )}
                           </td>
                         )}

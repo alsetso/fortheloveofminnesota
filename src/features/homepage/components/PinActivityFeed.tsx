@@ -317,7 +317,7 @@ export default function PinActivityFeed({ maps, activity, loading, showWhatYouCa
       {/* Map pins list */}
       {showMapPins && (
         <div className="space-y-2">
-          <SectionHeaderWithAdd title="Map Pins" addHref="/contribute" />
+          <SectionHeaderWithAdd title="Map Pins" addHref="/maps" />
           {activity.length === 0 ? (
             <div className="bg-white border border-gray-200 rounded-md p-[10px]">
               <p className="text-xs text-gray-500">No pin activity yet on your maps.</p>
@@ -342,7 +342,7 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
   const router = useRouter();
   const mapHref = item.map
     ? isLiveMap(item.map)
-      ? '/live'
+      ? '/maps'
       : getMapUrl({ id: item.map.id, slug: item.map.slug ?? undefined })
     : '#';
   const hasLatLng =
@@ -353,7 +353,7 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
   const cardHref =
     item.map && (hasLatLng || item.id)
       ? isLiveMap(item.map)
-        ? `/live?pin=${encodeURIComponent(item.id)}`
+        ? `/maps?pin=${encodeURIComponent(item.id)}`
         : hasLatLng
           ? getMapUrlWithPin(
               { id: item.map.id, slug: item.map.slug ?? undefined },
@@ -452,7 +452,7 @@ function PinActivityItem({ item }: { item: FeedPinActivity }) {
               <span className="text-gray-300 shrink-0">·</span>
             )}
             <Link
-              href={item.map && isLiveMap(item.map) ? `/live?pin=${encodeURIComponent(item.id)}` : cardHref}
+              href={item.map && isLiveMap(item.map) ? `/maps?pin=${encodeURIComponent(item.id)}` : cardHref}
               onClick={(e) => e.stopPropagation()}
               className="shrink-0 font-medium inline-flex items-center gap-0.5 whitespace-nowrap text-gray-600 hover:text-gray-900 transition-colors leading-none py-0"
             >

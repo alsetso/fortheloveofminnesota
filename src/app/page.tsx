@@ -1,60 +1,27 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { useAuthStateSafe } from '@/features/auth';
-import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
-import HomePageLayout from './HomePageLayout';
-import HomeFeedContent from '@/features/homepage/components/HomeFeedContent';
-import PromotionalBanner from '@/components/auth/PromotionalBanner';
+import { Suspense } from 'react';
+import { BlockedRouteToast } from '@/components/system/BlockedRouteToast';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
+import LandingPage from '@/components/landing/LandingPage';
 
+/**
+ * Homepage - Landing-style inside NewPageWrapper. Primary CTA: /maps.
+ */
 export default function Home() {
-  const { account: authAccount, isLoading, isAuthenticated: authIsAuthenticated } = useAuthStateSafe();
-  const { openWelcome } = useAppModalContextSafe();
-  const { closeSidebar: closeLeftSidebar } = useUnifiedSidebar();
-  const leftSidebarConfigs = useMemo(() => [], []);
-  const rightSidebarConfigs = useMemo(() => [], []);
-  
-  // Use the isAuthenticated from the hook (based on user, not just activeAccountId)
-  // Also require authAccount to exist (not just user) to be fully authenticated
-  const isAuthenticated = authIsAuthenticated && !!authAccount;
-
-  // Show promotional banner only for non-authenticated users
-  // Authenticated users (even on hobby plan) see the full homepage
-  if (isLoading || !isAuthenticated) {
-    return <PromotionalBanner isOpen={true} />;
-  }
-
   return (
-    <PageWrapper
-      headerContent={null}
-      searchComponent={
-        <MapSearchInput onLocationSelect={() => {}} />
-      }
-      accountDropdownProps={{
-        onAccountClick: () => {},
-        onSignInClick: openWelcome,
-      }}
-      searchResultsComponent={<SearchResults />}
-    >
-      <HomePageLayout
-        leftSidebar={null}
-        rightSidebar={null}
-        onLeftSidebarClose={closeLeftSidebar}
-        onRightSidebarClose={() => {}}
-        leftSidebarConfigs={leftSidebarConfigs}
-        rightSidebarConfigs={rightSidebarConfigs}
+    <>
+      <Suspense fallback={null}>
+        <BlockedRouteToast />
+      </Suspense>
+      <NewPageWrapper
+        leftSidebar={<LeftSidebar />}
+        rightSidebar={<RightSidebar />}
       >
-        <div className="h-full overflow-y-auto scrollbar-hide">
-          <div className="w-full py-6">
-            <HomeFeedContent />
-          </div>
-        </div>
-      </HomePageLayout>
-    </PageWrapper>
+        <LandingPage embedInNewPageWrapper />
+      </NewPageWrapper>
+    </>
   );
 }

@@ -144,15 +144,6 @@ export async function POST(request: NextRequest) {
           expand: ['latest_invoice.payment_intent'],
         });
 
-        // Log subscription creation for debugging (dev only)
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[create-subscription] Subscription created:', {
-            subscriptionId: subscription.id,
-            status: subscription.status,
-            customerId: customerId,
-          });
-        }
-
         // Check invoice and payment status
         const invoice = subscription.latest_invoice;
         let requiresAction = false;
@@ -165,14 +156,6 @@ export async function POST(request: NextRequest) {
             ? await stripe.invoices.retrieve(invoice)
             : invoice;
 
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[create-subscription] Invoice status:', {
-              invoiceId: fullInvoice.id,
-              status: fullInvoice.status,
-              paymentIntent: (fullInvoice as any).payment_intent,
-            });
-          }
-
           const paymentIntentValue = (fullInvoice as any).payment_intent;
           if (paymentIntentValue) {
             const paymentIntentId = typeof paymentIntentValue === 'string' 
@@ -183,22 +166,11 @@ export async function POST(request: NextRequest) {
               try {
                 const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
                 paymentStatus = paymentIntent.status;
-                
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('[create-subscription] Payment intent status:', {
-                    paymentIntentId,
-                    status: paymentIntent.status,
-                    amount: paymentIntent.amount,
-                  });
-                }
-                
+
                 // If payment requires confirmation, confirm it
                 if (paymentIntent.status === 'requires_confirmation') {
                   const confirmed = await stripe.paymentIntents.confirm(paymentIntentId);
                   paymentStatus = confirmed.status;
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('[create-subscription] Payment confirmed, new status:', confirmed.status);
-                  }
                 }
                 
                 // If payment requires action (3D Secure), return client secret
@@ -248,15 +220,6 @@ export async function POST(request: NextRequest) {
               console.error('[create-subscription] Failed to update account status:', updateError);
               // Don't fail the request - webhook will update it
             } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[create-subscription] Account status updated immediately:', {
-                  customerId,
-                  subscriptionId: subscription.id,
-                  status: subscription.status,
-                  accountId: account.id,
-                });
-              }
-
               // Log successful payment to stripe_events table
               // This ensures we have a record even if webhook doesn't fire
               try {
@@ -294,15 +257,6 @@ export async function POST(request: NextRequest) {
                 if (eventError) {
                   console.error('[create-subscription] Failed to log to stripe_events:', eventError);
                   // Don't fail the request - account is already updated
-                } else {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('[create-subscription] Payment logged to stripe_events:', {
-                      eventId,
-                      accountId: account.id,
-                      subscriptionId: subscription.id,
-                      customerId,
-                    });
-                  }
                 }
               } catch (eventErr) {
                 console.error('[create-subscription] Error logging to stripe_events:', eventErr);

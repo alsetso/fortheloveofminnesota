@@ -18,19 +18,19 @@ function getTimeAgo(isoDate: string): string {
 /** Same structure as loaded card: three sections with 1:1 skeleton per element. ProfilePhoto sm = w-8 h-8. */
 function PinCardSkeleton() {
   return (
-    <div className="border-b border-gray-100 last:border-0">
+    <div className="border-b border-border-muted last:border-0">
       <div className="p-[10px] space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex gap-2 min-w-0 flex-1">
             {/* Section 1: account image */}
-            <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-gray-200 animate-pulse" aria-hidden />
+            <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-surface-accent animate-pulse" aria-hidden />
             {/* Section 2 + 3: username area, then content + lat/lng */}
             <div className="min-w-0 flex-1 space-y-0.5">
               {/* Section 2: username · Pin line (text-xs) */}
-              <div className="h-3.5 w-28 rounded bg-gray-200 animate-pulse" aria-hidden />
+              <div className="h-3.5 w-28 rounded bg-surface-accent animate-pulse" aria-hidden />
               {/* Section 3: content line (snippet) + mention_type + time ago */}
-              <div className="h-3 w-full max-w-[160px] rounded bg-gray-100 animate-pulse" aria-hidden />
-              <div className="h-2.5 w-20 rounded bg-gray-100 animate-pulse" aria-hidden />
+              <div className="h-3 w-full max-w-[160px] rounded bg-surface-accent animate-pulse" aria-hidden />
+              <div className="h-2.5 w-20 rounded bg-surface-accent animate-pulse" aria-hidden />
             </div>
           </div>
         </div>
@@ -96,9 +96,9 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
 
   if (!pin) {
     return (
-      <div className="border-b border-gray-100 last:border-0">
+      <div className="border-b border-border-muted last:border-0">
         <div className="p-[10px] flex items-center justify-between gap-2">
-          <span className="text-xs text-gray-500">Pin not found</span>
+          <span className="text-xs text-foreground-muted">Pin not found</span>
         </div>
       </div>
     );
@@ -114,7 +114,7 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
   // Media (images/videos) shown edge-to-edge, other content wrapped in padding
   return (
     <div
-      className="border-b border-gray-100 last:border-0"
+      className="border-b border-border-muted last:border-0"
       data-viewer-owner={isViewerOwner ? 'true' : undefined}
     >
       {/* Media section - edge-to-edge, no padding */}
@@ -123,7 +123,7 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
           {pin.image_url && (
             <Link
               href={`/mention/${pin.id}`}
-              className="block w-full focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
+              className="block w-full focus:outline-none focus:ring-2 focus:ring-foreground-subtle focus:ring-offset-1"
             >
               <img
                 src={pin.image_url}
@@ -135,7 +135,7 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
           {pin.video_url && (
             <Link
               href={`/mention/${pin.id}`}
-              className="block w-full focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-1"
+              className="block w-full focus:outline-none focus:ring-2 focus:ring-foreground-subtle focus:ring-offset-1"
             >
               <video
                 src={pin.video_url}
@@ -160,45 +160,45 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
                 <ProfilePhoto account={pin.account as unknown as Account} size="sm" editable={false} />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-gray-200 animate-pulse" aria-hidden />
+              <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-surface-accent animate-pulse" aria-hidden />
             )}
             {/* Section 2: username area. Section 3: content + mention_type + time ago */}
             <div className="min-w-0 flex-1 space-y-0.5">
               {/* Section 2: username · Pin */}
               {hasAccount ? (
-                <p className="text-xs text-gray-900">
+                <p className="text-xs text-foreground">
                   {pin.account!.username ? (
                     <Link
                       href={`/${encodeURIComponent(pin.account!.username)}`}
-                      className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                      className="font-medium text-accent hover:text-accent-hover hover:underline"
                     >
                       {pin.account!.username}
                     </Link>
                   ) : (
-                    <span className="font-medium text-gray-600">Pin</span>
+                    <span className="font-medium text-foreground-muted">Pin</span>
                   )}
                 </p>
               ) : (
-                <div className="h-3.5 w-28 rounded bg-gray-200 animate-pulse" aria-hidden />
+                <div className="h-3.5 w-28 rounded bg-surface-accent animate-pulse" aria-hidden />
               )}
               {/* Section 3: content (snippet) + mention_type + time ago */}
               {snippet ? (
-                <p className="text-xs text-gray-600 truncate">{snippet}</p>
+                <p className="text-xs text-foreground-muted truncate">{snippet}</p>
               ) : hasContent ? (
-                <div className="h-3 w-full max-w-[160px] rounded bg-gray-100 animate-pulse" aria-hidden />
+                <div className="h-3 w-full max-w-[160px] rounded bg-surface-accent animate-pulse" aria-hidden />
               ) : isViewerOwner ? (
                 <Link
                   href={`/mention/${pin.id}/edit`}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:text-accent-hover hover:underline"
                 >
                   <PencilIcon className="w-3 h-3" />
                   <span>Add photo or caption</span>
                 </Link>
               ) : (
-                <p className="text-xs text-gray-500 italic">No description</p>
+                <p className="text-xs text-foreground-muted italic">No description</p>
               )}
               {pin.tagged_accounts && pin.tagged_accounts.length > 0 && (
-                <p className="mt-2 text-[10px] text-gray-600">
+                <p className="mt-2 text-[10px] text-foreground-muted">
                   Tagged{' '}
                   {pin.tagged_accounts.map((acc, i) => (
                     <span key={acc.id}>
@@ -206,18 +206,18 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
                       {acc.username ? (
                         <Link
                           href={`/${encodeURIComponent(acc.username)}`}
-                          className="text-blue-600 hover:text-blue-700 hover:underline"
+                          className="text-accent hover:text-accent-hover hover:underline"
                         >
                           @{acc.username}
                         </Link>
                       ) : (
-                        <span className="text-gray-500">@{acc.id.slice(0, 8)}…</span>
+                        <span className="text-foreground-muted">@{acc.id.slice(0, 8)}…</span>
                       )}
                     </span>
                   ))}
                 </p>
               )}
-              <p className="text-[10px] text-gray-500">
+              <p className="text-[10px] text-foreground-muted">
                 {mentionTypeLabel != null && (
                   <>
                     {mentionTypeEmoji && <span className="mr-0.5">{mentionTypeEmoji}</span>}
@@ -229,7 +229,7 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
               </p>
               <Link
                 href={`/mention/${pin.id}`}
-                className="inline-block text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline mt-1"
+                className="inline-block text-xs font-medium text-accent hover:text-accent-hover hover:underline mt-1"
               >
                 View More
               </Link>
@@ -237,14 +237,14 @@ export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: L
           </div>
         </div>
         {!isAuthenticated && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <p className="text-[10px] text-gray-500 mb-1">
+          <div className="mt-2 pt-2 border-t border-border-muted">
+            <p className="text-[10px] text-foreground-muted mb-1">
               Sign in to like, comment, or view full profile
             </p>
             <button
               type="button"
               onClick={openWelcome}
-              className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+              className="text-xs font-medium text-accent hover:text-accent-hover hover:underline"
             >
               Sign in →
             </button>

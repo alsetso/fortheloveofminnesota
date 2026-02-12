@@ -124,7 +124,7 @@ export default function HomeAnalyticsSidebar() {
         {/* Live Map Analytics */}
         <div className="bg-white border border-gray-200 rounded-md p-[10px]">
           <Link
-            href="/map/live"
+            href="/maps"
             className="block hover:bg-gray-50 transition-colors rounded-md -m-[10px] p-[10px]"
           >
             <div className="space-y-3">

@@ -59,7 +59,8 @@ export async function GET(
         } else {
           // Look up map by slug
           const { data: map, error: mapError } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('slug', identifier)
             .single();
@@ -78,7 +79,8 @@ export async function GET(
         }
 
         let pinsQuery = supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .select(`
             *,
             account:accounts!map_pins_account_id_fkey(id, username, first_name, last_name, image_url),
@@ -161,8 +163,9 @@ export async function POST(
         const supabase = await createServerClientWithAuth(cookies());
         
         // Resolve identifier to map_id (handle both UUID and slug)
-        let mapQuery = supabase
-          .from('map')
+        let mapQuery = (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('id, account_id, visibility, settings');
         
         if (isUUID(identifier)) {
@@ -280,21 +283,28 @@ export async function POST(
           }
         }
 
-        // Create pin
-        const { data: pin, error: pinError } = await supabase
-          .from('map_pins')
-          .insert({
-            map_id: (map as any).id,
-            emoji: body.emoji || null,
-            caption: body.caption || null,
-            image_url: body.image_url || null,
-            video_url: body.video_url || null,
-            lat: body.lat,
-            lng: body.lng,
-            mention_type_id: body.mention_type_id || null,
-          } as any)
-          .select()
-          .single();
+        // Create pin using RPC function to insert into maps.pins
+        const { data: pinResult, error: pinError } = await supabase.rpc('insert_pin_to_maps_pins', {
+          p_map_id: (map as any).id,
+          p_author_account_id: accountId,
+          p_lat: body.lat,
+          p_lng: body.lng,
+          p_body: body.caption || '', // Use caption as body for this API
+          p_title: null,
+          p_emoji: body.emoji || null,
+          p_caption: body.caption || null,
+          p_image_url: body.image_url || null,
+          p_video_url: body.video_url || null,
+          p_icon_url: null,
+          p_media_type: body.image_url ? 'image' : (body.video_url ? 'video' : 'none'),
+          p_full_address: null,
+          p_map_meta: null,
+          p_atlas_meta: null,
+          p_tag_id: body.mention_type_id || null,
+          p_visibility: 'public',
+          p_post_date: null,
+          p_tagged_account_ids: [],
+        });
 
         if (pinError) {
           if (process.env.NODE_ENV === 'development') {
@@ -303,7 +313,29 @@ export async function POST(
           return createErrorResponse('Failed to create pin', 500);
         }
 
-        return createSuccessResponse(pin, 201);
+        if (!pinResult || pinResult.length === 0) {
+          return createErrorResponse('Failed to create pin: No data returned', 500);
+        }
+
+        const pin = pinResult[0];
+        
+        // Transform maps.pins format to expected API response format
+        // Use original lat/lng values since we know them
+        const responsePin = {
+          id: pin.id,
+          map_id: pin.map_id,
+          lat: body.lat,
+          lng: body.lng,
+          emoji: pin.emoji,
+          caption: pin.caption || pin.body,
+          image_url: pin.image_url,
+          video_url: pin.video_url,
+          created_at: pin.created_at,
+          updated_at: pin.updated_at,
+          mention_type_id: pin.tag_id,
+        };
+
+        return createSuccessResponse(responsePin, 201);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[Maps API] Error:', error);

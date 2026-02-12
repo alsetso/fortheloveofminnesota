@@ -11,9 +11,9 @@ import {
 } from '@heroicons/react/24/outline';
 import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
 import EditFeatureLimitsModal from '@/components/admin/EditFeatureLimitsModal';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import { useAuthStateSafe } from '@/features/auth';
@@ -543,22 +543,9 @@ export default function BillingAdminClient() {
     const toastId = toast.loading('Updating feature limits...');
     
     try {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[BillingAdminClient] Updating feature limits:', { featureId, planLimits });
-      }
-      
       // Update each plan-feature limit
       await Promise.all(
         planLimits.map(async ({ planId, limitValue, limitType }) => {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[BillingAdminClient] Sending update request:', {
-              plan_id: planId,
-              feature_id: featureId,
-              limit_value: limitValue,
-              limit_type: limitType,
-            });
-          }
-          
           const res = await fetch('/api/admin/billing/plan-features/limits', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -581,10 +568,7 @@ export default function BillingAdminClient() {
             throw new Error(`[${res.status}] ${error.error || error.message || 'Failed to update limits'}`);
           }
           
-          const result = await res.json();
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[BillingAdminClient] Update successful:', result);
-          }
+          await res.json();
         })
       );
 
@@ -675,25 +659,19 @@ export default function BillingAdminClient() {
     return (
       <>
         <PageViewTracker />
-        <PageWrapper
+        <NewPageWrapper
+          leftSidebar={<LeftSidebar />}
+          rightSidebar={<RightSidebar />}
           headerContent={sidebarToggleButton}
-          searchComponent={
-            <MapSearchInput
-              onLocationSelect={() => {}}
-            />
-          }
-          accountDropdownProps={{
-            onAccountClick: () => {},
-            onSignInClick: openWelcome,
-          }}
-          searchResultsComponent={<SearchResults />}
         >
-          <div className="min-h-screen bg-gray-50 p-[10px]">
-            <div className="text-center py-12">
-              <p className="text-xs text-gray-600">Loading...</p>
+          <div className="w-full py-6">
+            <div className="min-h-screen bg-gray-50 p-[10px]">
+              <div className="text-center py-12">
+                <p className="text-xs text-gray-600">Loading...</p>
+              </div>
             </div>
           </div>
-        </PageWrapper>
+        </NewPageWrapper>
       </>
     );
   }
@@ -703,30 +681,24 @@ export default function BillingAdminClient() {
     return (
       <>
         <PageViewTracker />
-        <PageWrapper
+        <NewPageWrapper
+          leftSidebar={<LeftSidebar />}
+          rightSidebar={<RightSidebar />}
           headerContent={sidebarToggleButton}
-          searchComponent={
-            <MapSearchInput
-              onLocationSelect={() => {}}
-            />
-          }
-          accountDropdownProps={{
-            onAccountClick: () => {},
-            onSignInClick: openWelcome,
-          }}
-          searchResultsComponent={<SearchResults />}
         >
-          <div className="min-h-screen bg-gray-50 p-[10px]">
-            <div className="max-w-md mx-auto mt-12">
-              <div className="bg-white border border-red-200 rounded-md p-[10px]">
-                <h2 className="text-sm font-semibold text-red-900 mb-2">Access Denied</h2>
-                <p className="text-xs text-red-700">
-                  This page requires admin access. Please sign in with an admin account.
-                </p>
+          <div className="w-full py-6">
+            <div className="min-h-screen bg-gray-50 p-[10px]">
+              <div className="max-w-md mx-auto mt-12">
+                <div className="bg-white border border-red-200 rounded-md p-[10px]">
+                  <h2 className="text-sm font-semibold text-red-900 mb-2">Access Denied</h2>
+                  <p className="text-xs text-red-700">
+                    This page requires admin access. Please sign in with an admin account.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </PageWrapper>
+        </NewPageWrapper>
       </>
     );
   }
@@ -758,20 +730,13 @@ export default function BillingAdminClient() {
         }}
       />
       <PageViewTracker />
-      <PageWrapper
+      <NewPageWrapper
+        leftSidebar={<LeftSidebar />}
+        rightSidebar={<RightSidebar />}
         headerContent={sidebarToggleButton}
-        searchComponent={
-          <MapSearchInput
-            onLocationSelect={() => {}}
-          />
-        }
-        accountDropdownProps={{
-          onAccountClick: () => {},
-          onSignInClick: openWelcome,
-        }}
-        searchResultsComponent={<SearchResults />}
       >
-        <div className="min-h-screen bg-gray-50 p-[10px]">
+        <div className="w-full py-6">
+          <div className="min-h-screen bg-gray-50 p-[10px]">
           {/* Tabs */}
           <div className="mb-3 flex gap-2 border-b border-gray-200">
             <button
@@ -1168,7 +1133,8 @@ export default function BillingAdminClient() {
         />
       )}
     </div>
-      </PageWrapper>
+        </div>
+      </NewPageWrapper>
     </>
   );
 }

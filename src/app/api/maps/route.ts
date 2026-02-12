@@ -51,7 +51,8 @@ export async function GET(request: NextRequest) {
 
     // Build query - use new structure
     let query = supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select(`
         id,
         account_id,
@@ -235,7 +236,8 @@ export async function POST(request: NextRequest) {
         if (!isAdmin) {
           // INVARIANT: Count owned maps - this is the single source of truth
           const { count: ownedMapsCount, error: mapsError } = await supabase
-            .from('map')
+            .schema('maps')
+      .from('maps')
             .select('*', { count: 'exact', head: true })
             .eq('account_id', finalAccountId);
 
@@ -279,7 +281,8 @@ export async function POST(request: NextRequest) {
 
           // Check if slug is already taken
           const { data: existingMap } = await supabase
-            .from('map')
+            .schema('maps')
+      .from('maps')
             .select('id')
             .eq('slug', slug)
             .maybeSingle();
@@ -320,7 +323,8 @@ export async function POST(request: NextRequest) {
         } as any;
 
         const { data: map, error } = await supabase
-          .from('map')
+          .schema('maps')
+      .from('maps')
           .insert(insertData as any)
           .select(`
             id,

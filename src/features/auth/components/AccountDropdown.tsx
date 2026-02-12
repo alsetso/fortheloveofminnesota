@@ -6,11 +6,12 @@ import { UserIcon, Cog6ToothIcon, CreditCardIcon, ChartBarIcon, XMarkIcon } from
 import { useAuthStateSafe } from '@/features/auth';
 import { AccountService, Account } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import BottomButtonsPopup from '@/components/layout/BottomButtonsPopup';
 
 interface AccountDropdownProps {
-  /** Visual variant */
+  /** Visual variant; when omitted, follows page theme from ThemeContext */
   variant?: 'light' | 'dark';
   /** Callback when user clicks their authenticated account */
   onAccountClick?: () => void;
@@ -21,7 +22,7 @@ interface AccountDropdownProps {
 }
 
 export default function AccountDropdown({
-  variant = 'light',
+  variant,
   onAccountClick,
   onSignInClick,
   onTriggerClick,
@@ -46,6 +47,8 @@ export default function AccountDropdown({
   const isAdmin = account?.role === 'admin';
 
   const { openWelcome, openAccount, openCreateAccount } = useAppModalContextSafe();
+  const { theme } = useTheme();
+  const isDark = variant !== undefined ? variant === 'dark' : theme === 'dark';
 
   // Fetch all user accounts when dropdown opens
   useEffect(() => {
@@ -165,8 +168,6 @@ export default function AccountDropdown({
     }
   };
 
-  const isDark = variant === 'dark';
-
   // Detect mobile screen size (lg breakpoint is 1024px)
   const [isMobile, setIsMobile] = useState(false);
 
@@ -185,11 +186,7 @@ export default function AccountDropdown({
     return (
       <button
         onClick={handleSignIn}
-        className={`text-sm font-medium transition-colors ${
-          isDark
-            ? 'text-blue-400 hover:text-blue-300'
-            : 'text-blue-600 hover:text-blue-700'
-        }`}
+        className="text-sm font-medium transition-colors text-accent hover:text-accent-hover dark:text-accent-light dark:hover:text-accent"
         aria-label="Sign in"
       >
         Sign In
@@ -202,15 +199,15 @@ export default function AccountDropdown({
     <>
       {isLoading ? (
         <div className="flex items-center justify-center py-4">
-          <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-border rounded-full border-t-foreground animate-spin" />
         </div>
       ) : (
         <div className="space-y-0">
           {/* User email: admins only */}
           {isAdmin && user?.email && (
-            <div className="border-b border-gray-200">
+            <div className="border-b border-border">
               <div className="px-[10px] py-2">
-                <p className="text-xs text-gray-600 truncate" title={user.email}>
+                <p className="text-xs text-foreground-muted truncate" title={user.email}>
                   {user.email}
                 </p>
               </div>
@@ -219,15 +216,15 @@ export default function AccountDropdown({
 
           {/* Accounts: list for everyone; label + plan per account only for admins */}
           {account && (
-            <div className="border-b border-gray-200">
+            <div className="border-b border-border">
               {isAdmin && (
-                <div className="px-[10px] py-1.5 text-[10px] font-medium text-gray-500 uppercase tracking-wide bg-gray-50">
+                <div className="px-[10px] py-1.5 text-[10px] font-medium text-foreground-muted uppercase tracking-wide bg-surface-accent">
                   Accounts
                 </div>
               )}
               {loadingAccounts ? (
                 <div className="flex items-center justify-center py-4">
-                  <div className="w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                  <div className="w-3 h-3 border-2 border-border rounded-full border-t-foreground animate-spin" />
                 </div>
               ) : (
                 <div className="max-h-64 overflow-y-auto">
@@ -243,21 +240,21 @@ export default function AccountDropdown({
                             handleSwitchAccount(acc.id);
                           }
                         }}
-                        className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left"
+                        className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left"
                       >
                         <ProfilePhoto account={acc} size="sm" editable={false} />
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-900 truncate">
+                          <p className="text-xs font-medium text-foreground truncate">
                             {AccountService.getDisplayName(acc)}
                           </p>
                           {isAdmin && (
-                            <p className="text-[10px] text-gray-500">
+                            <p className="text-[10px] text-foreground-muted">
                               {acc.plan ? acc.plan.charAt(0).toUpperCase() + acc.plan.slice(1) : 'Account'}
                             </p>
                           )}
                         </div>
                         <div
-                          className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-green-500' : 'bg-gray-300'}`}
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-green-500' : 'bg-foreground-subtle'}`}
                           title={isActive ? 'Active' : 'Inactive'}
                         />
                       </button>
@@ -266,15 +263,15 @@ export default function AccountDropdown({
                 </div>
               )}
               {(account.role === 'admin' || account.plan === 'contributor') && (
-                <div className="border-t border-gray-200">
+                <div className="border-t border-border">
                   <button
                     onClick={() => {
                       setIsOpen(false);
                       openCreateAccount();
                     }}
-                    className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700 font-medium"
+                    className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-foreground font-medium"
                   >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-foreground-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                     Create New Account
@@ -285,7 +282,7 @@ export default function AccountDropdown({
           )}
 
           {/* Actions: Settings/Billing/Analytics admins only; Sign Out everyone */}
-          <div className="border-t border-gray-200">
+          <div className="border-t border-border">
             {account ? (
               <>
                 {isAdmin && (
@@ -295,9 +292,9 @@ export default function AccountDropdown({
                         setIsOpen(false);
                         router.push('/settings');
                       }}
-                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-foreground"
                     >
-                      <Cog6ToothIcon className="w-4 h-4 text-gray-500" />
+                      <Cog6ToothIcon className="w-4 h-4 text-foreground-muted" />
                       Settings
                     </button>
                     <button
@@ -305,9 +302,9 @@ export default function AccountDropdown({
                         setIsOpen(false);
                         router.push('/billing');
                       }}
-                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-foreground"
                     >
-                      <CreditCardIcon className="w-4 h-4 text-gray-500" />
+                      <CreditCardIcon className="w-4 h-4 text-foreground-muted" />
                       Billing
                     </button>
                     <button
@@ -315,16 +312,16 @@ export default function AccountDropdown({
                         setIsOpen(false);
                         router.push('/analytics');
                       }}
-                      className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-gray-700"
+                      className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-foreground"
                     >
-                      <ChartBarIcon className="w-4 h-4 text-gray-500" />
+                      <ChartBarIcon className="w-4 h-4 text-foreground-muted" />
                       Analytics
                     </button>
                   </>
                 )}
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-red-600 border-t border-gray-100"
+                  className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-red-600 border-t border-border-muted"
                 >
                   <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -335,7 +332,7 @@ export default function AccountDropdown({
             ) : (
               <button
                 onClick={handleSignIn}
-                className="w-full flex items-center gap-2 p-[10px] hover:bg-gray-50 transition-colors text-left text-xs text-blue-600 font-medium"
+                className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-accent font-medium"
               >
                 <UserIcon className="w-4 h-4" />
                 Sign In
@@ -361,11 +358,7 @@ export default function AccountDropdown({
             }
             setIsOpen(!isOpen);
           }}
-          className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm ${
-            isDark
-              ? 'bg-white/10 hover:bg-white/20 text-white/90 hover:text-white'
-              : 'bg-black/5 hover:bg-black/10 text-[#3C3C43]'
-          }`}
+          className="flex items-center justify-center w-8 h-8 rounded-full transition-all duration-200 backdrop-blur-sm bg-surface-accent hover:bg-surface-accent/80 text-foreground"
           aria-label="Account menu"
           aria-expanded={isOpen}
         >
@@ -376,8 +369,8 @@ export default function AccountDropdown({
               editable={false}
             />
           ) : (
-            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-              <UserIcon className={`w-3 h-3 ${isDark ? 'text-gray-500' : 'text-[#3C3C43]'}`} />
+            <div className="w-6 h-6 rounded-full bg-surface-accent flex items-center justify-center">
+              <UserIcon className="w-3 h-3 text-foreground-muted" />
             </div>
           )}
         </button>
@@ -385,7 +378,7 @@ export default function AccountDropdown({
         {/* Desktop Dropdown */}
         {!isMobile && isOpen && (
           <div 
-            className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white z-50 overflow-hidden rounded-md border border-gray-200 shadow-lg"
+            className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] bg-surface z-50 overflow-hidden rounded-md border border-border shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             {renderDropdownContent()}
@@ -400,18 +393,18 @@ export default function AccountDropdown({
           onClose={() => setIsOpen(false)}
           type="account"
           height="full"
-          darkMode={false}
+          darkMode={isDark}
           containerRelative={false}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-3xl">
-            <h2 className="text-sm font-semibold text-gray-900">Account</h2>
+          <div className="flex items-center justify-between px-[10px] py-[10px] border-b border-border sticky top-0 bg-surface z-10 rounded-t-3xl">
+            <h2 className="text-sm font-semibold text-foreground">Account</h2>
             <button
               onClick={() => setIsOpen(false)}
-              className="flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-md transition-colors"
+              className="flex items-center justify-center w-8 h-8 hover:bg-surface-accent rounded-md transition-colors"
               aria-label="Close"
             >
-              <XMarkIcon className="w-4 h-4 text-gray-500" />
+              <XMarkIcon className="w-4 h-4 text-foreground-muted" />
             </button>
           </div>
           

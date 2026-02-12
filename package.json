@@ -6,7 +6,8 @@
     "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
+    "dev:turbo": "next dev --turbopack",
     "dev:https": "node server.js",
     "setup:https": "bash scripts/setup-https.sh",
     "build": "next build",
@@ -16,6 +17,8 @@
     "type-check": "tsc --noEmit --skipLibCheck",
     "find-unused": "tsx scripts/find-unused-files.ts --dry-run",
     "find-unused:archive": "tsx scripts/find-unused-files.ts --dry-run --exclude-archive",
+    "draft:scan": "tsx scripts/mark-routes-without-metadata-as-draft.ts --dry-run",
+    "draft:apply": "tsx scripts/mark-routes-without-metadata-as-draft.ts --apply",
     "clean": "rm -rf .next out dist",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
@@ -36,6 +39,7 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.78.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@tanstack/react-query": "^5.90.20",
     "@tiptap/extension-image": "^3.10.7",
     "@tiptap/extension-link": "^3.10.7",
     "@tiptap/extension-placeholder": "^3.10.7",

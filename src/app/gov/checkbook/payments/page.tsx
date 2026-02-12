@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import StandardPageClient from '@/components/layout/StandardPageClient';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 
 export const revalidate = 3600;
 
@@ -27,8 +27,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PaymentsPage() {
   return (
-    <StandardPageClient contentClassName="h-full overflow-y-auto px-[10px] py-3">
-      <div className="max-w-7xl mx-auto">
+    <NewPageWrapper>
+      <div className="max-w-7xl mx-auto px-[10px] py-3">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
           { label: 'Government', href: '/gov' },
@@ -56,7 +56,7 @@ export default async function PaymentsPage() {
           </p>
         </div>
       </div>
-    </StandardPageClient>
+    </NewPageWrapper>
   );
 }
 

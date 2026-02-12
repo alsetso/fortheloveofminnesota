@@ -5,6 +5,7 @@ import { validateRequestBody } from '@/lib/security/validation';
 import { REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { z } from 'zod';
 import { cookies } from 'next/headers';
+import { parseAndResolveUsernames } from '@/lib/posts/parseUsernames';
 
 /**
  * GET /api/posts/[id]
@@ -26,6 +27,7 @@ export async function GET(
         const supabase = await createServerClientWithAuth(cookies());
 
         let query = supabase
+          .schema('content')
           .from('posts')
           .select(`
             id,
@@ -35,9 +37,11 @@ export async function GET(
             visibility,
             mention_type_id,
             mention_ids,
+            tagged_account_ids,
             map_id,
             images,
             map_data,
+            shared_post_id,
             created_at,
             updated_at,
             account:accounts!posts_account_id_fkey(
@@ -82,7 +86,8 @@ export async function GET(
         const postData = post as any;
         if (postData.mention_ids && Array.isArray(postData.mention_ids) && postData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
-            .from('map_pins')
+            .schema('maps')
+            .from('pins')
             .select(`
               id,
               lat,
@@ -104,6 +109,62 @@ export async function GET(
             .eq('archived', false);
 
           postData.mentions = mentions || [];
+        }
+
+        // Fetch tagged accounts if any
+        if (postData.tagged_account_ids && Array.isArray(postData.tagged_account_ids) && postData.tagged_account_ids.length > 0) {
+          const { data: taggedAccounts } = await supabase
+            .from('accounts')
+            .select('id, username, first_name, last_name, image_url')
+            .in('id', postData.tagged_account_ids);
+          
+          postData.tagged_accounts = taggedAccounts || [];
+        } else {
+          postData.tagged_accounts = [];
+        }
+
+        // Fetch shared post if exists
+        if (postData.shared_post_id) {
+          const { data: sharedPost } = await supabase
+            .schema('content')
+            .from('posts')
+            .select(`
+              id,
+              account_id,
+              title,
+              content,
+              visibility,
+              mention_type_id,
+              mention_ids,
+              tagged_account_ids,
+              map_id,
+              images,
+              map_data,
+              background_color,
+              created_at,
+              updated_at
+            `)
+            .eq('id', postData.shared_post_id)
+            .eq('visibility', 'public')
+            .maybeSingle();
+
+          if (sharedPost) {
+            // Fetch account for shared post
+            const { data: sharedPostAccount } = await supabase
+              .from('accounts')
+              .select('id, username, first_name, last_name, image_url, plan')
+              .eq('id', sharedPost.account_id)
+              .maybeSingle();
+
+            postData.shared_post = {
+              ...sharedPost,
+              account: sharedPostAccount || null,
+            };
+          } else {
+            postData.shared_post = null;
+          }
+        } else {
+          postData.shared_post = null;
         }
 
         return NextResponse.json({ post: postData });
@@ -169,6 +230,7 @@ export async function PATCH(
 
         // Get post and verify ownership
         const { data: post } = await supabase
+          .schema('content')
           .from('posts')
           .select('id, account_id')
           .eq('id', id)
@@ -196,7 +258,14 @@ export async function PATCH(
 
         const updateData: Record<string, any> = {};
         if (validation.data.title !== undefined) updateData.title = validation.data.title?.trim() || null;
-        if (validation.data.content !== undefined) updateData.content = validation.data.content.trim();
+        if (validation.data.content !== undefined) {
+          const trimmedContent = validation.data.content.trim();
+          updateData.content = trimmedContent;
+          
+          // Parse @username patterns from content and resolve to account IDs
+          const taggedAccountIds = await parseAndResolveUsernames(supabase, trimmedContent);
+          updateData.tagged_account_ids = taggedAccountIds.length > 0 ? taggedAccountIds : null;
+        }
         if (validation.data.visibility !== undefined) updateData.visibility = validation.data.visibility;
         if (validation.data.mention_type_id !== undefined) {
           updateData.mention_type_id = validation.data.mention_type_id || null;
@@ -225,7 +294,8 @@ export async function PATCH(
           // Validate mention IDs if provided (now map_pins)
           if (validation.data.mention_ids && validation.data.mention_ids.length > 0) {
             const { data: mentions } = await supabase
-              .from('map_pins')
+              .schema('maps')
+            .from('pins')
               .select('id')
               .in('id', validation.data.mention_ids)
               .eq('is_active', true)
@@ -247,7 +317,8 @@ export async function PATCH(
           if (validation.data.map_id) {
             // Check if map exists and is active
             const { data: map, error: mapError } = await supabase
-              .from('map')
+              .schema('maps')
+              .from('maps')
               .select(`
                 id,
                 visibility,
@@ -312,6 +383,7 @@ export async function PATCH(
 
         // Update post
         const { data: updatedPost, error } = await supabase
+          .schema('content')
           .from('posts')
           .update(updateData as never)
           .eq('id', id)
@@ -361,7 +433,8 @@ export async function PATCH(
         const updatedPostData = updatedPost as any;
         if (updatedPostData && updatedPostData.mention_ids && Array.isArray(updatedPostData.mention_ids) && updatedPostData.mention_ids.length > 0) {
           const { data: mentions } = await supabase
-            .from('map_pins')
+            .schema('maps')
+            .from('pins')
             .select(`
               id,
               lat,
@@ -379,6 +452,18 @@ export async function PATCH(
             .eq('archived', false);
 
           updatedPostData.mentions = mentions || [];
+        }
+
+        // Fetch tagged accounts if any
+        if (updatedPostData.tagged_account_ids && Array.isArray(updatedPostData.tagged_account_ids) && updatedPostData.tagged_account_ids.length > 0) {
+          const { data: taggedAccounts } = await supabase
+            .from('accounts')
+            .select('id, username, first_name, last_name, image_url')
+            .in('id', updatedPostData.tagged_account_ids);
+          
+          updatedPostData.tagged_accounts = taggedAccounts || [];
+        } else {
+          updatedPostData.tagged_accounts = [];
         }
 
         return NextResponse.json({ post: updatedPostData });
@@ -427,6 +512,7 @@ export async function DELETE(
 
         // Get post and verify ownership or map manager status
         const { data: post } = await supabase
+          .schema('content')
           .from('posts')
           .select('id, account_id, map_id')
           .eq('id', id)
@@ -464,6 +550,7 @@ export async function DELETE(
 
         // Delete post
         const { error } = await supabase
+          .schema('content')
           .from('posts')
           .delete()
           .eq('id', id);

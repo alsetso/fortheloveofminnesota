@@ -212,15 +212,6 @@ export async function POST(request: NextRequest) {
               console.error('[checkout-credits] Failed to log to stripe_events:', eventError);
             }
             // Don't fail the request - checkout URL is more important
-          } else {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-credits] Checkout event logged to stripe_events:', {
-                eventId,
-                sessionId: session.id,
-                accountId: account.id,
-                customerId,
-              });
-            }
           }
         } catch (error) {
           if (process.env.NODE_ENV === 'development') {

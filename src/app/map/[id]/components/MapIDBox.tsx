@@ -139,36 +139,38 @@ interface MapIDBoxProps {
   } | null;
   onLocationPopupChange?: (popup: { isOpen: boolean; lat: number; lng: number; address: string | null; mapMeta: Record<string, any> | null }) => void;
   viewAsRole?: 'owner' | 'manager' | 'editor' | 'non-member';
-  onOpenContributeOverlay?: (coordinates: { lat: number; lng: number }, mapMeta: Record<string, any> | null, fullAddress?: string | null) => void;
   onRemoveClickMarker?: (removeFn: () => void) => void;
   /** When true, collaboration tools use default iOS grey (matches PageWrapper). When false, use map settings colors. */
   useDefaultAppearance?: boolean;
-  /** When false, collaboration tools nav is hidden (e.g. on /live). Default true. */
+  /** When false, collaboration tools nav is hidden (e.g. on /maps). Default true. */
   showCollaborationTools?: boolean;
-  /** When true, map uses basic defaults (no bounds, world view) and shows zoom indicator. Used for /live only. */
+  /** When true, map uses basic defaults (no bounds, world view) and shows zoom indicator. Used for /maps only. */
   isLiveMap?: boolean;
-  /** When false (e.g. on /live until boundaries done), pins fetch is deferred. Omit/true = load pins when map ready. */
+  /** When false (e.g. on /maps until boundaries done), pins fetch is deferred. Omit/true = load pins when map ready. */
   allowPinsLoad?: boolean;
-  /** When false (e.g. on /live when a boundary layer is on), pins layer is hidden. Default true. */
+  /** When false (e.g. on /maps when a boundary layer is on), pins layer is hidden. Default true. */
   showPins?: boolean;
-  /** Called when mentions/pins layer loading state changes (e.g. for /live footer status). */
+  /** Called when mentions/pins layer loading state changes (e.g. for /maps footer status). */
   onMentionsLoadingChange?: (loading: boolean) => void;
-  /** Called when a boundary layer load starts/finishes (state, county, ctu). For Review accordion on /live. */
+  /** Called when a boundary layer load starts/finishes (state, county, ctu). For Review accordion on /maps. */
   onBoundaryLayerLoadChange?: (layerId: 'state' | 'county' | 'district' | 'ctu', loading: boolean) => void;
-  /** Called when a boundary is clicked. Single item for toggle selection; passed to /live footer. */
+  /** Called when a boundary is clicked. Single item for toggle selection; passed to /maps footer. */
   onBoundarySelect?: (item: { layer: 'state' | 'county' | 'district' | 'ctu'; id: string; name: string; lat: number; lng: number }) => void;
-  /** Called when map zoom changes (for /live: footer status and boundary layer selection). */
+  /** Called when map zoom changes (for /maps: footer status and boundary layer selection). */
   onZoomChange?: (zoom: number) => void;
-  /** When set (e.g. on /live), pin clicks call this with pin data; used to show pin in app footer. */
+  /** When set (e.g. on /maps), pin clicks call this with pin data; used to show pin in app footer. */
   onLivePinSelect?: (pinId: string, pinData?: Record<string, unknown> | null) => void;
+  /** When true (e.g. on /maps), pin clicks open a floating Mapbox popup above the pin instead of calling onLivePinSelect. */
+  showPinPopupOnMap?: boolean;
   /** Called when any item is clicked (for live map footer status). Passes clicked item info. */
   onLiveClickReport?: (clickedItem: { type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null } | null) => void;
   /** When false, show all pins unclustered. When true (default), cluster pins on the live map. */
   pinDisplayGrouping?: boolean;
-  /** When true on /live, show only current account's pins. Default false. */
+  /** When true on /maps, show only current account's pins. Default false. */
   showOnlyMyPins?: boolean;
-  /** When on /live: time filter for pins (24h, 7d, or null = all time). */
+  /** When on /maps: time filter for pins (24h, 7d, or null = all time). */
   timeFilter?: '24h' | '7d' | null;
+  /** When true, fetch pins from maps.pins table (admin view). Default false. */
 }
 
 interface MapPin {
@@ -258,7 +260,6 @@ export default function MapIDBox({
   mapData,
   onLocationPopupChange,
   viewAsRole,
-  onOpenContributeOverlay,
   onRemoveClickMarker,
   useDefaultAppearance = false,
   showCollaborationTools = true,
@@ -270,12 +271,14 @@ export default function MapIDBox({
   onBoundarySelect,
   onZoomChange,
   onLivePinSelect,
+  showPinPopupOnMap = false,
   onLiveClickReport,
   pinDisplayGrouping = true,
   showOnlyMyPins = false,
   timeFilter: timeFilterProp,
 }: MapIDBoxProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const pinPopupRef = useRef<any>(null);
   const { account: currentAccount, activeAccountId } = useAuthStateSafe();
   const { openAccount, openWelcome } = useAppModalContextSafe();
   const { addToast } = useToastContext();
@@ -391,6 +394,150 @@ export default function MapIDBox({
     return undefined;
   }, [checkPermission, onPinActionCheck, onAreaActionCheck]);
 
+  // Profile-style popup when showPinPopupOnMap (maps page)
+  const pinPopupInFlightRef = useRef<string | null>(null);
+  const showPinPopupOnMapHelper = useCallback(async (pinId: string, lat: number, lng: number) => {
+    if (!showPinPopupOnMap || !mapInstance || !mapLoaded) return;
+    if (pinPopupInFlightRef.current === pinId) return;
+    pinPopupInFlightRef.current = pinId;
+    if (pinPopupRef.current) {
+      pinPopupRef.current.remove();
+      pinPopupRef.current = null;
+    }
+    setLoadingEntity(true);
+    try {
+      // Use live pins API for maps page (correct schema); single request
+      const pinUrl = mapId === 'public' ? `/api/pins/${pinId}` : isLiveMap ? `/api/maps/live/pins/${pinId}` : `/api/maps/${mapId}/pins/${pinId}`;
+      const response = await fetch(pinUrl);
+      const pinData = response.ok ? await response.json() : null;
+      pinPopupInFlightRef.current = null;
+      if (!pinData || !mapInstance) return;
+
+      const escapeHtml = (s: string | null | undefined) => {
+        if (s == null) return '';
+        const d = document.createElement('div');
+        d.textContent = String(s);
+        return d.innerHTML;
+      };
+
+      const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      };
+
+      const accountUsername = pinData.account?.username ?? null;
+      const accountImageUrl = pinData.account?.image_url ?? null;
+      const profileUrl = accountUsername ? `/${encodeURIComponent(accountUsername)}` : null;
+      const displayName = accountUsername || 'User';
+      const description = pinData.description ?? pinData.caption ?? pinData.emoji ?? '';
+
+      const createPopupContent = (viewCount: number | null = null) => `
+        <div class="map-mention-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px;">
+            <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
+              ${accountImageUrl ? `<img src="${escapeHtml(accountImageUrl)}" alt="${escapeHtml(displayName)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e7eb;" />` : `<div style="width: 20px; height: 20px; border-radius: 50%; background-color: #f3f4f6; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; flex-shrink: 0; font-weight: 500;">${escapeHtml(displayName[0]?.toUpperCase() || '?')}</div>`}
+              <span style="font-size: 13px; color: #111827; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(displayName)}</span>
+            </a>
+            <a href="/mention/${escapeHtml(pinData.id)}" style="font-size: 11px; color: #6b7280; flex-shrink: 0; margin-left: 8px;">View</a>
+            <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 14px; line-height: 1; flex-shrink: 0;" aria-label="Close popup">×</button>
+          </div>
+          ${description ? `<div style="margin-bottom: 8px;"><div style="font-size: 12px; color: #374151; line-height: 1.5;">${escapeHtml(description)}</div></div>` : ''}
+          <div style="padding-top: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="font-size: 12px; color: #6b7280;">${formatDate(pinData.created_at)}</div>
+              ${viewCount !== null ? `<div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>${viewCount}</span></div>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const pinAccountId = pinData.account?.id ?? pinData.account_id ?? null;
+      const isOwnPin = activeAccountId != null && pinAccountId != null && activeAccountId === pinAccountId;
+
+      if (!isOwnPin && typeof window !== 'undefined') {
+        const trackMentionView = () => {
+          let deviceId: string | null = null;
+          if (typeof window !== 'undefined') {
+            deviceId = localStorage.getItem('analytics_device_id');
+            if (!deviceId) {
+              deviceId = crypto.randomUUID();
+              localStorage.setItem('analytics_device_id', deviceId);
+            }
+          }
+          fetch('/api/analytics/pin-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pin_id: pinData.id,
+              referrer_url: document.referrer || null,
+              user_agent: navigator.userAgent || null,
+              session_id: deviceId,
+            }),
+            keepalive: true,
+          }).catch(() => {});
+        };
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(trackMentionView, { timeout: 2000 });
+        } else {
+          setTimeout(trackMentionView, 1000);
+        }
+      }
+
+      const mapbox = await import('mapbox-gl');
+      pinPopupRef.current = new mapbox.default.Popup({
+        offset: 25,
+        closeButton: false,
+        closeOnClick: true,
+        maxWidth: '280px',
+        anchor: 'bottom',
+        className: 'map-mention-popup',
+      })
+        .setLngLat([lng, lat])
+        .setHTML(createPopupContent())
+        .addTo(mapInstance as any);
+
+      pinPopupRef.current.on('close', () => {
+        pinPopupRef.current = null;
+      });
+
+      const setupPopupHandlers = () => {
+        const popupElement = pinPopupRef.current?.getElement();
+        if (!popupElement) return;
+        const closeBtn = popupElement.querySelector('.mapboxgl-popup-close-button') as HTMLButtonElement;
+        if (closeBtn) {
+          closeBtn.addEventListener('click', (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (pinPopupRef.current) {
+              pinPopupRef.current.remove();
+              pinPopupRef.current = null;
+            }
+          });
+        }
+      };
+      setTimeout(setupPopupHandlers, 0);
+
+      const viewCountRes = await fetch(`/api/analytics/pin-stats?pin_id=${pinData.id}`);
+      const viewCountData = viewCountRes.ok ? await viewCountRes.json() : null;
+      const viewCount = viewCountData?.stats?.total_views ?? null;
+      if (pinPopupRef.current && viewCount !== null) {
+        pinPopupRef.current.setHTML(createPopupContent(viewCount));
+        setTimeout(setupPopupHandlers, 0);
+      }
+    } catch {
+      // ignore
+    } finally {
+      pinPopupInFlightRef.current = null;
+      setLoadingEntity(false);
+    }
+  }, [showPinPopupOnMap, mapInstance, mapLoaded, mapId, isLiveMap, activeAccountId]);
+
   // Use unified click handler - expose location popup state
   // Only pass mapData if it's a full MapData object (has all required fields)
   const fullMapData = mapData && 'name' in mapData && 'slug' in mapData ? mapData as any : null;
@@ -417,30 +564,23 @@ export default function MapIDBox({
     checkPermission: checkPermissionWrapper,
     pinMode,
     showAreaDrawModal,
-    onPinClick: async (pinId) => {
+    onPinClick: async (pinId, lat, lng) => {
+      if (showPinPopupOnMap && lat != null && lng != null) {
+        await showPinPopupOnMapHelper(pinId, lat, lng);
+        return;
+      }
       if (onLivePinSelect) {
-        // Check if pin data is already in initialPins (fastest path - no fetch needed)
         const cachedPin = initialPins.find((p: any) => p.id === pinId) as any;
         if (cachedPin && cachedPin.account?.image_url) {
-          // We have complete pin data, use it immediately
           onLivePinSelect(pinId, cachedPin as unknown as Record<string, unknown>);
           return;
         }
-        
-        // Call immediately with pinId (no data) to show skeleton instantly
         onLivePinSelect(pinId, undefined);
-        
-        // Fetch in background and update with data when ready
         setLoadingEntity(true);
         try {
           const response = await fetch(`/api/maps/${mapId}/pins/${pinId}`);
-          if (response.ok) {
-            const pinData = await response.json();
-            // Update with fetched data
-            onLivePinSelect(pinId, pinData);
-          } else {
-            onLivePinSelect(pinId, null);
-          }
+          const pinData = response.ok ? await response.json() : null;
+          onLivePinSelect(pinId, pinData);
         } catch {
           onLivePinSelect(pinId, null);
         } finally {
@@ -456,11 +596,9 @@ export default function MapIDBox({
           window.dispatchEvent(new CustomEvent('entity-click', {
             detail: { entity: pinData, type: 'pin' }
           }));
-        } else {
-          console.error('Failed to fetch pin:', response.statusText);
         }
-      } catch (err) {
-        console.error('Error fetching pin:', err);
+      } catch {
+        // ignore
       } finally {
         setLoadingEntity(false);
       }
@@ -484,39 +622,32 @@ export default function MapIDBox({
         setLoadingEntity(false);
       }
     },
-    onMentionClick: async (mentionId) => {
-      // Fetch mention data and dispatch event (MentionsLayer normally does this, but unified handler takes priority)
+    onMentionClick: async (mentionId, lat, lng) => {
+      if (showPinPopupOnMap && lat != null && lng != null) {
+        await showPinPopupOnMapHelper(mentionId, lat, lng);
+        return;
+      }
       setLoadingEntity(true);
       try {
-        // Try to get from MentionsLayer's cache first, then fetch if needed
         const response = await fetch(`/api/maps/${mapId}/pins/${mentionId}`);
         if (response.ok) {
           const mentionData = await response.json();
           window.dispatchEvent(new CustomEvent('mention-click', {
-            detail: { 
-              mention: mentionData,
-              address: mentionData.full_address || null
-            }
+            detail: { mention: mentionData, address: mentionData.full_address || null }
           }));
-        } else {
-          console.error('Failed to fetch mention:', response.statusText);
         }
-      } catch (err) {
-        console.error('Error fetching mention:', err);
+      } catch {
+        // ignore
       } finally {
         setLoadingEntity(false);
       }
     },
     onLiveClickReport: onLiveClickReport,
     initialPins: pins, // Pass current pins state for fast username lookup
-    onMapClick: async (coordinates, mapMeta) => {
-      // Handle pin creation when in pin mode - use contribute overlay
+    onMapClick: async () => {
       if (!pinMode || showAreaDrawModal) return;
-      
       const canAddPins = isOwner || (visibility === 'public' && allowOthersToPostPins);
       if (!canAddPins) return;
-      
-      // Additional permission check
       if (onPinActionCheck) {
         const allowed = onPinActionCheck();
         if (allowed === false) {
@@ -524,20 +655,8 @@ export default function MapIDBox({
           return;
         }
       }
-
-      const { lat, lng } = coordinates;
-      
-      // Remove click marker before opening overlay
-      if (removeClickMarker) {
-        removeClickMarker();
-      }
-      
-      // Use contribute overlay (same as "Add to Map" button in location selected)
-      if (onOpenContributeOverlay) {
-        // Address will be reverse geocoded in the contribute overlay
-        onOpenContributeOverlay({ lat, lng }, mapMeta || null, null);
-        setPinMode(false); // Exit pin mode after opening overlay
-      }
+      if (removeClickMarker) removeClickMarker();
+      setPinMode(false);
     },
     onBoundaryClick: async (feature) => {
       // When parent provides onBoundarySelect, layers update the app footer; do not open modal.
@@ -1053,13 +1172,7 @@ export default function MapIDBox({
         }
 
         if (initialAreas.length === 0) {
-          const areasResponse = await fetch(`/api/maps/${mapId}/areas`);
-          if (areasResponse.ok) {
-            const areasData = await areasResponse.json();
-            setAreas(areasData.areas || []);
-          } else if (areasResponse.status === 404 || areasResponse.status === 403) {
-            setAreas([]);
-          }
+          setAreas([]); // Areas API removed
         }
       } catch (err) {
         console.error('Error fetching map data:', err);
@@ -1535,7 +1648,7 @@ export default function MapIDBox({
             />
           )}
           
-          {/* Mentions Layer - Render mentions as pins on map when visible (hidden on /live when boundary layer on) */}
+          {/* Mentions Layer - Render mentions as pins on map when visible (hidden on /maps when boundary layer on) */}
           {mapLoaded && mapInstance && showPins && (visibility === 'public' || visibility === 'shared' || isOwner) && (
             <MentionsLayer 
               map={mapInstance} 
@@ -1625,17 +1738,8 @@ export default function MapIDBox({
           mapLoaded={mapLoaded}
           mapStyle={mapStyle}
           autoSave={true}
-          onAreaCreated={async () => {
-            // Refresh areas list
-            try {
-              const response = await fetch(`/api/maps/${mapId}/areas`);
-              if (response.ok) {
-                const data = await response.json();
-                setAreas(data.areas || []);
-              }
-            } catch (err) {
-              console.error('Error refreshing areas:', err);
-            }
+          onAreaCreated={() => {
+            setAreas([]); // Areas API removed
           }}
         />
       )}
@@ -1705,7 +1809,7 @@ export default function MapIDBox({
       {/* Entity sidebar is now handled by page-level useEntitySidebar hook */}
       {/* Layer clicks still use local state (not migrated yet) */}
 
-      {/* Collaboration Tools Nav - Show for members, owners, and non-members (for preview/join prompt). Hidden on /live. */}
+      {/* Collaboration Tools Nav - Show for members, owners, and non-members (for preview/join prompt). Hidden on /maps. */}
       {showCollaborationTools && mapLoaded && current_account_id && (
         <CollaborationToolsNav
           onToolSelect={handleToolSelect}

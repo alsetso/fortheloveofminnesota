@@ -5,11 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon, ShareIcon, CheckIcon, UserPlusIcon, CalendarIcon, ClockIcon, UserGroupIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 import { MentionService } from '../services/mentionService';
-import { LikeService } from '../services/likeService';
 import { useRouter } from 'next/navigation';
 import { usePageView } from '@/hooks/usePageView';
 import { useAuthStateSafe } from '@/features/auth';
-import LikeButton from '@/components/mentions/LikeButton';
 import { getMapUrlWithPin } from '@/lib/maps/urls';
 import { type MultiImage } from '@/components/shared/MultiImageGrid';
 import ImageOverlay from './ImageOverlay';
@@ -59,46 +57,22 @@ interface MentionDetailClientProps {
 }
 
 function getViewOnMapHref(mention: MentionDetailClientProps['mention']): string {
-  if (mention.map?.slug === 'live') return `/live?pin=${encodeURIComponent(mention.id)}`;
+  if (mention.map?.slug === 'live') return `/maps?pin=${encodeURIComponent(mention.id)}`;
   if (mention.map && Number.isFinite(mention.lat) && Number.isFinite(mention.lng)) {
     return getMapUrlWithPin({ id: mention.map.id, slug: mention.map.slug ?? null }, mention.lat, mention.lng);
   }
-  return `/live?pin=${encodeURIComponent(mention.id)}`;
+  return `/maps?pin=${encodeURIComponent(mention.id)}`;
 }
 
 export default function MentionDetailClient({ mention, isOwner }: MentionDetailClientProps) {
   const { account } = useAuthStateSafe();
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewCount, setViewCount] = useState(mention.view_count || 0);
-  const [likesCount, setLikesCount] = useState(mention.likes_count || 0);
-  const [isLiked, setIsLiked] = useState(mention.is_liked || false);
   const [showMenu, setShowMenu] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-
-  // Fetch likes data if not provided
-  useEffect(() => {
-    const fetchLikesData = async () => {
-      if (!account?.id || mention.likes_count !== undefined) return;
-
-      try {
-        const [count, liked] = await Promise.all([
-          LikeService.getLikeCount(mention.id),
-          LikeService.hasLiked(mention.id, account.id),
-        ]);
-        setLikesCount(count);
-        setIsLiked(liked);
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.error('[MentionDetailClient] Error fetching likes:', error);
-        }
-      }
-    };
-
-    fetchLikesData();
-  }, [mention.id, account?.id, mention.likes_count]);
 
   // Track page view
   usePageView({ page_url: `/mention/${mention.id}` });
@@ -290,7 +264,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                     </Link>
                   )}
                   <Link
-                    href={`/map/live?lat=${mention.lat}&lng=${mention.lng}`}
+                    href={`/maps?lat=${mention.lat}&lng=${mention.lng}`}
                     onClick={() => setShowMenu(false)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                   >
@@ -299,7 +273,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
                   </Link>
                   {mention.accounts?.username && mention.accounts?.account_taggable && (
                     <Link
-                      href={`/map/live?username=${encodeURIComponent(mention.accounts.username)}#contribute`}
+                      href={`/maps?username=${encodeURIComponent(mention.accounts.username)}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -370,7 +344,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               <div className="flex items-center gap-2">
                 {mention.mention_type && (
                   <Link
-                    href={`/live?type=${encodeURIComponent(mentionTypeNameToSlug(mention.mention_type.name))}`}
+                    href={`/maps?type=${encodeURIComponent(mentionTypeNameToSlug(mention.mention_type.name))}`}
                     className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
                   >
                     <span className="text-sm">{mention.mention_type.emoji}</span>
@@ -554,7 +528,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
               <span className="text-gray-500">Map:</span>
               <Link
-                href={mention.map.slug === 'live' ? '/live' : `/map/${mention.map.slug || mention.map.id}`}
+                href={mention.map.slug === 'live' ? '/maps' : `/map/${mention.map.slug || mention.map.id}`}
                 className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
               >
                 {mention.map.name}
@@ -568,19 +542,6 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               <EyeIcon className="w-4 h-4" />
               <span>{viewCount} views</span>
             </div>
-            {account && (
-              <LikeButton
-                mentionId={mention.id}
-                initialLiked={isLiked}
-                initialCount={likesCount}
-                onLikeChange={(liked, count) => {
-                  setIsLiked(liked);
-                  setLikesCount(count);
-                }}
-                size="sm"
-                showCount={true}
-              />
-            )}
             <div className="flex items-center gap-1">
               <CalendarIcon className="w-4 h-4" />
               <span>Posted {createdDate}</span>

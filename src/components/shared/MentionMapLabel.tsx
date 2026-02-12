@@ -28,8 +28,8 @@ export default function MentionMapLabel({
   const baseClasses = 'inline-flex items-center gap-1.5 max-h-[28px] px-3 py-1 rounded-full border text-[10px] font-medium whitespace-nowrap flex-shrink-0 transition-colors';
   
   const selectedClasses = isSelected
-    ? 'border-gray-300 bg-gray-100 text-gray-900 hover:bg-gray-200'
-    : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50';
+    ? 'border-border bg-surface-accent text-foreground hover:bg-surface-accent/80'
+    : 'border-border-muted bg-surface text-foreground hover:bg-surface-accent';
 
   return (
     <button
@@ -52,7 +52,7 @@ export default function MentionMapLabel({
           aria-label="Clear filter"
         >
           <XMarkIcon 
-            className="w-3.5 h-3.5 text-gray-500 hover:text-gray-700 transition-colors" 
+            className="w-3.5 h-3.5 text-foreground-muted hover:text-foreground transition-colors" 
             aria-hidden
           />
         </span>

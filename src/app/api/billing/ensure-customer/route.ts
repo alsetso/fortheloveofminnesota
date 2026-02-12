@@ -101,11 +101,8 @@ export async function POST(request: NextRequest) {
                 customerId: account.stripe_customer_id,
               });
             }
-          } catch (error) {
+          } catch {
             // Customer doesn't exist in Stripe, create new one
-            if (process.env.NODE_ENV === 'development') {
-              console.log('Customer not found in Stripe, creating new one');
-            }
           }
         }
 

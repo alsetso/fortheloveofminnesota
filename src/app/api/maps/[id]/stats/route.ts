@@ -88,7 +88,8 @@ export async function GET(
         } else {
           // Look up map by slug (new system) or custom_slug (legacy fallback)
           const { data: map, error: mapError } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .or(`slug.eq.${identifier},custom_slug.eq.${identifier}`)
             .single();

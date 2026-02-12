@@ -41,7 +41,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
   const searchParams = useSearchParams();
   const { account } = useAuthStateSafe();
   const { user } = useAuth();
-  const isLivePage = pathname === '/live' || pathname === '/map/live';
+  const isLivePage = pathname === '/maps' || pathname === '/map/live';
   // Initialize with consistent defaults to avoid hydration mismatch
   const [useBlurStyle, setUseBlurStyle] = useState(false);
   const [currentMapStyle, setCurrentMapStyle] = useState<'streets' | 'satellite'>('streets');
@@ -144,7 +144,11 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
           // Single mention type selected - show "Add [Type]" button
           <button
             onClick={() => {
-              router.push('/map/live#contribute');
+              const params = new URLSearchParams();
+              if (selectedMentionType) {
+                params.set('type', mentionTypeNameToSlug(selectedMentionType.name));
+              }
+              router.push(params.toString() ? `/maps?${params.toString()}` : '/maps');
             }}
             className={`px-4 h-14 rounded-full transition-all flex items-center gap-2 ${
               useTransparentUI
@@ -163,7 +167,7 @@ export default function BottomButtons({ activeButton, onButtonClick, isPopupOpen
           <button
             onClick={() => {
               if (isLivePage) {
-                router.push('/map/live#contribute');
+                router.push('/maps');
               } else {
                 onButtonClick('create');
               }

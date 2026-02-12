@@ -52,7 +52,7 @@ export default function HeaderMentionTypeCards() {
         params.set('type', slug);
       }
       const qs = params.toString();
-      router.replace(qs ? `/live?${qs}` : '/live');
+      router.replace(qs ? `/maps?${qs}` : '/maps');
     },
     [router, searchParams, typeSlugFromUrl]
   );
@@ -62,7 +62,7 @@ export default function HeaderMentionTypeCards() {
       <div className="flex-shrink-0 px-[10px] pb-2">
         <div className="flex flex-wrap gap-2">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-[28px] w-24 bg-gray-100 rounded-full animate-pulse" />
+            <div key={i} className="h-[28px] w-24 bg-surface-accent rounded-full animate-pulse" />
           ))}
         </div>
       </div>

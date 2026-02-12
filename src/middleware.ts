@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server';
 import type { Database } from '@/types/supabase';
 import type { AccountRole } from '@/features/auth/services/memberService';
 import { detectDevice } from '@/lib/deviceDetection';
+import { isDraftRoute, DRAFT_CONFIG } from '@/lib/routes/draft-pages';
 
 // Route protection configuration
 const ROUTE_PROTECTION: Record<string, { 
@@ -188,9 +189,19 @@ export async function middleware(req: NextRequest) {
   ].join('; ');
   response.headers.set('Content-Security-Policy', csp);
 
-  // Redirect deprecated routes to /live
-  if (pathname === '/maps' || pathname === '/plan' || pathname === '/plans' || pathname === '/billing') {
-    return NextResponse.redirect(new URL('/live', req.url));
+  // Redirect deprecated routes to /maps
+  if (pathname === '/plan' || pathname === '/plans' || pathname === '/billing') {
+    return NextResponse.redirect(new URL('/maps', req.url));
+  }
+  
+  // Redirect /live to /maps (live route deprecated)
+  if (pathname === '/live') {
+    const redirectUrl = new URL('/maps', req.url);
+    // Preserve query params
+    req.nextUrl.searchParams.forEach((value, key) => {
+      redirectUrl.searchParams.set(key, value);
+    });
+    return NextResponse.redirect(redirectUrl);
   }
   // Profile pages removed — canonical URL is /:username; redirect /profile and /profile/* to /:username or /
   if (pathname === '/profile') {
@@ -231,6 +242,17 @@ export async function middleware(req: NextRequest) {
     });
     
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // Block draft/unpublished routes in production (if enabled)
+  if (isDraftRoute(pathname)) {
+    // Always allow in development if configured
+    if (process.env.NODE_ENV === 'development' && DRAFT_CONFIG.allowInDevelopment) {
+      // Allow access in development
+    } else if (DRAFT_CONFIG.blockInProduction && process.env.NODE_ENV === 'production') {
+      // Block in production if enabled
+      return NextResponse.redirect(new URL('/', req.url));
+    }
   }
   
   const protection = matchesProtectedRoute(pathname);
@@ -280,14 +302,55 @@ export async function middleware(req: NextRequest) {
   // This helps keep sessions alive across requests
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+  // Check system visibility (if system visibility is enabled)
+  // IMPORTANT: This must run AFTER user is fetched so userId is available
+  // Note: This requires the system_visibility tables to exist
+  // Skip for API routes, static assets, and homepage (homepage is always accessible)
+  if (!pathname.startsWith('/api/') && !pathname.startsWith('/_next/') && pathname !== '/') {
+    try {
+      const { isRouteVisible, getSystemForRoute } = await import('@/lib/admin/systemVisibility');
+      const routeVisible = await isRouteVisible(pathname, user?.id || undefined);
+      
+      if (!routeVisible) {
+        // Route is hidden by system visibility settings
+        // Get system name to show in toast (using optimized database function)
+        const system = await getSystemForRoute(pathname);
+        const systemName = system?.system_name || 'This feature';
+        const redirectUrl = new URL('/', req.url);
+        redirectUrl.searchParams.set('blocked', encodeURIComponent(systemName));
+        return NextResponse.redirect(redirectUrl);
+      }
+    } catch (error) {
+      // System visibility check failed - fail closed for safety
+      // Block the route unless we're in development and the error suggests the system isn't set up
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isSetupError = errorMessage.includes('does not exist') || 
+                          errorMessage.includes('relation') ||
+                          errorMessage.includes('schema');
+      
+      if (process.env.NODE_ENV === 'development' && isSetupError) {
+        // In dev, only skip if it's clearly a setup issue (missing tables/functions)
+        console.warn('[middleware] System visibility check failed (setup issue):', error);
+      } else {
+        // Production or non-setup errors: block the route
+        console.error('[middleware] System visibility check failed, blocking route:', error);
+        return NextResponse.redirect(new URL('/', req.url));
+      }
+    }
+  }
+
   // ALLOWED ROUTES FOR NON-AUTHENTICATED USERS
   // Homepage, live map, mention detail pages, and profile pages are accessible without auth
   const isAllowedRouteForAnonymous = (() => {
     // Homepage is always allowed
     if (pathname === '/') return true;
     
-    // Live map page is allowed for all users
-    if (pathname === '/live') return true;
+    // Maps page (shows live map) is allowed for all users
+    if (pathname === '/maps') return true;
+    
+    // Gov and news are public
+    if (pathname === '/gov' || pathname.startsWith('/gov/')) return true;
+    if (pathname === '/news' || pathname.startsWith('/news/')) return true;
     
     // Mention detail pages are allowed
     if (pathname.startsWith('/mention/')) {
@@ -305,7 +368,7 @@ export async function middleware(req: NextRequest) {
       // Exclude known routes that aren't usernames
       const excludedRoutes = [
         'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
-        'billing', 'admin', 'login', 'signup', 'onboarding', 'contribute',
+        'billing', 'admin', 'login', 'signup', 'onboarding',
         'contact', 'privacy', 'terms', 'download', 'api', '_next', 'favicon.ico'
       ];
       if (!excludedRoutes.includes(firstSegment.toLowerCase())) {

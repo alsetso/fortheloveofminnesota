@@ -42,11 +42,12 @@ export async function GET(
         
         const supabase = auth?.userId
           ? await createServerClientWithAuth(cookies())
-          : createServerClient();
+          : await createServerClient();
 
         // Resolve identifier to map_id (handle both UUID and slug)
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select(`
             id,
             account_id,
@@ -134,19 +135,15 @@ export async function GET(
           
           // Pins
           supabase
-            .from('map_pins')
+            .schema('maps')
+            .from('pins')
             .select('*')
             .eq('map_id', mapId)
             .eq('is_active', true)
             .order('created_at', { ascending: false }),
           
-          // Areas
-          supabase
-            .from('map_areas')
-            .select('*')
-            .eq('map_id', mapId)
-            .eq('is_active', true)
-            .order('created_at', { ascending: false }),
+          // Areas (disabled - map_areas table not in use)
+          Promise.resolve({ data: [] as any[], error: null }),
           
           // Members (only if user can view members)
           canViewMembers && accountId

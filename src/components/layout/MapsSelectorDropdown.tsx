@@ -182,12 +182,7 @@ export default function MapsSelectorDropdown({ className = '', darkText = false 
             map.pins_count = pinsData.pins?.length || 0;
           }
           
-          // Fetch areas count
-          const areasResponse = await fetch(`/api/maps/${map.id}/areas`);
-          if (areasResponse.ok) {
-            const areasData = await areasResponse.json();
-            map.areas_count = areasData.areas?.length || 0;
-          }
+          map.areas_count = 0; // Areas API removed
           
           setCurrentMapData(map);
         }

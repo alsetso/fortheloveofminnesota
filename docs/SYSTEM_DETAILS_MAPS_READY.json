@@ -1,0 +1,145 @@
+{
+  "systemId": "e27f391f-2bcd-4cf1-aa6a-46d0d43e23fe",
+  "systemName": "Maps",
+  "routes": [
+    {
+      "path": "/maps",
+      "filePath": "src/app/maps/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    },
+    {
+      "path": "/maps/new",
+      "filePath": "src/app/maps/new/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    },
+    {
+      "path": "/map/[id]",
+      "filePath": "src/app/map/[id]/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    },
+    {
+      "path": "/map/[id]/settings",
+      "filePath": "src/app/map/[id]/settings/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    },
+    {
+      "path": "/map/[id]/post/[postId]",
+      "filePath": "src/app/map/[id]/post/[postId]/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    },
+    {
+      "path": "/map/[id]/post/[postId]/edit",
+      "filePath": "src/app/map/[id]/post/[postId]/edit/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    },
+    {
+      "path": "/map",
+      "filePath": "src/app/map/page.tsx",
+      "hasMetadata": true,
+      "isDraft": false
+    }
+  ],
+  "databaseTables": [
+    "maps.maps",
+    "maps.pins",
+    "maps.areas",
+    "maps.categories",
+    "maps.memberships",
+    "maps.reactions",
+    "maps.requests",
+    "maps.tags"
+  ],
+  "apiRoutes": [
+    "/api/maps",
+    "/api/maps/[id]",
+    "/api/maps/[id]/pins",
+    "/api/maps/[id]/pins/[pinId]",
+    "/api/maps/[id]/areas",
+    "/api/maps/[id]/areas/[areaId]",
+    "/api/maps/[id]/categories",
+    "/api/maps/[id]/members",
+    "/api/maps/[id]/members/[memberId]",
+    "/api/maps/[id]/membership-requests",
+    "/api/maps/[id]/membership-requests/[requestId]",
+    "/api/maps/[id]/membership-requests/my-request",
+    "/api/maps/[id]/stats",
+    "/api/maps/[id]/viewers",
+    "/api/maps/[id]/publish",
+    "/api/maps/[id]/data",
+    "/api/maps/stats",
+    "/api/maps/live/mentions",
+    "/api/maps/live/mentions/admin"
+  ],
+  "files": {
+    "components": [
+      "src/features/map/components/MentionsLayer.tsx",
+      "src/features/map/components/CreateMentionModal.tsx",
+      "src/features/map/components/CountyBoundariesLayer.tsx",
+      "src/features/map/components/CTUBoundariesLayer.tsx",
+      "src/features/map/components/CongressionalDistrictsLayer.tsx",
+      "src/features/map/components/StateBoundaryLayer.tsx",
+      "src/features/map/components/GovernmentBuildingsLayer.tsx",
+      "src/components/maps/MapsContent.tsx",
+      "src/components/maps/MapsLeftSidebar.tsx",
+      "src/components/maps/MapsRightSidebar.tsx",
+      "src/components/maps/LiveMapLeftSidebar.tsx",
+      "src/components/maps/LiveMapRightSidebar.tsx",
+      "src/components/maps/MapActionUpgradePrompt.tsx",
+      "src/components/maps/AdminViewToggle.tsx",
+      "src/app/maps/components/MapCard.tsx",
+      "src/app/maps/components/MapsSidebarContent.tsx",
+      "src/app/maps/components/MapDetailsContent.tsx",
+      "src/app/maps/components/MapMemberManagerInline.tsx",
+      "src/app/maps/components/MapMembersList.tsx",
+      "src/app/maps/components/MapDetailsPopup.tsx",
+      "src/app/maps/components/MapViewersModal.tsx",
+      "src/app/map/[id]/components/MapIDBox.tsx",
+      "src/app/map/[id]/components/EntityDetailSidebar.tsx",
+      "src/app/map/[id]/components/MentionDetailSidebar.tsx",
+      "src/app/map/[id]/components/MapSettingsSidebar.tsx",
+      "src/app/map/[id]/components/JoinMapSidebar.tsx",
+      "src/app/map/[id]/components/MapMembershipRequests.tsx",
+      "src/app/map/[id]/components/MapMemberManagement.tsx",
+      "src/app/map/[id]/components/MapAreaDrawModal.tsx",
+      "src/app/map/[id]/components/MemberManager.tsx",
+      "src/app/map/[id]/components/BoundaryLayersManager.tsx",
+      "src/app/map/[id]/components/ContributeOverlay.tsx"
+    ],
+    "services": [
+      "src/features/map/services/locationService.ts",
+      "src/features/map/services/locationLookupService.ts",
+      "src/features/map/services/addressParser.ts",
+      "src/features/map/services/liveBoundaryCache.ts",
+      "src/features/map/services/mapStylePreloader.ts",
+      "src/features/map/services/minnesotaBoundsService.ts",
+      "src/lib/maps/getAccessibleMaps.ts",
+      "src/lib/maps/urls.ts",
+      "src/lib/maps/memberLimits.ts",
+      "src/lib/data/queries/maps.ts"
+    ],
+    "hooks": [
+      "src/features/map/hooks/useLocation.ts",
+      "src/app/map/[id]/hooks/useMapPageData.ts",
+      "src/app/map/[id]/hooks/useMapMembership.ts",
+      "src/app/map/[id]/hooks/useMapboxMap.ts",
+      "src/app/map/[id]/hooks/useEntitySidebar.ts",
+      "src/app/map/[id]/hooks/useUnifiedMapClickHandler.ts"
+    ],
+    "types": [
+      "src/types/map.ts"
+    ],
+    "utils": [
+      "src/features/map/utils/mapboxLoader.ts",
+      "src/features/map/utils/layerOrder.ts",
+      "src/features/map/utils/addBuildingExtrusions.ts",
+      "src/features/map/config/layerStyles.ts",
+      "src/features/map/config.ts"
+    ]
+  }
+}

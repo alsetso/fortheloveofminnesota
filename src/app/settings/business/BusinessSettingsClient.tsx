@@ -172,8 +172,8 @@ export default function BusinessSettingsClient() {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-1">Business Plan</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-1">Business Plan</h3>
         <p className="text-xs text-gray-600">
           Connect your business with Minnesota. Verified profiles and statewide visibility.
         </p>
@@ -187,7 +187,7 @@ export default function BusinessSettingsClient() {
       </div>
 
       {/* Warning Banner */}
-      <div className="bg-white border border-yellow-200 rounded-md p-[10px] bg-yellow-50">
+      <div className="bg-surface border border-yellow-200 rounded-md p-[10px] bg-yellow-900/20">
         <p className="text-xs text-yellow-800 font-medium">
           Business account signups are currently disabled. Please check back later.
         </p>
@@ -196,13 +196,13 @@ export default function BusinessSettingsClient() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Logo Upload */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
-          <label className="text-xs font-medium text-gray-900">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px] space-y-2">
+          <label className="text-xs font-medium text-foreground">
             Business Logo
           </label>
           <div className="flex items-center gap-2">
             <div className="relative group">
-              <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
+              <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-100 border border-border-muted dark:border-white/10 flex items-center justify-center flex-shrink-0">
                 {formData.logoUrl ? (
                   <Image
                     src={formData.logoUrl}
@@ -213,7 +213,7 @@ export default function BusinessSettingsClient() {
                     unoptimized={formData.logoUrl.includes('supabase.co')}
                   />
                 ) : (
-                  <PhotoIcon className="w-4 h-4 text-gray-400" />
+                  <PhotoIcon className="w-4 h-4 text-foreground/60" />
                 )}
               </div>
               
@@ -225,7 +225,7 @@ export default function BusinessSettingsClient() {
                 {uploadingLogo ? (
                   <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <PhotoIcon className="w-3 h-3 text-white" />
+                  <PhotoIcon className="w-3 h-3 text-foreground" />
                 )}
               </div>
 
@@ -240,19 +240,19 @@ export default function BusinessSettingsClient() {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-foreground/60">
                 Click to upload or edit your business logo
               </p>
               {logoError && (
-                <p className="text-[10px] text-red-600 mt-0.5">{logoError}</p>
+                <p className="text-[10px] text-red-400 mt-0.5">{logoError}</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Business Name */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <label htmlFor="businessName" className="text-xs font-medium text-gray-900">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px] space-y-1.5">
+          <label htmlFor="businessName" className="text-xs font-medium text-foreground">
             Business Name *
           </label>
           <input
@@ -261,15 +261,15 @@ export default function BusinessSettingsClient() {
             required
             value={formData.businessName}
             onChange={(e) => setFormData(prev => ({ ...prev, businessName: e.target.value }))}
-            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
+            className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
             placeholder="Enter your business name"
             disabled={true}
           />
         </div>
 
         {/* Description */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <label htmlFor="description" className="text-xs font-medium text-gray-900">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px] space-y-1.5">
+          <label htmlFor="description" className="text-xs font-medium text-foreground">
             Business Description *
           </label>
           <textarea
@@ -278,17 +278,17 @@ export default function BusinessSettingsClient() {
             rows={4}
             value={formData.description}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 resize-none bg-gray-100 cursor-not-allowed"
+            className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 resize-none bg-gray-100 cursor-not-allowed"
             placeholder="Describe your business and what you offer"
             disabled={true}
           />
         </div>
 
         {/* Contact Information */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px] space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <label htmlFor="contactName" className="text-xs font-medium text-gray-900">
+              <label htmlFor="contactName" className="text-xs font-medium text-foreground">
                 Contact Name *
               </label>
               <input
@@ -297,13 +297,13 @@ export default function BusinessSettingsClient() {
                 required
                 value={formData.contactName}
                 onChange={(e) => setFormData(prev => ({ ...prev, contactName: e.target.value }))}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
+                className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
                 placeholder="Your name"
                 disabled={true}
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-xs font-medium text-gray-900">
+              <label htmlFor="email" className="text-xs font-medium text-foreground">
                 Email *
               </label>
               <input
@@ -312,7 +312,7 @@ export default function BusinessSettingsClient() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
+                className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
                 placeholder="your@email.com"
                 disabled={true}
               />
@@ -321,7 +321,7 @@ export default function BusinessSettingsClient() {
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <label htmlFor="phone" className="text-xs font-medium text-gray-900">
+              <label htmlFor="phone" className="text-xs font-medium text-foreground">
                 Phone
               </label>
               <input
@@ -329,13 +329,13 @@ export default function BusinessSettingsClient() {
                 id="phone"
                 value={formData.phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
+                className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
                 placeholder="(555) 123-4567"
                 disabled={true}
               />
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="website" className="text-xs font-medium text-gray-900">
+              <label htmlFor="website" className="text-xs font-medium text-foreground">
                 Website
               </label>
               <input
@@ -343,7 +343,7 @@ export default function BusinessSettingsClient() {
                 id="website"
                 value={formData.website}
                 onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
+                className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
                 placeholder="https://yourwebsite.com"
                 disabled={true}
               />
@@ -352,14 +352,14 @@ export default function BusinessSettingsClient() {
         </div>
 
         {/* Location */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-2">
-          <label className="text-xs font-medium text-gray-900">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px] space-y-2">
+          <label className="text-xs font-medium text-foreground">
             Business Location *
           </label>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-foreground/60">
             Search for your address in the map or click on the map to set your location.
           </p>
-          <div className="border border-gray-200 rounded-md overflow-hidden relative" style={{ height: '200px' }}>
+          <div className="border border-border-muted dark:border-white/10 rounded-md overflow-hidden relative" style={{ height: '200px' }}>
             <InlineMap
               lat={formData.lat?.toString()}
               lng={formData.lng?.toString()}
@@ -373,36 +373,36 @@ export default function BusinessSettingsClient() {
             type="text"
             value={formData.address}
             onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-            className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
+            className="w-full px-2 py-1.5 text-xs border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-100 cursor-not-allowed"
             placeholder="Address will be filled when you select a location on the map"
             readOnly
             disabled={true}
           />
           {formData.lat && formData.lng && (
-            <p className="text-[10px] text-gray-500">
+            <p className="text-[10px] text-foreground/60">
               Coordinates: {formData.lat.toFixed(6)}, {formData.lng.toFixed(6)}
             </p>
           )}
         </div>
 
         {/* Submit Button */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
           <button
             type="submit"
             disabled={true}
-            className="w-full px-2 py-1.5 text-xs font-medium text-white bg-gray-400 rounded-md transition-colors cursor-not-allowed"
+            className="w-full px-2 py-1.5 text-xs font-medium text-foreground bg-surface-accent dark:bg-white/20 rounded-md transition-colors cursor-not-allowed"
           >
             Signups Currently Disabled
           </button>
         </div>
 
         {/* Terms Footer */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-foreground/60">
               All payments are final
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-foreground/60">
               <a href="/terms" className="hover:text-gray-700 transition-colors">Terms of Service</a>
             </div>
           </div>

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validateQueryParams } from '@/lib/security/validation';
 import { z } from 'zod';
@@ -19,7 +18,7 @@ const ctuBoundariesQuerySchema = z.object({
   ctu_class: z.enum(['CITY', 'TOWNSHIP', 'UNORGANIZED TERRITORY']).optional(),
   county_name: z.string().max(200).optional(),
   // Coerce string to number for limit parameter (query params come as strings)
-  limit: z.coerce.number().int().positive().max(1000).optional(),
+  limit: z.coerce.number().int().positive().max(3000).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -34,33 +33,17 @@ export async function GET(request: NextRequest) {
         }
         
         const { id, ctu_class: ctuClass, county_name: countyName, limit } = validation.data;
-        const supabase = createServerClient();
-    
-    let query = (supabase as any)
-      .schema('layers')
-      .from('cities_and_towns')
-      .select('id, ctu_class, feature_name, gnis_feature_id, county_name, county_code, county_gnis_feature_id, population, acres, geometry')
-      .order('ctu_class', { ascending: true })
-      .order('feature_name', { ascending: true });
-    
-    // Apply filters
-    if (id) {
-      query = query.eq('id', id);
-    }
-    
-    if (ctuClass) {
-      query = query.eq('ctu_class', ctuClass);
-    }
-    
-    if (countyName) {
-      query = query.eq('county_name', countyName);
-    }
-    
-        if (limit) {
-          query = query.limit(limit);
-        }
         
-        const { data, error } = await query;
+        // Use RPC function to query layers schema (public resources)
+        const { createSupabaseClient } = await import('@/lib/supabase/unified');
+        const supabase = await createSupabaseClient();
+        
+        const { data, error } = await supabase.rpc('get_ctu_boundaries', {
+          p_id: id || null,
+          p_ctu_class: ctuClass || null,
+          p_county_name: countyName || null,
+          p_limit: limit ?? 3000
+        });
         
         if (error) {
           if (process.env.NODE_ENV === 'development') {

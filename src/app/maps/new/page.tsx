@@ -10,9 +10,9 @@ import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import { addBuildingExtrusions, removeBuildingExtrusions } from '@/features/map/utils/addBuildingExtrusions';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import { getMapUrl } from '@/lib/maps/urls';
@@ -62,14 +62,11 @@ export default function NewMapPage() {
     
     const fetchData = async () => {
       try {
-        console.log('[NewMapPage] Fetching data for activeAccountId:', activeAccountId);
-        
         // Fetch plans to get next plan's limit
         const plansResponse = await fetch('/api/billing/plans');
         if (plansResponse.ok) {
           const plansData = await plansResponse.json();
           setPlans(plansData.plans || []);
-          console.log('[NewMapPage] Plans fetched:', plansData.plans?.length || 0);
         }
 
         // Get user's map count using activeAccountId
@@ -77,21 +74,16 @@ export default function NewMapPage() {
         if (mapsResponse.ok) {
           const mapsData = await mapsResponse.json();
           const currentCount = mapsData.maps?.length || 0;
-          console.log('[NewMapPage] Current map count:', currentCount);
-          
+
           // Get account features to find map limit (account-scoped; includes limits)
           // This uses the active account from the cookie
           const featuresResponse = await fetch('/api/billing/user-features');
           if (featuresResponse.ok) {
             const featuresData = await featuresResponse.json();
-            console.log('[NewMapPage] User features response:', featuresData);
-            
             const features: any[] = Array.isArray(featuresData.features) ? featuresData.features : [];
-            console.log('[NewMapPage] Features array:', features);
 
             // Use canonical feature slug (invariant enforcement)
             const feature = features.find((f) => f.slug === MAP_FEATURE_SLUG) as AccountFeatureEntitlement | undefined;
-            console.log('[NewMapPage] custom_maps feature:', feature);
 
             // Store feature for centralized limit calculation
             setCustomMapsFeature(feature || null);
@@ -674,7 +666,7 @@ export default function NewMapPage() {
                   maxLength={100}
                 />
                 <p className="text-[10px] text-gray-500">
-                  Custom URL slug (lowercase, alphanumeric and hyphens only, 3-100 characters). If set, map will be accessible at /map/{customSlug || 'slug'}
+                  Custom URL slug (lowercase, alphanumeric and hyphens only, 3-100 characters). If set, map will be accessible at {`/map/${customSlug || 'slug'}`}
                 </p>
               </div>
             </div>
@@ -688,20 +680,14 @@ export default function NewMapPage() {
 
   // Calculate next plan's limit and upgrade message
   const upgradeInfo = useMemo(() => {
-    console.log('[NewMapPage] upgradeInfo calculation:', { mapLimit, account: account?.id, activeAccountId, isAdmin });
-    
     if (!mapLimit || !account || isAdmin) {
-      console.log('[NewMapPage] upgradeInfo: early return - no mapLimit, account, or isAdmin');
       return null;
     }
-    
+
     if (mapLimit.max === null || mapLimit.current < mapLimit.max) {
-      console.log('[NewMapPage] upgradeInfo: not at limit', { current: mapLimit.current, max: mapLimit.max });
       return null; // Not at limit
     }
-    
-    console.log('[NewMapPage] upgradeInfo: limit reached, calculating next plan');
-    
+
     const currentPlan = account.plan || 'hobby';
     const currentPlanData = plans.find(p => p.slug === currentPlan);
     const currentPlanOrder = currentPlanData?.display_order || 0;
@@ -712,26 +698,16 @@ export default function NewMapPage() {
       .sort((a, b) => a.display_order - b.display_order)[0];
     
     if (!nextPlan) {
-      console.log('[NewMapPage] upgradeInfo: no next plan found');
       return null;
     }
-    
-    console.log('[NewMapPage] upgradeInfo: next plan found:', nextPlan.name, nextPlan.features?.length || 0, 'features');
-    
+
     // Get canonical feature from next plan
     const nextPlanMapFeature = nextPlan.features?.find(f => f.slug === MAP_FEATURE_SLUG);
-    console.log('[NewMapPage] upgradeInfo: next plan map feature:', nextPlanMapFeature);
     
     const nextPlanLimit = nextPlanMapFeature?.limit_value ?? null;
     const nextPlanLimitType = nextPlanMapFeature?.limit_type ?? null;
     const nextPlanIsUnlimited = nextPlanLimitType === 'unlimited' || (nextPlanLimitType === 'count' && nextPlanLimit === null);
-    
-    console.log('[NewMapPage] upgradeInfo: next plan limit data:', {
-      limit_value: nextPlanLimit,
-      limit_type: nextPlanLimitType,
-      is_unlimited: nextPlanIsUnlimited,
-    });
-    
+
     // Format plan name (capitalize first letter)
     const planName = currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1);
     
@@ -744,7 +720,7 @@ export default function NewMapPage() {
       moreMapsText = `${nextPlanLimit - mapLimit.current}`;
     }
     
-    const result = {
+    return {
       currentPlanName: planName,
       nextPlanName: nextPlan.name,
       moreMaps: moreMapsText,
@@ -753,22 +729,9 @@ export default function NewMapPage() {
       nextPlanIsUnlimited: nextPlanIsUnlimited,
       nextPlanMapFeature: nextPlanMapFeature,
     };
-    
-    console.log('[NewMapPage] upgradeInfo result:', result);
-    return result;
   }, [mapLimit, account, plans, isAdmin]);
 
   const isLimitReached = mapLimit && mapLimit.max !== null && mapLimit.current >= mapLimit.max && !isAdmin;
-  
-  console.log('[NewMapPage] Render check:', {
-    isLimitReached,
-    mapLimit,
-    upgradeInfo,
-    isAdmin,
-    accountId: account?.id,
-    activeAccountId,
-    accountPlan: account?.plan,
-  });
 
   return (
     <>
@@ -841,25 +804,13 @@ export default function NewMapPage() {
           </div>
         </div>
       )}
-      <PageWrapper
-        headerContent={null}
-        searchComponent={
-          <MapSearchInput
-            onLocationSelect={() => {
-              // Handle location selection if needed
-            }}
-          />
-        }
-        accountDropdownProps={{
-          onAccountClick: () => {
-            // Handle account click
-          },
-          onSignInClick: openWelcome,
-        }}
-        searchResultsComponent={<SearchResults />}
+      <NewPageWrapper
+        leftSidebar={<LeftSidebar />}
+        rightSidebar={<RightSidebar />}
       >
-        <div className="max-w-7xl mx-auto px-4 py-6 overflow-y-auto">
-          <div className="flex flex-col lg:flex-row gap-3">
+        <div className="w-full py-6">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex flex-col lg:flex-row gap-3">
             {/* Left Side - Form Steps */}
             <div className="flex-1 lg:max-w-md w-full">
               <div className="space-y-3">
@@ -873,7 +824,7 @@ export default function NewMapPage() {
                           ? 'text-red-600'
                           : 'text-gray-700'
                       }`}>
-                        {mapLimit.current} / {mapLimit.max === null ? '∞' : mapLimit.max}
+                        {mapLimit.current}{' / '}{mapLimit.max === null ? '∞' : mapLimit.max}
                       </span>
                     </div>
                     {mapLimit.max !== null && (
@@ -1044,7 +995,8 @@ export default function NewMapPage() {
             </div>
           </div>
         </div>
-      </PageWrapper>
+        </div>
+      </NewPageWrapper>
     </>
   );
 }

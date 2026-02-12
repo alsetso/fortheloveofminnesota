@@ -89,11 +89,11 @@ export default function PrivacySettingsClient() {
 
   return (
     <div className="space-y-2">
-      <div className="bg-white border border-gray-200 rounded-md p-3">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-3">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-900">Profile is searchable</p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Allow others to find you in @ mention searches</p>
+            <p className="text-xs font-semibold text-foreground">Profile is searchable</p>
+            <p className="text-[10px] text-foreground/60 mt-0.5">Allow others to find you in @ mention searches</p>
           </div>
           <div className="flex-shrink-0 ml-3">
             <button
@@ -101,7 +101,7 @@ export default function PrivacySettingsClient() {
               onClick={handleToggleSearchable}
               disabled={isUpdatingSearchable}
               className={`relative inline-flex h-5 w-9 cursor-pointer rounded-lg transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                account.search_visibility ? 'bg-green-500' : 'bg-gray-200'
+                account.search_visibility ? 'bg-green-500' : 'bg-surface-accent'
               }`}
               role="switch"
               aria-checked={account.search_visibility}
@@ -117,11 +117,11 @@ export default function PrivacySettingsClient() {
           </div>
         </div>
       </div>
-      <div className="bg-white border border-gray-200 rounded-md p-3">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-3">
         <div className="flex items-center justify-between">
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-gray-900">Profile is taggable</p>
-            <p className="text-[10px] text-gray-500 mt-0.5">Allow others to tag you in mentions</p>
+            <p className="text-xs font-semibold text-foreground">Profile is taggable</p>
+            <p className="text-[10px] text-foreground/60 mt-0.5">Allow others to tag you in mentions</p>
           </div>
           <div className="flex-shrink-0 ml-3">
             <button
@@ -129,7 +129,7 @@ export default function PrivacySettingsClient() {
               onClick={handleToggleTaggable}
               disabled={isUpdatingTaggable}
               className={`relative inline-flex h-5 w-9 cursor-pointer rounded-lg transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                account.account_taggable ? 'bg-green-500' : 'bg-gray-200'
+                account.account_taggable ? 'bg-green-500' : 'bg-surface-accent'
               }`}
               role="switch"
               aria-checked={account.account_taggable}
@@ -146,40 +146,40 @@ export default function PrivacySettingsClient() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Account Actions</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Account Actions</h3>
         {signOutError && (
-          <div className="mb-3 bg-red-50 border border-red-200 text-red-700 px-[10px] py-[10px] rounded-md text-xs flex items-start gap-2">
+          <div className="mb-3 bg-red-900/20 border border-red-500/50 text-red-400 px-[10px] py-[10px] rounded-md text-xs flex items-start gap-2">
             <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{signOutError}</span>
           </div>
         )}
-        <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
+        <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent transition-colors bg-surface-accent">
           <div>
-            <h4 className="text-xs font-semibold text-gray-900 mb-0.5">Sign Out</h4>
-            <p className="text-xs text-gray-600">Sign out of your account on this device</p>
+            <h4 className="text-xs font-semibold text-foreground mb-0.5">Sign Out</h4>
+            <p className="text-xs text-foreground/70">Sign out of your account on this device</p>
           </div>
-          <button onClick={handleSignOutClick} disabled={isSigningOut} className="flex items-center gap-1.5 px-[10px] py-[10px] text-xs font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleSignOutClick} disabled={isSigningOut} className="flex items-center gap-1.5 px-[10px] py-[10px] text-xs font-medium text-foreground bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isSigningOut ? (<><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Signing out...</>) : 'Sign Out'}
           </button>
         </div>
       </div>
 
       {showSignOutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="signout-title" onKeyDown={(e) => e.key === 'Escape' && handleSignOutCancel()}>
-          <div className="bg-white rounded-md border border-gray-200 w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="signout-title" onKeyDown={(e) => e.key === 'Escape' && handleSignOutCancel()}>
+          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md w-full max-w-md mx-4">
             <div className="p-[10px]">
               <div className="flex items-center mb-3">
-                <div className="flex-shrink-0 w-8 h-8 mx-auto bg-red-100 rounded-md flex items-center justify-center">
-                  <ArrowRightOnRectangleIcon className="w-4 h-4 text-red-600" aria-hidden />
+                <div className="flex-shrink-0 w-8 h-8 mx-auto bg-red-900/20 rounded-md flex items-center justify-center">
+                  <ArrowRightOnRectangleIcon className="w-4 h-4 text-red-400" aria-hidden />
                 </div>
               </div>
               <div className="text-center">
-                <h3 id="signout-title" className="text-sm font-semibold text-gray-900 mb-1.5">Sign out of your account?</h3>
-                <p className="text-xs text-gray-600 mb-3">You&apos;ll need to sign in again to access your account.</p>
+                <h3 id="signout-title" className="text-sm font-semibold text-foreground mb-1.5">Sign out of your account?</h3>
+                <p className="text-xs text-foreground/70 mb-3">You&apos;ll need to sign in again to access your account.</p>
                 <div className="flex gap-2">
-                  <button onClick={handleSignOutCancel} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-gray-900 border border-gray-200 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 transition-colors">Cancel</button>
-                  <button onClick={handleSignOutConfirm} disabled={isSigningOut} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{isSigningOut ? 'Signing out...' : 'Sign out'}</button>
+                  <button onClick={handleSignOutCancel} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-foreground bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors">Cancel</button>
+                  <button onClick={handleSignOutConfirm} disabled={isSigningOut} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-foreground bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{isSigningOut ? 'Signing out...' : 'Sign out'}</button>
                 </div>
               </div>
             </div>

@@ -12,7 +12,6 @@ import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
 import YouTubePreview from '@/features/mentions/components/YouTubePreview';
-import LikeButton from '@/components/mentions/LikeButton';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import type { Mention } from '@/types/mention';
 
@@ -22,6 +21,8 @@ interface MapEntityPopupProps {
   type: 'pin' | 'location' | null;
   /** Callback when a nearby mention is clicked - updates URL and switches to mention view */
   onMentionSelect?: (mentionId: string, lat: number, lng: number) => void;
+  /** When true, positions popup within NewPageWrapper center column instead of fixed to viewport */
+  inMapContainer?: boolean;
   data: {
     // Pin/Mention data
     id?: string;
@@ -63,14 +64,12 @@ interface MapEntityPopupProps {
  * iOS-style popup that appears above mobile nav (z-[60])
  * Shows pin or location details
  */
-export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionSelect }: MapEntityPopupProps) {
+export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionSelect, inMapContainer = false }: MapEntityPopupProps) {
   const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isAtMaxHeight, setIsAtMaxHeight] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [likesCount, setLikesCount] = useState(data?.likes_count || 0);
-  const [isLiked, setIsLiked] = useState(data?.is_liked || false);
   const [nearbyMentions, setNearbyMentions] = useState<Mention[]>([]);
   const [isLoadingNearby, setIsLoadingNearby] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -130,7 +129,10 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
       // Trigger animation on next frame
       requestAnimationFrame(() => {
         if (popupRef.current) {
-          popupRef.current.style.transform = 'translate(-50%, 0)';
+          // Low position: when inMapContainer, start at 70% (showing 30% of popup)
+          // Otherwise, animate to bottom (0)
+          const translateY = inMapContainer ? '70%' : '0';
+          popupRef.current.style.transform = `translate(-50%, ${translateY})`;
         }
       });
     } else {
@@ -142,7 +144,7 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, type]);
+  }, [isOpen, type, inMapContainer]);
 
   // Check if content reaches max height
   useEffect(() => {
@@ -177,7 +179,10 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
 
   const handleClose = () => {
     if (popupRef.current) {
-      popupRef.current.style.transform = 'translate(-50%, 100%)';
+      // Animate back to off-screen position before closing
+      // When in map container, animate back to low position (70% down) then off screen
+      const translateY = inMapContainer ? '100%' : '100%';
+      popupRef.current.style.transform = `translate(-50%, ${translateY})`;
     }
     // Wait for animation to complete
     setTimeout(() => {
@@ -188,14 +193,6 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
   // Check if current user owns this mention
   const isOwner = type === 'pin' && user && account && data && data.account_id === account.id;
 
-
-  // Update likes state when data changes
-  useEffect(() => {
-    if (data) {
-      setLikesCount(data.likes_count || 0);
-      setIsLiked(data.is_liked || false);
-    }
-  }, [data]);
 
   // Fetch nearby mentions when popup opens with location data
   useEffect(() => {
@@ -329,17 +326,17 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
       {/* Popup - iOS-style bottom sheet */}
       <div
         ref={popupRef}
-        className={`fixed z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
-          bottom-0 left-1/2 -translate-x-1/2 rounded-t-3xl
+        className={`${inMapContainer ? 'absolute' : 'fixed'} z-[60] shadow-2xl transition-all duration-300 ease-out flex flex-col
+          ${inMapContainer ? 'bottom-0 left-1/2' : 'bottom-0 left-1/2'} -translate-x-1/2 rounded-t-3xl
           xl:rounded-t-lg xl:rounded-b-none xl:max-h-[50vh]
           ${useBlurStyle ? 'bg-transparent backdrop-blur-md' : 'bg-white'}`}
         style={{
-          transform: 'translate(-50%, 100%)',
-          maxWidth: '600px',
-          width: 'calc(100% - 2rem)',
+          transform: inMapContainer ? 'translate(-50%, 70%)' : 'translate(-50%, 100%)',
+          maxWidth: inMapContainer ? 'calc(100% - 2rem)' : '600px',
+          width: inMapContainer ? 'calc(100% - 2rem)' : 'calc(100% - 2rem)',
           minHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? 'auto' : '40vh',
           maxHeight: typeof window !== 'undefined' && window.innerWidth >= 1280 ? '50vh' : '80vh',
-          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingBottom: inMapContainer ? '0' : 'env(safe-area-inset-bottom)',
         }}
       >
         {/* Handle bar - hidden on desktop */}
@@ -609,8 +606,8 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
                               const typeSlug = mentionTypeNameToSlug(data.mention_type!.name);
                               // Close popup first
                               handleClose();
-                              // Navigate to /live with type filter
-                              router.push(`/map/live?type=${typeSlug}`);
+                              // Navigate to /maps with type filter
+                              router.push(`/maps?type=${typeSlug}`);
                             }}
                             className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors ${
                               useWhiteText 
@@ -801,19 +798,6 @@ export default function MapEntityPopup({ isOpen, onClose, type, data, onMentionS
                         <EyeIcon className="w-3 h-3" />
                         <span>{data.view_count.toLocaleString()}</span>
                       </div>
-                    )}
-                    {type === 'pin' && data.id && account && (
-                      <LikeButton
-                        mentionId={data.id}
-                        initialLiked={isLiked}
-                        initialCount={likesCount}
-                        onLikeChange={(liked, count) => {
-                          setIsLiked(liked);
-                          setLikesCount(count);
-                        }}
-                        size="sm"
-                        showCount={true}
-                      />
                     )}
                     {/* Collection Label */}
                     {data.collection && (

@@ -84,15 +84,15 @@ export default function BillingPageClient() {
     
     const status = account.subscription_status;
     if (status === 'active' || status === 'trialing') {
-      return { text: 'Active', color: 'bg-green-100 text-green-800' };
+      return { text: 'Active', color: 'bg-green-900/20 text-green-400' };
     }
     if (status === 'canceled') {
-      return { text: 'Canceled', color: 'bg-gray-100 text-gray-800' };
+      return { text: 'Canceled', color: 'bg-surface-accent text-foreground/80' };
     }
     if (status === 'past_due') {
-      return { text: 'Payment Required', color: 'bg-red-100 text-red-800' };
+      return { text: 'Payment Required', color: 'bg-red-900/20 text-red-400' };
     }
-    return { text: status, color: 'bg-gray-100 text-gray-800' };
+    return { text: status, color: 'bg-surface-accent text-foreground/80' };
   };
 
   const getBrandIcon = (brand: string | undefined) => {
@@ -127,16 +127,16 @@ export default function BillingPageClient() {
       )}
 
       {/* Manage Billing */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Manage Billing</h3>
-        <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Manage Billing</h3>
+        <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent transition-colors bg-surface-accent">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h4 className="text-xs font-semibold text-gray-900">{planDisplayName}</h4>
-              {isTrial && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Trial</span>}
+              <h4 className="text-xs font-semibold text-foreground">{planDisplayName}</h4>
+              {isTrial && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-900/20 text-blue-400">Trial</span>}
               {statusDisplay && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusDisplay.color}`}>{statusDisplay.text}</span>}
             </div>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-foreground/70">
               {isProUser 
                 ? (isActive 
                   ? `${planPrice} • Active subscription` 
@@ -151,7 +151,7 @@ export default function BillingPageClient() {
           </div>
           <button 
             onClick={isProUser && hasStripeCustomer ? handleManageBilling : handleUpgrade} 
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex-shrink-0"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-surface border border-border-muted dark:border-white/20 hover:bg-surface-accent rounded-md transition-colors flex-shrink-0"
           >
             <CreditCardIcon className="w-3 h-3" />
             <span>{isProUser && hasStripeCustomer ? 'Manage' : 'Upgrade'}</span>
@@ -161,12 +161,12 @@ export default function BillingPageClient() {
 
       {/* Payment Methods */}
       {hasStripeCustomer && (
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Payment Methods</h3>
+            <h3 className="text-sm font-semibold text-foreground">Payment Methods</h3>
             <button
               onClick={handleManageBilling}
-              className="text-xs text-gray-600 hover:text-gray-900 font-medium"
+              className="text-xs text-foreground/70 hover:text-foreground font-medium"
             >
               Manage
             </button>
@@ -174,8 +174,8 @@ export default function BillingPageClient() {
 
           {loading ? (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-900 mb-2"></div>
-              <p className="text-xs text-gray-500">Loading payment methods...</p>
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-border-muted dark:border-white/30 border-t-white mb-2"></div>
+              <p className="text-xs text-foreground/60">Loading payment methods...</p>
             </div>
           ) : paymentMethods.length > 0 ? (
             <div className="space-y-2">
@@ -184,26 +184,26 @@ export default function BillingPageClient() {
                   key={pm.id}
                   className={`border rounded-md p-[10px] ${
                     pm.isDefault 
-                      ? 'border-blue-300 bg-blue-50' 
-                      : 'border-gray-200 bg-white'
+                      ? 'border-lake-blue/50 bg-lake-blue/10' 
+                      : 'border-border-muted dark:border-white/10 bg-surface-accent'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <CreditCardIcon className="w-4 h-4 text-gray-500" />
+                      <CreditCardIcon className="w-4 h-4 text-foreground/60" />
                       <div>
-                        <div className="text-xs font-medium text-gray-900">
+                        <div className="text-xs font-medium text-foreground">
                           {getBrandIcon(pm.brand)} •••• {pm.last4 || 'N/A'}
                         </div>
                         {pm.expMonth && pm.expYear && (
-                          <div className="text-[10px] text-gray-500">
+                          <div className="text-[10px] text-foreground/60">
                             Expires {pm.expMonth.toString().padStart(2, '0')}/{pm.expYear}
                           </div>
                         )}
                       </div>
                     </div>
                     {pm.isDefault && (
-                      <span className="text-[10px] font-semibold text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] font-semibold text-lake-blue bg-lake-blue/20 px-1.5 py-0.5 rounded">
                         DEFAULT
                       </span>
                     )}
@@ -212,12 +212,12 @@ export default function BillingPageClient() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 border border-gray-200 rounded-md">
-              <CreditCardIcon className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-xs text-gray-500">No payment methods found</p>
+            <div className="text-center py-8 border border-border-muted dark:border-white/10 rounded-md bg-surface-accent">
+              <CreditCardIcon className="w-8 h-8 text-foreground/40 mx-auto mb-2" />
+              <p className="text-xs text-foreground/60">No payment methods found</p>
               <button
                 onClick={handleManageBilling}
-                className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                className="mt-2 text-xs text-lake-blue hover:text-lake-blue/80 font-medium"
               >
                 Add payment method
               </button>
@@ -225,15 +225,15 @@ export default function BillingPageClient() {
           )}
 
           {/* Stripe Portal Link */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="mt-3 pt-3 border-t border-border-muted dark:border-white/10">
             <button
               onClick={handleManageBilling}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-foreground bg-surface border border-border-muted dark:border-white/20 hover:bg-surface-accent rounded-md transition-colors"
             >
               <span>Open Billing Portal</span>
               <ArrowTopRightOnSquareIcon className="w-3 h-3" />
             </button>
-            <p className="text-[10px] text-gray-500 mt-1.5 text-center">
+            <p className="text-[10px] text-foreground/60 mt-1.5 text-center">
               Manage subscriptions, payment methods, and billing history
             </p>
           </div>
@@ -246,14 +246,14 @@ export default function BillingPageClient() {
       )}
 
       {/* Help Section */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">Need Help?</h3>
-        <p className="text-xs text-gray-600 mb-2">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-2">Need Help?</h3>
+        <p className="text-xs text-foreground/70 mb-2">
           Have questions about billing or payments?
         </p>
         <a
           href="mailto:loveofminnesota@gmail.com"
-          className="text-xs text-blue-600 hover:text-blue-800 underline"
+          className="text-xs text-lake-blue hover:text-lake-blue/80 underline"
         >
           loveofminnesota@gmail.com
         </a>

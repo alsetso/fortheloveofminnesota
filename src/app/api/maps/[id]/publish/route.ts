@@ -65,7 +65,8 @@ export async function PATCH(
 
         // Resolve identifier to map_id
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id, account_id, published_to_community')
           .eq('is_active', true);
         
@@ -105,7 +106,8 @@ export async function PATCH(
         };
 
         const { data: updatedMap, error: updateError } = await (supabase
-          .from('map') as any)
+          .schema('maps')
+          .from('maps') as any)
           .update(updateData)
           .eq('id', mapData.id)
           .select('id, published_to_community, published_at')

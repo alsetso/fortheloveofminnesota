@@ -39,8 +39,8 @@ export default function HomePageLayout({
   return (
     <div className="relative w-full h-full flex">
       {/* Mobile: Content + Sidebar containers handle popups */}
-      <div className="lg:hidden w-full h-full relative overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
-        <div className="absolute inset-0 w-full h-full overflow-y-auto">
+      <div className="lg:hidden w-full h-full relative overflow-hidden bg-surface-muted" style={{ height: '100%', maxHeight: '100%' }}>
+        <div className="absolute inset-0 w-full h-full overflow-y-auto bg-surface-muted">
           {children}
         </div>
         {/* Left sidebar popup */}
@@ -70,8 +70,8 @@ export default function HomePageLayout({
           sidebars={leftSidebarConfigs}
         />
         
-        {/* Center: Content */}
-        <main className="flex-1 min-w-0 relative h-full overflow-y-auto">
+        {/* Center: Content - theme-aware like NewPageWrapper */}
+        <main className="flex-1 min-w-0 relative h-full overflow-y-auto bg-surface-muted">
           {children}
         </main>
 
@@ -79,7 +79,7 @@ export default function HomePageLayout({
         <aside
           className={`${
             rightSidebar ? 'w-80' : 'w-0'
-          } transition-all duration-300 ease-in-out flex-shrink-0 bg-white border-l border-gray-200 overflow-hidden`}
+          } transition-all duration-300 ease-in-out flex-shrink-0 bg-surface border-l border-border-muted dark:border-white/10 overflow-hidden`}
         >
           {rightSidebarConfigs.find(s => s.type === rightSidebar) && (
             <div className="h-full flex flex-col">

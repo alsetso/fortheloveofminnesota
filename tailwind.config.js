@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -12,6 +13,39 @@ module.exports = {
         'libre-baskerville': ['Libre Baskerville', 'serif'],
       },
       colors: {
+        /* Semantic Design Tokens from CSS Variables */
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          muted: 'hsl(var(--surface-muted))',
+          accent: 'hsl(var(--surface-accent))',
+        },
+        header: {
+          DEFAULT: 'hsl(var(--header))',
+          muted: 'hsl(var(--header-muted))',
+        },
+        'lake-blue': {
+          DEFAULT: 'hsl(var(--lake-blue))',
+          light: 'hsl(var(--lake-blue-light))',
+        },
+        'aurora-teal': {
+          DEFAULT: 'hsl(var(--aurora-teal))',
+          light: 'hsl(var(--aurora-teal-light))',
+        },
+        foreground: {
+          DEFAULT: 'hsl(var(--foreground))',
+          muted: 'hsl(var(--foreground-muted))',
+          subtle: 'hsl(var(--foreground-subtle))',
+        },
+        border: {
+          DEFAULT: 'hsl(var(--border))',
+          muted: 'hsl(var(--border-muted))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          hover: 'hsl(var(--accent-hover))',
+          light: 'hsl(var(--accent-light))',
+        },
+        /* Legacy colors maintained for backward compatibility */
         gold: {
           50: '#FAF8F4',
           100: '#F5F1E9',
@@ -28,13 +62,6 @@ module.exports = {
         dark: {
           DEFAULT: '#242222',
           gray: '#242222',
-        },
-        accent: {
-          DEFAULT: '#014463',
-          blue: '#014463',
-          'blue-dark': '#013347',
-          'blue-hover': '#013347',
-          'blue-light': '#1dd1f5',
         },
         'header-focus': {
           DEFAULT: '#2a2828',

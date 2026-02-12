@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 
 /**
@@ -15,15 +14,11 @@ export async function GET(request: NextRequest) {
     request,
     async () => {
       try {
-        const supabase = createServerClient();
+        // Use RPC function to query layers schema (public resources)
+        const { createSupabaseClient } = await import('@/lib/supabase/unified');
+        const supabase = await createSupabaseClient();
         
-        // Type assertion needed: Supabase TypeScript types only support 'public' schema,
-        // but we need to query from 'civic' schema. The schema() method exists at runtime.
-        const { data, error } = await (supabase as any)
-          .schema('layers')
-          .from('state')
-          .select('id, name, description, publisher, source_date, geometry')
-          .single();
+        const { data, error } = await supabase.rpc('get_state_boundary');
         
         if (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -35,14 +30,16 @@ export async function GET(request: NextRequest) {
           );
         }
         
-        if (!data) {
+        const stateData = Array.isArray(data) && data.length > 0 ? data[0] : data;
+        
+        if (!stateData) {
           return NextResponse.json(
             { error: 'State boundary not found' },
             { status: 404 }
           );
         }
         
-        return NextResponse.json(data);
+        return NextResponse.json(stateData);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[State Boundary API] Error:', error);

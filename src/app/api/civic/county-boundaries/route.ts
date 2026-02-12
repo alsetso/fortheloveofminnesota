@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validateQueryParams } from '@/lib/security/validation';
 import { z } from 'zod';
@@ -17,7 +16,7 @@ import { commonSchemas } from '@/lib/security/validation';
 const countyBoundariesQuerySchema = z.object({
   id: commonSchemas.uuid.optional(),
   county_name: z.string().max(200).optional(),
-  limit: commonSchemas.positiveInt.max(1000).optional(),
+  limit: commonSchemas.positiveInt.max(3000).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -32,30 +31,16 @@ export async function GET(request: NextRequest) {
         }
         
         const { id, county_name: countyName, limit } = validation.data;
-        const supabase = createServerClient();
-    
-    // Type assertion needed: Supabase TypeScript types only support 'public' schema,
-    // but we need to query from 'civic' schema. The schema() method exists at runtime.
-    let query = (supabase as any)
-      .schema('layers')
-      .from('counties')
-      .select('id, county_name, county_code, county_gnis_feature_id, county_id, description, publisher, source_date, geometry')
-      .order('county_name', { ascending: true });
-    
-    // Apply filters
-    if (id) {
-      query = query.eq('id', id);
-    }
-    
-    if (countyName) {
-      query = query.eq('county_name', countyName);
-    }
-    
-        if (limit) {
-          query = query.limit(limit);
-        }
         
-        const { data, error } = await query;
+        // Use RPC function to query layers schema (public resources)
+        const { createSupabaseClient } = await import('@/lib/supabase/unified');
+        const supabase = await createSupabaseClient();
+        
+        const { data, error } = await supabase.rpc('get_counties', {
+          p_id: id || null,
+          p_county_name: countyName || null,
+          p_limit: limit ?? 3000
+        });
         
         if (error) {
           if (process.env.NODE_ENV === 'development') {

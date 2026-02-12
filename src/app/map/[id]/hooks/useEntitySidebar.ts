@@ -40,7 +40,7 @@ interface UseEntitySidebarReturn {
 }
 
 export interface UseEntitySidebarOptions {
-  /** When true (e.g. on /live), do not open sidebar on mention-click or entity-click; pin/mention selection is shown in app footer only. */
+  /** When true (e.g. on /maps), do not open sidebar on mention-click or entity-click; pin/mention selection is shown in app footer only. */
   disableForClicks?: boolean;
 }
 

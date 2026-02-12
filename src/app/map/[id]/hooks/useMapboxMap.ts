@@ -16,7 +16,7 @@ interface UseMapboxMapOptions {
   onMapLoad?: (map: MapboxMapInstance) => void;
   /** Called when GeolocateControl is added to the map */
   onGeolocateControlReady?: (control: any) => void;
-  /** When false, omit maxBounds and allow minZoom 0 (e.g. /live map). Default true. */
+  /** When false, omit maxBounds and allow minZoom 0 (e.g. /maps). Default true. */
   restrictToMinnesota?: boolean;
 }
 

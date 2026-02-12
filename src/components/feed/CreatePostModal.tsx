@@ -4,12 +4,17 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuthStateSafe, Account } from '@/features/auth';
 import Link from 'next/link';
+import Image from 'next/image';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import { Mention } from '@/types/mention';
 import PostMapDrawer from './PostMapDrawer';
 import PostImageDrawer from './PostImageDrawer';
 import { getAccessibleMaps, type AccessibleMap } from '@/lib/maps/getAccessibleMaps';
 import { MentionService } from '@/features/mentions/services/mentionService';
+import { XMarkIcon, GlobeAltIcon, PhotoIcon, UserIcon, VideoCameraIcon, MapPinIcon, FaceSmileIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { useTheme } from '@/contexts/ThemeContext';
+import MentionTextarea, { MentionTextareaRef } from './MentionTextarea';
+import PostContent from '@/components/posts/PostContent';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -20,6 +25,8 @@ interface CreatePostModalProps {
   initialMentionTypeId?: string | null;
   /** Mode: 'post' creates posts, 'pin' creates map_pins. Default: 'pin' */
   createMode?: 'post' | 'pin';
+  /** Post to share - when provided, modal shows shared post preview */
+  sharedPost?: Post | null;
 }
 
 type PinStep = 'mode' | 'single' | 'location' | 'description' | 'optional' | 'review';
@@ -33,9 +40,11 @@ export default function CreatePostModal({
   initialAction,
   initialMapId,
   initialMentionTypeId,
-  createMode: initialCreateMode = 'pin'
+  createMode: initialCreateMode = 'pin',
+  sharedPost
 }: CreatePostModalProps) {
   const { account, activeAccountId } = useAuthStateSafe();
+  const { theme } = useTheme();
   const [currentStep, setCurrentStep] = useState<Step>('mode');
   const [createMode, setCreateMode] = useState<'post' | 'pin'>(initialCreateMode);
   const [content, setContent] = useState('');
@@ -70,9 +79,12 @@ export default function CreatePostModal({
   const [accessibleMaps, setAccessibleMaps] = useState<AccessibleMap[]>([]);
   const [isLoadingMaps, setIsLoadingMaps] = useState(false);
   const [showMapSelector, setShowMapSelector] = useState(false);
+  const [showBackgroundColorPanel, setShowBackgroundColorPanel] = useState(false);
+  const [selectedBackgroundColor, setSelectedBackgroundColor] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<MentionTextareaRef>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const backgroundColorPanelRef = useRef<HTMLDivElement>(null);
 
   // Random heart emojis
   const heartEmojis = ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '❣️', '❤️‍🔥', '❤️‍🩹'];
@@ -84,19 +96,24 @@ export default function CreatePostModal({
   const handleAddEmoji = () => {
     if (!textareaRef.current) return;
     
-    const textarea = textareaRef.current;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
     const emoji = getRandomHeartEmoji();
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
     
-    const newContent = content.slice(0, start) + emoji + content.slice(end);
-    setContent(newContent);
-    
-    // Set cursor position after the inserted emoji
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + emoji.length, start + emoji.length);
-    }, 0);
+    if (range) {
+      const start = range.startOffset;
+      const end = range.endOffset;
+      const newContent = content.slice(0, start) + emoji + content.slice(end);
+      setContent(newContent);
+      
+      // Set cursor position after the inserted emoji
+      setTimeout(() => {
+        textareaRef.current?.setSelectionRange(start + emoji.length, start + emoji.length);
+      }, 0);
+    } else {
+      // Fallback: append emoji
+      setContent(content + emoji);
+    }
   };
 
   // Check if user can upload videos
@@ -133,7 +150,8 @@ export default function CreatePostModal({
         try {
           const { supabase } = await import('@/lib/supabase');
           const { data: liveMap, error } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('slug', 'live')
             .eq('is_active', true)
@@ -162,8 +180,57 @@ export default function CreatePostModal({
       // Reset when modal closes
       setSelectedMapId(null);
       setLiveMapId(null);
+      setSelectedBackgroundColor(null);
+      setShowBackgroundColorPanel(false);
     }
   }, [isOpen, initialMapId]);
+
+  // Close background color panel when clicking outside
+  useEffect(() => {
+    if (!showBackgroundColorPanel) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        backgroundColorPanelRef.current &&
+        !backgroundColorPanelRef.current.contains(event.target as Node) &&
+        !(event.target as HTMLElement).closest('button[data-aa-button]')
+      ) {
+        setShowBackgroundColorPanel(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showBackgroundColorPanel]);
+
+  // Auto-resize textarea when content changes (only when no background color)
+  useEffect(() => {
+    if (textareaRef.current && !selectedBackgroundColor) {
+      const textarea = textareaRef.current;
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set height based on scrollHeight, with minimum of 120px
+      const newHeight = Math.max(textarea.scrollHeight, 120);
+      textarea.style.height = `${newHeight}px`;
+    } else if (textareaRef.current && selectedBackgroundColor) {
+      // Fixed height of 333px when background color is selected
+      textareaRef.current.style.height = '333px';
+    }
+  }, [content, selectedBackgroundColor]);
+
+  // Also resize on mount and when background color changes
+  useEffect(() => {
+    if (textareaRef.current && isOpen) {
+      const textarea = textareaRef.current;
+      if (selectedBackgroundColor) {
+        textarea.style.height = '333px';
+      } else {
+        textarea.style.height = 'auto';
+        const newHeight = Math.max(textarea.scrollHeight, 120);
+        textarea.style.height = `${newHeight}px`;
+      }
+    }
+  }, [isOpen, selectedBackgroundColor]);
 
   // Fetch mention types (only active ones for public selection)
   useEffect(() => {
@@ -233,15 +300,17 @@ export default function CreatePostModal({
       try {
         const { supabase } = await import('@/lib/supabase');
         // Get live map ID first
-        const { data: liveMap } = await supabase
-          .from('map')
+        const { data: liveMap } = await (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('id')
           .eq('slug', 'live')
           .eq('is_active', true)
           .single();
 
         const { data, error } = await supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .select(`
             id,
             lat,
@@ -340,7 +409,7 @@ export default function CreatePostModal({
   const handleModeSelect = (mode: 'pin' | 'post') => {
     setCreateMode(mode);
     // For pins, skip stepper and go directly to single-step form
-    // For posts, use the stepper starting with content step
+    // For posts, go directly to content step (single-step form)
     setCurrentStep(mode === 'pin' ? 'single' : 'content');
     if (mode === 'pin' && initialMentionTypeId) {
       setSelectedMentionTypeId(initialMentionTypeId);
@@ -354,10 +423,24 @@ export default function CreatePostModal({
     }
   }, [isOpen, initialMentionTypeId, createMode]);
 
+  // For posts, skip mode step and go directly to content when modal opens
+  useEffect(() => {
+    if (isOpen && initialCreateMode === 'post' && currentStep === 'mode') {
+      setCurrentStep('content');
+      setCreateMode('post');
+    }
+    // If sharing a post, go directly to content step
+    if (isOpen && sharedPost) {
+      setCurrentStep('content');
+      setCreateMode('post');
+    }
+  }, [isOpen, initialCreateMode, currentStep, sharedPost]);
+
   // Reset form when modal closes
   useEffect(() => {
     if (!isOpen) {
-      setCurrentStep('mode');
+      // For posts, skip mode step and go directly to content
+      setCurrentStep(initialCreateMode === 'post' ? 'content' : 'mode');
       setCreateMode(initialCreateMode);
       setContent('');
       setTitle('');
@@ -376,8 +459,12 @@ export default function CreatePostModal({
       setSelectedMentionTypeId(null);
       setShowMentionTypesModal(false);
       setMentionTypeSearchQuery('');
+    } else if (isOpen && (initialCreateMode === 'post' || sharedPost)) {
+      // When modal opens for posts or sharing, go directly to content step
+      setCurrentStep('content');
+      setCreateMode('post');
     }
-  }, [isOpen, initialCreateMode]);
+  }, [isOpen, initialCreateMode, sharedPost]);
 
   // Focus title input when it's shown
   useEffect(() => {
@@ -388,28 +475,31 @@ export default function CreatePostModal({
     }
   }, [showTitle]);
 
-  // Lock body scroll when modal is open and handle slide-up animation
+  // Lock body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      
-      // Trigger slide-up animation on next frame
-      requestAnimationFrame(() => {
-        if (modalRef.current) {
-          modalRef.current.style.transform = 'translateY(0)';
-        }
-      });
     } else {
       document.body.style.overflow = '';
-      // Reset transform when closing
-      if (modalRef.current) {
-        modalRef.current.style.transform = '';
-      }
     }
     return () => {
       document.body.style.overflow = '';
     };
   }, [isOpen]);
+
+  // Close privacy menu when clicking outside
+  useEffect(() => {
+    if (!showPrivacyMenu) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        setShowPrivacyMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showPrivacyMenu]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -638,6 +728,8 @@ export default function CreatePostModal({
             geometry: mapData.geometry,
             screenshot: mapData.screenshot,
           } : null,
+          background_color: selectedBackgroundColor || null,
+          shared_post_id: sharedPost?.id || null,
         }),
       });
 
@@ -657,6 +749,8 @@ export default function CreatePostModal({
       setSelectedMentionTypeId(null);
       setSelectedMapId(null);
       setMapData(null);
+      setSelectedBackgroundColor(null);
+      setShowBackgroundColorPanel(false);
       onPostCreated?.();
       onClose();
     } catch (err) {
@@ -686,36 +780,65 @@ export default function CreatePostModal({
     return labels[step] || step;
   };
 
-  // Portal modal to document body to ensure it overlays entire map container
+  // Small centered modal with backdrop (not full-screen)
   const modalContent = (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-[100] transition-opacity"
+        className="fixed inset-0 z-[100] bg-black/50 dark:bg-black/70 transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="fixed inset-0 z-[101] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-none">
+      {/* Centered Modal */}
+      <div className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none">
         <div
           ref={modalRef}
-          className="bg-white sm:rounded-md w-full max-w-[500px] pointer-events-auto flex flex-col h-screen sm:h-[90vh] transition-transform duration-300 ease-out border border-gray-200"
-          style={{ transform: 'translateY(100%)' }}
+          className={`w-full max-w-[500px] rounded-lg shadow-2xl pointer-events-auto flex flex-col max-h-[90vh] ${
+            theme === 'dark' 
+              ? 'bg-gray-800' 
+              : 'bg-white'
+          }`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-[10px] border-b border-gray-200 flex-shrink-0">
-            {showImageView || showMapView || (createMode === 'post' && showMentionsList) ? (
-              <>
+          <div className={`flex items-center justify-between px-4 py-3 border-b ${
+            theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+          }`}>
+            <h2 className={`text-sm font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>
+              Create post
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                theme === 'dark' 
+                  ? 'hover:bg-gray-700 text-gray-400 hover:text-white' 
+                  : 'hover:bg-gray-100 text-gray-600'
+              }`}
+              aria-label="Close"
+            >
+              <XMarkIcon className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className={`flex-1 space-y-4 ${selectedBackgroundColor ? 'py-4' : 'p-4'} ${selectedBackgroundColor ? 'overflow-y-auto' : 'overflow-y-auto'}`}>
+            <div ref={modalRef}>
+
+            {/* Back button for image/map/mentions views */}
+            {(showImageView || showMapView || (createMode === 'post' && showMentionsList)) && (
+              <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => {
                     setShowImageView(false);
                     setShowMapView(false);
                     if (createMode === 'post') {
-                    setShowMentionsList(false);
+                      setShowMentionsList(false);
                     }
                   }}
-                  className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
                 >
                   <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -724,49 +847,17 @@ export default function CreatePostModal({
                 <h3 className="text-sm font-semibold text-gray-900 flex-1 text-center">
                   {showImageView ? 'Add Photos & Videos' : showMapView ? (createMode === 'pin' ? 'Select Location' : 'Draw on Map') : 'Select Mentions'}
                 </h3>
-                <div className="w-9" /> {/* Spacer for centering */}
-              </>
-            ) : (
-              <>
-                {currentStep !== 'mode' && currentStep !== 'single' ? (
-                  <button
-                    onClick={handleBack}
-                    className="w-8 h-8 rounded-full hover:bg-gray-50 flex items-center justify-center transition-colors"
-                  >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                ) : (
-                  <div className="w-9" />
-                )}
-                <h3 className="text-sm font-semibold text-gray-900 flex-1 text-center">
-                  {currentStep === 'mode' 
-                    ? getStepLabel(currentStep)
-                    : currentStep === 'single'
-                      ? 'Create Pin'
-                      : createMode === 'pin' 
-                        ? 'Drop Pin'
-                        : 'Add Post'
-                  }
-                </h3>
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-full hover:bg-gray-50 flex items-center justify-center transition-colors"
-                >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </>
+                <div className="w-8" />
+              </div>
             )}
-          </div>
 
-          {/* Stepper Progress Indicator - Hide mode step and single-step pin form, start from first real action */}
-          {currentStep !== 'mode' && currentStep !== 'single' && !showImageView && !showMapView && !(createMode === 'post' && showMentionsList) && (
-            <div className="px-[10px] py-2 border-b border-gray-200 flex-shrink-0">
+            {/* Stepper Progress Indicator - Hide for posts (single-step form), only show for pins */}
+            {createMode === 'pin' && currentStep !== 'mode' && currentStep !== 'single' && !showImageView && !showMapView && (
+              <div className={`px-4 py-2 border-b mb-3 rounded-md ${
+                theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
+              }`}>
               <div className="flex items-center justify-between">
-                {(createMode === 'pin' ? pinSteps : postSteps)
+                {pinSteps
                   .filter(step => step !== 'mode' && step !== 'single') // Exclude mode and single-step from stepper display
                   .map((step, index) => {
                     const allSteps: Step[] = createMode === 'pin' ? pinSteps : postSteps;
@@ -781,10 +872,10 @@ export default function CreatePostModal({
                         <div className="flex flex-col items-center flex-1">
                           <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium transition-colors ${
                             isActive 
-                              ? 'bg-gray-900 text-white' 
+                              ? theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-900 text-white'
                               : isCompleted 
-                                ? 'bg-gray-900 text-white' 
-                                : 'bg-gray-200 text-gray-500'
+                                ? theme === 'dark' ? 'bg-gray-600 text-white' : 'bg-gray-900 text-white'
+                                : theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'
                           }`}>
                             {isCompleted ? (
                               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -795,25 +886,29 @@ export default function CreatePostModal({
                             )}
                           </div>
                           <span className={`text-[10px] mt-1 text-center ${
-                            isActive ? 'text-gray-900 font-medium' : 'text-gray-500'
+                            isActive 
+                              ? theme === 'dark' ? 'text-white font-medium' : 'text-gray-900 font-medium'
+                              : theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                           }`}>
                             {getStepLabel(step)}
                           </span>
                         </div>
-                        {index < (createMode === 'pin' ? pinSteps : postSteps).filter(s => s !== 'mode' && s !== 'single').length - 1 && (
+                        {index < pinSteps.filter(s => s !== 'mode' && s !== 'single').length - 1 && (
                           <div className={`flex-1 h-0.5 mx-1 ${
-                            isCompleted ? 'bg-gray-900' : 'bg-gray-200'
+                            isCompleted 
+                              ? theme === 'dark' ? 'bg-gray-600' : 'bg-gray-900'
+                              : theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
                           }`} />
                         )}
                       </div>
                     );
                   })}
               </div>
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* Content Area */}
-          <div className="relative overflow-hidden flex-1 min-h-0">
+            {/* Content Area */}
+            <div className="relative overflow-hidden">
             {/* Mentions List View - Slides in from right (only for posts) */}
             {createMode === 'post' && (
             <div
@@ -939,11 +1034,11 @@ export default function CreatePostModal({
             </div>
 
             {/* Step Content Area */}
-            <div className={`flex-1 overflow-y-auto transition-transform duration-300 ${
+            <div className={`transition-transform duration-300 ${
               (createMode === 'post' && showMentionsList) || showMapView || showImageView ? '-translate-x-full' : 'translate-x-0'
             }`}>
-              {/* Step 0: Mode Selection */}
-              {currentStep === 'mode' && (
+              {/* Step 0: Mode Selection - Skip for posts, go directly to content */}
+              {currentStep === 'mode' && createMode === 'pin' && (
                 <div className="p-[10px]">
                   <div className="text-center mb-3">
                     <h2 className="text-sm font-semibold text-gray-900 mb-1">What would you like to create?</h2>
@@ -1140,12 +1235,12 @@ export default function CreatePostModal({
                       <label className="block text-xs font-medium text-gray-700 mb-1.5">
                         Description <span className="text-red-500">*</span>
                       </label>
-                      <textarea
+                      <MentionTextarea
                         ref={textareaRef}
                         value={content}
-                        onChange={(e) => setContent(e.target.value)}
+                        onChange={setContent}
                         placeholder="Describe this location..."
-                        className="w-full min-h-[120px] px-3 py-2 text-xs resize-none focus:outline-none placeholder:text-gray-400 border border-gray-200 rounded-md"
+                        className="w-full min-h-[120px] px-3 py-2 text-xs resize-none focus:outline-none border border-gray-200 rounded-md whitespace-pre-wrap break-words"
                         maxLength={240}
                       />
                       {content.length >= 230 && (
@@ -1430,12 +1525,12 @@ export default function CreatePostModal({
                         {/* Description Textarea */}
                         <div>
                           <label className="text-xs font-medium text-gray-700 mb-1 block">Description (required)</label>
-                          <textarea
+                          <MentionTextarea
                             ref={textareaRef}
                             value={content}
-                            onChange={(e) => setContent(e.target.value)}
+                            onChange={setContent}
                             placeholder="Describe this location..."
-                            className="w-full min-h-[200px] px-3 py-2 text-xs resize-none focus:outline-none placeholder:text-gray-400 border border-gray-200 rounded-md"
+                            className="w-full min-h-[200px] px-3 py-2 text-xs resize-none focus:outline-none border border-gray-200 rounded-md whitespace-pre-wrap break-words"
                             maxLength={240}
                           />
                           {content.length >= 230 && (
@@ -1728,14 +1823,59 @@ export default function CreatePostModal({
               </div>
             )}
 
+            {/* Shared Post Preview */}
+            {sharedPost && (
+              <div className="mb-4 border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div className="p-3 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    {sharedPost.account?.image_url ? (
+                      <img
+                        src={sharedPost.account.image_url}
+                        alt={sharedPost.account.username || 'User'}
+                        className="w-6 h-6 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                        <UserIcon className="w-4 h-4 text-gray-500" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-gray-900 truncate">
+                        @{sharedPost.account?.username || 'unknown'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {sharedPost.content && (
+                  <div className="p-3">
+                    <PostContent
+                      content={sharedPost.content}
+                      taggedAccounts={sharedPost.tagged_accounts}
+                      className="text-sm text-gray-900"
+                      backgroundColor={sharedPost.background_color || null}
+                    />
+                  </div>
+                )}
+                {sharedPost.images && sharedPost.images.length > 0 && (
+                  <div className="border-t border-gray-200">
+                    <img
+                      src={sharedPost.images[0].url}
+                      alt={sharedPost.title || 'Post image'}
+                      className="w-full max-h-[300px] object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Text Input */}
             <div className="relative min-h-[200px]">
-              <textarea
+              <MentionTextarea
                 ref={textareaRef}
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder={createMode === 'pin' ? 'Describe this location...' : `What's on your mind, ${accountName.split(' ')[0]}?`}
-                className="w-full h-full min-h-[200px] px-4 py-3 text-lg resize-none focus:outline-none placeholder:text-gray-400"
+                onChange={setContent}
+                placeholder={sharedPost ? 'Add a caption...' : (createMode === 'pin' ? 'Describe this location...' : `What's on your mind, ${accountName.split(' ')[0]}?`)}
+                className="w-full h-full min-h-[200px] px-4 py-3 text-lg resize-none focus:outline-none whitespace-pre-wrap break-words"
                 maxLength={240}
               />
               
@@ -2109,32 +2249,355 @@ export default function CreatePostModal({
                 </form>
               )}
 
-              {/* Post Steps */}
-              {createMode === 'post' && currentStep !== 'mode' && (
-                <form onSubmit={(e) => { e.preventDefault(); currentStep === 'review' ? handleSubmit(e) : handleNext(); }} className="p-4">
-                  
-                  {/* Step: Content */}
-                  {currentStep === 'content' && (
-                    <div className="space-y-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">What's on your mind?</h3>
-                        <p className="text-sm text-gray-600 mb-4">Share your thoughts (required)</p>
-                        <textarea
-                          ref={textareaRef}
-                          value={content}
-                          onChange={(e) => setContent(e.target.value)}
-                          placeholder={`What's on your mind, ${accountName.split(' ')[0]}?`}
-                          className="w-full min-h-[200px] px-4 py-3 text-lg resize-none focus:outline-none placeholder:text-gray-400 border border-gray-200 rounded-lg"
-                          maxLength={10000}
-                        />
-                        {content.length >= 9990 && (
-                          <div className="text-right text-xs text-gray-500 mt-1">
-                            {content.length}/10,000
+              {/* Post Steps - Simplified single-step form matching screenshot */}
+              {createMode === 'post' && currentStep === 'content' && (
+                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(e); }} className="space-y-4">
+                  {/* Profile Section */}
+                  <div className={`flex items-center gap-3 ${selectedBackgroundColor ? 'px-4' : ''}`}>
+                    <ProfilePhoto account={account as unknown as Account} size="sm" editable={false} />
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-semibold ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {accountName}
+                      </div>
+                      {/* Visibility Dropdown */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowPrivacyMenu(!showPrivacyMenu)}
+                          className={`flex items-center gap-1.5 mt-1 px-2 py-1 rounded-md text-xs transition-colors ${
+                            theme === 'dark'
+                              ? 'text-gray-400 hover:bg-gray-700'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <GlobeAltIcon className="w-3.5 h-3.5" />
+                          <span>{visibility === 'public' ? 'Public' : 'Draft'}</span>
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {showPrivacyMenu && (
+                          <div className={`absolute top-full left-0 mt-1 rounded-md shadow-lg z-50 min-w-[160px] ${
+                            theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+                          }`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVisibility('public');
+                                setShowPrivacyMenu(false);
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                                theme === 'dark'
+                                  ? 'text-gray-300 hover:bg-gray-700'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <GlobeAltIcon className="w-4 h-4" />
+                              <span>Public</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setVisibility('draft');
+                                setShowPrivacyMenu(false);
+                              }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
+                                theme === 'dark'
+                                  ? 'text-gray-300 hover:bg-gray-700'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                              </svg>
+                              <span>Draft</span>
+                            </button>
                           </div>
                         )}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Shared Post Preview */}
+                  {sharedPost && (
+                    <div className="mb-4 border border-gray-200 rounded-lg overflow-hidden bg-white">
+                      <div className="p-3 border-b border-gray-200">
+                        <div className="flex items-center gap-2">
+                          {sharedPost.account?.image_url ? (
+                            <img
+                              src={sharedPost.account.image_url}
+                              alt={sharedPost.account.username || 'User'}
+                              className="w-6 h-6 rounded-full"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                              <UserIcon className="w-4 h-4 text-gray-500" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-gray-900 truncate">
+                              @{sharedPost.account?.username || 'unknown'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {sharedPost.content && (
+                        <div className="p-3">
+                          <PostContent
+                            content={sharedPost.content}
+                            taggedAccounts={sharedPost.tagged_accounts}
+                            className="text-sm text-gray-900"
+                            backgroundColor={sharedPost.background_color || null}
+                          />
+                        </div>
+                      )}
+                      {sharedPost.images && sharedPost.images.length > 0 && (
+                        <div className="border-t border-gray-200">
+                          <img
+                            src={sharedPost.images[0].url}
+                            alt={sharedPost.title || 'Post image'}
+                            className="w-full max-h-[300px] object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
                   )}
+
+                  {/* Text Input Area */}
+                  <div className={`relative transition-all ${selectedBackgroundColor ? '-mx-4' : ''}`}>
+                    <MentionTextarea
+                      ref={textareaRef}
+                      value={content}
+                      onChange={setContent}
+                      placeholder={sharedPost ? 'Add a caption...' : `What's on your mind, ${accountName.split(' ')[0]}?`}
+                      mentionColor={selectedBackgroundColor ? 'white' : 'blue'}
+                      className={`w-full resize-none focus:outline-none transition-all overflow-hidden break-words ${
+                        selectedBackgroundColor
+                          ? selectedBackgroundColor === 'black'
+                            ? 'bg-black text-white rounded-none font-bold text-center p-4'
+                            : selectedBackgroundColor === 'red'
+                            ? 'bg-red-600 text-white rounded-none font-bold text-center p-4'
+                            : 'bg-blue-600 text-white rounded-none font-bold text-center p-4'
+                          : theme === 'dark'
+                          ? 'bg-gray-700/50 text-white border border-gray-600 rounded-lg py-3 px-4 min-h-[120px] text-base'
+                          : 'bg-transparent text-gray-900 border-none rounded-lg py-3 px-4 min-h-[120px] text-base'
+                      }`}
+                      style={selectedBackgroundColor ? (() => {
+                        // Calculate dynamic font size based on content length
+                        const getFontSize = (textLength: number): string => {
+                          if (textLength <= 20) return '2.25rem'; // text-4xl - Very short
+                          if (textLength <= 40) return '1.875rem'; // text-3xl - Short
+                          if (textLength <= 80) return '1.5rem';   // text-2xl - Medium
+                          if (textLength <= 150) return '1.25rem'; // text-xl - Long
+                          return '1.125rem'; // text-lg - Very long
+                        };
+                        
+                        return {
+                          height: '333px',
+                          minHeight: '333px',
+                          maxHeight: '333px',
+                          padding: '1rem',
+                          textAlign: 'center',
+                          lineHeight: '1.5',
+                          fontSize: getFontSize(content.length),
+                          wordWrap: 'break-word',
+                          overflowWrap: 'break-word',
+                          whiteSpace: 'pre-wrap',
+                          boxSizing: 'border-box'
+                        };
+                      })() : {}}
+                      maxLength={10000}
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* "Add to your post" Bar */}
+                  <div className={`${selectedBackgroundColor ? 'px-4' : 'px-4'} py-3 rounded-lg mt-4 ${
+                    theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {/* Aa Button */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            data-aa-button
+                            onClick={() => setShowBackgroundColorPanel(!showBackgroundColorPanel)}
+                            className={`w-7 h-7 rounded-md flex items-center justify-center text-xs font-semibold transition-all border ${
+                              selectedBackgroundColor
+                                ? selectedBackgroundColor === 'black'
+                                  ? 'bg-black text-white border-transparent'
+                                  : selectedBackgroundColor === 'red'
+                                  ? 'bg-red-600 text-white border-transparent'
+                                  : 'bg-blue-600 text-white border-transparent'
+                                : 'bg-white text-gray-700 border-gray-300'
+                            } ${showBackgroundColorPanel ? 'ring-2 ring-blue-500' : ''}`}
+                          >
+                            Aa
+                          </button>
+                          
+                          {/* Background Color Panel */}
+                          {showBackgroundColorPanel && (
+                            <div
+                              ref={backgroundColorPanelRef}
+                              className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-[104]"
+                            >
+                              <div className="flex items-center gap-2">
+                                {/* White/Reset to Normal */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBackgroundColor(null);
+                                    setShowBackgroundColorPanel(false);
+                                  }}
+                                  className={`w-8 h-8 rounded flex items-center justify-center transition-all border ${
+                                    !selectedBackgroundColor
+                                      ? 'ring-2 ring-blue-500 ring-offset-1 border-gray-300'
+                                      : 'border-gray-200 hover:ring-2 hover:ring-gray-300'
+                                  }`}
+                                  style={{ backgroundColor: '#FFFFFF' }}
+                                  title="Reset to normal"
+                                >
+                                  {!selectedBackgroundColor && (
+                                    <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </button>
+                                
+                                {/* Black */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBackgroundColor(selectedBackgroundColor === 'black' ? null : 'black');
+                                    setShowBackgroundColorPanel(false);
+                                  }}
+                                  className={`w-8 h-8 rounded flex items-center justify-center transition-all ${
+                                    selectedBackgroundColor === 'black'
+                                      ? 'ring-2 ring-blue-500 ring-offset-1'
+                                      : 'hover:ring-2 hover:ring-gray-300'
+                                  }`}
+                                  style={{ backgroundColor: '#000000' }}
+                                >
+                                  {selectedBackgroundColor === 'black' && (
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </button>
+                                
+                                {/* Red */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBackgroundColor(selectedBackgroundColor === 'red' ? null : 'red');
+                                    setShowBackgroundColorPanel(false);
+                                  }}
+                                  className={`w-8 h-8 rounded flex items-center justify-center transition-all ${
+                                    selectedBackgroundColor === 'red'
+                                      ? 'ring-2 ring-blue-500 ring-offset-1'
+                                      : 'hover:ring-2 hover:ring-gray-300'
+                                  }`}
+                                  style={{ backgroundColor: '#DC2626' }}
+                                >
+                                  {selectedBackgroundColor === 'red' && (
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </button>
+                                
+                                {/* Blue */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBackgroundColor(selectedBackgroundColor === 'blue' ? null : 'blue');
+                                    setShowBackgroundColorPanel(false);
+                                  }}
+                                  className={`w-8 h-8 rounded flex items-center justify-center transition-all ${
+                                    selectedBackgroundColor === 'blue'
+                                      ? 'ring-2 ring-blue-500 ring-offset-1'
+                                      : 'hover:ring-2 hover:ring-gray-300'
+                                  }`}
+                                  style={{ backgroundColor: '#2563EB' }}
+                                >
+                                  {selectedBackgroundColor === 'blue' && (
+                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <span className={`text-sm font-medium ${
+                          theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Add to your post
+                        </span>
+                      </div>
+                      {!selectedBackgroundColor && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowImageView(true)}
+                            className={`p-2 rounded-md transition-colors ${
+                              theme === 'dark' ? 'text-green-400 hover:bg-gray-600' : 'text-green-600 hover:bg-gray-100'
+                            }`}
+                            title="Photo/Video"
+                          >
+                            <PhotoIcon className="w-5 h-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowMapView(true)}
+                            className={`p-2 rounded-md transition-colors ${
+                              theme === 'dark' ? 'text-orange-400 hover:bg-gray-600' : 'text-orange-600 hover:bg-gray-100'
+                            }`}
+                            title="Location"
+                          >
+                            <MapPinIcon className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Error Message */}
+                  {error && (
+                    <div className={`mt-3 p-3 rounded-md ${
+                      theme === 'dark' ? 'bg-red-900/30 border border-red-800' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <p className={`text-xs ${
+                        theme === 'dark' ? 'text-red-400' : 'text-red-600'
+                      }`}>{error}</p>
+                    </div>
+                  )}
+
+                  {/* Next Button Footer */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button
+                      type="submit"
+                      disabled={!content.trim() || isSubmitting}
+                      className={`w-full px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                        !content.trim() || isSubmitting
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          : 'bg-[#007AFF] text-white hover:bg-[#0051D5] active:bg-[#0047B8] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2'
+                      }`}
+                    >
+                      {isSubmitting ? 'Posting...' : 'Next'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Post Steps - Old multi-step form (keep for optional/review steps) */}
+              {createMode === 'post' && currentStep !== 'mode' && currentStep !== 'content' && (
+                <form onSubmit={(e) => { e.preventDefault(); currentStep === 'review' ? handleSubmit(e) : handleNext(); }} className="p-4">
 
                   {/* Step: Optional (combines title, mention type, media, mentions, map, privacy) */}
                   {currentStep === 'optional' && createMode === 'post' && (
@@ -2465,12 +2928,14 @@ export default function CreatePostModal({
               </div>
             </>
           )}
+            </div>
+          </div>
         </div>
       </div>
     </>
   );
 
-  // Use portal to render at document body level
+  // Use portal to render modal overlay
   if (typeof window !== 'undefined') {
     return createPortal(modalContent, document.body);
   }

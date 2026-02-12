@@ -31,13 +31,17 @@ export default function OnboardingBanner({ initialAccount, redirectTo }: Onboard
   }, []);
 
   const stepInstructions: Record<string, { heading: string; subtext: string }> = {
-    profile_photo: {
-      heading: 'Upload profile image',
-      subtext: 'Add a photo to personalize your profile',
+    welcome: {
+      heading: 'Welcome',
+      subtext: 'Get started with the map',
     },
     username: {
       heading: 'Choose username',
       subtext: 'Pick a unique username for your account',
+    },
+    profile_photo: {
+      heading: 'Profile photo',
+      subtext: 'Add a photo (optional)',
     },
     name: {
       heading: 'Your name',

@@ -35,6 +35,28 @@ function getRobotsConfig(index = true, follow = true) {
 }
 
 /**
+ * Generates metadata for unpublished/draft pages
+ * Prevents search engine indexing while keeping the page accessible
+ */
+export function generateDraftMetadata(overrides?: Partial<Metadata>): Metadata {
+  return {
+    ...overrides,
+    robots: {
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+        'max-video-preview': -1,
+        'max-image-preview': 'none' as const,
+        'max-snippet': -1,
+      },
+    },
+    ...(overrides?.title ? {} : { title: 'Draft Page' }),
+  };
+}
+
+/**
  * Generates metadata for explore main page
  */
 export function generateExploreMetadata(cityCount: number, countyCount: number): Metadata {
@@ -49,26 +71,19 @@ export function generateExploreMetadata(cityCount: number, countyCount: number):
       'Minnesota demographics',
       'Minnesota population',
       'Minnesota geography',
-      'Twin Cities',
-      'Minneapolis',
-      'St. Paul',
-      'Hennepin County',
-      'Ramsey County',
       'Minnesota locations',
-      'MN city data',
-      'MN county data',
+      'Minnesota places',
+      'Land of 10,000 Lakes',
+      'Minnesota information',
+      'Minnesota data',
+      'Minnesota resources',
     ],
     openGraph: {
-      title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN | For the Love of Minnesota',
-      description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities. Discover population data, geographic information, and detailed profiles for every location in Minnesota.`,
+      title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN',
+      description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities.`,
       url: `${BASE_URL}/explore`,
       siteName: BASE_METADATA.siteName,
-      images: [
-        {
-          ...BASE_METADATA.defaultImage,
-          alt: 'Explore Minnesota - Complete Cities and Counties Directory',
-        },
-      ],
+      images: [BASE_METADATA.defaultImage],
       locale: BASE_METADATA.locale,
       type: BASE_METADATA.type,
     },
@@ -76,80 +91,10 @@ export function generateExploreMetadata(cityCount: number, countyCount: number):
       card: 'summary_large_image',
       title: 'Explore Minnesota | Complete Directory of All Cities & Counties in MN',
       description: `Explore Minnesota through comprehensive directories of all ${countyCount || 87} counties and ${cityCount || 'hundreds of'} cities.`,
-      images: ['/seo_share_public_image.png'],
+      images: [BASE_METADATA.defaultImage.url],
     },
     alternates: {
       canonical: `${BASE_URL}/explore`,
-    },
-    robots: getRobotsConfig(),
-  };
-}
-
-/**
- * Generates metadata for cities list page
- */
-export function generateCitiesMetadata(cityCount: number): Metadata {
-  return {
-    title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
-    description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location. Find detailed information about Minneapolis, St. Paul, Duluth, Rochester, and all other Minnesota cities. Updated directory with population data and city profiles.`,
-    keywords: ['Minnesota cities', 'MN cities', 'city directory', 'Minneapolis', 'St. Paul', 'Duluth', 'Rochester', 'Minnesota demographics', 'city population', 'Minnesota locations'],
-    openGraph: {
-      title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
-      description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location. Find detailed information about every city in Minnesota.`,
-      url: `${BASE_URL}/explore/cities`,
-      siteName: BASE_METADATA.siteName,
-      images: [
-        {
-          ...BASE_METADATA.defaultImage,
-          alt: 'Minnesota Cities Directory - Complete List of All Cities in Minnesota',
-        },
-      ],
-      locale: BASE_METADATA.locale,
-      type: BASE_METADATA.type,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `Minnesota Cities Directory | Complete List of All Cities in MN`,
-      description: `Complete directory of all Minnesota cities. Browse cities by population, county, and location.`,
-      images: ['/seo_share_public_image.png'],
-    },
-    alternates: {
-      canonical: `${BASE_URL}/explore/cities`,
-    },
-    robots: getRobotsConfig(),
-  };
-}
-
-/**
- * Generates metadata for counties list page
- */
-export function generateCountiesMetadata(countyCount: number): Metadata {
-  return {
-    title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
-    description: `Complete directory of all ${countyCount} Minnesota counties. Browse all counties by name, population, and area. Find detailed information about Hennepin County, Ramsey County, Dakota County, and all other Minnesota counties. Updated directory with population data and county profiles.`,
-    keywords: ['Minnesota counties', 'MN counties', 'county directory', 'Hennepin County', 'Ramsey County', 'Dakota County', 'Minnesota demographics', 'county population', 'Minnesota geography'],
-    openGraph: {
-      title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
-      description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area. Find detailed information about every county in Minnesota.`,
-      url: `${BASE_URL}/explore/counties`,
-      siteName: BASE_METADATA.siteName,
-      images: [
-        {
-          ...BASE_METADATA.defaultImage,
-          alt: 'Minnesota Counties Directory - Complete List of All Counties in Minnesota',
-        },
-      ],
-      locale: BASE_METADATA.locale,
-      type: BASE_METADATA.type,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `Minnesota Counties Directory | Complete List of All ${countyCount} Counties in MN`,
-      description: `Complete directory of all ${countyCount} Minnesota counties. Browse counties by name, population, and area.`,
-      images: ['/seo_share_public_image.png'],
-    },
-    alternates: {
-      canonical: `${BASE_URL}/explore/counties`,
     },
     robots: getRobotsConfig(),
   };
@@ -169,7 +114,7 @@ export function generateCityMetadata(
   slug: string
 ): Metadata {
   const baseUrl = BASE_URL;
-  const url = `${baseUrl}/explore/city/${slug}`;
+  const url = `${baseUrl}/explore/cities-and-towns/${slug}`;
   const title = city.meta_title || `${city.name}, Minnesota | City Information`;
   const populationText = city.population !== null ? city.population.toLocaleString() : 'N/A';
   const description = city.meta_description || `${city.name}, Minnesota. Population: ${populationText}${city.county ? `, County: ${city.county}` : ''}. Information about ${city.name} including demographics, location, and resources.`;
@@ -270,9 +215,3 @@ export function generateNotFoundMetadata(): Metadata {
     robots: getRobotsConfig(false, false),
   };
 }
-
-
-
-
-
-

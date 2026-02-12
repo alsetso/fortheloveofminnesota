@@ -8,7 +8,7 @@ import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
-import StandardPageClient from '@/components/layout/StandardPageClient';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 
 export const revalidate = 3600;
 
@@ -98,8 +98,8 @@ export default async function PersonPage({ params }: Props) {
   });
 
   return (
-    <StandardPageClient contentClassName="h-full overflow-y-auto px-[10px] py-3">
-      <div className="max-w-4xl mx-auto">
+    <NewPageWrapper>
+      <div className="max-w-4xl mx-auto px-[10px] py-3">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
           { label: 'Minnesota', href: '/' },
@@ -239,7 +239,7 @@ export default async function PersonPage({ params }: Props) {
           </div>
         )}
       </div>
-    </StandardPageClient>
+    </NewPageWrapper>
   );
 }
 

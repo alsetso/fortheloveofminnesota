@@ -133,8 +133,9 @@ export class CollectionService {
       throw new Error('You must be signed in to update mentions');
     }
 
-    const { error } = await supabase
-      .from('map_pins')
+    const { error } = await (supabase as any)
+      .schema('maps')
+      .from('pins')
       .update({ collection_id: collectionId })
       .eq('id', mentionId)
       .eq('is_active', true);

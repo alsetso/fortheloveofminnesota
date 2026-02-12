@@ -7,7 +7,6 @@ import { MapPinIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon, ShareIcon, Che
 import { useRouter } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
-import LikeButton from '@/components/mentions/LikeButton';
 // Note: Mentions are now map_pins - using map_pins API
 import type { Mention } from '@/types/mention';
 
@@ -25,8 +24,6 @@ export default function MentionDetailSidebar({ mention, isOwner, permissionsLoad
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [viewCount, setViewCount] = useState(mention.view_count || 0);
-  const [likesCount, setLikesCount] = useState(mention.likes_count || 0);
-  const [isLiked, setIsLiked] = useState(mention.is_liked || false);
   const [showMenu, setShowMenu] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -286,22 +283,6 @@ export default function MentionDetailSidebar({ mention, isOwner, permissionsLoad
           </div>
         )}
 
-        {/* Like Button */}
-        {account && (
-          <div className="pt-2 border-t border-gray-200">
-            <LikeButton
-              mentionId={mention.id}
-              initialLiked={isLiked}
-              initialCount={likesCount}
-              onLikeChange={(liked, count) => {
-                setIsLiked(liked);
-                setLikesCount(count);
-              }}
-              size="sm"
-              showCount={true}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

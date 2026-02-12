@@ -3,7 +3,7 @@
 import { ReactNode } from 'react';
 
 /**
- * Full-viewport app wrapper (100% × 100dvh). Used on /live for no-scroll app-like experience.
+ * Full-viewport app wrapper (100% × 100dvh). Legacy component, no longer used.
  * 100dvh = dynamic viewport height (mobile address bar show/hide); 100% width avoids scrollbar overflow.
  */
 interface AppContainerProps {

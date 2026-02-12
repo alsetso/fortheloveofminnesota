@@ -113,12 +113,7 @@ export default async function OnboardingPage() {
   // Get account and check if onboarding is complete
   const account = await getAccountForOnboarding();
   
-  // If account is onboarded (onboarded = true), redirect away from onboarding
   if (account && account.onboarded === true) {
-    // Redirect to profile if username exists, otherwise home
-    if (account.username) {
-      redirect(`/${account.username}`);
-    }
     redirect('/');
   }
 
@@ -130,7 +125,7 @@ export default async function OnboardingPage() {
       <StripeProvider>
         <OnboardingBanner
           initialAccount={account}
-          redirectTo={account?.username ? `/${account.username}` : '/'}
+          redirectTo="/"
         />
       </StripeProvider>
     </OnboardingGuard>

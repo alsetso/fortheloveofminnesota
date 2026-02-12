@@ -123,12 +123,12 @@ export function MapInfoSkeleton({ onClose }: { onClose?: () => void }) {
   return (
     <div className="p-[10px] space-y-3" data-container="map-info-skeleton" aria-label="Loading map info">
       <div className="flex items-center justify-between gap-2">
-        <div className="h-4 w-32 rounded bg-gray-200 animate-pulse" aria-hidden />
+        <div className="h-4 w-32 rounded bg-surface-accent animate-pulse" aria-hidden />
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="flex-shrink-0 flex items-center justify-center p-1 text-gray-500 hover:text-gray-700 transition-colors"
+            className="flex-shrink-0 flex items-center justify-center p-1 text-foreground-muted hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <XMarkIcon className="w-4 h-4" />
@@ -136,9 +136,9 @@ export function MapInfoSkeleton({ onClose }: { onClose?: () => void }) {
         )}
       </div>
       <div className="space-y-1">
-        <div className="h-2.5 w-20 rounded bg-gray-200 animate-pulse" aria-hidden />
-        <div className="h-3.5 w-full max-w-[200px] rounded bg-gray-100 animate-pulse" aria-hidden />
-        <div className="h-2.5 w-24 rounded bg-gray-100 animate-pulse" aria-hidden />
+        <div className="h-2.5 w-20 rounded bg-surface-accent animate-pulse" aria-hidden />
+        <div className="h-3.5 w-full max-w-[200px] rounded bg-surface-accent animate-pulse" aria-hidden />
+        <div className="h-2.5 w-24 rounded bg-surface-accent animate-pulse" aria-hidden />
       </div>
     </div>
   );
@@ -440,12 +440,12 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
     >
       {detailRows.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Entity details</div>
-          <ul className="space-y-0.5 list-none p-0 m-0 text-xs text-gray-600">
+          <div className="text-[10px] font-medium text-foreground-muted uppercase tracking-wide">Entity details</div>
+          <ul className="space-y-0.5 list-none p-0 m-0 text-xs text-foreground-muted">
             {detailRows.map(({ label, value }) => (
               <li key={label} className="flex gap-2">
-                <span className="text-gray-500 flex-shrink-0">{label}:</span>
-                <span className="text-gray-900 break-words">{value}</span>
+                <span className="text-foreground-muted flex-shrink-0">{label}:</span>
+                <span className="text-foreground break-words">{value}</span>
               </li>
             ))}
           </ul>
@@ -455,7 +455,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
       {/* Image preview - full width with no outer padding */}
       {imagePreview && (
         <div className="relative -mx-[10px] w-[calc(100%+20px)]">
-          <div className="relative w-full aspect-video overflow-hidden bg-gray-100">
+          <div className="relative w-full aspect-video overflow-hidden bg-surface-accent">
             <Image
               src={imagePreview}
               alt="Image preview"
@@ -476,13 +476,13 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
       )}
 
       {error && (
-        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-md p-2">
+        <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-md p-2">
           {error}
         </div>
       )}
       
       <div className="space-y-1">
-        <div className="text-xs text-gray-900 break-words">{display}</div>
+        <div className="text-xs text-foreground break-words">{display}</div>
         
         {/* Map meta - above coordinates */}
         {mapMetaCard && (
@@ -490,11 +490,11 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
             <span className="text-base flex-shrink-0" aria-hidden>
               {mapMetaCard.emoji}
             </span>
-            <span className="text-xs font-medium text-gray-900 truncate">{mapMetaCard.name}</span>
+            <span className="text-xs font-medium text-foreground truncate">{mapMetaCard.name}</span>
           </div>
         )}
         
-        <div className="text-[10px] text-gray-500">
+        <div className="text-[10px] text-foreground-muted">
           {lat.toFixed(5)}, {lng.toFixed(5)}
         </div>
         
@@ -509,7 +509,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What's going on here"
             rows={3}
-            className="w-full py-1.5 text-[20px] font-bold text-gray-900 placeholder-gray-400 resize-none focus:outline-none"
+            className="w-full py-1.5 text-[20px] font-bold text-foreground placeholder-foreground-muted resize-none focus:outline-none"
             style={{ paddingLeft: 0, paddingRight: 0 }}
           />
         </div>
@@ -532,7 +532,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingImage}
-              className="flex-shrink-0 flex items-center justify-center h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-shrink-0 flex items-center justify-center h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Upload image"
             >
               <CameraIcon className="w-4 h-4" />
@@ -545,7 +545,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
                   <button
                     type="button"
                     onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
-                    className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                    className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
                     aria-label="Change mention type"
                   >
                     <span className="text-base">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.emoji}</span>
@@ -554,7 +554,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
                   <button
                     type="button"
                     onClick={() => setSelectedMentionTypeId(null)}
-                    className="flex-shrink-0 h-8 w-8 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
+                    className="flex-shrink-0 h-8 w-8 flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors"
                     aria-label="Remove mention type"
                   >
                     <XMarkIcon className="w-3 h-3" />
@@ -564,7 +564,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
                 <button
                   type="button"
                   onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
-                  className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+                  className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
                   aria-label="Select mention type"
                 >
                   <span className="text-xs">#</span>
@@ -573,9 +573,9 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
               )}
               
               {showMentionTypeDropdown && (
-                <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-md shadow-lg max-h-[300px] overflow-y-auto min-w-[200px]">
+                <div className="absolute left-0 top-full mt-1 z-50 bg-surface border border-border rounded-md shadow-lg max-h-[300px] overflow-y-auto min-w-[200px]">
                   {loadingMentionTypes ? (
-                    <div className="px-3 py-2 text-xs text-gray-500">Loading...</div>
+                    <div className="px-3 py-2 text-xs text-foreground-muted">Loading...</div>
                   ) : (
                     <div className="p-1">
                       {mentionTypes.map((type) => (
@@ -586,10 +586,10 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
                             setSelectedMentionTypeId(type.id);
                             setShowMentionTypeDropdown(false);
                           }}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left hover:bg-gray-50 rounded transition-colors"
+                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left hover:bg-surface-accent rounded transition-colors"
                         >
                           <span className="text-base">{type.emoji}</span>
-                          <span className="text-gray-900">{type.name}</span>
+                          <span className="text-foreground">{type.name}</span>
                         </button>
                       ))}
                     </div>
@@ -606,7 +606,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting || isUploadingImage || !selectedMentionTypeId || !description.trim()}
-                className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label={selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map'}
               >
                 <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />

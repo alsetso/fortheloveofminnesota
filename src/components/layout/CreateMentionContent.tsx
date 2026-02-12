@@ -430,14 +430,16 @@ export default function CreateMentionContent({
         try {
           // Get live map ID first
           const { data: liveMap } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('slug', 'live')
             .eq('is_active', true)
             .single();
 
           const { count } = await supabase
-            .from('map_pins')
+            .schema('maps')
+            .from('pins')
             .select('*', { count: 'exact', head: true })
             .eq('map_id', liveMap?.id)
             .eq('account_id', activeAccountId)

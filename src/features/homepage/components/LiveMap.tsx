@@ -477,7 +477,8 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
     const fetchLiveMapId = async () => {
       try {
         const { data, error } = await supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id')
           .eq('custom_slug', 'live')
           .eq('is_primary', true)
@@ -581,7 +582,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
   }, []);
 
 
-  // Handler for "Add Mention" button from layer popups - navigate to live map contribute overlay
+  // Handler for "Add Mention" button from layer popups - navigate to maps with location
   useEffect(() => {
     const handleShowLocationForMention = async (event: Event) => {
       const customEvent = event as CustomEvent<{
@@ -593,11 +594,10 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
       const { lat, lng } = customEvent.detail || {};
       if (!lat || !lng) return;
 
-      // Navigate to live map with contribute overlay
       const params = new URLSearchParams();
       params.set('lat', lat.toString());
       params.set('lng', lng.toString());
-      router.push(`/map/live?${params.toString()}#contribute`);
+      router.push(`/maps?${params.toString()}`);
     };
 
     window.addEventListener('show-location-for-mention', handleShowLocationForMention);
@@ -1132,8 +1132,8 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
               mentionTypeEmoji={selectedMentionTypes[0].emoji}
               onClick={() => {
                 const params = new URLSearchParams();
-                params.set('mention_type_id', selectedMentionTypes[0].id);
-                router.push(`/map/live?${params.toString()}#contribute`);
+                params.set('type', mentionTypeNameToSlug(selectedMentionTypes[0].name));
+                router.push(`/maps?${params.toString()}`);
               }}
             />
           )}
@@ -1252,7 +1252,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           if (mentionTypeId) {
             params.set('mention_type_id', mentionTypeId);
           }
-          router.push(`/map/live?${params.toString()}#contribute`);
+          router.push(`/maps?${params.toString()}`);
         }}
       />
 
@@ -1287,7 +1287,7 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
           const params = new URLSearchParams();
           params.set('lat', coordinates.lat.toString());
           params.set('lng', coordinates.lng.toString());
-          router.push(`/map/live?${params.toString()}#contribute`);
+          router.push(`/maps?${params.toString()}`);
         }}
       />
 

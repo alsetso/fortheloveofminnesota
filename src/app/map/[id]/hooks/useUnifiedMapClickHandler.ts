@@ -53,13 +53,13 @@ interface UnifiedMapClickHandlerOptions {
   pinMode?: boolean;
   showAreaDrawModal?: boolean;
   // Callbacks
-  onPinClick?: (pinId: string) => void;
+  onPinClick?: (pinId: string, lat?: number, lng?: number) => void;
   onAreaClick?: (areaId: string) => void;
-  onMentionClick?: (mentionId: string) => void;
+  onMentionClick?: (mentionId: string, lat?: number, lng?: number) => void;
   onMapClick?: (coordinates: { lat: number; lng: number }, mapMeta: Record<string, any> | null) => void;
   /** Called when a boundary (state/county/CTU) is clicked. Use to set layer entity and open sidebar. */
   onBoundaryClick?: (feature: { layer?: { id: string }; properties?: Record<string, unknown>; geometry?: unknown }) => void;
-  /** When true, show "Not minnesota" error toast when user clicks outside Minnesota (e.g. on /live). */
+  /** When true, show "Not minnesota" error toast when user clicks outside Minnesota (e.g. on /maps). */
   isLiveMap?: boolean;
   /** Called when any item is clicked (for live map footer status). Passes clicked item info. */
   onLiveClickReport?: (clickedItem: { type: 'pin' | 'area' | 'map' | 'boundary'; id?: string; lat: number; lng: number; layer?: 'state' | 'county' | 'district' | 'ctu'; username?: string | null } | null) => void;
@@ -358,9 +358,6 @@ export function useUnifiedMapClickHandler({
         });
         if (boundaryFeatures.length > 0) {
           const feature = boundaryFeatures[0];
-          if (process.env.NODE_ENV === 'development') {
-            console.debug('[UnifiedMapClickHandler] onclick: target=boundary', { layerId: feature.layer?.id });
-          }
           return { target: 'boundary', feature, layerId: feature.layer?.id };
         }
       }
@@ -369,9 +366,6 @@ export function useUnifiedMapClickHandler({
     }
 
     // Priority 6: Map click (empty space)
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[UnifiedMapClickHandler] onclick: target=map (empty space)');
-    }
     return { target: 'map' };
   }, []);
 
@@ -389,6 +383,11 @@ export function useUnifiedMapClickHandler({
     const currentMapData = mapDataRef.current;
     const currentIsOwner = isOwnerRef.current;
     const currentEffectiveIsMember = effectiveIsMemberRef.current;
+    
+    // Public maps page (/maps) - no map entity, id/slug 'public'; allow all clicks
+    if (currentMapData?.id === 'public' || currentMapData?.slug === 'public') {
+      return false;
+    }
     
     // Check if collaboration tool (allow_clicks) is disabled
     const allowClicks = currentMapData?.settings?.collaboration?.allow_clicks ?? false;
@@ -474,10 +473,6 @@ export function useUnifiedMapClickHandler({
     const currentCheckPermission = checkPermissionRef.current;
     const currentPinMode = pinModeRef.current;
     const currentShowAreaDrawModal = showAreaDrawModalRef.current;
-
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[UnifiedMapClickHandler] onclick: goal=', target === 'map' ? 'location-select-or-pin' : target === 'boundary' ? 'leave-footer-to-boundary-handler' : target);
-    }
 
     // Handle based on click target priority
     try {
@@ -593,7 +588,7 @@ export function useUnifiedMapClickHandler({
               }
             }
             
-            onPinClickRef.current(entityId);
+            onPinClickRef.current(entityId, pinLat, pinLng);
           }
           return;
 
@@ -670,13 +665,19 @@ export function useUnifiedMapClickHandler({
                 username: immediateUsername
               });
               
-              // If username not available, fetch in background and update
+              // If username not available, fetch in background and update (use live API when on live map)
               if (!immediateUsername) {
                 const currentMapData = mapDataRef.current;
-                const mapIdForFetch = currentMapData?.id;
-                if (mapIdForFetch) {
-                  // Fetch pin data to get username (non-blocking)
-                  fetch(`/api/maps/${mapIdForFetch}/pins/${mentionId}`)
+                const isLive = isLiveMapRef.current;
+                const url = currentMapData?.id === 'public' || currentMapData?.slug === 'public'
+                  ? `/api/pins/${mentionId}`
+                  : isLive
+                    ? `/api/maps/live/pins/${mentionId}`
+                    : currentMapData?.id
+                      ? `/api/maps/${currentMapData.id}/pins/${mentionId}`
+                      : null;
+                if (url) {
+                  fetch(url)
                     .then((response) => {
                       if (response.ok) {
                         return response.json();
@@ -703,7 +704,7 @@ export function useUnifiedMapClickHandler({
               }
             }
             
-            onMentionClickRef.current(entityId);
+            onMentionClickRef.current(entityId, mentionLat, mentionLng);
           }
           return;
 
@@ -849,8 +850,8 @@ async function handleMapClickTarget({
           };
         }
       }
-    } catch (err) {
-      console.debug('[UnifiedMapClickHandler] Error capturing map feature in pin mode:', err);
+    } catch {
+      // Non-critical: feature capture failed
     }
 
     // Call custom handler if provided
@@ -866,17 +867,20 @@ async function handleMapClickTarget({
     return;
   }
 
-  // Check if map settings allow clicks (owners can always click)
-  const allowClicks = currentMapData?.settings?.collaboration?.allow_clicks ?? false;
-  if (!allowClicks && !currentIsOwner) {
-    return;
-  }
-
-  // Check clickability permission
-  if (currentMapData && currentAccount && currentCheckPermission) {
-    const allowed = currentCheckPermission('clicks');
-    if (allowed === false) {
-      return; // Permission denied
+  // Public maps page (/maps) - no collaboration model, allow all clicks
+  const isPublicMap = currentMapData?.id === 'public' || currentMapData?.slug === 'public';
+  if (!isPublicMap) {
+    // Check if map settings allow clicks (owners can always click)
+    const allowClicks = currentMapData?.settings?.collaboration?.allow_clicks ?? false;
+    if (!allowClicks && !currentIsOwner) {
+      return;
+    }
+    // Check clickability permission
+    if (currentMapData && currentAccount && currentCheckPermission) {
+      const allowed = currentCheckPermission('clicks');
+      if (allowed === false) {
+        return;
+      }
     }
   }
 
@@ -919,8 +923,8 @@ async function handleMapClickTarget({
         };
       }
     }
-  } catch (err) {
-    console.debug('[UnifiedMapClickHandler] Error capturing map feature:', err);
+  } catch {
+    // Non-critical: feature capture failed
   }
 
   // Trigger reverse geocode

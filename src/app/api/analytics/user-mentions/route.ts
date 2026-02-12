@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
 
     // Get live map ID first
     const { data: liveMap } = await supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select('id')
       .eq('slug', 'live')
       .eq('is_active', true)
@@ -75,7 +76,8 @@ export async function GET(request: NextRequest) {
 
     // Build query for user's mentions (now map_pins on live map)
     let query = supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .select('id, description, image_url, created_at, view_count')
       .eq('map_id', liveMap.id)
       .eq('account_id', account.id)

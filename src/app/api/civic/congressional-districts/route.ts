@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validateQueryParams } from '@/lib/security/validation';
 import { z } from 'zod';
@@ -16,6 +15,7 @@ import { commonSchemas } from '@/lib/security/validation';
  */
 const congressionalDistrictsQuerySchema = z.object({
   id: commonSchemas.uuid.optional(),
+  limit: z.coerce.number().int().positive().max(3000).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -29,21 +29,16 @@ export async function GET(request: NextRequest) {
           return validation.error;
         }
         
-        const { id } = validation.data;
-        const supabase = createServerClient();
-    
-    let query = (supabase as any)
-      .schema('layers')
-      .from('districts')
-      .select('id, district_number, name, geometry')
-      .order('district_number', { ascending: true });
-    
-    // Apply filters
-    if (id) {
-      query = query.eq('id', id);
-    }
-    
-        const { data, error } = await query;
+        const { id, limit } = validation.data;
+        
+        // Use RPC function to query layers schema (public resources)
+        const { createSupabaseClient } = await import('@/lib/supabase/unified');
+        const supabase = await createSupabaseClient();
+        
+        const { data, error } = await supabase.rpc('get_congressional_districts', {
+          p_id: id || null,
+          p_limit: limit ?? 3000
+        });
         
         if (error) {
           if (process.env.NODE_ENV === 'development') {

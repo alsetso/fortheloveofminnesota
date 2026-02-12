@@ -197,8 +197,8 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
   }, [account?.id]);
 
   return (
-    <div className="max-w-[800px] mx-auto space-y-3">
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+    <div className="max-w-[800px] mx-auto space-y-3 p-3">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
         <ProfileCard
           account={account}
           isOwnProfile={true}
@@ -222,35 +222,35 @@ export default function HomeDashboardContent({ account }: HomeDashboardContentPr
         />
       )}
       
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <Link href="/analytics" className="block hover:bg-gray-50 transition-colors rounded-md -m-[10px] p-[10px]">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <Link href="/analytics" className="block hover:bg-surface-accent dark:hover:bg-white/5 transition-colors rounded-md -m-[10px] p-[10px]">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <ChartBarIcon className="w-4 h-4 text-gray-600" />
-              <h3 className="text-xs font-semibold text-gray-900">Analytics</h3>
+              <ChartBarIcon className="w-4 h-4 text-foreground-muted" />
+              <h3 className="text-xs font-semibold text-foreground">Analytics</h3>
             </div>
-            <p className="text-xs text-gray-600">View your profile, mention, post, and map analytics</p>
-            <div className="pt-1.5 border-t border-gray-100">
+            <p className="text-xs text-foreground-muted">View your profile, mention, post, and map analytics</p>
+            <div className="pt-1.5 border-t border-border-muted dark:border-white/10">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">View analytics</span>
-                <EyeIcon className="w-3 h-3 text-gray-500" />
+                <span className="text-xs text-foreground-muted">View analytics</span>
+                <EyeIcon className="w-3 h-3 text-foreground-muted" />
               </div>
             </div>
           </div>
         </Link>
       </div>
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <Link href="/live" className="block hover:bg-gray-50 transition-colors rounded-md -m-[10px] p-[10px]">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <Link href="/maps" className="block hover:bg-surface-accent dark:hover:bg-white/5 transition-colors rounded-md -m-[10px] p-[10px]">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <ChartBarIcon className="w-4 h-4 text-gray-600" />
-              <h3 className="text-xs font-semibold text-gray-900">Live Map</h3>
+              <ChartBarIcon className="w-4 h-4 text-foreground-muted" />
+              <h3 className="text-xs font-semibold text-foreground">Live Map</h3>
             </div>
-            <p className="text-xs text-gray-600">View real-time visit statistics and page analytics</p>
-            <div className="pt-1.5 border-t border-gray-100">
+            <p className="text-xs text-foreground-muted">View real-time visit statistics and page analytics</p>
+            <div className="pt-1.5 border-t border-border-muted dark:border-white/10">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">View map</span>
-                <EyeIcon className="w-3 h-3 text-gray-500" />
+                <span className="text-xs text-foreground-muted">View map</span>
+                <EyeIcon className="w-3 h-3 text-foreground-muted" />
               </div>
             </div>
           </div>

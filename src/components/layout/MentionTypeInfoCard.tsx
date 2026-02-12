@@ -60,9 +60,9 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
   const handleAddToMap = () => {
     if (!type) return;
     const params = new URLSearchParams(searchParams.toString());
-    params.set('mention_type_id', type.id);
+    params.set('type', mentionTypeNameToSlug(type.name));
     const qs = params.toString();
-    router.push(`/live?${qs}#contribute`);
+    router.push(qs ? `/maps?${qs}` : '/maps');
   };
 
   if (loading || !type) return null;
@@ -77,7 +77,7 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
 
   return (
     <div
-      className="p-[10px] border-b border-gray-200 bg-white"
+      className="p-[10px] border-b border-border bg-surface"
       data-container="mention-type-info-card"
       aria-label={`Add ${type.name} to map`}
     >
@@ -85,13 +85,13 @@ export default function MentionTypeInfoCard({ typeSlug }: MentionTypeInfoCardPro
         <span className="text-base flex-shrink-0" aria-hidden>
           {type.emoji}
         </span>
-        <span className="text-xs font-medium text-gray-900 truncate flex-1">{type.name}</span>
+        <span className="text-xs font-medium text-foreground truncate flex-1">{type.name}</span>
       </div>
       {isAuthenticated ? (
         <button
           type="button"
           onClick={handleAddToMap}
-          className="mt-2 flex items-center justify-center gap-1.5 max-w-fit py-1.5 px-2 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+          className="mt-2 flex items-center justify-center gap-1.5 max-w-fit py-1.5 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
           aria-label={`Add ${type.name} to map`}
         >
           <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />

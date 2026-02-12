@@ -115,7 +115,8 @@ export async function resolveMapId(
   
   // Otherwise, look up by slug
   const { data, error } = await supabase
-    .from('map')
+    .schema('maps')
+    .from('maps')
     .select('id')
     .eq('slug', identifier)
     .eq('is_active', true)
@@ -124,7 +125,8 @@ export async function resolveMapId(
   if (error || !data) {
     // Also check custom_slug for legacy support
     const { data: legacyData, error: legacyError } = await supabase
-      .from('map')
+      .schema('maps')
+    .from('maps')
       .select('id')
       .eq('custom_slug', identifier)
       .eq('is_active', true)

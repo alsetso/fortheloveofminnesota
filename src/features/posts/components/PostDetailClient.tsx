@@ -11,10 +11,12 @@ import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import MentionCard from '@/components/feed/MentionCard';
 import { Account } from '@/features/auth';
 import { getMapUrl, getMapPostEditUrl } from '@/lib/maps/urls';
+import PostContent from '@/components/posts/PostContent';
 
 interface PostDetailClientProps {
   mapId?: string;
   mapSlug?: string;
+  useNewWrapper?: boolean;
   post: {
     id: string;
     account_id: string;
@@ -79,11 +81,18 @@ interface PostDetailClientProps {
         title: string;
       } | null;
     }> | null;
+    tagged_accounts?: Array<{
+      id: string;
+      username: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      image_url: string | null;
+    }> | null;
   };
   isOwner: boolean;
 }
 
-export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: PostDetailClientProps) {
+export default function PostDetailClient({ post, isOwner, mapId, mapSlug, useNewWrapper = false }: PostDetailClientProps) {
   const { account } = useAuthStateSafe();
   const [isDeleting, setIsDeleting] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -223,10 +232,9 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
   };
 
 
-  return (
+  const content = (
     <>
-      <div className="min-h-screen bg-white">
-        {/* Header */}
+      {!useNewWrapper && (
         <header className="border-b border-gray-200 bg-white sticky top-0 z-10">
           <div className="max-w-[600px] mx-auto px-4 py-3 flex items-center justify-between">
             <Link
@@ -295,7 +303,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
                   )}
                   {post.map_data! && (
                     <Link
-                      href={`/map/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}`}
+                      href={`/maps?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}`}
                       onClick={() => setShowMenu(false)}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                     >
@@ -329,9 +337,91 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
             </div>
           </div>
         </header>
-
-        {/* Content */}
-        <main className="max-w-[600px] mx-auto px-4 py-6">
+      )}
+      {useNewWrapper && (
+        <div className="sticky top-14 z-10 bg-surface border-b border-white/10 px-4 py-2 flex items-center justify-end">
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-1 text-white/70 hover:text-white transition-colors"
+              aria-label="More options"
+            >
+              <EllipsisVerticalIcon className="w-5 h-5" />
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[160px] bg-surface border border-white/10">
+                <button
+                  onClick={handleCopyLink}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:bg-surface-accent transition-colors"
+                >
+                  {isCopied ? (
+                    <>
+                      <CheckIcon className="w-4 h-4 text-green-400" />
+                      <span className="text-green-400">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      <span>Copy URL</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleShare}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:bg-surface-accent transition-colors"
+                >
+                  <ShareIcon className="w-4 h-4" />
+                  <span>Share</span>
+                </button>
+                {post.account?.username && (
+                  <Link
+                    href={`/${post.account.username}`}
+                    onClick={() => setShowMenu(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:bg-surface-accent transition-colors"
+                  >
+                    <MapPinIcon className="w-4 h-4" />
+                    <span>View Profile</span>
+                  </Link>
+                )}
+                {post.map_data! && (
+                  <Link
+                    href={`/map/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}`}
+                    onClick={() => setShowMenu(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:bg-surface-accent transition-colors"
+                  >
+                    <MapPinIcon className="w-4 h-4" />
+                    <span>View on Map</span>
+                  </Link>
+                )}
+                {isOwner && (
+                  <>
+                    <div className="border-t border-white/10 my-1" />
+                    <Link
+                      href={post.map ? getMapPostEditUrl(post.map, post.id) : '#'}
+                      onClick={() => setShowMenu(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:bg-surface-accent transition-colors"
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                      <span>Edit</span>
+                    </Link>
+                    <button
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                      <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <main className={`${useNewWrapper ? 'max-w-2xl mx-auto px-4 py-6' : 'max-w-[600px] mx-auto px-4 py-6'}`}>
           {/* Author Info */}
           {post.account && (
             <div className="flex items-center gap-3 mb-4">
@@ -345,7 +435,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
               <div className="flex-1">
                 <Link 
                   href={`/${username}`}
-                  className="text-sm font-semibold text-gray-900 hover:opacity-80 transition-opacity"
+                  className={`text-sm font-semibold ${useNewWrapper ? 'text-white hover:opacity-80' : 'text-gray-900 hover:opacity-80'} transition-opacity`}
                 >
                   @{username}
                 </Link>
@@ -353,14 +443,14 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
                   <div className="mt-1">
                     <Link
                       href={getMapUrl(post.map)}
-                      className="inline-flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors"
+                      className={`inline-flex items-center gap-1.5 text-xs ${useNewWrapper ? 'text-white/70 hover:text-white' : 'text-gray-600 hover:text-gray-900'} transition-colors`}
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                       </svg>
                       <span>{post.map.name}</span>
                       {post.map.visibility === 'private' && (
-                        <svg className="w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className={`w-3 h-3 ${useNewWrapper ? 'text-white/50' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -373,12 +463,17 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
 
           {/* Title */}
           {post.title && (
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">{post.title}</h1>
+            <h1 className={`text-2xl font-bold mb-3 ${useNewWrapper ? 'text-white' : 'text-gray-900'}`}>{post.title}</h1>
           )}
 
           {/* Content */}
-          <div className="text-sm text-gray-900 whitespace-pre-wrap mb-4 leading-relaxed">
-            {post.content}
+          <div className={`text-sm mb-4 leading-relaxed ${post.background_color ? '-mx-4' : useNewWrapper ? 'text-white/90' : 'text-gray-900'}`}>
+            <PostContent 
+              content={post.content} 
+              taggedAccounts={post.tagged_accounts}
+              className="whitespace-pre-wrap"
+              backgroundColor={post.background_color || null}
+            />
           </div>
 
           {/* Images - Filter out map screenshot if it exists in map_data */}
@@ -397,7 +492,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
                   return (
                     <div 
                       key={index} 
-                      className="rounded-lg overflow-hidden border border-gray-200 relative group cursor-pointer"
+                      className={`rounded-lg overflow-hidden border relative group cursor-pointer ${useNewWrapper ? 'border-white/10' : 'border-gray-200'}`}
                       onClick={() => !isVideo && setSelectedImageIndex(index)}
                     >
                       {isVideo ? (
@@ -504,20 +599,20 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
                 </div>
               )}
               <Link
-                href={`/map/live?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}&zoom=15`}
-                className="block bg-gray-50 border border-gray-200 rounded-lg p-3 hover:bg-gray-100 transition-colors"
+                href={`/maps?lat=${post.map_data!.lat}&lng=${post.map_data!.lng}&zoom=15`}
+                className={`block rounded-lg p-3 transition-colors ${useNewWrapper ? 'bg-surface-accent border border-white/10 hover:bg-surface-accent/80' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}
               >
                 <div className="flex items-center gap-2">
                   <MapPinIcon className="w-5 h-5 text-red-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className={`text-sm font-medium ${useNewWrapper ? 'text-white' : 'text-gray-900'}`}>
                       {post.map_data!.place_name || post.map_data!.address || 'Location'}
                     </div>
                     {post.map_data!.address && post.map_data!.place_name && (
-                      <div className="text-xs text-gray-500">{post.map_data!.address}</div>
+                      <div className={`text-xs ${useNewWrapper ? 'text-white/60' : 'text-gray-500'}`}>{post.map_data!.address}</div>
                     )}
                     {post.map_data!.type && (
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className={`text-xs mt-1 ${useNewWrapper ? 'text-white/60' : 'text-gray-500'}`}>
                         {post.map_data!.type === 'area' ? 'Area' : post.map_data!.type === 'pin' ? 'Pin' : 'Area & Pin'}
                       </div>
                     )}
@@ -530,7 +625,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
           {/* Mentions */}
           {post.mentions && post.mentions.length > 0 && (
             <div className="mb-4 space-y-2">
-              <div className="text-xs font-medium text-gray-600 mb-2">Referenced Places:</div>
+              <div className={`text-xs font-medium mb-2 ${useNewWrapper ? 'text-white/70' : 'text-gray-600'}`}>Referenced Places:</div>
               {post.mentions.map((mention) => (
                 <MentionCard key={mention.id} mention={mention} />
               ))}
@@ -538,7 +633,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
           )}
 
           {/* Meta Info */}
-          <div className="flex items-center gap-4 text-xs text-gray-500 pt-4 border-t border-gray-200">
+          <div className={`flex items-center gap-4 text-xs pt-4 border-t ${useNewWrapper ? 'text-white/60 border-white/10' : 'text-gray-500 border-gray-200'}`}>
             <div className="flex items-center gap-1">
               <EyeIcon className="w-4 h-4" />
               <span>{viewCount} views</span>
@@ -546,7 +641,7 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
             <div className="flex items-center gap-1">
               <span>{relativeTime}</span>
               {isEdited && (
-                <span className="text-gray-400" title={`Edited on ${new Date(post.updated_at).toLocaleDateString()}`}>
+                <span className={useNewWrapper ? 'text-white/50' : 'text-gray-400'} title={`Edited on ${new Date(post.updated_at).toLocaleDateString()}`}>
                   • edited
                 </span>
               )}
@@ -565,12 +660,23 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug }: Post
               )}
             </div>
             {post.visibility === 'draft' && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-medium">
+              <span className={`px-2 py-1 rounded text-xs font-medium ${useNewWrapper ? 'bg-surface-accent text-white/80' : 'bg-gray-100 text-gray-600'}`}>
                 Draft
               </span>
             )}
           </div>
         </main>
+    </>
+  );
+
+  if (useNewWrapper) {
+    return content;
+  }
+
+  return (
+    <>
+      <div className="min-h-screen bg-white">
+        {content}
       </div>
     </>
   );

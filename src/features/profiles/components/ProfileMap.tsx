@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
@@ -16,6 +16,15 @@ interface ProfileMapProps {
   selectedCollectionId?: string | null;
   collections?: Collection[];
   onPinSelect?: (pinId: string | null) => void;
+  /** When true, map click on empty space calls onMapClick (for drop-pin flow). */
+  dropPinMode?: boolean;
+  onMapClick?: (coords: { lat: number; lng: number }) => void;
+  /** Called when map instance is ready (for temp pin marker). */
+  onMapInstanceReady?: (map: MapboxMapInstance) => void;
+  /** When set, fly to this pin and open its popup (e.g. from sidebar click). */
+  focusPin?: ProfilePin | null;
+  /** Incremented on each focus request; use in effect deps so same-pin reclick retriggers. */
+  focusTrigger?: number;
 }
 
 const SOURCE_ID = 'profile-mentions';
@@ -33,6 +42,11 @@ export default function ProfileMap({
   selectedCollectionId = null,
   collections = [],
   onPinSelect,
+  dropPinMode = false,
+  onMapClick,
+  onMapInstanceReady,
+  focusPin,
+  focusTrigger = 0,
 }: ProfileMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
@@ -103,6 +117,7 @@ export default function ProfileMap({
         mapInstance.on('load', () => {
           if (mounted) {
             setMapLoaded(true);
+            onMapInstanceReady?.(mapInstance as MapboxMapInstance);
             // Trigger resize after a short delay to ensure container is fully rendered
             setTimeout(() => {
               if (mapInstance && !(mapInstance as MapboxMapInstance)._removed) {
@@ -182,6 +197,11 @@ export default function ProfileMap({
     pinsRef.current = pins;
   }, [pins]);
 
+  // Sync selectedCollectionId from parent (sidebar) to local filter state
+  useEffect(() => {
+    setActiveCollectionId(selectedCollectionId ?? null);
+  }, [selectedCollectionId]);
+
   // Listen for filter-by-collection event
   useEffect(() => {
     const handleFilterByCollection = (event: Event) => {
@@ -197,6 +217,138 @@ export default function ProfileMap({
       window.removeEventListener('filter-by-collection', handleFilterByCollection);
     };
   }, []);
+
+  // When focusPin is set (e.g. from sidebar click), fly to it and open popup
+  const showPopupForPin = useCallback(
+    async (map: MapboxMapInstance & { _removed?: boolean }, pin: ProfilePin) => {
+      const escapeHtml = (text: string | null): string => {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      };
+      const formatDate = (dateString: string): string => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+        if (diffDays < 7) return `${diffDays} days ago`;
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      };
+      const createPopupContent = (viewCount: number | null = null) => {
+        const profileSlug = accountUsername;
+        const profileUrl = profileSlug ? `/${encodeURIComponent(profileSlug)}` : null;
+        const displayName = accountUsername || 'User';
+        return `
+          <div class="map-mention-popup-content" style="min-width: 200px; max-width: 280px; padding: 10px; background: white; border-radius: 6px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 8px;">
+              <a href="${profileUrl || '#'}" style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; cursor: ${profileUrl ? 'pointer' : 'default'};" ${profileUrl ? '' : 'onclick="event.preventDefault()"'}>
+                ${accountImageUrl ? `<img src="${escapeHtml(accountImageUrl)}" alt="${escapeHtml(displayName)}" style="width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #e5e7eb;" />` : `<div style="width: 20px; height: 20px; border-radius: 50%; background-color: #f3f4f6; border: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #6b7280; flex-shrink: 0; font-weight: 500;">${escapeHtml(displayName[0].toUpperCase())}</div>`}
+                <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; min-width: 0;">
+                  <span style="font-size: 13px; color: #111827; font-weight: 600; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(displayName)}</span>
+                </div>
+              </a>
+              <button class="mapboxgl-popup-close-button" style="width: 16px; height: 16px; padding: 0; border: none; background: transparent; cursor: pointer; color: #6b7280; font-size: 14px; flex-shrink: 0;" aria-label="Close popup">×</button>
+            </div>
+            <div style="margin-bottom: 8px;">
+              ${pin.description ? `<div style="font-size: 12px; color: #374151; line-height: 1.5; word-wrap: break-word;">${escapeHtml(pin.description)}</div>` : ''}
+            </div>
+            <div style="padding-top: 8px;">
+              <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="font-size: 12px; color: #6b7280;">${formatDate(pin.created_at)}</div>
+                ${viewCount !== null ? `<div style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>${viewCount}</span></div>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      };
+      if (popupRef.current) {
+        popupRef.current.remove();
+      }
+      if (!isOwnProfile) {
+        const trackMentionView = () => {
+          let deviceId: string | null = null;
+          if (typeof window !== 'undefined') {
+            deviceId = localStorage.getItem('analytics_device_id');
+            if (!deviceId) {
+              deviceId = crypto.randomUUID();
+              localStorage.setItem('analytics_device_id', deviceId);
+            }
+          }
+          fetch('/api/analytics/pin-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              pin_id: pin.id,
+              referrer_url: typeof document !== 'undefined' ? document.referrer : null,
+              user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+              session_id: deviceId,
+            }),
+            keepalive: true,
+          }).catch(() => {});
+        };
+        if ('requestIdleCallback' in window) requestIdleCallback(trackMentionView, { timeout: 2000 });
+        else setTimeout(trackMentionView, 1000);
+      }
+      let viewCount: number | null = null;
+      try {
+        const res = await fetch(`/api/analytics/pin-stats?pin_id=${pin.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          viewCount = data.stats?.total_views ?? null;
+        }
+      } catch {
+        // ignore
+      }
+      const mapbox = await import('mapbox-gl');
+      const popupContainer = mapWrapperRef.current || mapContainer.current?.parentElement || mapContainer.current;
+      popupRef.current = new mapbox.default.Popup({
+        offset: 25,
+        closeButton: false,
+        closeOnClick: true,
+        className: 'map-mention-popup',
+        maxWidth: '280px',
+        anchor: 'bottom',
+        ...(popupContainer ? { container: popupContainer } : {}),
+      })
+        .setLngLat([pin.lng, pin.lat])
+        .setHTML(createPopupContent(viewCount))
+        .addTo(map as any);
+      const setupPopupHandlers = () => {
+        const el = popupRef.current?.getElement();
+        if (!el) return;
+        const closeBtn = el.querySelector('.mapboxgl-popup-close-button') as HTMLButtonElement;
+        if (closeBtn) {
+          closeBtn.addEventListener('click', (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (popupRef.current) {
+              popupRef.current.remove();
+              popupRef.current = null;
+            }
+          });
+        }
+      };
+      setTimeout(setupPopupHandlers, 0);
+    },
+    [accountUsername, accountImageUrl, isOwnProfile]
+  );
+
+  useEffect(() => {
+    if (!focusPin || !mapLoaded || !mapInstanceRef.current || (mapInstanceRef.current as MapboxMapInstance & { _removed?: boolean })._removed) return;
+    const map = mapInstanceRef.current as MapboxMapInstance & { _removed?: boolean };
+    map.flyTo({
+      center: [focusPin.lng, focusPin.lat],
+      zoom: 14,
+      duration: 600,
+    });
+    const run = async () => {
+      await showPopupForPin(map, focusPin);
+    };
+    run();
+  }, [focusPin?.id, focusTrigger, mapLoaded, showPopupForPin]);
 
   // Add pins to map
   useEffect(() => {
@@ -680,20 +832,21 @@ export default function ProfileMap({
           currentMap.on('click', LAYER_IDS.points, handleMentionClick);
           currentMap.on('click', LAYER_IDS.labels, handleMentionClick);
           
-          // Clear pin selection when clicking on map (not on a pin)
-          if (onPinSelect) {
-            const handleMapClick = (e: any) => {
-              const features = currentMap.queryRenderedFeatures(e.point, {
-                layers: [LAYER_IDS.points, LAYER_IDS.labels],
-              });
-              // If no features clicked, clear selection
-              if (features.length === 0) {
-                onPinSelect(null);
-              }
-            };
-            mapClickHandlerRef.current = handleMapClick;
-            currentMap.on('click', handleMapClick);
-          }
+          // Map click: drop-pin flow (when dropPinMode) or clear pin selection
+          const handleMapClick = (e: any) => {
+            const features = currentMap.queryRenderedFeatures(e.point, {
+              layers: [LAYER_IDS.points, LAYER_IDS.labels],
+            });
+            if (features.length > 0) return;
+            if (dropPinMode && onMapClick) {
+              const { lat, lng } = e.lngLat;
+              onMapClick({ lat, lng });
+              return;
+            }
+            if (onPinSelect) onPinSelect(null);
+          };
+          mapClickHandlerRef.current = handleMapClick;
+          currentMap.on('click', handleMapClick);
           
           // Add cursor styles
           currentMap.on('mouseenter', LAYER_IDS.points, () => {
@@ -774,7 +927,7 @@ export default function ProfileMap({
         popupRef.current = null;
       }
     };
-  }, [mapLoaded, pins, accountId, isOwnProfile, accountUsername, accountImageUrl, onPinSelect, activeCollectionId]); // Added activeCollectionId
+  }, [mapLoaded, pins, accountId, isOwnProfile, accountUsername, accountImageUrl, onPinSelect, activeCollectionId, dropPinMode, onMapClick]);
 
   // Show toast when a collection is selected (not on initial load)
   useEffect(() => {

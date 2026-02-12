@@ -1,641 +1,260 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { MagnifyingGlassIcon, PlusIcon, MapIcon } from '@heroicons/react/24/outline';
-import { useAuthStateSafe } from '@/features/auth';
-import { useBillingEntitlementsSafe } from '@/contexts/BillingEntitlementsContext';
-import PageWrapper from '@/components/layout/PageWrapper';
-import SearchResults from '@/components/layout/SearchResults';
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { SearchStateProvider } from '@/contexts/SearchStateContext';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import MapInfo, { type MapInfoLocation } from '@/components/layout/MapInfo';
+import LivePinCard, { type LivePinData } from '@/components/layout/LivePinCard';
+import MapPage from '../map/[id]/page';
+import MapsPageFooter from '@/components/maps/MapsPageFooter';
+import MentionTypeFilter from './components/MentionTypeFilter';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
-import MapCard from './components/MapCard';
-import MapsPageLayout from './MapsPageLayout';
-import { useUnifiedSidebar } from '@/hooks/useUnifiedSidebar';
-import { getMapUrl } from '@/lib/maps/urls';
-import type { MapItem } from './types';
-import { MAP_FEATURE_SLUG, calculateMapLimitState } from '@/lib/billing/mapLimits';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
-type ViewType = 'featured' | 'community' | 'my-maps';
+export interface LiveMapData {
+  map: { id: string; name?: string; slug?: string };
+  pins: any[];
+  tags: { id: string; emoji: string; name: string }[];
+}
 
-export default function MapsPage() {
+function MapsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { account } = useAuthStateSafe();
-  const { openWelcome } = useAppModalContextSafe();
-  const { features } = useBillingEntitlementsSafe();
-  
-  // View state
-  const [viewType, setViewType] = useState<ViewType>(() => {
-    const param = searchParams.get('view');
-    if (param === 'my-maps' && account) return 'my-maps';
-    if (param === 'community') return 'community';
-    return 'featured';
-  });
-  
-  // Search
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Data state
-  const [featuredMaps, setFeaturedMaps] = useState<MapItem[]>([]);
-  const [communityMaps, setCommunityMaps] = useState<MapItem[]>([]);
-  const [myMapsByRole, setMyMapsByRole] = useState<{
-    owner: MapItem[];
-    manager: MapItem[];
-    editor: MapItem[];
-  }>({
-    owner: [],
-    manager: [],
-    editor: [],
-  });
-  const [loadingFeatured, setLoadingFeatured] = useState(false);
-  const [loadingCommunity, setLoadingCommunity] = useState(false);
-  const [loadingMyMaps, setLoadingMyMaps] = useState(false);
-  
-  const { activeSidebar } = useUnifiedSidebar();
+  const { activeAccountId } = useAuthStateSafe();
+  const currentAccountId = activeAccountId ?? null;
+  const { modal } = useAppModalContextSafe();
+  const isWelcomeModalOpen = modal.type === 'welcome';
 
-  // Update view type when URL changes
-  useEffect(() => {
-    const param = searchParams.get('view');
-    if (param === 'my-maps' && account) {
-      setViewType('my-maps');
-    } else if (param === 'community') {
-      setViewType('community');
-    } else {
-      setViewType('featured');
-    }
-  }, [searchParams, account]);
+  const [liveData, setLiveData] = useState<LiveMapData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedLocation, setSelectedLocation] = useState<MapInfoLocation | null>(null);
+  const [liveStatus, setLiveStatus] = useState({ loadingData: true, mapLoaded: false, loadingPins: false, currentZoom: 0 });
+  const [selectedPin, setSelectedPin] = useState<LivePinData | null>(null);
+  const [isLoadingPin, setIsLoadingPin] = useState(false);
+  const pinCacheRef = useRef<Map<string, LivePinData>>(new Map());
+  const clearMapSelectionRef = useRef<(() => void) | null>(null);
 
-  // Fetch featured maps
+  const pinIdFromUrl = searchParams.get('pin');
+  const latFromUrl = searchParams.get('lat');
+  const lngFromUrl = searchParams.get('lng');
+  const hasPinSelection = Boolean(pinIdFromUrl);
+  const hasLocationSelection = Boolean(latFromUrl && lngFromUrl);
+  const hasSelection = hasPinSelection || hasLocationSelection;
+  const showMentionTypes = !hasPinSelection && !hasLocationSelection;
+
+  // Single fetch: public.map_pins + public.mention_types (no map lookup)
   useEffect(() => {
-    if (viewType !== 'featured') return;
-    
-    const fetchFeatured = async () => {
-      setLoadingFeatured(true);
-      try {
-        // Only fetch maps that are published to community
-        const response = await fetch('/api/maps?community=true&limit=100');
-        if (!response.ok) throw new Error('Failed to fetch maps');
-        const data = await response.json();
-        
-        // Filter for featured maps (settings.presentation.is_featured) that are also published
-        const featured = (data.maps || [])
-          .filter((map: any) => map.settings?.presentation?.is_featured === true && map.published_to_community === true)
-          .map((map: any) => ({
-            ...map,
-            name: map.name || map.title,
-            slug: map.slug || map.custom_slug,
-            href: getMapUrl({ id: map.id, slug: map.slug, custom_slug: map.custom_slug }),
-            account_id: map.account_id,
-            visibility: map.visibility || 'public',
-          }));
-        
-        // Fetch stats
-        if (featured.length > 0) {
-          const statsResponse = await fetch(`/api/maps/stats?ids=${featured.map((m: any) => m.id).join(',')}`);
-          if (statsResponse.ok) {
-            const statsData = await statsResponse.json();
-            const withStats = featured.map((map: any) => ({
-              ...map,
-              view_count: statsData.stats?.[map.id]?.total_views || 0,
-            }));
-            setFeaturedMaps(withStats);
-          } else {
-            setFeaturedMaps(featured);
-          }
-        } else {
-          setFeaturedMaps([]);
+    let cancelled = false;
+    fetch('/api/maps/public')
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled || !data?.pins) return;
+        setLiveData({
+          map: data.map || { id: 'public', name: 'Minnesota', slug: 'public' },
+          pins: data.pins || [],
+          tags: data.mention_types || [],
+        });
+      })
+      .catch((err) => console.error('[MapsPage] Fetch error:', err))
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const buildLiveUrl = useCallback(
+    (updates: { pin?: string | null; lat?: number | null; lng?: number | null; clearSelection?: boolean }) => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('pin');
+      next.delete('lat');
+      next.delete('lng');
+      if (!updates.clearSelection) {
+        if (updates.pin != null && updates.pin !== '') {
+          next.set('pin', updates.pin);
+        } else if (updates.lat != null && updates.lng != null) {
+          next.set('lat', updates.lat.toString());
+          next.set('lng', updates.lng.toString());
         }
-      } catch (err) {
-        console.error('Error fetching featured maps:', err);
-        setFeaturedMaps([]);
-      } finally {
-        setLoadingFeatured(false);
       }
-    };
-    
-    fetchFeatured();
-  }, [viewType]);
+      const q = next.toString();
+      return q ? `/maps?${q}` : '/maps';
+    },
+    [searchParams]
+  );
 
-  // Fetch community maps
-  useEffect(() => {
-    if (viewType !== 'community') return;
-    
-    const fetchCommunity = async () => {
-      setLoadingCommunity(true);
-      try {
-        // Use community=true to filter by published_to_community
-        const response = await fetch('/api/maps?community=true&limit=200');
-        if (!response.ok) throw new Error('Failed to fetch maps');
-        const data = await response.json();
-        
-        const maps = (data.maps || [])
-          .filter((map: any) => !map.settings?.presentation?.is_featured) // Exclude featured
-          .map((map: any) => ({
-            ...map,
-            name: map.name || map.title,
-            slug: map.slug || map.custom_slug,
-            href: getMapUrl({ id: map.id, slug: map.slug, custom_slug: map.custom_slug }),
-            categories: map.categories || [],
-            account_id: map.account_id,
-            visibility: map.visibility || 'public',
-            published_to_community: map.published_to_community || false,
-          }));
-        
-        // Fetch stats
-        if (maps.length > 0) {
-          const statsResponse = await fetch(`/api/maps/stats?ids=${maps.map((m: any) => m.id).join(',')}`);
-          if (statsResponse.ok) {
-            const statsData = await statsResponse.json();
-            const withStats = maps.map((map: any) => ({
-              ...map,
-              view_count: statsData.stats?.[map.id]?.total_views || 0,
-            }));
-            setCommunityMaps(withStats);
-          } else {
-            setCommunityMaps(maps);
-          }
-        } else {
-          setCommunityMaps([]);
-        }
-      } catch (err) {
-        console.error('Error fetching community maps:', err);
-        setCommunityMaps([]);
-      } finally {
-        setLoadingCommunity(false);
-      }
-    };
-    
-    fetchCommunity();
-  }, [viewType]);
+  const fetchPinData = useCallback(async (pinId: string): Promise<LivePinData | null> => {
+    const cached = pinCacheRef.current.get(pinId);
+    if (cached) return cached;
+    const res = await fetch(`/api/pins/${pinId}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data) pinCacheRef.current.set(pinId, data);
+    return data;
+  }, []);
 
-  // Fetch my maps grouped by role
   useEffect(() => {
-    if (viewType !== 'my-maps' || !account?.id) {
-      setMyMapsByRole({ owner: [], manager: [], editor: [] });
+    if (!hasPinSelection || !pinIdFromUrl) {
+      setSelectedPin(null);
+      setIsLoadingPin(false);
       return;
     }
-    
-    const fetchMyMaps = async () => {
-      setLoadingMyMaps(true);
-      try {
-        // Fetch maps where user is a member or owner
-        const response = await fetch(`/api/maps?account_id=${account.id}`);
-        if (!response.ok) throw new Error('Failed to fetch maps');
-        const data = await response.json();
-        
-        const maps = (data.maps || [])
-          .map((map: any) => ({
-            ...map,
-            name: map.name || map.title,
-            slug: map.slug || map.custom_slug,
-            href: getMapUrl({ id: map.id, slug: map.slug, custom_slug: map.custom_slug }),
-            account_id: map.account_id,
-            visibility: map.visibility || 'public',
-          }));
-        
-        // Fetch member roles for each map and determine user's role
-        const mapsWithRoles = await Promise.all(
-          maps.map(async (map: any) => {
-            const isOwner = map.account_id === account.id;
-            if (isOwner) {
-              return {
-                ...map,
-                current_user_role: 'owner' as const,
-              };
-            }
-            
-            try {
-              const memberResponse = await fetch(`/api/maps/${map.id}/members`);
-              if (memberResponse.ok) {
-                const memberData = await memberResponse.json();
-                const myMember = memberData.members?.find((m: any) => m.account_id === account.id);
-                return {
-                  ...map,
-                  current_user_role: myMember?.role || null,
-                };
-              }
-            } catch (err) {
-              console.error(`Error fetching member role for map ${map.id}:`, err);
-            }
-            return {
-              ...map,
-              current_user_role: null,
-            };
-          })
-        );
-        
-        // Filter to only maps where user has a role
-        const mapsWithValidRoles = mapsWithRoles.filter((map: any) => map.current_user_role !== null);
-        
-        // Fetch stats
-        if (mapsWithValidRoles.length > 0) {
-          const statsResponse = await fetch(`/api/maps/stats?ids=${mapsWithValidRoles.map((m: any) => m.id).join(',')}`);
-          if (statsResponse.ok) {
-            const statsData = await statsResponse.json();
-            const withStats = mapsWithValidRoles.map((map: any) => ({
-              ...map,
-              view_count: statsData.stats?.[map.id]?.total_views || 0,
-            }));
-            
-            // Group by role
-            const grouped = {
-              owner: withStats.filter((m: any) => m.current_user_role === 'owner'),
-              manager: withStats.filter((m: any) => m.current_user_role === 'manager'),
-              editor: withStats.filter((m: any) => m.current_user_role === 'editor'),
-            };
-            
-            setMyMapsByRole(grouped);
-          } else {
-            const grouped = {
-              owner: mapsWithValidRoles.filter((m: any) => m.current_user_role === 'owner'),
-              manager: mapsWithValidRoles.filter((m: any) => m.current_user_role === 'manager'),
-              editor: mapsWithValidRoles.filter((m: any) => m.current_user_role === 'editor'),
-            };
-            setMyMapsByRole(grouped);
-          }
-        } else {
-          setMyMapsByRole({ owner: [], manager: [], editor: [] });
-        }
-      } catch (err) {
-        console.error('Error fetching my maps:', err);
-        setMyMapsByRole({ owner: [], manager: [], editor: [] });
-      } finally {
-        setLoadingMyMaps(false);
+    const cached = pinCacheRef.current.get(pinIdFromUrl);
+    if (cached) {
+      setSelectedPin(cached);
+      setIsLoadingPin(false);
+      return;
+    }
+    setIsLoadingPin(true);
+    setSelectedPin(null);
+    let cancelled = false;
+    fetchPinData(pinIdFromUrl).then((data) => {
+      if (!cancelled) {
+        setSelectedPin(data);
+        setIsLoadingPin(Boolean(data && (data.description || data.caption || data.emoji || data.image_url || data.video_url)));
       }
-    };
-    
-    fetchMyMaps();
-  }, [viewType, account?.id]);
+    }).finally(() => {
+      if (!cancelled) setIsLoadingPin(false);
+    });
+    return () => { cancelled = true; };
+  }, [hasPinSelection, pinIdFromUrl, fetchPinData]);
 
-  // Filter maps by search
-  const filteredMapsByRole = useMemo(() => {
-    if (viewType === 'featured') {
-      const filtered = searchQuery.trim()
-        ? featuredMaps.filter(map => {
-            const query = searchQuery.toLowerCase();
-            return (map.name || '').toLowerCase().includes(query) ||
-                   (map.description || '').toLowerCase().includes(query);
-          })
-        : featuredMaps;
-      return { owner: [], manager: [], editor: [], community: [], featured: filtered };
+  useEffect(() => {
+    if (!hasLocationSelection || !latFromUrl || !lngFromUrl) {
+      setSelectedLocation(null);
+      return;
     }
-    
-    if (viewType === 'community') {
-      const filtered = searchQuery.trim()
-        ? communityMaps.filter(map => {
-            const query = searchQuery.toLowerCase();
-            return (map.name || '').toLowerCase().includes(query) ||
-                   (map.description || '').toLowerCase().includes(query);
-          })
-        : communityMaps;
-      return { owner: [], manager: [], editor: [], community: filtered, featured: [] };
+    setSelectedPin(null);
+    const lat = parseFloat(latFromUrl);
+    const lng = parseFloat(lngFromUrl);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setSelectedLocation({ lat, lng, address: null, mapMeta: null });
     }
-    
-    // For my-maps, filter each role group
-    const filterMaps = (maps: MapItem[]) => {
-      if (!searchQuery.trim()) return maps;
-      const query = searchQuery.toLowerCase();
-      return maps.filter(map => 
-        (map.name || '').toLowerCase().includes(query) ||
-        (map.description || '').toLowerCase().includes(query)
+  }, [hasLocationSelection, latFromUrl, lngFromUrl]);
+
+  const handleLocationSelect = useCallback(
+    (info: { lat: number; lng: number; address: string | null; isOpen: boolean }) => {
+      if (!info.isOpen) return;
+      setSelectedPin(null);
+      setSelectedLocation({
+        lat: info.lat,
+        lng: info.lng,
+        address: info.address,
+        mapMeta: null,
+      });
+      router.replace(buildLiveUrl({ lat: info.lat, lng: info.lng }));
+    },
+    [router, buildLiveUrl]
+  );
+
+  const handleLivePinSelect = useCallback(
+    (pinId: string, pinData?: Record<string, unknown> | null) => {
+      setSelectedLocation(null);
+      if (pinData) {
+        const pin = pinData as unknown as LivePinData;
+        if (String(pin.id) === pinId) {
+          pinCacheRef.current.set(pinId, pin);
+          setSelectedPin(pin);
+          setIsLoadingPin(false);
+          router.replace(buildLiveUrl({ pin: pinId }));
+          return;
+        }
+      }
+      const cached = pinCacheRef.current.get(pinId);
+      if (cached) {
+        setSelectedPin(cached);
+        setIsLoadingPin(false);
+        router.replace(buildLiveUrl({ pin: pinId }));
+        return;
+      }
+      setIsLoadingPin(true);
+      setSelectedPin(null);
+      router.replace(buildLiveUrl({ pin: pinId }));
+    },
+    [router, buildLiveUrl]
+  );
+
+  const handleClearSelection = useCallback(() => {
+    router.replace('/maps');
+    setSelectedLocation(null);
+    setSelectedPin(null);
+    setIsLoadingPin(false);
+    clearMapSelectionRef.current?.();
+  }, [router]);
+
+  const footerContent = useMemo(() => {
+    if (hasPinSelection && pinIdFromUrl) {
+      const pin = selectedPin && String(selectedPin.id) === pinIdFromUrl ? selectedPin : null;
+      return (
+        <LivePinCard
+          pinId={pinIdFromUrl}
+          pin={pin}
+          currentAccountId={currentAccountId}
+        />
       );
-    };
-    
+    }
+    return (
+      <MapInfo
+        location={selectedLocation}
+        zoom={liveStatus.currentZoom}
+        emptyLabel="Explore public pins on the map."
+        onClose={handleClearSelection}
+      />
+    );
+  }, [hasPinSelection, pinIdFromUrl, selectedPin, currentAccountId, selectedLocation, liveStatus.currentZoom, handleClearSelection]);
+
+  const initialData = useMemo(() => {
+    if (!liveData) return null;
     return {
-      owner: filterMaps(myMapsByRole.owner),
-      manager: filterMaps(myMapsByRole.manager),
-      editor: filterMaps(myMapsByRole.editor),
-      community: [],
-      featured: [],
+      map: liveData.map as any,
+      pins: liveData.pins,
+      areas: [],
+      members: null,
+      tags: liveData.tags,
     };
-  }, [viewType, featuredMaps, communityMaps, myMapsByRole, searchQuery]);
-  
-  // Total count for current view
-  const totalCount = useMemo(() => {
-    if (viewType === 'featured') return filteredMapsByRole.featured.length;
-    if (viewType === 'community') return filteredMapsByRole.community.length;
-    return filteredMapsByRole.owner.length + filteredMapsByRole.manager.length + filteredMapsByRole.editor.length;
-  }, [viewType, filteredMapsByRole]);
+  }, [liveData]);
 
-  // Get custom_maps feature using canonical slug (invariant enforcement)
-  const customMapsFeature = useMemo(() => {
-    return features.find(f => f.slug === MAP_FEATURE_SLUG);
-  }, [features]);
-
-  // Owned maps count is source of truth (invariant)
-  const ownedMapsCount = useMemo(() => {
-    return filteredMapsByRole.owner.length;
-  }, [filteredMapsByRole.owner.length]);
-
-  // Use centralized limit calculation (invariant enforcement)
-  const limitState = useMemo(() => {
-    return calculateMapLimitState(ownedMapsCount, customMapsFeature || null);
-  }, [ownedMapsCount, customMapsFeature]);
-
-  // Backward compatibility: isLimitReached and mapLimitDisplay
-  const isLimitReached = limitState.isAtLimit;
-  const mapLimitDisplay = limitState.displayText;
-
-  const handleCloseSidebar = useCallback(() => {
-    // Sidebar disabled - no action needed
-  }, []);
-
-  // Sidebar configurations - empty to disable sidebar
-  const sidebarConfigs = useMemo(() => {
-    return [];
-  }, []);
+  if (loading || !liveData?.pins) {
+    return (
+      <div className="flex items-center justify-center w-full h-[calc(100vh-3.5rem)] bg-gray-50">
+        <div className="text-sm text-gray-500">Loading map…</div>
+      </div>
+    );
+  }
 
   return (
     <>
       <PageViewTracker />
-        <PageWrapper
-        headerContent={null}
-        searchComponent={null}
-        accountDropdownProps={{
-          onAccountClick: () => {},
-          onSignInClick: openWelcome,
-        }}
-        searchResultsComponent={<SearchResults />}
-      >
-        <MapsPageLayout
-          activeSidebar={activeSidebar}
-          onSidebarClose={handleCloseSidebar}
-          sidebarConfigs={sidebarConfigs}
-        >
-          <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-3">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <MapIcon className="w-4 h-4 text-gray-700" />
-              <h1 className="text-sm font-semibold text-gray-900">Maps</h1>
-            </div>
-          </div>
-
-          {/* Map Feed */}
-          <div className="space-y-3">
-            {/* All Maps */}
-            <div className="space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-sm font-semibold text-gray-900">
-                    {viewType === 'featured' ? 'Featured' : viewType === 'community' ? 'All Maps' : 'My Maps'}
-                  </h2>
-                  {/* View Toggle */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setViewType('featured');
-                        router.push('/maps?view=featured');
-                      }}
-                      className={`text-xs font-medium transition-colors ${
-                        viewType === 'featured'
-                          ? 'text-gray-900'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Featured
-                    </button>
-                    <button
-                      onClick={() => {
-                        setViewType('community');
-                        router.push('/maps?view=community');
-                      }}
-                      className={`text-xs font-medium transition-colors ${
-                        viewType === 'community'
-                          ? 'text-gray-900'
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Community
-                    </button>
-                    {account && (
-                      <button
-                        onClick={() => {
-                          setViewType('my-maps');
-                          router.push('/maps?view=my-maps');
-                        }}
-                        className={`text-xs font-medium transition-colors ${
-                          viewType === 'my-maps'
-                            ? 'text-gray-900'
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        My Maps
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Search */}
-                  <div className="relative">
-                    <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-500" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search maps..."
-                      className="pl-7 pr-2 py-1.5 text-xs bg-white border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                    />
-                  </div>
-                  {account && (
-                    <div className="flex items-center gap-2">
-                      {!limitState.canCreate ? (
-                        <>
-                          <button
-                            onClick={() => {
-                              router.push('/billing');
-                            }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors text-white bg-red-600 hover:bg-red-700"
-                            title="Map limit reached. Click to upgrade."
-                          >
-                            <PlusIcon className="w-3 h-3" />
-                            <span>Upgrade</span>
-                          </button>
-                          {customMapsFeature?.limit_value !== null && customMapsFeature?.limit_value !== undefined && (
-                            <span className="text-xs text-gray-500">
-                              ({customMapsFeature.limit_value})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            router.push('/maps/new');
-                          }}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors text-white bg-indigo-600 hover:bg-indigo-700"
-                          title="Create a new map"
-                        >
-                          <PlusIcon className="w-3 h-3" />
-                          <span>Create Map</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <span className="text-xs text-gray-500">
-                    ({totalCount})
-                  </span>
-                </div>
-              </div>
-              {viewType === 'featured' && loadingFeatured ? (
-                <div className="text-xs text-gray-500">Loading featured maps...</div>
-              ) : viewType === 'my-maps' && loadingMyMaps ? (
-                <div className="text-xs text-gray-500">Loading your maps...</div>
-              ) : viewType === 'community' && loadingCommunity ? (
-                <div className="text-xs text-gray-500">Loading maps...</div>
-              ) : viewType === 'featured' ? (
-                filteredMapsByRole.featured.length === 0 ? (
-                  <div className="text-xs text-gray-500 text-center py-8">
-                    {searchQuery ? 'No featured maps match your search' : 'No featured maps'}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                    {filteredMapsByRole.featured.map((map) => (
-                      <MapCard
-                        key={map.id}
-                        map={map}
-                        account={account}
-                        showRoleIcon={false}
-                      />
-                    ))}
-                  </div>
-                )
-              ) : viewType === 'my-maps' ? (
-                <div className="space-y-4">
-                  {/* Owner Section */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-gray-900">Owner</h3>
-                      {(() => {
-                        const mapFeature = features.find(f => f.slug === 'custom_maps');
-                        if (!mapFeature) return null;
-                        
-                        const limitDisplay = mapFeature.is_unlimited
-                          ? `${ownedMapsCount} (unlimited)`
-                          : mapFeature.limit_value !== null
-                            ? `${ownedMapsCount} / ${mapFeature.limit_value}`
-                            : `${ownedMapsCount}`;
-                        
-                        return (
-                          <span className={`text-xs ${ownedMapsCount >= (mapFeature.limit_value || Infinity) ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
-                            {limitDisplay}
-                          </span>
-                        );
-                      })()}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                      {/* Placeholder Create Map Card */}
-                      {account && (
-                        <div
-                          onClick={() => {
-                            if (!limitState.canCreate) {
-                              router.push('/billing');
-                              return;
-                            }
-                            router.push('/maps/new');
-                          }}
-                          className={`bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors cursor-pointer group overflow-hidden relative ${
-                            !limitState.canCreate ? 'opacity-60' : ''
-                          }`}
-                        >
-                          <div className="w-full h-48 bg-gray-100 relative overflow-hidden flex items-center justify-center">
-                            {!limitState.canCreate ? (
-                              <div className="flex flex-col items-center justify-center gap-2 p-[10px]">
-                                <div className="text-xs font-semibold text-red-600">Limit Reached</div>
-                                <div className="text-[10px] text-gray-500 text-center">
-                                  {customMapsFeature?.limit_value !== null && customMapsFeature?.limit_value !== undefined
-                                    ? `(${customMapsFeature.limit_value})`
-                                    : ''}
-                                </div>
-                                <div className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors">
-                                  <PlusIcon className="w-3 h-3" />
-                                  <span>Upgrade</span>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center gap-2 p-[10px]">
-                                <PlusIcon className="w-8 h-8 text-gray-400" />
-                                <div className="text-xs font-semibold text-gray-700">Create Map</div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      {filteredMapsByRole.owner.map((map) => (
-                        <MapCard
-                          key={map.id}
-                          map={map}
-                          account={account}
-                          showRoleIcon={true}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Manager Section */}
-                  {filteredMapsByRole.manager.length > 0 && (
-                    <div className="space-y-2">
-                      <h3 className="text-xs font-semibold text-gray-900">Manager</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                        {filteredMapsByRole.manager.map((map) => (
-                          <MapCard
-                            key={map.id}
-                            map={map}
-                            account={account}
-                            showRoleIcon={true}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Editor Section */}
-                  {filteredMapsByRole.editor.length > 0 && (
-                    <div className="space-y-2">
-                      <h3 className="text-xs font-semibold text-gray-900">Editor</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                        {filteredMapsByRole.editor.map((map) => (
-                          <MapCard
-                            key={map.id}
-                            map={map}
-                            account={account}
-                            showRoleIcon={true}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Empty state */}
-                  {totalCount === 0 && (
-                    <div className="text-xs text-gray-500 text-center py-8">
-                      {searchQuery
-                        ? 'No maps match your search'
-                        : 'You are not a member of any maps yet'}
-                    </div>
-                  )}
-                </div>
-              ) : filteredMapsByRole.community.length === 0 ? (
-                <div className="text-xs text-gray-500 text-center py-8">
-                  {searchQuery ? 'No maps match your search' : 'No maps found'}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-2 auto-rows-fr">
-                  {filteredMapsByRole.community.map((map) => (
-                    <MapCard
-                      key={map.id}
-                      map={map}
-                      account={account}
-                      showRoleIcon={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+      <NewPageWrapper>
+        <div className="relative w-full h-[calc(100vh-3.5rem)] overflow-hidden">
+          {showMentionTypes && <MentionTypeFilter tags={liveData.tags} visible={showMentionTypes} />}
+          <MapPage
+            params={Promise.resolve({ id: 'public' })}
+            skipPageWrapper
+            onLocationSelect={handleLocationSelect}
+            onLiveStatusChange={setLiveStatus}
+            onLivePinSelect={handleLivePinSelect}
+            onRegisterClearSelection={(fn) => { clearMapSelectionRef.current = fn; }}
+            initialData={initialData}
+          />
+          {!isWelcomeModalOpen && hasSelection && (
+            <MapsPageFooter
+              children={footerContent}
+              onClose={handleClearSelection}
+              showCloseIcon={hasSelection}
+            />
+          )}
         </div>
-        </MapsPageLayout>
-      </PageWrapper>
+      </NewPageWrapper>
     </>
+  );
+}
+
+export default function MapsPage() {
+  return (
+    <SearchStateProvider>
+      <MapsPageContent />
+    </SearchStateProvider>
   );
 }

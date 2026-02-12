@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
-    // Query 24-hour stats using public.get_url_stats for /live page
+    // Query 24-hour stats using public.get_url_stats for /maps page
     const { data: stats24h, error: error24h } = await supabase.rpc('get_url_stats', {
-      p_url: '/live',
+      p_url: '/maps',
       p_hours: 24,
     });
 
@@ -43,13 +43,13 @@ export async function GET(request: NextRequest) {
     const { count: countPrevious24h } = await supabase
       .from('url_visits')
       .select('*', { count: 'exact', head: true })
-      .eq('url', '/live')
+      .eq('url', '/maps')
       .gte('viewed_at', fortyEightHoursAgo)
       .lt('viewed_at', twentyFourHoursAgo);
 
-    // Query total stats (no time filter) for /live page
+    // Query total stats (no time filter) for /maps page
     const { data: statsTotal, error: errorTotal } = await supabase.rpc('get_url_stats', {
-      p_url: '/live',
+      p_url: '/maps',
       p_hours: null,
     });
 
@@ -58,13 +58,13 @@ export async function GET(request: NextRequest) {
       const { count: count24h } = await supabase
         .from('url_visits')
         .select('*', { count: 'exact', head: true })
-        .eq('url', '/live')
+        .eq('url', '/maps')
         .gte('viewed_at', twentyFourHoursAgo);
 
       const { count: countTotal } = await supabase
         .from('url_visits')
         .select('*', { count: 'exact', head: true })
-        .eq('url', '/live');
+        .eq('url', '/maps');
 
       return NextResponse.json({
         last24Hours: count24h || 0,

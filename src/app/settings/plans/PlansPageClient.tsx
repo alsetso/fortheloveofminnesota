@@ -17,23 +17,23 @@ export default function PlansPageClient({ currentPlanSlug }: PlansPageClientProp
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Plans & Features</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h2 className="text-sm font-semibold text-foreground">Plans & Features</h2>
+            <p className="text-xs text-foreground/60 mt-0.5">
               Compare plans and their features
             </p>
           </div>
           {isAdmin && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">View Mode:</span>
+              <span className="text-xs text-foreground/70">View Mode:</span>
               <button
                 onClick={() => setIsAdminMode(false)}
                 className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                   !isAdminMode
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-lake-blue text-foreground'
+                    : 'bg-surface-accent text-foreground/70 hover:bg-surface-accent/80'
                 }`}
               >
                 Public
@@ -42,8 +42,8 @@ export default function PlansPageClient({ currentPlanSlug }: PlansPageClientProp
                 onClick={() => setIsAdminMode(true)}
                 className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                   isAdminMode
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-lake-blue text-foreground'
+                    : 'bg-surface-accent text-foreground/70 hover:bg-surface-accent/80'
                 }`}
               >
                 Admin
@@ -54,7 +54,7 @@ export default function PlansPageClient({ currentPlanSlug }: PlansPageClientProp
       </div>
 
       {/* Plans Comparison Table */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
         <PlansComparisonTable 
           currentPlanSlug={currentPlanSlug} 
           isAdmin={isAdminMode && isAdmin}

@@ -48,7 +48,8 @@ export async function GET(
 
         // Resolve identifier to map_id
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id');
         
         if (isUUID(identifier)) {
@@ -129,7 +130,8 @@ export async function DELETE(
 
         // Resolve identifier to map_id
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id');
         
         if (isUUID(identifier)) {

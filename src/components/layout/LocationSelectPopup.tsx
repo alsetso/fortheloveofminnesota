@@ -177,14 +177,11 @@ export default function LocationSelectPopup({
       return;
     }
     
-    // Default: navigate to live map with contribute overlay
+    // Default: navigate to maps with location
     const params = new URLSearchParams();
     params.set('lat', lat.toString());
     params.set('lng', lng.toString());
-    if (selectedMentionTypeId || propMentionTypeId) {
-      params.set('mention_type_id', (selectedMentionTypeId || propMentionTypeId)!);
-    }
-    router.push(`/map/live?${params.toString()}#contribute`);
+    router.push(`/maps?${params.toString()}`);
     handleClose();
   };
 

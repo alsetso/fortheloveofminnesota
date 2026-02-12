@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import PageWrapper from '@/components/layout/PageWrapper';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import OnboardingClient from '@/features/account/components/OnboardingClient';
 import type { Account } from '@/features/auth';
 
@@ -22,7 +22,7 @@ export default function OnboardingPageClient({ initialAccount, redirectTo }: Onb
   }, []);
 
   return (
-    <PageWrapper stepper={stepperState}>
+    <NewPageWrapper>
       <div className="max-w-md mx-auto px-4 py-8">
         <OnboardingClient 
           initialAccount={initialAccount}
@@ -30,6 +30,6 @@ export default function OnboardingPageClient({ initialAccount, redirectTo }: Onb
           onStepperChange={handleStepperChange}
         />
       </div>
-    </PageWrapper>
+    </NewPageWrapper>
   );
 }

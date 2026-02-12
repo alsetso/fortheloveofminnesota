@@ -5,7 +5,6 @@ import WelcomeModal from '@/features/account/components/WelcomeModal';
 import CreateAccountModal from '@/features/account/components/CreateAccountModal';
 import BillingModal from '@/components/modals/BillingModal';
 import ComingSoonModal from '@/components/modals/ComingSoonModal';
-
 /**
  * GlobalModals - Renders all URL-controlled modals at the app level
  * 
@@ -13,7 +12,7 @@ import ComingSoonModal from '@/components/modals/ComingSoonModal';
  * positioned in front of other content with proper z-index.
  */
 export default function GlobalModals() {
-  const { modal, closeModal, openWelcome } = useAppModalContext();
+  const { modal, closeModal } = useAppModalContext();
 
   return (
     <>
@@ -42,7 +41,6 @@ export default function GlobalModals() {
         onClose={closeModal}
         feature={modal.comingSoonFeature || 'This feature'}
       />
-
     </>
   );
 }

@@ -42,7 +42,7 @@ export default function AppHeader({ onAccountImageClick, onUniversalClose, showC
 
   return (
     <header
-      className={`flex-shrink-0 flex items-center gap-2 py-[10px] ${isSearchActive ? 'bg-white' : ''}`}
+      className={`flex-shrink-0 flex items-center gap-2 py-[10px] ${isSearchActive ? 'bg-surface' : ''}`}
       data-container="app-header"
       aria-label="App header"
     >
@@ -54,13 +54,13 @@ export default function AppHeader({ onAccountImageClick, onUniversalClose, showC
         />
       </div>
       <div className="flex-shrink-0">
-        <AccountDropdown variant="light" onTriggerClick={onAccountImageClick} />
+        <AccountDropdown onTriggerClick={onAccountImageClick} />
       </div>
       {showCloseIcon && (
         <button
           type="button"
           onClick={handleClose}
-          className="flex-shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
+          className="flex-shrink-0 w-[30px] h-[30px] rounded-full flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors"
           aria-label="Close"
         >
           <XMarkIcon className="w-4 h-4" />

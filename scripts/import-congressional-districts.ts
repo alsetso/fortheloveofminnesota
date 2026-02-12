@@ -22,7 +22,7 @@ import { resolve } from 'path';
 // Load environment variables from .env.local
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const DISTRICTS_DIR = join(process.cwd(), 'minnesota_gov', 'Congressional Districts JSON');
+const DISTRICTS_DIR = join(process.cwd(), 'minnesota_gov', 'GIS', 'Congressional Districts JSON');
 
 interface GeoJSONFeatureCollection {
   type: 'FeatureCollection';

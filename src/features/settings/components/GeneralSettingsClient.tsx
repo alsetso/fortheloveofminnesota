@@ -265,49 +265,49 @@ export default function GeneralSettingsClient() {
 
   return (
     <>
-      <div className="bg-white border border-gray-200 rounded-md p-[10px] flex flex-col gap-1.5">
-        <p className="text-xs text-gray-600">Signed in as {userEmail || '—'}</p>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px] flex flex-col gap-1.5">
+        <p className="text-xs text-foreground-muted">Signed in as {userEmail || '—'}</p>
         {account.username && (
-          <Link href={`/${encodeURIComponent(account.username)}`} className="text-xs font-medium text-gray-900 hover:underline">
+          <Link href={`/${encodeURIComponent(account.username)}`} className="text-xs font-medium text-foreground hover:underline">
             View profile →
           </Link>
         )}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Currently in Minnesota</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Currently in Minnesota</h3>
         <div className="space-y-2">
           {locationError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-[10px] py-[10px] rounded-md text-xs flex items-start gap-2">
+            <div className="bg-red-900/20 border border-red-500/50 text-red-400 px-[10px] py-[10px] rounded-md text-xs flex items-start gap-2">
               <XCircleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
               <span>{locationError}</span>
             </div>
           )}
           
-          <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md">
+          <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md bg-surface-accent">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <h4 className="text-xs font-semibold text-gray-900">State Verification</h4>
+                <h4 className="text-xs font-semibold text-foreground">State Verification</h4>
                 {stateVerified === true && (
                   <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                     verificationExpiration.isExpired 
-                      ? 'bg-red-100 text-red-800'
+                      ? 'bg-red-900/20 text-red-400'
                       : verificationExpiration.daysRemaining !== null && verificationExpiration.daysRemaining <= 7
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-green-100 text-green-800'
+                      ? 'bg-yellow-900/20 text-yellow-400'
+                      : 'bg-green-900/20 text-green-400'
                   }`}>
                     <CheckCircleIcon className="w-3 h-3" />
                     {verificationExpiration.isExpired ? 'Expired' : 'Verified'}
                   </span>
                 )}
                 {stateVerified === false && (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/20 text-red-400">
                     <XCircleIcon className="w-3 h-3" />
                     Not Verified
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-foreground-muted">
                 {stateVerified === null 
                   ? 'Verify your current location in Minnesota'
                   : stateVerified
@@ -318,11 +318,11 @@ export default function GeneralSettingsClient() {
                           <>
                             <br />
                             {verificationExpiration.isExpired ? (
-                              <span className="text-red-600 font-medium">
+                              <span className="text-red-400 font-medium">
                                 Expired • Recheck required
                               </span>
                             ) : verificationExpiration.daysRemaining !== null && verificationExpiration.daysRemaining <= 7 ? (
-                              <span className="text-yellow-600">
+                              <span className="text-yellow-400">
                                 Expires {verificationExpiration.daysRemaining === 0 
                                   ? 'today' 
                                   : verificationExpiration.daysRemaining === 1 
@@ -331,7 +331,7 @@ export default function GeneralSettingsClient() {
                                 } • Recheck by {verificationExpiration.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                               </span>
                             ) : (
-                              <span className="text-gray-500">
+                              <span className="text-foreground-subtle">
                                 Recheck by {verificationExpiration.expiresAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} ({verificationExpiration.daysRemaining} days remaining)
                               </span>
                             )}
@@ -346,7 +346,7 @@ export default function GeneralSettingsClient() {
             <button
               onClick={handleCheckLocation}
               disabled={isCheckingLocation}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-surface border border-border-muted dark:border-white/20 hover:bg-surface-accent dark:hover:bg-white/10 rounded-md transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isCheckingLocation ? (
                 <>
@@ -364,13 +364,13 @@ export default function GeneralSettingsClient() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Location Preferences</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Location Preferences</h3>
         <div className="space-y-2">
-          <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md">
+          <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md bg-surface-accent">
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-semibold text-gray-900 mb-0.5">Cities & Towns</h4>
-              <p className="text-xs text-gray-600">
+              <h4 className="text-xs font-semibold text-foreground mb-0.5">Cities & Towns</h4>
+              <p className="text-xs text-foreground-muted">
                 {getLocationDisplayName(locationPreferences.cities_and_towns, 'cities_and_towns') || 'Not set'}
               </p>
             </div>
@@ -383,10 +383,10 @@ export default function GeneralSettingsClient() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md">
+          <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md bg-surface-accent">
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-semibold text-gray-900 mb-0.5">County</h4>
-              <p className="text-xs text-gray-600">
+              <h4 className="text-xs font-semibold text-foreground mb-0.5">County</h4>
+              <p className="text-xs text-foreground-muted">
                 {getLocationDisplayName(locationPreferences.county, 'county') || 'Not set'}
               </p>
             </div>
@@ -399,10 +399,10 @@ export default function GeneralSettingsClient() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md">
+          <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md bg-surface-accent">
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-semibold text-gray-900 mb-0.5">Districts</h4>
-              <p className="text-xs text-gray-600">
+              <h4 className="text-xs font-semibold text-foreground mb-0.5">Districts</h4>
+              <p className="text-xs text-foreground-muted">
                 {getLocationDisplayName(locationPreferences.districts, 'districts') || 'Not set'}
               </p>
             </div>
@@ -417,36 +417,36 @@ export default function GeneralSettingsClient() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">ID Verification</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-3">ID Verification</h3>
         <div className="space-y-2">
           {loadingIdVerification ? (
-            <div className="text-xs text-gray-500">Loading...</div>
+            <div className="text-xs text-foreground-muted">Loading...</div>
           ) : (
-            <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md">
+            <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md bg-surface-accent">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h4 className="text-xs font-semibold text-gray-900">Identity Verification</h4>
+                  <h4 className="text-xs font-semibold text-foreground">Identity Verification</h4>
                   {idVerificationStatus?.hasVerification && idVerificationStatus.status === 'approved' && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/20 text-green-400">
                       <CheckCircleIcon className="w-3 h-3" />
                       Approved
                     </span>
                   )}
                   {idVerificationStatus?.hasVerification && idVerificationStatus.status === 'pending' && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-900/20 text-yellow-400">
                       <ClockIcon className="w-3 h-3" />
                       Pending
                     </span>
                   )}
                   {idVerificationStatus?.hasVerification && idVerificationStatus.status === 'rejected' && (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-900/20 text-red-400">
                       <XCircleIcon className="w-3 h-3" />
                       Rejected
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground-muted">
                   {idVerificationStatus?.hasVerification
                     ? idVerificationStatus.status === 'approved'
                       ? 'Your identity has been verified'
@@ -468,18 +468,18 @@ export default function GeneralSettingsClient() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">Account Actions</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Account Actions</h3>
         {signOutError && (
-          <div className="mb-3 bg-red-50 border border-red-200 text-red-700 px-[10px] py-[10px] rounded-md text-xs flex items-start gap-2">
+          <div className="mb-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-400 px-[10px] py-[10px] rounded-md text-xs flex items-start gap-2">
             <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span>{signOutError}</span>
           </div>
         )}
-        <div className="flex items-center justify-between p-[10px] border border-gray-200 rounded-md hover:bg-gray-50 transition-colors">
+        <div className="flex items-center justify-between p-[10px] border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent dark:hover:bg-white/10 transition-colors bg-surface-accent">
           <div>
-            <h4 className="text-xs font-semibold text-gray-900 mb-0.5">Sign Out</h4>
-            <p className="text-xs text-gray-600">Sign out of your account on this device</p>
+            <h4 className="text-xs font-semibold text-foreground mb-0.5">Sign Out</h4>
+            <p className="text-xs text-foreground-muted">Sign out of your account on this device</p>
           </div>
           <button onClick={handleSignOutClick} disabled={isSigningOut} className="flex items-center gap-1.5 px-[10px] py-[10px] text-xs font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {isSigningOut ? (<><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> Signing out...</>) : 'Sign Out'}
@@ -488,19 +488,19 @@ export default function GeneralSettingsClient() {
       </div>
 
       {showSignOutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" role="dialog" aria-modal="true" aria-labelledby="signout-title" onKeyDown={(e) => e.key === 'Escape' && handleSignOutCancel()}>
-          <div className="bg-white rounded-md border border-gray-200 w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="signout-title" onKeyDown={(e) => e.key === 'Escape' && handleSignOutCancel()}>
+          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md w-full max-w-md mx-4">
             <div className="p-[10px]">
               <div className="flex items-center mb-3">
-                <div className="flex-shrink-0 w-8 h-8 mx-auto bg-red-100 rounded-md flex items-center justify-center">
-                  <ArrowRightOnRectangleIcon className="w-4 h-4 text-red-600" aria-hidden />
+                <div className="flex-shrink-0 w-8 h-8 mx-auto bg-red-900/20 rounded-md flex items-center justify-center">
+                  <ArrowRightOnRectangleIcon className="w-4 h-4 text-red-400" aria-hidden />
                 </div>
               </div>
               <div className="text-center">
-                <h3 id="signout-title" className="text-sm font-semibold text-gray-900 mb-1.5">Sign out of your account?</h3>
-                <p className="text-xs text-gray-600 mb-3">You&apos;ll need to sign in again to access your account.</p>
+                <h3 id="signout-title" className="text-sm font-semibold text-foreground mb-1.5">Sign out of your account?</h3>
+                <p className="text-xs text-foreground-muted mb-3">You&apos;ll need to sign in again to access your account.</p>
                 <div className="flex gap-2">
-                  <button onClick={handleSignOutCancel} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-gray-900 border border-gray-200 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 transition-colors">Cancel</button>
+                  <button onClick={handleSignOutCancel} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-foreground-muted bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-foreground/30 transition-colors">Cancel</button>
                   <button onClick={handleSignOutConfirm} disabled={isSigningOut} className="flex-1 px-[10px] py-[10px] text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">{isSigningOut ? 'Signing out...' : 'Sign out'}</button>
                 </div>
               </div>

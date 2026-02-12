@@ -14,12 +14,18 @@ export type BoundarySelectItem = {
   details?: Record<string, unknown>;
 };
 
+type MapboxFeatureLike = { properties?: Record<string, unknown>; geometry?: unknown; layer?: { id?: string } };
+
 interface CongressionalDistrictsLayerProps {
   map: MapboxMapInstance | null;
   mapLoaded: boolean;
   visible: boolean;
+  selectedId?: string;
+  focusOnlyId?: string;
+  /** When set, parent handles interaction; layer only applies highlight */
+  hoveredFeature?: MapboxFeatureLike | null;
   onDistrictHover?: (district: any) => void;
-  /** When set (e.g. /live), layer only visible at zoom >= minzoom and < maxzoom. */
+  /** When set (e.g. /maps), layer only visible at zoom >= minzoom and < maxzoom. */
   minzoom?: number;
   maxzoom?: number;
   onLoadChange?: (loading: boolean) => void;
@@ -34,6 +40,9 @@ export default function CongressionalDistrictsLayer({
   map,
   mapLoaded,
   visible,
+  selectedId,
+  focusOnlyId,
+  hoveredFeature: externalHoveredFeature,
   onDistrictHover,
   minzoom,
   maxzoom,
@@ -107,6 +116,18 @@ export default function CongressionalDistrictsLayer({
 
     const mapboxMap = map as any;
 
+    const districtsToRender = focusOnlyId
+      ? districts.filter(
+          (d) =>
+            d.id === focusOnlyId ||
+            String(d.district_number) === focusOnlyId
+        )
+      : districts;
+    if (districtsToRender.length === 0) {
+      isAddingLayersRef.current = false;
+      return;
+    }
+
     // Color palette for 8 districts
     const districtColors = [
       '#FF6B6B', // District 1 - Red
@@ -119,7 +140,7 @@ export default function CongressionalDistrictsLayer({
       '#6C5CE7', // District 8 - Purple
     ];
 
-    districts.forEach((district) => {
+    districtsToRender.forEach((district) => {
       const districtNum = district.district_number;
       const sourceId = `congressional-district-${districtNum}-source`;
       const fillLayerId = `congressional-district-${districtNum}-fill`;
@@ -228,6 +249,68 @@ export default function CongressionalDistrictsLayer({
         }, beforeId);
       }
 
+      // Handle selection highlighting for this district
+      const updateDistrictSelection = () => {
+        const isSelected = selectedId && (
+          selectedId === String(districtNum) || 
+          selectedId === (district as { id?: string }).id ||
+          selectedId === district.district_number?.toString()
+        );
+
+        if (isSelected && featureCollection.features && featureCollection.features.length > 0) {
+          // Highlight selected district
+          const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+          if (highlightSource && highlightSource.setData) {
+            highlightSource.setData({
+              type: 'FeatureCollection',
+              features: featureCollection.features,
+            });
+          }
+        } else if (!selectedId) {
+          // Clear highlight if no selection
+          const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+          if (highlightSource && highlightSource.setData) {
+            highlightSource.setData({
+              type: 'FeatureCollection',
+              features: [],
+            });
+          }
+        }
+
+        // Update opacity based on selection
+        if (selectedId) {
+          const isSelected = selectedId === String(districtNum) || 
+                            selectedId === (district as { id?: string }).id ||
+                            selectedId === district.district_number?.toString();
+          
+          try {
+            if (mapboxMap.getLayer(fillLayerId)) {
+              mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', isSelected ? 0.2 : 0.05);
+            }
+            if (mapboxMap.getLayer(outlineLayerId)) {
+              mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', isSelected ? 0.8 : 0.2);
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        } else {
+          // Restore normal opacity when no selection
+          try {
+            if (mapboxMap.getLayer(fillLayerId)) {
+              mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.2);
+            }
+            if (mapboxMap.getLayer(outlineLayerId)) {
+              mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', 0.8);
+            }
+          } catch (e) {
+            // Ignore errors
+          }
+        }
+      };
+
+      // Initial selection update
+      updateDistrictSelection();
+
       // Add hover handlers - get specific feature at cursor
       const handleMouseMove = (e: any) => {
         mapboxMap.getCanvas().style.cursor = 'pointer';
@@ -250,24 +333,29 @@ export default function CongressionalDistrictsLayer({
             });
           }
 
-          // Fade all other districts
+          // Fade all other districts (but respect selection state)
           districts.forEach((otherDistrict) => {
             if (otherDistrict.district_number !== districtNum) {
               const otherFillLayerId = `congressional-district-${otherDistrict.district_number}-fill`;
               const otherOutlineLayerId = `congressional-district-${otherDistrict.district_number}-outline`;
+              const isOtherSelected = selectedId && (
+                selectedId === String(otherDistrict.district_number) ||
+                selectedId === (otherDistrict as { id?: string }).id ||
+                selectedId === otherDistrict.district_number?.toString()
+              );
 
               try {
                 if (mapboxMap.getLayer(otherFillLayerId)) {
-                  mapboxMap.setPaintProperty(otherFillLayerId, 'fill-opacity', 0.05);
+                  mapboxMap.setPaintProperty(otherFillLayerId, 'fill-opacity', isOtherSelected ? 0.2 : 0.05);
                 }
                 if (mapboxMap.getLayer(otherOutlineLayerId)) {
-                  mapboxMap.setPaintProperty(otherOutlineLayerId, 'line-opacity', 0.2);
+                  mapboxMap.setPaintProperty(otherOutlineLayerId, 'line-opacity', isOtherSelected ? 0.8 : 0.2);
                 }
               } catch (e) {
                 // Ignore errors
               }
             } else {
-              // Keep current district at normal opacity
+              // Keep hovered district at normal opacity
               try {
                 if (mapboxMap.getLayer(fillLayerId)) {
                   mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', 0.2);
@@ -303,39 +391,17 @@ export default function CongressionalDistrictsLayer({
           onDistrictHover(null);
         }
 
-        // Clear highlight
-        const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
-        if (highlightSource && highlightSource.setData) {
-          highlightSource.setData({
-            type: 'FeatureCollection',
-            features: [],
-          });
-        }
-
-        // Restore all districts to normal opacity
-        districts.forEach((otherDistrict) => {
-          const otherFillLayerId = `congressional-district-${otherDistrict.district_number}-fill`;
-          const otherOutlineLayerId = `congressional-district-${otherDistrict.district_number}-outline`;
-
-          try {
-            if (mapboxMap.getLayer(otherFillLayerId)) {
-              mapboxMap.setPaintProperty(otherFillLayerId, 'fill-opacity', 0.2);
-            }
-            if (mapboxMap.getLayer(otherOutlineLayerId)) {
-              mapboxMap.setPaintProperty(otherOutlineLayerId, 'line-opacity', 0.8);
-            }
-          } catch (e) {
-            // Ignore errors
-          }
-        });
+        // Restore selection state (or clear if no selection)
+        updateDistrictSelection();
       };
 
-      // Use mousemove and mouseleave on fill layer (same as state, county, CTU)
-      mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
-      mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
+      if (externalHoveredFeature === undefined) {
+        mapboxMap.on('mousemove', fillLayerId, handleMouseMove);
+        mapboxMap.on('mouseleave', fillLayerId, handleMouseLeave);
+      }
     });
 
-    // Single map-level click handler for all district layers (same pattern as state/county/CTU: one handler, query layer)
+    // Single map-level click handler for all district layers
     const districtFillLayerIds = districts.map((d) => `congressional-district-${d.district_number}-fill`);
     const handleDistrictClick = (e: any) => {
       const features = mapboxMap.queryRenderedFeatures(e.point, { layers: districtFillLayerIds });
@@ -365,20 +431,19 @@ export default function CongressionalDistrictsLayer({
       }
       onBoundarySelect?.(item);
     };
-    mapboxMap.on('click', handleDistrictClick);
-
+    const attachedClick = externalHoveredFeature === undefined;
+    if (attachedClick) {
+      mapboxMap.on('click', handleDistrictClick);
+    }
     isAddingLayersRef.current = false;
 
-    // Cleanup function
     return () => {
       if (!map) return;
       const mapboxMap = map as any;
       try {
-        mapboxMap.off('click', handleDistrictClick);
-      } catch (e) {
-        // ignore
-      }
-      districts.forEach((district) => {
+        if (attachedClick) mapboxMap.off('click', handleDistrictClick);
+      } catch { /* ignore */ }
+      districtsToRender.forEach((district) => {
         const districtNum = district.district_number;
         const fillLayerId = `congressional-district-${districtNum}-fill`;
         const outlineLayerId = `congressional-district-${districtNum}-outline`;
@@ -404,7 +469,107 @@ export default function CongressionalDistrictsLayer({
         }
       });
     };
-  }, [map, mapLoaded, districts, visible, onDistrictHover, minzoom, maxzoom, onLoadChange, onBoundarySelect]);
+  }, [map, mapLoaded, districts, visible, selectedId, focusOnlyId, externalHoveredFeature, onDistrictHover, minzoom, maxzoom, onLoadChange, onBoundarySelect]);
+
+  // Apply highlight when parent passes hoveredFeature (Explore unified interaction)
+  useEffect(() => {
+    if (externalHoveredFeature === undefined || !map || !mapLoaded || !visible || districts.length === 0) return;
+    const mapboxMap = map as any;
+    const f = externalHoveredFeature as MapboxFeatureLike;
+    const layerId = f.layer?.id;
+    const match = typeof layerId === 'string' && layerId.match(/^congressional-district-(\d+)-fill$/);
+    if (externalHoveredFeature && match) {
+      const districtNum = parseInt(match[1], 10);
+      const highlightSourceId = `congressional-district-${districtNum}-highlight-source`;
+      const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+      if (highlightSource?.setData) {
+        highlightSource.setData({ type: 'FeatureCollection', features: [externalHoveredFeature] });
+      }
+      districts.forEach((d) => {
+        const n = d.district_number;
+        const fillId = `congressional-district-${n}-fill`;
+        const outlineId = `congressional-district-${n}-outline`;
+        const isHovered = n === districtNum;
+        const isSelected = selectedId && (String(n) === selectedId || (d as { id?: string }).id === selectedId);
+        try {
+          if (mapboxMap.getLayer(fillId)) mapboxMap.setPaintProperty(fillId, 'fill-opacity', isHovered ? 0.2 : isSelected ? 0.2 : 0.05);
+          if (mapboxMap.getLayer(outlineId)) mapboxMap.setPaintProperty(outlineId, 'line-opacity', isHovered ? 0.8 : isSelected ? 0.8 : 0.2);
+        } catch { /* ignore */ }
+      });
+    } else {
+      districts.forEach((d) => {
+        const n = d.district_number;
+        const highlightSourceId = `congressional-district-${n}-highlight-source`;
+        const fillId = `congressional-district-${n}-fill`;
+        const outlineId = `congressional-district-${n}-outline`;
+        const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+        if (highlightSource?.setData) highlightSource.setData({ type: 'FeatureCollection', features: [] });
+        const isSelected = selectedId && (String(n) === selectedId || (d as { id?: string }).id === selectedId);
+        try {
+          if (mapboxMap.getLayer(fillId)) mapboxMap.setPaintProperty(fillId, 'fill-opacity', isSelected ? 0.2 : 0.2);
+          if (mapboxMap.getLayer(outlineId)) mapboxMap.setPaintProperty(outlineId, 'line-opacity', isSelected ? 0.8 : 0.8);
+        } catch { /* ignore */ }
+      });
+    }
+  }, [map, mapLoaded, visible, districts, externalHoveredFeature, selectedId]);
+
+  // Update selection when selectedId changes (separate effect to handle selection updates)
+  useEffect(() => {
+    if (!map || !mapLoaded || !visible || districts.length === 0) return;
+    
+    const mapboxMap = map as any;
+
+    districts.forEach((district) => {
+      const districtNum = district.district_number;
+      const fillLayerId = `congressional-district-${districtNum}-fill`;
+      const outlineLayerId = `congressional-district-${districtNum}-outline`;
+      const highlightSourceId = `congressional-district-${districtNum}-highlight-source`;
+      const sourceId = `congressional-district-${districtNum}-source`;
+
+      if (!mapboxMap.getLayer(fillLayerId) || !mapboxMap.getSource(sourceId)) return;
+
+      const featureCollection = district.geometry;
+      if (!featureCollection || !featureCollection.features) return;
+
+      const isSelected = selectedId && (
+        selectedId === String(districtNum) ||
+        selectedId === (district as { id?: string }).id ||
+        selectedId === district.district_number?.toString()
+      );
+
+      if (isSelected) {
+        // Highlight selected district
+        const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+        if (highlightSource && highlightSource.setData) {
+          highlightSource.setData({
+            type: 'FeatureCollection',
+            features: featureCollection.features,
+          });
+        }
+      } else if (!selectedId) {
+        // Clear highlight if no selection
+        const highlightSource = mapboxMap.getSource(highlightSourceId) as any;
+        if (highlightSource && highlightSource.setData) {
+          highlightSource.setData({
+            type: 'FeatureCollection',
+            features: [],
+          });
+        }
+      }
+
+      // Update opacity based on selection
+      try {
+        if (mapboxMap.getLayer(fillLayerId)) {
+          mapboxMap.setPaintProperty(fillLayerId, 'fill-opacity', isSelected ? 0.2 : (selectedId ? 0.05 : 0.2));
+        }
+        if (mapboxMap.getLayer(outlineLayerId)) {
+          mapboxMap.setPaintProperty(outlineLayerId, 'line-opacity', isSelected ? 0.8 : (selectedId ? 0.2 : 0.8));
+        }
+      } catch (e) {
+        // Ignore errors
+      }
+    });
+  }, [selectedId, map, mapLoaded, visible, districts]);
 
   return null; // This component doesn't render any UI
 }

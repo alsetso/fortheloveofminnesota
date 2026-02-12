@@ -3,12 +3,15 @@
 import type { ReactNode } from 'react';
 import { Post } from '@/types/post';
 import Link from 'next/link';
-import { GlobeAltIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { GlobeAltIcon, LockClosedIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import MentionCard from './MentionCard';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { MultiImageGrid } from '@/components/shared/MultiImageGrid';
 import { Account } from '@/features/auth';
 import { getMapUrl, getMapPostUrl } from '@/lib/maps/urls';
+import PostContent from '@/components/posts/PostContent';
+import { useState } from 'react';
+import CreatePostModal from './CreatePostModal';
 
 function DetailBlock({
   children,
@@ -43,6 +46,7 @@ interface FeedPostProps {
   isFirst?: boolean;
   isLast?: boolean;
   compact?: boolean;
+  onShare?: (post: Post) => void;
 }
 
 export default function FeedPost({
@@ -51,9 +55,11 @@ export default function FeedPost({
   isFirst = false,
   isLast = false,
   compact = false,
+  onShare,
 }: FeedPostProps) {
   const username = post.account?.username || 'unknown';
   const displayName = post.account?.username || 'Unknown User';
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const timeAgo = new Date(post.created_at).toLocaleDateString('en-US', {
     month: 'short',
@@ -152,7 +158,14 @@ export default function FeedPost({
           <div className="mt-1 space-y-2">
             {post.title && <h3 className="text-sm font-semibold text-gray-900">{post.title}</h3>}
 
-            <div className="text-xs text-gray-900 whitespace-pre-wrap">{post.content}</div>
+            <div className={`transition-all ${post.background_color ? '-mx-4' : ''}`}>
+              <PostContent 
+                content={post.content} 
+                taggedAccounts={post.tagged_accounts}
+                className={`text-xs whitespace-pre-wrap transition-all ${post.background_color ? '' : 'text-gray-900'}`}
+                backgroundColor={post.background_color || null}
+              />
+            </div>
 
             {post.images && post.images.length > 0 && (
               <MultiImageGrid images={post.images ?? []} postHref={post.map ? getMapPostUrl(post.map, post.id) : `/post/${post.id}`} />
@@ -269,8 +282,12 @@ export default function FeedPost({
 
             {/* Content - truncated in compact mode */}
             {contentPreview && (
-              <div className={`${compact ? 'text-xs text-gray-900 whitespace-pre-wrap mb-1 leading-tight line-clamp-3' : 'text-sm text-gray-900 whitespace-pre-wrap mb-4'}`}>
-                {contentPreview}
+              <div className={`${compact ? 'text-xs mb-1 leading-tight line-clamp-3' : 'text-sm mb-4'}`}>
+                <PostContent 
+                  content={contentPreview} 
+                  taggedAccounts={post.tagged_accounts}
+                  className={`text-gray-900 whitespace-pre-wrap ${compact ? '' : ''}`}
+                />
               </div>
             )}
 
@@ -306,16 +323,34 @@ export default function FeedPost({
           </div>
         </div>
 
-        {/* Right: Three Dots Menu */}
-        <Link
-          href={post.map ? getMapPostUrl(post.map, post.id) : '#'}
-          className={`${compact ? 'w-5 h-5' : 'w-8 h-8'} rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0`}
-          aria-label="View post"
-        >
-          <svg className={compact ? 'w-3.5 h-3.5 text-gray-600' : 'w-5 h-5 text-gray-600'} fill="currentColor" viewBox="0 0 20 20">
-            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-          </svg>
-        </Link>
+        {/* Right: Share and Menu */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onShare) {
+                onShare(post);
+              } else {
+                setShowShareModal(true);
+              }
+            }}
+            className={`${compact ? 'w-5 h-5' : 'w-8 h-8'} rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0`}
+            aria-label="Share post"
+            title="Share post"
+          >
+            <ArrowPathIcon className={compact ? 'w-3.5 h-3.5 text-gray-600' : 'w-5 h-5 text-gray-600'} />
+          </button>
+          <Link
+            href={`/post/${post.id}`}
+            className={`${compact ? 'w-5 h-5' : 'w-8 h-8'} rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0 mt-0`}
+            aria-label="View post"
+          >
+            <svg className={compact ? 'w-3.5 h-3.5 text-gray-600' : 'w-5 h-5 text-gray-600'} fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       {/* Images - hidden in compact mode, shown via indicator */}
@@ -365,6 +400,16 @@ export default function FeedPost({
             ))}
           </div>
         </div>
+      )}
+      
+      {/* Share Modal */}
+      {showShareModal && (
+        <CreatePostModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          sharedPost={post}
+          createMode="post"
+        />
       )}
     </article>
   );

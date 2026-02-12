@@ -1,33 +1,19 @@
 'use client';
 
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import NewsGenerateClient from './NewsGenerateClient';
 
 export default function NewsGeneratePageClient() {
-  const { openWelcome } = useAppModalContextSafe();
-
   return (
-    <PageWrapper
-      headerContent={null}
-      searchComponent={
-        <MapSearchInput
-          onLocationSelect={() => {
-            // Handle location selection if needed
-          }}
-        />
-      }
-      accountDropdownProps={{
-        onAccountClick: () => {
-          // Handle account click
-        },
-        onSignInClick: openWelcome,
-      }}
-      searchResultsComponent={<SearchResults />}
+    <NewPageWrapper
+      leftSidebar={<LeftSidebar />}
+      rightSidebar={<RightSidebar />}
     >
-      <NewsGenerateClient />
-    </PageWrapper>
+      <div className="w-full py-6">
+        <NewsGenerateClient />
+      </div>
+    </NewPageWrapper>
   );
 }

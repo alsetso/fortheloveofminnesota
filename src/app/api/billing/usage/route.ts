@@ -48,9 +48,6 @@ export async function GET(request: NextRequest) {
           // Collection-related features
           'collections': 'collections',
           'collection': 'collections',
-          // Group-related features
-          'groups': 'groups',
-          'group': 'groups',
         };
         
         // Get all account features to determine which resources to count
@@ -104,9 +101,6 @@ export async function GET(request: NextRequest) {
         }
         if (tableCounts['collections'] !== undefined) {
           usage.collections = tableCounts['collections'];
-        }
-        if (tableCounts['groups'] !== undefined) {
-          usage.groups = tableCounts['groups'];
         }
         
         return NextResponse.json({ accountId, usage });

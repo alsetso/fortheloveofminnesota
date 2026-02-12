@@ -43,21 +43,21 @@ const LIVE_BOUNDARY_LAYERS: LiveBoundaryLayerId[] = ['state', 'county', 'ctu', '
 interface AppMenuProps {
   open: boolean;
   onClose: () => void;
-  /** When on /live: single boundary layer to show (one at a time). */
+  /** When on /maps: single boundary layer to show (one at a time). */
   liveBoundaryLayer?: LiveBoundaryLayerId | null;
-  /** When on /live: set which boundary layer is visible; pass same layer to turn off. */
+  /** When on /maps: set which boundary layer is visible; pass same layer to turn off. */
   onLiveBoundaryLayerChange?: (layer: LiveBoundaryLayerId | null) => void;
-  /** When on /live: pin display grouping (cluster pins). Controlled from live page. */
+  /** When on /maps: pin display grouping (cluster pins). Controlled from maps page. */
   pinDisplayGrouping?: boolean;
-  /** When on /live: set pin display grouping. */
+  /** When on /maps: set pin display grouping. */
   onPinDisplayGroupingChange?: (value: boolean) => void;
-  /** When on /live: show only current account's pins on the map. */
+  /** When on /maps: show only current account's pins on the map. */
   showOnlyMyPins?: boolean;
-  /** When on /live: set show only my pins. */
+  /** When on /maps: set show only my pins. */
   onShowOnlyMyPinsChange?: (value: boolean) => void;
-  /** When on /live: time filter for pins (24h, 7d, or null = all time). */
+  /** When on /maps: time filter for pins (24h, 7d, or null = all time). */
   timeFilter?: '24h' | '7d' | null;
-  /** When on /live: set time filter. */
+  /** When on /maps: set time filter. */
   onTimeFilterChange?: (value: '24h' | '7d' | null) => void;
 }
 
@@ -789,7 +789,7 @@ function AppMenuSubPageContent({
     );
   }
   if (subPage === 'invite-friends') {
-    const livePath = '/live';
+    const livePath = '/maps';
     const profilePath = account?.username ? `/${account.username}` : null;
     const copyUrl = (path: string) => {
       const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
@@ -1078,7 +1078,7 @@ function AppMenuSubPageContent({
 
 /**
  * Full-height menu panel over the app container. Slides in from the left (open) and out to the left (close).
- * Max width 500px, 100dvh, black background. Used on /live when user clicks the account image.
+ * Max width 500px, 100dvh, black background. Used on /maps when user clicks the account image.
  */
 const SUBPAGE_TITLES: Record<AppMenuSubPage, string> = {
   profile: 'Your Profile',

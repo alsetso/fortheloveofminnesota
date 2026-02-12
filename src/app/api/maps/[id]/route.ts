@@ -54,8 +54,9 @@ export async function GET(
           : createServerClient();
 
         // Build query - try slug first if not UUID, otherwise try id
-        let query = supabase
-          .from('map')
+        let query = (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select(`
             id,
             account_id,
@@ -248,7 +249,8 @@ export async function PUT(
 
         // Resolve identifier to map_id (handle both UUID and slug)
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id, account_id, settings');
         
         if (isUUID(identifier)) {
@@ -318,7 +320,8 @@ export async function PUT(
           if (body.slug) {
             // Check if slug is already taken (excluding current map)
             const { data: existingMap } = await supabase
-              .from('map')
+              .schema('maps')
+          .from('maps')
               .select('id')
               .eq('slug', body.slug)
               .neq('id', mapId)
@@ -413,7 +416,8 @@ export async function PUT(
         }
 
         const { data: updatedMap, error: updateError } = await (supabase
-          .from('map') as any)
+          .schema('maps')
+          .from('maps') as any)
           .update(updateData)
           .eq('id', mapId)
           .select(`
@@ -496,7 +500,8 @@ export async function DELETE(
 
         // Resolve identifier to map_id (handle both UUID and slug)
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('account_id, id');
         
         if (isUUID(identifier)) {
@@ -521,7 +526,8 @@ export async function DELETE(
 
         // Soft delete: set is_active = false
         const { error: deleteError } = await ((supabase
-          .from('map') as any)
+          .schema('maps')
+          .from('maps') as any)
           .update({ is_active: false })
           .eq('id', mapId));
 

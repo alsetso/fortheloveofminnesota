@@ -37,17 +37,8 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       return 'review';
     }
     
-    // URL params take precedence (but review is only allowed with checkout=success)
-    if (urlStep && urlStep !== 'review') {
-      // Validate step is a valid OnboardingStep
-      // Contact step is only valid if user owns a business
-      const validSteps: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business'];
-      if (urlStep === 'contact' && initialAccount?.owns_business === true) {
-        validSteps.push('contact');
-      } else if (urlStep === 'contact') {
-        // If trying to access contact step but doesn't own business, redirect to owns_business step
-        return 'owns_business';
-      }
+    if (urlStep) {
+      const validSteps: OnboardingStep[] = ['welcome', 'username', 'profile_photo'];
       if (validSteps.includes(urlStep as OnboardingStep)) {
         return urlStep as OnboardingStep;
       }
@@ -142,18 +133,11 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   const locationMapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [locationMapLoaded, setLocationMapLoaded] = useState(false);
 
-  const totalSteps = 10;
+  const totalSteps = 3;
   const stepIndexMap: Record<OnboardingStep, number> = {
     welcome: 0,
-    profile_photo: 1,
-    username: 2,
-    location: 3,
-    name: 4,
-    bio: 5,
-    traits: 6,
-    owns_business: 7,
-    contact: 8,
-    review: 9,
+    username: 1,
+    profile_photo: 2,
   };
   const stepIndex = stepIndexMap[currentStep];
 
@@ -974,13 +958,6 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     setSaving(true);
     setError('');
 
-    // Validate mandatory steps are complete
-    if (!account?.image_url) {
-      setError('Please complete your profile photo');
-      setSaving(false);
-      return;
-    }
-
     if (!account?.username) {
       setError('Please complete your username');
       setSaving(false);
@@ -1039,7 +1016,7 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
       if (onComplete) {
         await onComplete();
       }
-      router.push('/');
+      router.push(redirectTo || '/');
       router.refresh();
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -1275,88 +1252,30 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
     router.replace(`/onboarding?${params.toString()}`, { scroll: false });
   }, [router]);
 
-  // Redirect away from contact step if user doesn't own a business
-  useEffect(() => {
-    if (currentStep === 'contact' && account?.owns_business !== true) {
-      // If on contact step but doesn't own business, redirect to review step
-      setCurrentStep('review');
-      updateStepUrl('review');
-    }
-  }, [currentStep, account?.owns_business, updateStepUrl]);
+  const getStepOrder = (): OnboardingStep[] => ['welcome', 'username', 'profile_photo'];
 
-  // Helper function to get step order based on business selection
-  const getStepOrder = (includeReview = false): OnboardingStep[] => {
-    const baseSteps: OnboardingStep[] = ['welcome', 'profile_photo', 'username', 'location', 'name', 'bio', 'traits', 'owns_business'];
-    
-    // Only include contact step if user owns a business
-    if (account?.owns_business === true) {
-      baseSteps.push('contact');
-    }
-    
-    if (includeReview) {
-      baseSteps.push('review');
-    }
-    
-    return baseSteps;
-  };
-
-  // Unified step completion validation
   const isStepComplete = (step: OnboardingStep): boolean => {
-    if (!account) {
-      // Welcome step is always complete (no validation needed)
-      return step === 'welcome';
-    }
-    
+    if (!account) return step === 'welcome';
     switch (step) {
       case 'welcome':
-        // Welcome step is always complete (informational only)
         return true;
-      case 'profile_photo':
-        return !!account.image_url && photoConfirmed;
       case 'username':
         return !!account.username && usernameSaved;
-      case 'name':
-        return nameSaved && !!(account.first_name || account.last_name);
-      case 'bio':
-        // Bio is optional - if bio exists, it must be saved; if no bio, step is complete (skipped)
-        if (!account.bio || account.bio.trim().length === 0) {
-          return true; // No bio = step skipped = complete
-        }
-        return bioSaved && account.bio.trim().length > 0;
-      case 'traits':
-        // Traits are optional - if traits exist, they must be saved; if no traits, step is complete (skipped)
-        if (!account.traits || !Array.isArray(account.traits) || account.traits.length === 0) {
-          return true; // No traits = step skipped = complete
-        }
-        return traitsSaved && account.traits.length >= 1 && account.traits.length <= 5;
-      case 'owns_business':
-        return ownsBusinessSaved && account.owns_business !== null && account.owns_business !== undefined && 
-               (account.owns_business === false || (account.owns_business === true && !!account.business_name));
-      case 'contact':
-        // Contact step should only be checked if owns_business is true
-        if (account.owns_business !== true) return true; // Skip validation if not a business owner
-        return contactSaved && !!(account.email || account.phone);
-      case 'location':
-        return locationSaved && !!account.city_id;
-      case 'review':
-        // Review is complete when all previous steps are complete
-        const stepOrder = getStepOrder(false);
-        return stepOrder.every(s => isStepComplete(s));
+      case 'profile_photo':
+        return !!account.username && (!!account.image_url ? photoConfirmed : true);
       default:
         return false;
     }
   };
 
   const handleNext = () => {
-    const stepOrder = getStepOrder(true);
+    const stepOrder = getStepOrder();
     const currentIndex = stepOrder.indexOf(currentStep);
-    
-    // Can only proceed if current step is complete
-    if (!isStepComplete(currentStep)) {
+    if (!isStepComplete(currentStep)) return;
+    if (currentStep === 'profile_photo') {
+      handleSubmit();
       return;
     }
-    
-    // Can only proceed to next step if it exists
     if (currentIndex < stepOrder.length - 1) {
       const nextStep = stepOrder[currentIndex + 1];
       setCurrentStep(nextStep);
@@ -1365,9 +1284,8 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   };
 
   const handleBack = () => {
-    const stepOrder = getStepOrder(true);
+    const stepOrder = getStepOrder();
     const currentIndex = stepOrder.indexOf(currentStep);
-    
     if (currentIndex > 0) {
       const prevStep = stepOrder[currentIndex - 1];
       setCurrentStep(prevStep);
@@ -2935,8 +2853,7 @@ function OnboardingFooter({
   }
 
   if (currentStep === 'profile_photo') {
-    // Disabled if no photo, not confirmed, or if they declined (need to upload again)
-    const disabled = !account?.image_url || !photoConfirmed;
+    const disabled = !account?.username || (account?.image_url ? !photoConfirmed : false);
     return (
       <footer className="pt-2">
         <div className="flex items-center gap-2 justify-between">
@@ -2957,7 +2874,7 @@ function OnboardingFooter({
             disabled={disabled}
             className="group inline-flex justify-center items-center px-[10px] py-[10px] border border-transparent rounded-md text-xs font-medium text-white bg-[#007AFF] hover:bg-[#0066D6] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Next
+            Go to map
             <span className="inline-flex items-center overflow-hidden max-w-0 group-hover:max-w-[1.125rem] group-focus-visible:max-w-[1.125rem] transition-[max-width] duration-200">
               <span className="min-w-[6px] flex-shrink-0" />
               <ArrowRightIcon className="w-3 h-3 flex-shrink-0" />

@@ -64,7 +64,8 @@ export async function GET(request: NextRequest) {
     
     // Try slug first
     const { data: slugMap, error: slugError } = await supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select('id')
       .eq('slug', 'live')
       .maybeSingle();
@@ -79,7 +80,8 @@ export async function GET(request: NextRequest) {
     if (!liveMapId) {
       // Fallback to custom_slug (legacy)
       const { data: customSlugMap, error: customSlugError } = await supabase
-        .from('map')
+        .schema('maps')
+      .from('maps')
         .select('id')
         .eq('custom_slug', 'live')
         .maybeSingle();
@@ -101,7 +103,8 @@ export async function GET(request: NextRequest) {
     }
 
     let query = supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .select(isAuthenticated
         ? `${essentialColumns},
           accounts(

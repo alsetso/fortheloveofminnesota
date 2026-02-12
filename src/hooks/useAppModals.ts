@@ -178,6 +178,10 @@ export function useAppModals(): UseAppModalsReturn {
     });
   }, []);
 
+  const openMission = useCallback(() => {
+    setModal({ type: 'mission' });
+  }, []);
+
   // Close modal
   const closeModal = useCallback(() => {
     // Clear context
@@ -206,6 +210,7 @@ export function useAppModals(): UseAppModalsReturn {
     openComingSoon,
     openSuccessPin,
     updateSuccessPin,
+    openMission,
     closeModal,
     getIntelligenceContext,
     getAtlasContext,

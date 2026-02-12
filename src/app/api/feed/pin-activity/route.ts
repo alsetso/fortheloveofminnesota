@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
 
       // 1. Owned map IDs
       const { data: ownedMaps, error: ownedError } = await supabase
-        .from('map')
+        .schema('maps')
+        .from('maps')
         .select('id')
         .eq('account_id', accountId)
         .eq('is_active', true);
@@ -83,7 +84,8 @@ export async function GET(request: NextRequest) {
 
       // Always include live map for authenticated users
       const { data: liveMap } = await supabase
-        .from('map')
+        .schema('maps')
+        .from('maps')
         .select('id, name, slug')
         .eq('slug', 'live')
         .eq('is_active', true)
@@ -109,7 +111,8 @@ export async function GET(request: NextRequest) {
 
       // 3. Maps list for header (id, name, slug)
       const { data: mapsData, error: mapsError } = await supabase
-        .from('map')
+        .schema('maps')
+        .from('maps')
         .select('id, name, slug')
         .in('id', mapIds)
         .eq('is_active', true)
@@ -151,7 +154,8 @@ export async function GET(request: NextRequest) {
 
       // 4. Pin activity: pins on maps the logged-in account owns or is a member of; optionally only by that account
       let pinsQuery = supabase
-        .from('map_pins')
+        .schema('maps')
+        .from('pins')
         .select(
           `
           id,

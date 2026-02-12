@@ -58,7 +58,8 @@ export async function GET(
           mapId = identifier;
         } else {
           const { data: map, error: mapError } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('slug', identifier)
             .eq('is_active', true)
@@ -70,11 +71,13 @@ export async function GET(
         }
 
         // Fetch pin with related data (RLS will filter based on permissions)
+        // maps.pins uses author_account_id and tag_id (maps.tags), not account_id/mention_types
         const { data: pin, error } = await supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .select(`
             *,
-            account:accounts!map_pins_account_id_fkey(
+            account:accounts!map_pins_author_account_id_fkey(
               id,
               username,
               first_name,
@@ -87,7 +90,7 @@ export async function GET(
               emoji,
               title
             ),
-            mention_type:mention_types(
+            mention_type:tags(
               id,
               emoji,
               name
@@ -102,6 +105,17 @@ export async function GET(
         }
 
         const raw = pin as Record<string, unknown>;
+        let lat: number | null = null;
+        let lng: number | null = null;
+        if (raw.geometry) {
+          try {
+            const geom = typeof raw.geometry === 'string' ? JSON.parse(raw.geometry as string) : raw.geometry;
+            if (geom?.type === 'Point' && Array.isArray(geom.coordinates) && geom.coordinates.length >= 2) {
+              lng = geom.coordinates[0];
+              lat = geom.coordinates[1];
+            }
+          } catch { /* ignore */ }
+        }
         const rawTagged = raw.tagged_account_ids;
         const taggedIdsList = Array.isArray(rawTagged)
           ? (rawTagged as unknown[]).filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -120,7 +134,14 @@ export async function GET(
           if (tagged_accounts.length === 0) tagged_accounts = null;
         }
 
-        return createSuccessResponse({ ...raw, tagged_accounts });
+        return createSuccessResponse({
+          ...raw,
+          description: raw.body ?? raw.caption ?? raw.emoji ?? null,
+          lat,
+          lng,
+          account_id: raw.author_account_id ?? (raw.account as { id?: string } | null)?.id ?? null,
+          tagged_accounts,
+        });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[Maps API] Error:', error);
@@ -187,7 +208,8 @@ export async function PUT(
         } else {
           // Look up map by custom_slug
           const { data: map, error: mapError } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('custom_slug', identifier)
             .single();
@@ -200,7 +222,8 @@ export async function PUT(
         
         // Check if pin exists
         const { data: pin, error: pinError } = await supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .select('map_id')
           .eq('id', validatedPinId)
           .eq('map_id', mapId)
@@ -211,8 +234,9 @@ export async function PUT(
         }
 
         // Check if user owns the map
-        const { data: map, error: mapError } = await supabase
-          .from('map')
+        const { data: map, error: mapError } = await (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('account_id')
           .eq('id', mapId)
           .single();
@@ -244,7 +268,8 @@ export async function PUT(
 
         // Update pin
         const { data: updatedPin, error: updateError } = await supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .update(updateData as never)
           .eq('id', validatedPinId)
           .select()
@@ -314,7 +339,8 @@ export async function DELETE(
         } else {
           // Look up map by custom_slug
           const { data: mapLookup, error: mapLookupError } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('custom_slug', validatedId)
             .single();
@@ -327,8 +353,9 @@ export async function DELETE(
 
         // Check if pin exists
         const { data: pin, error: pinError } = await supabase
-          .from('map_pins')
-          .select('map_id, account_id')
+          .schema('maps')
+          .from('pins')
+          .select('map_id, author_account_id')
           .eq('id', validatedPinId)
           .eq('map_id', mapId)
           .single();
@@ -337,11 +364,12 @@ export async function DELETE(
           return createErrorResponse('Pin not found', 404);
         }
 
-        const pinAccountId = (pin as any).account_id;
+        const pinAccountId = (pin as any).author_account_id;
 
         // Check if user owns the map or is the pin author (can delete own pin on any map)
-        const { data: map, error: mapError } = await supabase
-          .from('map')
+        const { data: map, error: mapError } = await (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('account_id')
           .eq('id', mapId)
           .single();
@@ -357,7 +385,8 @@ export async function DELETE(
 
         // Delete pin
         const { error: deleteError } = await supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .delete()
           .eq('id', validatedPinId);
 

@@ -12,6 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = await createServerClientWithAuth();
 
   const { data: post } = await supabase
+    .schema('content')
     .from('posts')
     .select(`
       id,
@@ -82,7 +83,8 @@ export default async function MapPostPage({ params }: Props) {
 
   // Verify map exists and get map ID
   const { data: mapData } = await supabase
-    .from('map')
+    .schema('maps')
+    .from('maps')
     .select('id, slug')
     .or(`id.eq.${mapIdOrSlug},slug.eq.${mapIdOrSlug}`)
     .eq('is_active', true)
@@ -96,6 +98,7 @@ export default async function MapPostPage({ params }: Props) {
 
   // Fetch post with all details
   const { data: post, error } = await supabase
+    .schema('content')
     .from('posts')
     .select(`
       id,
@@ -103,7 +106,6 @@ export default async function MapPostPage({ params }: Props) {
       title,
       content,
       visibility,
-      group_id,
       mention_type_id,
       mention_ids,
       map_id,
@@ -186,7 +188,8 @@ export default async function MapPostPage({ params }: Props) {
   // Fetch mentions if referenced
   if (postData.mention_ids && Array.isArray(postData.mention_ids) && postData.mention_ids.length > 0) {
     const { data: mentions } = await supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .select(`
         id,
         lat,

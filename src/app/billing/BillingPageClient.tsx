@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { UserCircleIcon, CreditCardIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import confetti from 'canvas-confetti';
-import PageWrapper from '@/components/layout/PageWrapper';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import AccountSidebar from '@/components/billing/AccountSidebar';
 import PaymentMethodsSidebar from '@/components/billing/PaymentMethodsSidebar';
 import BillingSetup from '@/components/billing/BillingSetup';
@@ -226,9 +228,13 @@ export default function BillingPageClient({ initialPlans, initialSelectedPlan, i
         </div>
       )}
 
-      <PageWrapper headerContent={headerContent}>
-        <div className="w-full h-full overflow-y-auto">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <NewPageWrapper
+        leftSidebar={<LeftSidebar />}
+        rightSidebar={<RightSidebar />}
+        headerContent={headerContent}
+      >
+        <div className="w-full py-6">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {/* Show billing setup if no Stripe customer */}
             {!hasStripeCustomer && (
               <BillingSetup 
@@ -255,7 +261,7 @@ export default function BillingPageClient({ initialPlans, initialSelectedPlan, i
             </div>
           </div>
         </div>
-      </PageWrapper>
+      </NewPageWrapper>
       
       <AccountSidebar
         isOpen={isAccountSidebarOpen}

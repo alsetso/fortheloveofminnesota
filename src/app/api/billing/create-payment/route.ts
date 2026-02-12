@@ -175,15 +175,6 @@ export async function POST(request: NextRequest) {
               if (process.env.NODE_ENV === 'development') {
                 console.error('[create-payment] Failed to log to stripe_events:', eventError);
               }
-            } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[create-payment] Payment logged to stripe_events:', {
-                  eventId,
-                  accountId: account.id,
-                  paymentIntentId: paymentIntent.id,
-                  customerId,
-                });
-              }
             }
           } catch (eventErr) {
             if (process.env.NODE_ENV === 'development') {

@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { LikeService } from './likeService';
 import { AccountService } from '@/features/auth/services/memberService';
 import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
 
@@ -19,7 +18,8 @@ export class MentionService {
     }
     
     const { data, error } = await supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select('id')
       .eq('slug', 'live')
       .eq('is_active', true)
@@ -44,18 +44,17 @@ export class MentionService {
     
     // Build query - optimized for map display
     // Select only essential columns (exclude large JSONB fields like map_meta, atlas_meta for performance)
-    // Note: collections join is excluded for anonymous users due to RLS restrictions
+    // Note: maps.pins uses geometry (PostGIS) instead of lat/lng, author_account_id instead of account_id,
+    // body instead of description, tag_id instead of mention_type_id
+    // PostgREST cannot join across schemas, so we fetch account data separately
     const essentialColumns = `id,
-      lat,
-      lng,
-      description,
+      geometry,
+      body,
       image_url,
       video_url,
       media_type,
-      account_id,
-      city_id,
-      collection_id,
-      mention_type_id,
+      author_account_id,
+      tag_id,
       visibility,
       archived,
       post_date,
@@ -64,36 +63,14 @@ export class MentionService {
       view_count`;
     
     let query = supabase
-      .from('map_pins')
-      .select(isAuthenticated 
-        ? `${essentialColumns},
-          accounts(
-            id,
-            username,
-            first_name,
-            image_url,
-            plan
-          ),
-          collections(
-            id,
-            emoji,
-            title
-          ),
-          mention_type:mention_types(
-            id,
-            emoji,
-            name
-          )`
-        : `${essentialColumns},
-          accounts(
-            image_url
-          ),
-          mention_type:mention_types(
-            id,
-            emoji,
-            name
-          )`
-      )
+      .schema('maps')
+      .from('pins')
+      .select(`${essentialColumns},
+        mention_type:tags(
+          id,
+          emoji,
+          name
+        )`)
       .eq('archived', false) // Exclude archived mentions
       .eq('is_active', true); // Exclude inactive pins
     
@@ -112,12 +89,13 @@ export class MentionService {
     query = query.order('created_at', { ascending: false });
 
     if (filters?.account_id) {
-      query = query.eq('account_id', filters.account_id);
+      query = query.eq('author_account_id', filters.account_id);
     }
 
-    if (filters?.city_id) {
-      query = query.eq('city_id', filters.city_id);
-    }
+    // Note: maps.pins doesn't have city_id column, so this filter is ignored
+    // if (filters?.city_id) {
+    //   query = query.eq('city_id', filters.city_id);
+    // }
 
     // All mentions are now linked to the live map
     // If map_id filter is provided, use it; otherwise default to live map
@@ -131,10 +109,10 @@ export class MentionService {
 
     if (filters?.mention_type_ids && filters.mention_type_ids.length > 0) {
       // Multiple mention types - use 'in' filter
-      query = query.in('mention_type_id', filters.mention_type_ids);
+      query = query.in('tag_id', filters.mention_type_ids);
     } else if (filters?.mention_type_id) {
       // Single mention type
-      query = query.eq('mention_type_id', filters.mention_type_id);
+      query = query.eq('tag_id', filters.mention_type_id);
     }
 
     // Time filter - filter by created_at (last 24 hours or 7 days)
@@ -175,13 +153,12 @@ export class MentionService {
     }
 
     // Bounding box filter for map queries
-    if (filters?.bbox) {
-      query = query
-        .gte('lat', filters.bbox.minLat)
-        .lte('lat', filters.bbox.maxLat)
-        .gte('lng', filters.bbox.minLng)
-        .lte('lng', filters.bbox.maxLng);
-    }
+    // Note: PostgREST doesn't support PostGIS ST_Within/ST_Intersects in filters easily
+    // For now, we'll filter client-side after extracting lat/lng from geometry
+    // TODO: Consider using PostGIS RPC function for server-side bbox filtering
+    // if (filters?.bbox) {
+    //   // Would need PostGIS function: ST_Within(geometry, ST_MakeEnvelope(...))
+    // }
 
     let data, error;
     try {
@@ -203,84 +180,101 @@ export class MentionService {
       throw new Error(`Failed to fetch mentions: ${error.message}`);
     }
 
-    const mentions = (data || []) as any[];
+    const pins = (data || []) as any[];
 
-    // Transform mention_type relationship (Supabase returns it as an object when using alias)
-    // Since we're using mention_type:mention_types(...), it should already be an object, not an array
-    mentions.forEach((mention: any) => {
-      // If mention_type is already an object (from the alias), keep it
-      // If it's an array (legacy format), transform it
-      if (mention.mention_type && Array.isArray(mention.mention_type)) {
-        mention.mention_type = mention.mention_type.length > 0 ? mention.mention_type[0] : null;
-      } else if (!mention.mention_type) {
-        // If mention_type is missing, set it to null
-        mention.mention_type = null;
-      }
+    // Extract lat/lng from PostGIS geometry and transform to Mention format
+    // Also fetch account data separately (PostgREST can't join across schemas)
+    const accountIds = [...new Set(pins.map((p: any) => p.author_account_id).filter(Boolean))];
+    const accountMap = new Map<string, any>();
+    
+    if (accountIds.length > 0) {
+      const { data: accounts, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id, username, first_name, image_url, plan')
+        .in('id', accountIds);
       
-      // Clean up any legacy mention_types array if it exists
-      if (mention.mention_types) {
-        delete mention.mention_types;
-      }
-      
-      // Debug: Log if mention has mention_type_id but no mention_type object
-      if (process.env.NODE_ENV === 'development' && mention.mention_type_id && !mention.mention_type) {
-        console.warn('[MentionService] Mention has mention_type_id but no mention_type object:', {
-          id: mention.id,
-          mention_type_id: mention.mention_type_id,
-          mention_type: mention.mention_type,
-        });
-      }
-    });
-
-    // Add likes data if we have mentions
-    if (mentions.length > 0 && isAuthenticated) {
-      try {
-        // Get current user's account using AccountService (handles RLS properly)
-        const account = await AccountService.getCurrentAccount();
-        
-        if (account?.id) {
-          const mentionIds = mentions.map(m => m.id);
-          
-          // Get like counts for all mentions (batch query)
-          const likeCounts = await LikeService.getLikeCounts(mentionIds);
-          
-          // Get which mentions the user has liked (batch query)
-          const likedMentionIds = await LikeService.getLikedMentionIds(mentionIds, account.id);
-
-          // Merge likes data into mentions
-          mentions.forEach(mention => {
-            mention.likes_count = likeCounts.get(mention.id) || 0;
-            mention.is_liked = likedMentionIds.has(mention.id);
-          });
-        }
-      } catch (likesError) {
-        // Non-blocking: if likes fetch fails, mentions still work
-        console.warn('[MentionService] Error fetching likes data:', likesError);
-        mentions.forEach(mention => {
-          mention.likes_count = 0;
-          mention.is_liked = false;
-        });
-      }
-    } else if (mentions.length > 0) {
-      // For anonymous users, still get like counts (but not is_liked)
-      try {
-        const mentionIds = mentions.map(m => m.id);
-        const likeCounts = await LikeService.getLikeCounts(mentionIds);
-        
-        mentions.forEach(mention => {
-          mention.likes_count = likeCounts.get(mention.id) || 0;
-          mention.is_liked = false;
-        });
-      } catch (likesError) {
-        console.warn('[MentionService] Error fetching like counts:', likesError);
-        mentions.forEach(mention => {
-          mention.likes_count = 0;
-          mention.is_liked = false;
+      if (!accountsError && accounts) {
+        accounts.forEach((account: any) => {
+          accountMap.set(account.id, account);
         });
       }
     }
 
-    return mentions as Mention[];
+    // Transform pins to mentions format
+    const mentions = pins.map((pin: any) => {
+      // Extract lat/lng from PostGIS geometry
+      let lat: number | null = null;
+      let lng: number | null = null;
+      
+      if (pin.geometry) {
+        try {
+          // Try parsing as GeoJSON first
+          const geom = typeof pin.geometry === 'string' ? JSON.parse(pin.geometry) : pin.geometry;
+          if (geom.type === 'Point' && Array.isArray(geom.coordinates) && geom.coordinates.length >= 2) {
+            lng = geom.coordinates[0];
+            lat = geom.coordinates[1];
+          } else if (typeof pin.geometry === 'string') {
+            // Try parsing PostGIS POINT string format: "POINT(lng lat)"
+            const match = pin.geometry.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/);
+            if (match) {
+              lng = parseFloat(match[1]);
+              lat = parseFloat(match[2]);
+            }
+          }
+        } catch (e) {
+          console.warn('[MentionService] Failed to parse geometry:', e);
+        }
+      }
+
+      // Transform mention_type relationship
+      let mentionType = null;
+      if (pin.mention_type) {
+        if (Array.isArray(pin.mention_type)) {
+          mentionType = pin.mention_type.length > 0 ? pin.mention_type[0] : null;
+        } else {
+          mentionType = pin.mention_type;
+        }
+      }
+
+      // Get account data
+      const account = pin.author_account_id ? accountMap.get(pin.author_account_id) : null;
+
+      return {
+        ...pin,
+        lat,
+        lng,
+        description: pin.body || null,
+        account_id: pin.author_account_id || null,
+        mention_type_id: pin.tag_id || null,
+        mention_type: mentionType,
+        account: account ? {
+          id: account.id,
+          username: account.username,
+          first_name: account.first_name,
+          image_url: account.image_url,
+          plan: account.plan,
+        } : null,
+        // Legacy fields that maps.pins doesn't have
+        city_id: null,
+        collection_id: null,
+        is_active: true,
+      };
+    });
+
+    // Apply bbox filter client-side if needed (since PostgREST can't filter PostGIS geometry easily)
+    let filteredMentions = mentions;
+    if (filters?.bbox) {
+      filteredMentions = mentions.filter((mention: any) => {
+        if (mention.lat === null || mention.lng === null) return false;
+        return mention.lat >= filters.bbox!.minLat &&
+               mention.lat <= filters.bbox!.maxLat &&
+               mention.lng >= filters.bbox!.minLng &&
+               mention.lng <= filters.bbox!.maxLng;
+      });
+    }
+
+    // Add likes data if we have mentions
+    return filteredMentions as Mention[];
   }
 
   /**
@@ -348,53 +342,106 @@ export class MentionService {
     // Get map ID - use provided map_id or default to live map
     const mapId = data.map_id || await this.getLiveMapId();
     
-    const { data: mention, error } = await supabase
-      .from('map_pins')
-      .insert({
-        map_id: mapId,
-        lat: data.lat,
-        lng: data.lng,
-        description: data.description || null,
-        caption: null, // Mentions use description, not caption
-        city_id: cityId,
-        post_date: normalizedPostDate,
-        account_id: account_id,
-        visibility: data.visibility || 'public',
-        archived: false, // New mentions are never archived
-        is_active: true, // New mentions are always active
-        icon_url: null, // Not used - we use account.image_url instead
-        image_url: data.image_url || null,
-        video_url: data.video_url || null,
-        media_type: data.media_type || 'none',
-        full_address: data.full_address || null,
-        map_meta: data.map_meta || null,
-        atlas_meta: null,
-        collection_id: data.collection_id || null,
-        mention_type_id: data.mention_type_id || null,
-        tagged_account_ids: data.tagged_account_ids && data.tagged_account_ids.length > 0 ? data.tagged_account_ids : [],
-      })
-      .select(`
-        *,
-        accounts(
-          id,
-          username,
-          first_name,
-          image_url
-        ),
-        collections(
-          id,
-          emoji,
-          title
-        )
-      `)
-      .single();
+    // Use RPC function to insert into maps.pins
+    const { data: pinResult, error } = await supabase.rpc('insert_pin_to_maps_pins', {
+      p_map_id: mapId,
+      p_author_account_id: account_id,
+      p_lat: data.lat,
+      p_lng: data.lng,
+      p_body: data.description || '',
+      p_title: null,
+      p_emoji: null,
+      p_caption: null,
+      p_image_url: data.image_url || null,
+      p_video_url: data.video_url || null,
+      p_icon_url: null,
+      p_media_type: data.media_type || 'none',
+      p_full_address: data.full_address || null,
+      p_map_meta: data.map_meta || null,
+      p_atlas_meta: null,
+      p_tag_id: data.mention_type_id || null,
+      p_visibility: data.visibility || 'public',
+      p_post_date: normalizedPostDate,
+      p_tagged_account_ids: data.tagged_account_ids && data.tagged_account_ids.length > 0 
+        ? data.tagged_account_ids as any
+        : [],
+    });
 
     if (error) {
       console.error('[MentionService] Error creating mention:', error);
       throw new Error(`Failed to create mention: ${error.message}`);
     }
 
-    return mention as Mention;
+    if (!pinResult || pinResult.length === 0) {
+      throw new Error('Failed to create mention: No data returned');
+    }
+
+    const pin = pinResult[0];
+    
+    // Transform maps.pins format to Mention format
+    // Fetch account and mention_type data
+    const { data: accountData } = await supabase
+      .from('accounts')
+      .select('id, username, first_name, image_url')
+      .eq('id', account_id)
+      .single();
+    
+    let mentionTypeData = null;
+    if (pin.tag_id) {
+      const { data: tagData } = await supabase
+        .schema('maps')
+        .from('tags')
+        .select('id, emoji, name')
+        .eq('id', pin.tag_id)
+        .single();
+      mentionTypeData = tagData;
+    }
+
+    // Transform to Mention format
+    const mention: Mention = {
+      id: pin.id,
+      map_id: pin.map_id,
+      lat: data.lat, // Keep original lat/lng for compatibility
+      lng: data.lng,
+      description: pin.body,
+      caption: pin.caption,
+      emoji: pin.emoji,
+      image_url: pin.image_url,
+      video_url: pin.video_url,
+      media_type: pin.media_type as 'image' | 'video' | 'none',
+      account_id: pin.author_account_id,
+      mention_type_id: pin.tag_id,
+      visibility: pin.visibility as 'public' | 'private',
+      archived: pin.archived,
+      post_date: pin.post_date,
+      created_at: pin.created_at,
+      updated_at: pin.updated_at,
+      view_count: pin.view_count,
+      full_address: pin.full_address,
+      map_meta: pin.map_meta,
+      atlas_meta: pin.atlas_meta,
+      tagged_account_ids: Array.isArray(pin.tagged_account_ids) 
+        ? pin.tagged_account_ids 
+        : (typeof pin.tagged_account_ids === 'string' 
+          ? JSON.parse(pin.tagged_account_ids) 
+          : []),
+      account: accountData ? {
+        id: accountData.id,
+        username: accountData.username,
+        first_name: accountData.first_name,
+        image_url: accountData.image_url,
+      } : null,
+      mention_type: mentionTypeData ? {
+        id: mentionTypeData.id,
+        emoji: mentionTypeData.emoji,
+        name: mentionTypeData.name,
+      } : null,
+      collection_id: null, // maps.pins doesn't have collection_id
+      city_id: null, // maps.pins doesn't have city_id
+      is_active: true, // maps.pins doesn't have is_active, assume true
+    };
+
+    return mention;
   }
 
   /**
@@ -417,9 +464,19 @@ export class MentionService {
       throw new Error('You must be signed in to update mentions');
     }
 
+    // Transform data to maps.pins schema
+    const updateData: any = {};
+    if (data.description !== undefined) updateData.body = data.description;
+    if (data.archived !== undefined) updateData.archived = data.archived;
+    if (data.image_url !== undefined) updateData.image_url = data.image_url;
+    if (data.video_url !== undefined) updateData.video_url = data.video_url;
+    if (data.media_type !== undefined) updateData.media_type = data.media_type;
+    // Note: collection_id doesn't exist in maps.pins, so it's ignored
+
     const { data: mention, error } = await supabase
-      .from('map_pins')
-      .update(data)
+      .schema('maps')
+      .from('pins')
+      .update(updateData)
       .eq('id', mentionId)
       .eq('is_active', true)
       .select()
@@ -430,7 +487,17 @@ export class MentionService {
       throw new Error(`Failed to update mention: ${error.message}`);
     }
 
-    return mention as Mention;
+    // Transform back to Mention format
+    const transformedMention = {
+      ...mention,
+      description: mention.body || null,
+      account_id: mention.author_account_id || null,
+      mention_type_id: mention.tag_id || null,
+      city_id: null,
+      collection_id: null,
+    };
+
+    return transformedMention as Mention;
   }
 
   /**
@@ -443,24 +510,35 @@ export class MentionService {
       throw new Error('You must be signed in to delete mentions');
     }
 
-    // Get mention to verify ownership (now map_pins)
-    const { data: mention } = await supabase
-      .from('map_pins')
-      .select('account_id, accounts!inner(user_id)')
+    // Get mention to verify ownership
+    // PostgREST can't join across schemas, so fetch pin and account separately
+    const { data: pin, error: pinError } = await supabase
+      .schema('maps')
+      .from('pins')
+      .select('author_account_id')
       .eq('id', mentionId)
       .eq('is_active', true)
       .single();
 
-    const mentionAccounts = mention?.accounts as { user_id: string } | { user_id: string }[] | null | undefined;
-    const accountUserId = Array.isArray(mentionAccounts) ? mentionAccounts[0]?.user_id : mentionAccounts?.user_id;
+    if (pinError || !pin) {
+      throw new Error('Mention not found');
+    }
 
-    if (!mention || accountUserId !== user.id) {
+    // Verify user owns the account that created this pin
+    const { data: account, error: accountError } = await supabase
+      .from('accounts')
+      .select('id, user_id')
+      .eq('id', pin.author_account_id)
+      .single();
+
+    if (accountError || !account || account.user_id !== user.id) {
       throw new Error('You do not have permission to delete this mention');
     }
 
     // Soft delete by setting is_active = false
     const { error } = await supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .update({ is_active: false, archived: true })
       .eq('id', mentionId);
 

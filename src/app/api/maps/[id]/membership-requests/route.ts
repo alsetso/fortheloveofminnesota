@@ -51,7 +51,8 @@ export async function GET(
 
         // Resolve identifier to map_id
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id, account_id');
         
         if (isUUID(identifier)) {
@@ -180,7 +181,8 @@ export async function POST(
 
         // Resolve identifier to map_id
         let mapQuery = supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id, account_id, visibility, auto_approve_members, settings, member_count');
         
         if (isUUID(identifier)) {

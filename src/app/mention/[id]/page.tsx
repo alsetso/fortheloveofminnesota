@@ -1,9 +1,9 @@
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import MentionDetailClient from '@/features/mentions/components/MentionDetailClient';
 import MentionDetailGate from './MentionDetailGate';
 
@@ -15,8 +15,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const supabase = await createServerClientWithAuth();
 
-  const { data: mention } = await supabase
-    .from('map_pins')
+  const { data: mention } = await (supabase as any)
+    .schema('maps')
+    .from('pins')
     .select(`
       id,
       description,
@@ -76,8 +77,9 @@ export default async function MentionPage({ params }: Props) {
   const supabase = await createServerClientWithAuth();
 
   // Fetch mention with all details (now map_pins)
-  const { data: mention, error } = await supabase
-    .from('map_pins')
+  const { data: mention, error } = await (supabase as any)
+    .schema('maps')
+    .from('pins')
     .select(`
       id,
       lat,
@@ -217,15 +219,17 @@ export default async function MentionPage({ params }: Props) {
   const isAuthenticated = Boolean(user);
 
   return (
-    <PageWrapper
-      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
-      searchResultsComponent={<SearchResults />}
+    <NewPageWrapper
+      leftSidebar={<LeftSidebar />}
+      rightSidebar={<RightSidebar />}
     >
-      {isAuthenticated ? (
-        <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />
-      ) : (
-        <MentionDetailGate mention={mentionData as any} />
-      )}
-    </PageWrapper>
+      <div className="w-full py-6">
+        {isAuthenticated ? (
+          <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />
+        ) : (
+          <MentionDetailGate mention={mentionData as any} />
+        )}
+      </div>
+    </NewPageWrapper>
   );
 }

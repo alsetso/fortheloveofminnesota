@@ -16,6 +16,73 @@
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
   }
 
+  /* Light Theme - Default */
+  :root,
+  :root.light,
+  [data-theme="light"] {
+    /* Surface Colors - Light Theme */
+    --surface: 0 0% 100%; /* White for cards */
+    --surface-muted: 0 0% 98%; /* Very light gray for background */
+    --surface-accent: 0 0% 96%; /* Light gray for hovers */
+    
+    /* Header Colors - Light Theme */
+    --header: 0 0% 100%; /* White header */
+    --header-muted: 0 0% 60%; /* Medium gray */
+    
+    /* Brand Colors - Minnesota Lake & Aurora */
+    --lake-blue: 200 100% 30%; /* Deep lake blue */
+    --lake-blue-light: 200 80% 50%; /* Lighter lake blue */
+    --aurora-teal: 180 60% 45%; /* Aurora teal */
+    --aurora-teal-light: 180 50% 60%; /* Lighter aurora teal */
+    
+    /* Text Colors - Light Theme */
+    --foreground: 0 0% 10%; /* Near black */
+    --foreground-muted: 0 0% 45%; /* Medium gray text */
+    --foreground-subtle: 0 0% 65%; /* Light gray text */
+    
+    /* Border Colors - Light Theme */
+    --border: 0 0% 85%; /* Light border */
+    --border-muted: 0 0% 90%; /* Lighter border */
+    
+    /* Interactive States */
+    --accent: 200 100% 30%; /* Lake blue for accents */
+    --accent-hover: 200 100% 25%; /* Darker on hover */
+    --accent-light: 200 80% 50%; /* Light accent */
+  }
+
+  /* Dark Theme */
+  :root.dark,
+  [data-theme="dark"] {
+    /* Surface Colors - Dark Theme */
+    --surface: 0 0% 18%; /* Dark gray for cards */
+    --surface-muted: 0 0% 12%; /* Darker gray for background */
+    --surface-accent: 0 0% 22%; /* Slightly lighter for hovers */
+    
+    /* Header Colors - Dark Theme */
+    --header: 0 0% 15%; /* Dark gray/black */
+    --header-muted: 0 0% 40%; /* Medium gray */
+    
+    /* Brand Colors - Minnesota Lake & Aurora */
+    --lake-blue: 200 100% 30%; /* Deep lake blue */
+    --lake-blue-light: 200 80% 50%; /* Lighter lake blue */
+    --aurora-teal: 180 60% 45%; /* Aurora teal */
+    --aurora-teal-light: 180 50% 60%; /* Lighter aurora teal */
+    
+    /* Text Colors - Dark Theme */
+    --foreground: 0 0% 95%; /* Near white */
+    --foreground-muted: 0 0% 70%; /* Light gray text */
+    --foreground-subtle: 0 0% 55%; /* Medium gray text */
+    
+    /* Border Colors - Dark Theme */
+    --border: 0 0% 25%; /* Dark border */
+    --border-muted: 0 0% 20%; /* Darker border */
+    
+    /* Interactive States */
+    --accent: 200 100% 30%; /* Lake blue for accents */
+    --accent-hover: 200 100% 25%; /* Darker on hover */
+    --accent-light: 200 80% 50%; /* Light accent */
+  }
+
   /* Prevent text size adjustment on iOS */
   html {
     -webkit-text-size-adjust: 100%;
@@ -157,7 +224,7 @@ body {
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Light theme (default) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -174,6 +241,65 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Dark scrollbar for dark theme pages */
+.scrollbar-dark::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: hsl(var(--surface-muted));
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Theme-aware scrollbar: light in light mode, dark in dark mode */
+.scrollbar-theme {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9; /* thumb track - light */
+}
+
+.dark .scrollbar-theme {
+  scrollbar-color: rgba(255, 255, 255, 0.25) hsl(var(--surface-muted)); /* thumb track - dark */
+}
+
+.scrollbar-theme::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-theme::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.scrollbar-theme::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-theme::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.dark .scrollbar-theme::-webkit-scrollbar-track {
+  background: hsl(var(--surface-muted));
+}
+
+.dark .scrollbar-theme::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.dark .scrollbar-theme::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 /* Hide scrollbar but keep functionality */

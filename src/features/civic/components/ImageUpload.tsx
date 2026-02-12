@@ -69,8 +69,8 @@ export default function ImageUpload({
       onClick={handleClick}
       className={`relative ${sizeClasses[size]} border-2 border-dashed rounded cursor-pointer transition-colors ${
         isDragging
-          ? 'border-blue-500 bg-blue-50'
-          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+          ? 'border-accent bg-accent-light/10 dark:bg-accent/20'
+          : 'border-border hover:border-foreground-muted hover:bg-surface-accent'
       } ${uploading ? 'opacity-50 pointer-events-none' : ''} ${className}`}
     >
       <input
@@ -88,12 +88,12 @@ export default function ImageUpload({
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
-          <span className="text-[10px] text-gray-400 text-center px-1">Drop or click</span>
+          <span className="text-[10px] text-foreground-muted text-center px-1">Drop or click</span>
         </div>
       )}
       {uploading && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
-          <span className="text-[10px] text-gray-600">Uploading...</span>
+        <div className="absolute inset-0 bg-surface bg-opacity-90 flex items-center justify-center">
+          <span className="text-[10px] text-foreground-muted">Uploading...</span>
         </div>
       )}
     </div>

@@ -70,11 +70,11 @@ export default function MapsSettingsClient() {
     return (
       <div className="space-y-3">
         {/* Plan & map limits — from accounts.plan server-side: hobby=1, contributor=5 */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <h3 className="text-sm font-semibold text-gray-900 mb-2">Map limits</h3>
-          <p className="text-xs text-gray-600 mb-2">{displayText}</p>
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+          <h3 className="text-sm font-semibold text-foreground mb-2">Map limits</h3>
+          <p className="text-xs text-foreground/70 mb-2">{displayText}</p>
           {!canCreate && (
-            <Link href="/billing" className="text-xs font-medium text-blue-600 hover:underline">
+            <Link href="/billing" className="text-xs font-medium text-lake-blue hover:underline">
               Upgrade to create more maps
             </Link>
           )}
@@ -89,60 +89,60 @@ export default function MapsSettingsClient() {
               router.push('/billing');
             }
           }}
-          className={`block bg-white border border-gray-200 rounded-md p-6 flex flex-col items-center justify-center gap-2 transition-colors ${
-            canCreate ? 'hover:bg-gray-50' : 'opacity-70 cursor-default'
+          className={`block bg-surface border border-border-muted dark:border-white/10 rounded-md p-6 flex flex-col items-center justify-center gap-2 transition-colors ${
+            canCreate ? 'hover:bg-surface-accent' : 'opacity-70 cursor-default'
           }`}
         >
-          <div className="w-12 h-12 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-            <PlusIcon className="w-6 h-6 text-gray-400" aria-hidden />
+          <div className="w-12 h-12 rounded-lg border-2 border-dashed border-border-muted dark:border-white/20 flex items-center justify-center">
+            <PlusIcon className="w-6 h-6 text-foreground/60" aria-hidden />
           </div>
-          <span className="text-xs font-medium text-gray-600">
+          <span className="text-xs font-medium text-foreground/70">
             {canCreate ? 'Create new map' : 'Map limit reached'}
           </span>
         </Link>
 
         {/* Owner permissions table: maps you own */}
-        <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
-          <h3 className="text-sm font-semibold text-gray-900 px-[10px] py-3 border-b border-gray-200">
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+          <h3 className="text-sm font-semibold text-foreground px-[10px] py-3 border-b border-border-muted dark:border-white/10">
             Maps you own
           </h3>
           {loading ? (
-            <div className="px-[10px] py-4 text-xs text-gray-500">Loading...</div>
+            <div className="px-[10px] py-4 text-xs text-foreground/60">Loading...</div>
           ) : ownedMaps.length === 0 ? (
-            <div className="px-[10px] py-4 text-xs text-gray-500">No maps yet. Create one above.</div>
+            <div className="px-[10px] py-4 text-xs text-foreground/60">No maps yet. Create one above.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="text-left px-[10px] py-2 font-semibold text-gray-900">Name</th>
-                    <th className="text-left px-[10px] py-2 font-semibold text-gray-900">Visibility</th>
-                    <th className="text-left px-[10px] py-2 font-semibold text-gray-900">Members</th>
-                    <th className="text-right px-[10px] py-2 font-semibold text-gray-900">Actions</th>
+                  <tr className="border-b border-border-muted dark:border-white/10 bg-surface-accent">
+                    <th className="text-left px-[10px] py-2 font-semibold text-foreground">Name</th>
+                    <th className="text-left px-[10px] py-2 font-semibold text-foreground">Visibility</th>
+                    <th className="text-left px-[10px] py-2 font-semibold text-foreground">Members</th>
+                    <th className="text-right px-[10px] py-2 font-semibold text-foreground">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ownedMaps.map((map) => (
-                    <tr key={map.id} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-                      <td className="px-[10px] py-2 text-gray-900 font-medium truncate max-w-[120px]">
+                    <tr key={map.id} className="border-b border-border-muted dark:border-white/10 last:border-b-0 hover:bg-surface-accent">
+                      <td className="px-[10px] py-2 text-foreground font-medium truncate max-w-[120px]">
                         {map.name}
                       </td>
-                      <td className="px-[10px] py-2 text-gray-600 capitalize">{map.visibility}</td>
-                      <td className="px-[10px] py-2 text-gray-600">{map.member_count ?? 0}</td>
+                      <td className="px-[10px] py-2 text-foreground/70 capitalize">{map.visibility}</td>
+                      <td className="px-[10px] py-2 text-foreground/70">{map.member_count ?? 0}</td>
                       <td className="px-[10px] py-2 text-right">
                         <span className="inline-flex items-center gap-1">
                           <Link
                             href={map.href}
-                            className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-0.5"
+                            className="text-foreground/70 hover:text-foreground inline-flex items-center gap-0.5"
                             title="View map"
                           >
                             <ArrowTopRightOnSquareIcon className="w-3 h-3" />
                             View
                           </Link>
-                          <span className="text-gray-300">|</span>
+                          <span className="text-foreground/30">|</span>
                           <Link
                             href={`${map.href}/settings`}
-                            className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-0.5"
+                            className="text-foreground/70 hover:text-foreground inline-flex items-center gap-0.5"
                             title="Map settings"
                           >
                             <Cog6ToothIcon className="w-3 h-3" />
@@ -160,7 +160,7 @@ export default function MapsSettingsClient() {
 
         <Link
           href="/maps"
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded-md transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-surface border border-border-muted dark:border-white/20 hover:bg-surface-accent rounded-md transition-colors"
         >
           <MapIcon className="w-3 h-3" />
           Go to Maps
@@ -190,64 +190,64 @@ export default function MapsSettingsClient() {
         onClick={() => {
           success('Coming soon');
         }}
-        className="block w-full bg-white border border-gray-200 rounded-md p-6 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-gray-50 cursor-pointer"
+        className="block w-full bg-surface border border-border-muted dark:border-white/10 rounded-md p-6 flex flex-col items-center justify-center gap-2 transition-colors hover:bg-surface-accent cursor-pointer"
       >
-        <div className="w-12 h-12 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-          <PlusIcon className="w-6 h-6 text-gray-400" aria-hidden />
+        <div className="w-12 h-12 rounded-lg border-2 border-dashed border-border-muted dark:border-white/20 flex items-center justify-center">
+          <PlusIcon className="w-6 h-6 text-foreground/60" aria-hidden />
         </div>
-        <span className="text-xs font-medium text-gray-600">Create new map</span>
+        <span className="text-xs font-medium text-foreground/70">Create new map</span>
       </button>
 
       {/* Maps you own - Grey container with "Create Custom Maps On February 15th" */}
-      <div className="bg-gray-100 border border-gray-200 rounded-md overflow-hidden">
-        <h3 className="text-sm font-semibold text-gray-900 px-[10px] py-3 border-b border-gray-200">
+      <div className="bg-surface-accent border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+        <h3 className="text-sm font-semibold text-foreground px-[10px] py-3 border-b border-border-muted dark:border-white/10">
           Maps you own
         </h3>
         {loading ? (
-          <div className="px-[10px] py-4 text-xs text-gray-500">Loading...</div>
+          <div className="px-[10px] py-4 text-xs text-foreground/60">Loading...</div>
         ) : (
           <div className="px-[10px] py-4">
             {/* Always show "Create Custom Maps On February 15th" message */}
-            <div className="mb-3 text-center pb-3 border-b border-gray-200">
-              <p className="text-xs font-medium text-gray-900">Create Custom Maps On February 15th</p>
+            <div className="mb-3 text-center pb-3 border-b border-border-muted dark:border-white/10">
+              <p className="text-xs font-medium text-foreground">Create Custom Maps On February 15th</p>
             </div>
             {ownedMaps.length === 0 ? (
               <div className="text-center py-2">
-                <p className="text-xs text-gray-600">No maps yet.</p>
+                <p className="text-xs text-foreground/70">No maps yet.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      <th className="text-left px-[10px] py-2 font-semibold text-gray-900">Name</th>
-                      <th className="text-left px-[10px] py-2 font-semibold text-gray-900">Visibility</th>
-                      <th className="text-left px-[10px] py-2 font-semibold text-gray-900">Members</th>
-                      <th className="text-right px-[10px] py-2 font-semibold text-gray-900">Actions</th>
+                    <tr className="border-b border-border-muted dark:border-white/10 bg-surface">
+                      <th className="text-left px-[10px] py-2 font-semibold text-foreground">Name</th>
+                      <th className="text-left px-[10px] py-2 font-semibold text-foreground">Visibility</th>
+                      <th className="text-left px-[10px] py-2 font-semibold text-foreground">Members</th>
+                      <th className="text-right px-[10px] py-2 font-semibold text-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ownedMaps.map((map) => (
-                      <tr key={map.id} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-                        <td className="px-[10px] py-2 text-gray-900 font-medium truncate max-w-[120px]">
+                      <tr key={map.id} className="border-b border-border-muted dark:border-white/10 last:border-b-0 hover:bg-surface">
+                        <td className="px-[10px] py-2 text-foreground font-medium truncate max-w-[120px]">
                           {map.name}
                         </td>
-                        <td className="px-[10px] py-2 text-gray-600 capitalize">{map.visibility}</td>
-                        <td className="px-[10px] py-2 text-gray-600">{map.member_count ?? 0}</td>
+                        <td className="px-[10px] py-2 text-foreground/70 capitalize">{map.visibility}</td>
+                        <td className="px-[10px] py-2 text-foreground/70">{map.member_count ?? 0}</td>
                         <td className="px-[10px] py-2 text-right">
                           <span className="inline-flex items-center gap-1">
                             <Link
                               href={map.href}
-                              className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-0.5"
+                              className="text-foreground/70 hover:text-foreground inline-flex items-center gap-0.5"
                               title="View map"
                             >
                               <ArrowTopRightOnSquareIcon className="w-3 h-3" />
                               View
                             </Link>
-                            <span className="text-gray-300">|</span>
+                            <span className="text-foreground/30">|</span>
                             <Link
                               href={`${map.href}/settings`}
-                              className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-0.5"
+                              className="text-foreground/70 hover:text-foreground inline-flex items-center gap-0.5"
                               title="Map settings"
                             >
                               <Cog6ToothIcon className="w-3 h-3" />

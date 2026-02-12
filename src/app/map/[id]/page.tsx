@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
@@ -8,9 +8,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import confetti from 'canvas-confetti';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import type { Mention } from '@/types/mention';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import MapIDBox from './components/MapIDBox';
 import MapPageLayout from './MapPageLayout';
 import MapPageHeaderButtons from './MapPageHeaderButtons';
@@ -22,7 +20,6 @@ import { useUnifiedMapClickHandler } from './hooks/useUnifiedMapClickHandler';
 import { useMapPageData } from './hooks/useMapPageData';
 import { useBoundaryLayers } from './hooks/useBoundaryLayers';
 import { useMapAccess } from './hooks/useMapAccess';
-import { useContributeOverlay } from './hooks/useContributeOverlay';
 import { useMapSidebarHandlers } from './hooks/useMapSidebarHandlers';
 import { useEntitySidebar } from './hooks/useEntitySidebar';
 import { useViewAsRole } from './hooks/useViewAsRole';
@@ -32,9 +29,6 @@ import MapActionUpgradePrompt from '@/components/maps/MapActionUpgradePrompt';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
 import ViewAsSelector from './components/ViewAsSelector';
 import type { MapData } from '@/types/map';
-
-// Lazy load ContributeOverlay - only needed when #contribute hash is present
-const ContributeOverlay = lazy(() => import('./components/ContributeOverlay'));
 
 export interface MapPageLocationSelect {
   lat: number;
@@ -49,31 +43,33 @@ import type { LiveBoundaryLayerId } from '@/features/map/config';
 
 interface MapPageProps {
   params: Promise<{ id: string }>;
-  /** When true, render only map content (no PageWrapper). Used by /live with AppContainer. */
+  /** When true, render only map content (no PageWrapper). Used by /maps with NewPageWrapper. */
   skipPageWrapper?: boolean;
-  /** Called when location selection changes (e.g. map click). Used by /live to show location in app footer. */
+  /** Called when location selection changes (e.g. map click). Used by /maps to show location in app footer. */
   onLocationSelect?: (info: MapPageLocationSelect) => void;
-  /** Called when live map loading state changes (for /live footer status strip). */
+  /** Called when live map loading state changes (for /maps footer status strip). */
   onLiveStatusChange?: (status: LiveMapFooterStatusState) => void;
-  /** When set (e.g. on /live), pin clicks call this; pass pinData when resolved from URL or after fetch. */
+  /** When set (e.g. on /maps), pin clicks call this; pass pinData when resolved from URL or after fetch. */
   onLivePinSelect?: (pinId: string, pinData?: Record<string, unknown> | null) => void;
-  /** When set (e.g. on /live), single boundary layer to show; only one at a time, toggled from main menu. */
+  /** When set (e.g. on /maps), single boundary layer to show; only one at a time, toggled from main menu. */
   liveBoundaryLayer?: LiveBoundaryLayerId | null;
-  /** When set (e.g. on /live), register a clear-selection function so footer close can sync map/status state. */
+  /** When set (e.g. on /maps), register a clear-selection function so footer close can sync map/status state. */
   onRegisterClearSelection?: (clearFn: () => void) => void;
   /** When false, show all pins unclustered on live map. When true (default), cluster pins. */
   pinDisplayGrouping?: boolean;
-  /** When true on /live, show only current account's pins. Default false. */
+  /** When true on /maps, show only current account's pins. Default false. */
   showOnlyMyPins?: boolean;
-  /** When on /live: time filter for pins (24h, 7d, or null = all time). */
+  /** When on /maps: time filter for pins (24h, 7d, or null = all time). */
   timeFilter?: '24h' | '7d' | null;
-  /** Called when map instance is available (for /live footer nearby pins). */
+  /** Called when map instance is available (for /maps footer nearby pins). */
   onMapInstanceReady?: (map: any) => void;
-  /** Called when GeolocateControl is ready (for /live user location). */
+  /** Called when GeolocateControl is ready (for /maps user location). */
   onGeolocateControlReady?: (control: any) => void;
+  /** When provided (e.g. from /maps), skip data fetch and use this. */
+  initialData?: { map: MapData; pins?: any[]; areas?: any[]; members?: any[] | null; tags?: { id: string; emoji: string; name: string }[] } | null;
 }
 
-export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null, onMapInstanceReady, onGeolocateControlReady }: MapPageProps) {
+export default function MapPage({ params, skipPageWrapper = false, onLocationSelect, onLiveStatusChange, onLivePinSelect, liveBoundaryLayer, onRegisterClearSelection, pinDisplayGrouping = true, showOnlyMyPins = false, timeFilter = null, onMapInstanceReady, onGeolocateControlReady, initialData }: MapPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { account, activeAccountId } = useAuthStateSafe();
@@ -86,12 +82,11 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   const [mapId, setMapId] = useState<string | null>(null);
   useEffect(() => {
     params.then(({ id }) => {
-      // Redirect /map/live to /live (preserving query params)
+      // Redirect /map/live to /maps (preserving query params)
       // Only redirect when NOT skipPageWrapper (i.e., when visiting /map/live directly)
-      // When skipPageWrapper is true (called from /live page), allow it to render
       if (id === 'live' && !skipPageWrapper) {
         const queryString = searchParams.toString();
-        const redirectUrl = queryString ? `/live?${queryString}` : '/live';
+        const redirectUrl = queryString ? `/maps?${queryString}` : '/maps';
         router.replace(redirectUrl);
         return;
       }
@@ -109,7 +104,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     initialAreas,
     initialMembers,
     updateMapData,
-  } = useMapPageData({ mapId });
+  } = useMapPageData({ mapId, initialData });
 
   // Boundary layers state (consolidated)
   // For custom maps, boundary layers come from mapData.settings.appearance.map_layers (source of truth)
@@ -233,12 +228,12 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     membershipToastShownRef.current = false;
   }, [mapId]);
 
-  // Check if this is the live map (only when skipPageWrapper is true, meaning called from /live page)
+  // Check if this is the live map (only when skipPageWrapper is true, meaning called from /maps page)
   // Posts are only available on the live map, not custom maps
   // IMPORTANT: For custom maps (skipPageWrapper = false), isLiveMap is always false
   // This ensures custom maps always use their own settings from mapData.settings as the source of truth
   const isLiveMap = useMemo(() => {
-    // Only consider it live map if skipPageWrapper is true (called from /live page)
+    // Only consider it live map if skipPageWrapper is true (called from /maps page)
     // Custom maps (skipPageWrapper = false) always return false to ensure independence
     if (!skipPageWrapper) return false;
     if (!mapData && !mapId) return false;
@@ -248,9 +243,9 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     return slugIsLive || idIsLive;
   }, [skipPageWrapper, mapData?.slug, mapId]);
 
-  // Check for pending membership requests
+  // Check for pending membership requests (skip for public map - no membership model)
   useEffect(() => {
-    if (!mapData || !mapId || !currentAccountId || isLiveMap) {
+    if (!mapData || !mapId || !currentAccountId || isLiveMap || mapId === 'public') {
       setHasPendingRequest(false);
       return;
     }
@@ -353,15 +348,6 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     const lat = Number(item.lat);
     const lng = Number(item.lng);
     const entityId = (item.id != null && String(item.id).trim() !== '') ? String(item.id).trim() : '';
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[LiveBoundary] MapPage handleBoundarySelect', {
-        layer: item.layer,
-        id: item.id,
-        entityId,
-        name: item.name,
-        mapMetaBoundaryEntityId: entityId || (item.id != null ? String(item.id) : ''),
-      });
-    }
     setSelectedBoundaries([{ layer: item.layer, id: entityId || (item.id != null ? String(item.id) : ''), name: item.name, lat: Number.isFinite(lat) ? lat : 0, lng: Number.isFinite(lng) ? lng : 0 }]);
     setLocationSelectPopup({
       isOpen: true,
@@ -413,7 +399,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     });
   }, [skipPageWrapper, onRegisterClearSelection]);
 
-  // Report live map status for footer status strip (skipPageWrapper = /live)
+  // Report live map status for footer status strip (skipPageWrapper = /maps)
   useEffect(() => {
     if (!skipPageWrapper || !onLiveStatusChange) return;
     onLiveStatusChange({
@@ -468,7 +454,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   
   const popupAddress = locationSelectPopup.address;
 
-  // Notify parent (e.g. /live) when location selection changes so it can show in app footer
+  // Notify parent (e.g. /maps) when location selection changes so it can show in app footer
   useEffect(() => {
     if (!skipPageWrapper || !onLocationSelect) return;
     const lat = Number(locationSelectPopup.lat);
@@ -544,37 +530,10 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
     },
   });
 
-  // Contribute overlay management
-  const { showOverlay: showContributeOverlay, openOverlay, closeOverlay: handleCloseContribute } = useContributeOverlay();
-  
   // Track remove click marker function from MapIDBox
   const removeClickMarkerRef = useRef<(() => void) | null>(null);
-  
-  // Remove click marker when contribute overlay opens
-  useEffect(() => {
-    if (showContributeOverlay && removeClickMarkerRef.current) {
-      removeClickMarkerRef.current();
-    }
-  }, [showContributeOverlay]);
 
-  // Listen for open-contribute-overlay (e.g. from live page MapInfo "Add to map" button)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const d = (e as CustomEvent).detail;
-      if (d && typeof d.lat === 'number' && typeof d.lng === 'number') {
-        openOverlay(
-          { lat: d.lat, lng: d.lng },
-          typeof d.mentionTypeId === 'string' ? d.mentionTypeId : undefined,
-          d.mapMeta ?? null,
-          d.address ?? null
-        );
-      }
-    };
-    window.addEventListener('open-contribute-overlay', handler as EventListener);
-    return () => window.removeEventListener('open-contribute-overlay', handler as EventListener);
-  }, [openOverlay]);
-
-  // Listen for live-search-pin-select (fly to pin on /live)
+  // Listen for live-search-pin-select (fly to pin on /maps)
   useEffect(() => {
     const handler = (e: Event) => {
       const d = (e as CustomEvent).detail;
@@ -592,56 +551,51 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
 
   // Handle mention creation: fly to pin, show modal, select pin
   const handleMentionCreated = useCallback((mention: Mention) => {
-    // Close overlay
-    handleCloseContribute();
-    
-    // Wait a bit for overlay to close, then fly to location
-    setTimeout(() => {
-      if (mapInstanceRef.current && mention.lat && mention.lng) {
-        mapInstanceRef.current.flyTo({
-          center: [mention.lng, mention.lat],
-          zoom: 15,
-          duration: 1500,
-        });
+    // Fly to location
+    if (mapInstanceRef.current && mention.lat && mention.lng) {
+      mapInstanceRef.current.flyTo({
+        center: [mention.lng, mention.lat],
+        zoom: 15,
+        duration: 1500,
+      });
+    }
+
+    // Select the new pin - dispatch mention-click event so sidebar opens
+    window.dispatchEvent(new CustomEvent('mention-click', {
+      detail: { mention }
+    }));
+
+    // Show success modal with confetti
+    setCreatedMention(mention);
+    setShowSuccessModal(true);
+
+    // Trigger confetti
+    const duration = 3000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        return;
       }
-      
-      // Select the new pin - dispatch mention-click event so sidebar opens
-      window.dispatchEvent(new CustomEvent('mention-click', {
-        detail: { mention }
-      }));
-      
-      // Show success modal with confetti
-      setCreatedMention(mention);
-      setShowSuccessModal(true);
-      
-      // Trigger confetti
-      const duration = 3000;
-      const animationEnd = Date.now() + duration;
-      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
-      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-      const interval = setInterval(() => {
-        const timeLeft = animationEnd - Date.now();
-        if (timeLeft <= 0) {
-          clearInterval(interval);
-          return;
-        }
-        const particleCount = 50 * (timeLeft / duration);
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
-        });
-        confetti({
-          ...defaults,
-          particleCount,
-          origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
-        });
-      }, 250);
-      
-      // Cleanup after duration
-      setTimeout(() => clearInterval(interval), duration);
-    }, 300);
-  }, [handleCloseContribute, entitySidebar]);
+      const particleCount = 50 * (timeLeft / duration);
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 }
+      });
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 }
+      });
+    }, 250);
+
+    // Cleanup after duration
+    setTimeout(() => clearInterval(interval), duration);
+  }, []);
 
   // Handle #people hash parameter - open members sidebar if user has permission
   useEffect(() => {
@@ -676,7 +630,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   }, [access.canViewMembers, openSidebar]);
 
   // URL normalization: automatically redirect ID URLs to slug URLs when available
-  // Skip when skipPageWrapper (e.g. /live) so we do not redirect off the current route
+  // Skip when skipPageWrapper (e.g. /maps) so we do not redirect off the current route
   useEffect(() => {
     if (skipPageWrapper || !mapData || !mapId || loading) return;
     
@@ -689,7 +643,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
   }, [skipPageWrapper, mapData, mapId, loading, router]);
 
   const mainContent = (
-    <div className={`relative w-full ${skipPageWrapper ? 'h-auto min-h-full' : 'h-full'}`} style={{ minHeight: 0, width: '100%' }}>
+    <div className={`relative w-full ${skipPageWrapper ? 'h-auto min-h-full' : 'h-[calc(100vh-3.5rem)]'}`} style={{ minHeight: 0, width: '100%' }}>
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-50" style={{ height: skipPageWrapper ? '100dvh' : '100%' }}>
               <div className="text-center">
@@ -748,7 +702,8 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     mapId={mapData.id}
                     isOwner={effectiveIsOwner}
                     isLiveMap={isLiveMap}
-                    onLivePinSelect={skipPageWrapper ? onLivePinSelect : undefined}
+                    onLivePinSelect={skipPageWrapper ? undefined : onLivePinSelect}
+                    showPinPopupOnMap={skipPageWrapper}
                     onLiveClickReport={skipPageWrapper ? handleLiveClickReport : undefined}
                     // For custom maps, always use map's own settings. For live map, use liveBoundaryLayer override
                     meta={skipPageWrapper ? undefined : mapData.settings?.appearance?.meta}
@@ -792,14 +747,6 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     onGeolocateControlReady={onGeolocateControlReady}
                     onMapUpdate={updateMapData}
                     viewAsRole={isOwner ? viewAsRole : undefined}
-                    onOpenContributeOverlay={(coordinates, mapMeta, fullAddress) => {
-                      // Remove click marker before opening overlay
-                      if (removeClickMarkerRef.current) {
-                        removeClickMarkerRef.current();
-                      }
-                      // Open contribute overlay with location, mapMeta, and address (same as location selected)
-                      openOverlay(coordinates, undefined, mapMeta || null, fullAddress || null);
-                    }}
                     useDefaultAppearance={!mapData?.settings?.colors}
                     showCollaborationTools={!skipPageWrapper}
                     // For custom maps, always show pins. For live map, hide when boundary layer is active
@@ -819,19 +766,6 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
                     timeFilter={timeFilter}
                   />
                 </MapPageLayout>
-                
-                {/* Contribute Overlay - positioned over map area only */}
-                {mapData && showContributeOverlay && (
-                  <Suspense fallback={null}>
-                    <ContributeOverlay
-                      isOpen={showContributeOverlay}
-                      onClose={handleCloseContribute}
-                      mapId={mapData.id}
-                      mapSlug={mapData.slug}
-                      onMentionCreated={handleMentionCreated}
-                    />
-                  </Suspense>
-                )}
               </div>
 
             </>
@@ -866,61 +800,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
       {skipPageWrapper ? (
         mainContent
       ) : (
-        <PageWrapper
-          mapSettings={mapData?.settings ? {
-            ...mapData.settings,
-            colors: {
-              owner: mapData.settings.colors?.owner || 'linear-gradient(to right, #FFB700, #DD4A00, #5C0F2F)',
-              manager: mapData.settings.colors?.manager || '#000000',
-              editor: mapData.settings.colors?.editor || '#000000',
-              'non-member': mapData.settings.colors?.['non-member'] || '#000000',
-            },
-          } : null}
-          viewAsRole={isOwner ? viewAsRole : undefined}
-          mapMembership={{
-            isMember: effectiveIsMember,
-            isOwner: effectiveIsOwner,
-            onJoinClick: sidebarHandlers.handleJoinClick,
-            mapData: mapData ? {
-              id: mapData.id,
-              name: mapData.name,
-              description: mapData.description,
-              visibility: mapData.visibility,
-              auto_approve_members: mapData.auto_approve_members || false,
-              membership_questions: mapData.membership_questions || [],
-              membership_rules: mapData.membership_rules || null,
-              settings: mapData.settings ? {
-                ...mapData.settings,
-                collaboration: mapData.settings.collaboration ? {
-                  ...mapData.settings.collaboration,
-                  pin_permissions: mapData.settings.collaboration.pin_permissions ? {
-                    required_plan: (mapData.settings.collaboration.pin_permissions.required_plan === 'professional' || mapData.settings.collaboration.pin_permissions.required_plan === 'business') 
-                      ? 'contributor' 
-                      : (mapData.settings.collaboration.pin_permissions.required_plan === 'hobby' || mapData.settings.collaboration.pin_permissions.required_plan === 'contributor' 
-                        ? mapData.settings.collaboration.pin_permissions.required_plan 
-                        : null)
-                  } : null,
-                  area_permissions: mapData.settings.collaboration.area_permissions ? {
-                    required_plan: (mapData.settings.collaboration.area_permissions.required_plan === 'professional' || mapData.settings.collaboration.area_permissions.required_plan === 'business') 
-                      ? 'contributor' 
-                      : (mapData.settings.collaboration.area_permissions.required_plan === 'hobby' || mapData.settings.collaboration.area_permissions.required_plan === 'contributor' 
-                        ? mapData.settings.collaboration.area_permissions.required_plan 
-                        : null)
-                  } : null,
-                  post_permissions: mapData.settings.collaboration.post_permissions ? {
-                    required_plan: (mapData.settings.collaboration.post_permissions.required_plan === 'professional' || mapData.settings.collaboration.post_permissions.required_plan === 'business') 
-                      ? 'contributor' 
-                      : (mapData.settings.collaboration.post_permissions.required_plan === 'hobby' || mapData.settings.collaboration.post_permissions.required_plan === 'contributor' 
-                        ? mapData.settings.collaboration.post_permissions.required_plan 
-                        : null)
-                  } : null,
-                } : undefined
-              } : undefined,
-            } : null,
-            onJoinSuccess: () => {
-              // Membership will refresh automatically via useMapMembership hook
-            },
-          }}
+        <NewPageWrapper
           headerContent={
             <MapPageHeaderButtons
               onSettingsClick={sidebarHandlers.handleSettingsClick}
@@ -929,30 +809,9 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
               showFilter={shouldShowFilterIcon}
             />
           }
-          searchComponent={
-            <MapSearchInput
-              map={mapInstanceRef.current}
-              onLocationSelect={(coordinates, placeName) => {
-                if (mapInstanceRef.current) {
-                  mapInstanceRef.current.flyTo({
-                    center: [coordinates.lng, coordinates.lat],
-                    zoom: 15,
-                    duration: 1500,
-                  });
-                }
-              }}
-            />
-          }
-          accountDropdownProps={{
-            onAccountClick: () => {
-              // Handle account click
-            },
-            onSignInClick: openWelcome,
-          }}
-          searchResultsComponent={<SearchResults />}
         >
-            {mainContent}
-          </PageWrapper>
+          {mainContent}
+        </NewPageWrapper>
       )}
 
       {/* Success Modal */}
@@ -972,7 +831,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
               onClick={() => {
                 setShowSuccessModal(false);
                 setCreatedMention(null);
-                // Reset URL parameters (remove any contribute overlay params and hash)
+                // Reset URL parameters
                 if (typeof window !== 'undefined') {
                   const url = window.location.pathname;
                   window.history.replaceState(null, '', url);
@@ -1005,7 +864,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
         currentPlan={upgradePrompt.currentPlan}
       />
 
-      {/* Location Select Popup - hidden on /live (location shown in app footer instead) */}
+      {/* Location Select Popup - hidden on /maps (location shown in app footer instead) */}
       {!skipPageWrapper && (
         <LocationSelectPopup
           isOpen={locationSelectPopup.isOpen}
@@ -1016,14 +875,6 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
           mapMeta={locationSelectPopup.mapMeta}
           allowPins={mapData?.settings?.collaboration?.allow_pins ?? false}
           isOwner={effectiveIsOwner}
-          onAddToMap={(coordinates, mapMeta, mentionTypeId) => {
-            // Remove click marker before opening overlay
-            if (removeClickMarkerRef.current) {
-              removeClickMarkerRef.current();
-            }
-            // Open contribute overlay with location, mention type, and mapMeta
-            openOverlay(coordinates, mentionTypeId || undefined, mapMeta || null, popupAddress || null);
-          }}
         />
       )}
     </>

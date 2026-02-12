@@ -102,45 +102,17 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // DEBUG: Log account data from Supabase
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[checkout-promo] Account from Supabase:', {
-            accountId: account.id,
-            stripe_customer_id: account.stripe_customer_id,
-            hasStripeCustomerId: !!account.stripe_customer_id,
-          });
-        }
-
         // Ensure Stripe customer exists and is saved to Supabase
         let customerId = account.stripe_customer_id;
 
         // If customer ID exists, verify it's valid in Stripe
         if (customerId) {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('[checkout-promo] Verifying existing Stripe customer:', customerId);
-          }
           try {
             const customer = await stripe.customers.retrieve(customerId);
             if (customer.deleted) {
-              // Customer was deleted in Stripe, need to create new one
-              if (process.env.NODE_ENV === 'development') {
-                console.log('[checkout-promo] Customer was deleted in Stripe, creating new one');
-              }
               customerId = null;
-            } else {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Customer verified in Stripe:', {
-                customerId: customer.id,
-                // Email only logged in development for debugging
-                email: customer.email,
-              });
             }
-            }
-          } catch (error) {
-            // Customer doesn't exist in Stripe, need to create new one
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Existing customer ID not found in Stripe, creating new customer. Error:', error);
-            }
+          } catch {
             customerId = null;
           }
         }
@@ -149,10 +121,6 @@ export async function POST(request: NextRequest) {
         // NOTE: User authentication is already verified above - this is safe
         if (!customerId) {
           try {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Creating new Stripe customer for account:', account.id);
-            }
-
             // Step 1: Create Stripe customer (user.email is guaranteed to exist from check above)
             const customer = await stripe.customers.create({
               email: user.email,
@@ -163,14 +131,6 @@ export async function POST(request: NextRequest) {
             });
 
             customerId = customer.id;
-
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Stripe customer created:', {
-                customerId: customer.id,
-                // Email only logged in development for debugging
-                email: customer.email,
-              });
-            }
 
             // Step 2: Save customer ID to Supabase BEFORE creating checkout
             const { error: updateError } = await supabase
@@ -186,10 +146,6 @@ export async function POST(request: NextRequest) {
                 { error: 'Failed to save customer ID to database' },
                 { status: 500 }
               );
-            }
-
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Customer ID saved to Supabase accounts table');
             }
 
             // Step 3: Verify the save was successful by re-fetching
@@ -212,14 +168,6 @@ export async function POST(request: NextRequest) {
               );
             }
 
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Customer ID verified in Supabase:', {
-                accountId: account.id,
-                stripe_customer_id: verifyAccount.stripe_customer_id,
-                match: verifyAccount.stripe_customer_id === customerId,
-              });
-            }
-
             // Customer ID is now guaranteed to be saved in Supabase
           } catch (error) {
             console.error('[checkout-promo] Error creating Stripe customer:', error);
@@ -228,14 +176,6 @@ export async function POST(request: NextRequest) {
               { status: 500 }
             );
           }
-        }
-
-        // DEBUG: Final customer ID before checkout creation
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[checkout-promo] Final customer ID before checkout:', {
-            customerId,
-            accountId: account.id,
-          });
         }
 
         // At this point, customerId is guaranteed to exist and be saved in Supabase
@@ -335,16 +275,6 @@ export async function POST(request: NextRequest) {
             // Log error but don't fail the request - checkout URL is more important
             if (process.env.NODE_ENV === 'development') {
               console.error('[checkout-promo] Failed to log checkout event:', eventError);
-            }
-          } else {
-            if (process.env.NODE_ENV === 'development') {
-              console.log('[checkout-promo] Checkout event logged to stripe_events:', {
-                eventId,
-                sessionId: session.id,
-                accountId: account.id,
-                customerId,
-                checkoutUrl: session.url,
-              });
             }
           }
         } catch (error) {

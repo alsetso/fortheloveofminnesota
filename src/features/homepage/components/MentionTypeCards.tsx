@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
+import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { PencilIcon, XMarkIcon, EyeIcon, EyeSlashIcon, TrashIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 type MentionType = { id: string; emoji: string; name: string; is_active?: boolean };
@@ -115,7 +116,7 @@ export default function MentionTypeCards({ isAdmin = false }: MentionTypeCardsPr
 
   const goToLive = (type: MentionType, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('svg')) return;
-    router.push(`/live?mention_type_id=${encodeURIComponent(type.id)}#contribute`);
+    router.push(`/maps?type=${encodeURIComponent(mentionTypeNameToSlug(type.name))}`);
   };
 
   if (loading) {
@@ -147,7 +148,7 @@ export default function MentionTypeCards({ isAdmin = false }: MentionTypeCardsPr
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            router.push(`/live?mention_type_id=${encodeURIComponent(type.id)}#contribute`);
+            router.push(`/maps?type=${encodeURIComponent(mentionTypeNameToSlug(type.name))}`);
           }
         }}
         className={`flex items-center gap-2 rounded-md border border-gray-200 p-[10px] transition-colors cursor-pointer group ${

@@ -6,6 +6,14 @@ import type { MapData } from '@/types/map';
 
 interface UseMapPageDataOptions {
   mapId: string | null;
+  /** When provided (e.g. for /maps), skip fetch and use this data */
+  initialData?: {
+    map: MapData;
+    pins?: any[];
+    areas?: any[];
+    members?: any[] | null;
+    tags?: { id: string; emoji: string; name: string }[];
+  } | null;
 }
 
 interface MapPageDataState {
@@ -16,21 +24,23 @@ interface MapPageDataState {
   initialPins: any[];
   initialAreas: any[];
   initialMembers: any[] | null;
+  tags: { id: string; emoji: string; name: string }[];
 }
 
 /**
  * Hook to manage map page data fetching and state
  * Consolidates map data, loading, error, view count, and initial pins/areas/members
  */
-export function useMapPageData({ mapId }: UseMapPageDataOptions) {
+export function useMapPageData({ mapId, initialData }: UseMapPageDataOptions) {
   const [state, setState] = useState<MapPageDataState>({
-    mapData: null,
-    loading: true,
+    mapData: initialData?.map ?? null,
+    loading: !initialData,
     error: null,
     viewCount: 0,
-    initialPins: [],
-    initialAreas: [],
-    initialMembers: null,
+    initialPins: initialData?.pins ?? [],
+    initialAreas: initialData?.areas ?? [],
+    initialMembers: initialData?.members ?? null,
+    tags: initialData?.tags ?? [],
   });
   
   const [hasRecordedView, setHasRecordedView] = useState(false);
@@ -44,8 +54,25 @@ export function useMapPageData({ mapId }: UseMapPageDataOptions) {
     }));
   };
 
-  // Fetch all map data in one call - runs once per mapId
+  // When initialData provided, use it and skip fetch
   useEffect(() => {
+    if (initialData) {
+      setState((prev) => ({
+        ...prev,
+        mapData: initialData.map,
+        loading: false,
+        initialPins: initialData.pins ?? [],
+        initialAreas: initialData.areas ?? [],
+        initialMembers: initialData.members ?? null,
+        tags: initialData.tags ?? [],
+      }));
+      return;
+    }
+  }, [initialData]);
+
+  // Fetch all map data in one call - runs once per mapId (skip when initialData)
+  useEffect(() => {
+    if (initialData) return;
     if (!mapId) {
       setState({
         mapData: null,
@@ -55,6 +82,7 @@ export function useMapPageData({ mapId }: UseMapPageDataOptions) {
         initialPins: [],
         initialAreas: [],
         initialMembers: null,
+        tags: [],
       });
       return;
     }
@@ -97,10 +125,12 @@ export function useMapPageData({ mapId }: UseMapPageDataOptions) {
           initialPins: data.pins || [],
           initialAreas: data.areas || [],
           initialMembers: data.members || null,
+          tags: data.tags || [],
         });
 
-        // Record view (fire and forget) - only once per map
-        if (!hasRecordedViewRef.current && map.id) {
+        // Record view (fire and forget) - only once per map (skip for public/live - no UUID)
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(map.id));
+        if (!hasRecordedViewRef.current && map.id && isUuid) {
           hasRecordedViewRef.current = true;
           setHasRecordedView(true);
           

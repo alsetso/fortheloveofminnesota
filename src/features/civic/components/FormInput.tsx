@@ -65,25 +65,25 @@ export default function FormInput({
 
   return (
     <div>
-      <label className="block text-[10px] font-medium text-gray-700 mb-0.5">
+      <label className="block text-[10px] font-medium text-foreground mb-0.5">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+        {required && <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>}
       </label>
       <input
         type={type}
         value={value}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={handleBlur}
-        className={`w-full text-xs border rounded px-2 py-1 focus:outline-none focus:ring-1 ${
-          error 
-            ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
-            : 'border-gray-300 focus:ring-blue-500'
+        className={`w-full text-xs border rounded px-2 py-1 bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 ${
+          error
+            ? 'border-red-300 dark:border-red-600 focus:ring-red-500 dark:focus:ring-red-400'
+            : 'border-border focus:ring-foreground-muted'
         }`}
         required={required}
         placeholder={placeholder}
       />
       {error && (
-        <p className="text-[10px] text-red-600 mt-0.5">{error}</p>
+        <p className="text-[10px] text-red-600 dark:text-red-400 mt-0.5">{error}</p>
       )}
     </div>
   );

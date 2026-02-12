@@ -66,8 +66,9 @@ export function useMentionData(mentionId: string | null): UseMentionDataResult {
 
     const fetchMention = async (): Promise<Mention | null> => {
       try {
-        const { data, error: fetchError } = await supabase
-          .from('map_pins')
+        const { data, error: fetchError } = await (supabase as any)
+          .schema('maps')
+          .from('pins')
           .select(`
             id,
             lat,

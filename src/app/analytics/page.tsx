@@ -50,8 +50,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   // Get mention IDs for filtering
   // Get live map ID first
-  const { data: liveMap, error: liveMapError } = await supabase
-    .from('map')
+  const { data: liveMap, error: liveMapError } = await (supabase as any)
+    .schema('maps')
+    .from('maps')
     .select('id')
     .eq('slug', 'live')
     .eq('is_active', true)
@@ -63,8 +64,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   let liveMentionsData: Array<{ id: string }> | null = null;
   let liveMentionsError = null;
   if (liveMapId) {
-    const result = await supabase
-      .from('map_pins')
+    const result = await (supabase as any)
+      .schema('maps')
+      .from('pins')
       .select('id', { count: 'exact', head: false })
       .eq('map_id', liveMapId)
       .eq('account_id', accountId)
@@ -78,8 +80,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const liveMentionIds = ((liveMentionsData || []) as Array<{ id: string }>).map(m => m.id);
 
   // Get total pins (all pins across all maps)
-  const { data: allPinsData, error: allPinsError } = await supabase
-    .from('map_pins')
+  const { data: allPinsData, error: allPinsError } = await (supabase as any)
+    .schema('maps')
+    .from('pins')
     .select('id', { count: 'exact', head: false })
     .eq('account_id', accountId)
     .eq('is_active', true)
@@ -89,7 +92,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const mentionIds = ((allPinsData || []) as Array<{ id: string }>).map(m => m.id);
 
   // Get post IDs for filtering
-  const { data: postsData, error: postsError } = await supabase
+  const { data: postsData, error: postsError } = await (supabase as any)
+    .schema('content')
     .from('posts')
     .select('id')
     .eq('account_id', accountId)
@@ -98,8 +102,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const postIds = postsData?.map(p => p.id) || [];
 
   // Get map IDs for filtering (both UUID and custom_slug)
-  const { data: mapsData, error: mapsError } = await supabase
-    .from('map')
+  const { data: mapsData, error: mapsError } = await (supabase as any)
+    .schema('maps')
+    .from('maps')
     .select('id, custom_slug')
     .eq('account_id', accountId)
     .returns<Array<{ id: string; custom_slug: string | null }>>();
@@ -342,16 +347,16 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     // Batch fetch content data with account_id to check ownership and get owner info
     const [mentionsData, postsData, mapsByIdData, mapsBySlugData] = await Promise.all([
       mentionIdsToFetch.length > 0
-        ? supabase.from('map_pins').select('id, description, account_id, account:accounts!map_pins_account_id_fkey(username, image_url)').in('id', [...new Set(mentionIdsToFetch)])
+        ? (supabase as any).schema('maps').from('pins').select('id, description, account_id, account:accounts!map_pins_account_id_fkey(username, image_url)').in('id', [...new Set(mentionIdsToFetch)])
         : Promise.resolve({ data: [] }),
       postIdsToFetch.length > 0
-        ? supabase.from('posts').select('id, title, content, account_id, account:accounts!posts_account_id_fkey(username, image_url)').in('id', [...new Set(postIdsToFetch)])
+        ? (supabase as any).schema('content').from('posts').select('id, title, content, account_id, account:accounts!posts_account_id_fkey(username, image_url)').in('id', [...new Set(postIdsToFetch)])
         : Promise.resolve({ data: [] }),
       mapIdsToFetch.length > 0
-        ? supabase.from('map').select('id, title, description').in('id', [...new Set(mapIdsToFetch)])
+        ? (supabase as any).schema('maps').from('maps').select('id, title, description').in('id', [...new Set(mapIdsToFetch)])
         : Promise.resolve({ data: [] }),
       mapSlugsToFetch.length > 0
-        ? supabase.from('map').select('id, title, description, custom_slug').in('custom_slug', [...new Set(mapSlugsToFetch)])
+        ? (supabase as any).schema('maps').from('maps').select('id, title, description, custom_slug').in('custom_slug', [...new Set(mapSlugsToFetch)])
         : Promise.resolve({ data: [] }),
     ]);
 
@@ -587,15 +592,17 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       
       if (uniqueMapIds.length > 0) {
         const { data: mapsById } = await supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id, title, description, custom_slug')
           .in('id', uniqueMapIds);
         if (mapsById) mapsContent.push(...mapsById);
       }
       
       if (uniqueMapSlugs.length > 0) {
-        const { data: mapsBySlug } = await supabase
-          .from('map')
+        const { data: mapsBySlug } = await (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('id, title, description, custom_slug')
           .in('custom_slug', uniqueMapSlugs);
         if (mapsBySlug) mapsContent.push(...mapsBySlug);

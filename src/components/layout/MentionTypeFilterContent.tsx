@@ -74,13 +74,13 @@ export default function MentionTypeFilterContent({ onClose, showHeader = false }
     }
   }, [mentionTypes, searchParams]);
 
-  // Handle type selection - navigate to live map with contribute overlay
+  // Handle type selection - navigate to maps with type filter
   const handleTypeSelect = (typeId: string) => {
     const selectedType = mentionTypes.find(t => t.id === typeId);
     if (selectedType) {
       const params = new URLSearchParams();
-      params.set('mention_type_id', typeId);
-      router.push(`/map/live?${params.toString()}#contribute`);
+      params.set('type', mentionTypeNameToSlug(selectedType.name));
+      router.push(`/maps?${params.toString()}`);
       if (onClose) {
         onClose();
       }
@@ -93,7 +93,7 @@ export default function MentionTypeFilterContent({ onClose, showHeader = false }
     const params = new URLSearchParams(searchParams.toString());
     params.delete('type');
     params.delete('types');
-    router.push(`/map/live?${params.toString()}`);
+    router.push(params.toString() ? `/maps?${params.toString()}` : '/maps');
   };
 
   return (

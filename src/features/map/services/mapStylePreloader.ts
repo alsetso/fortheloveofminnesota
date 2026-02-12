@@ -4,7 +4,7 @@
  * 
  * Performance optimizations:
  * - Caches style JSON in localStorage (7-day TTL)
- * - Preloads sprites and glyphs
+ * - Preloads style definitions (sprites/glyphs loaded automatically by Mapbox GL JS)
  * - Falls back to API if cache is stale or missing
  */
 
@@ -112,22 +112,9 @@ class MapStylePreloader {
         // Check cache first
         const cached = this.loadFromCache(style);
         if (cached) {
-          const styleData = cached.styleData;
+          // Sprites are loaded automatically by Mapbox GL JS when style is used
+          // No need to preload them manually
           
-          // Preload sprite and glyphs from cached data
-          if (styleData.sprite) {
-            const spriteUrl = typeof styleData.sprite === 'string' 
-              ? styleData.sprite 
-              : styleData.sprite[0];
-            
-            try {
-              await fetch(`${spriteUrl}.json`, { cache: 'force-cache' });
-            } catch (e) {
-              // Sprite preload is optional
-              console.debug(`[MapStylePreloader] Sprite preload failed for ${style}:`, e);
-            }
-          }
-
           this.preloadedStyles.set(style, {
             styleUrl,
             loaded: true,
@@ -160,20 +147,9 @@ class MapStylePreloader {
         // Cache the style JSON
         this.saveToCache(style, styleData);
 
-        // Preload sprite and glyphs if available
-        if (styleData.sprite) {
-          const spriteUrl = typeof styleData.sprite === 'string' 
-            ? styleData.sprite 
-            : styleData.sprite[0];
-          
-          // Preload sprite JSON
-          try {
-            await fetch(`${spriteUrl}.json`);
-          } catch (e) {
-            // Sprite preload is optional
-            console.debug(`[MapStylePreloader] Sprite preload failed for ${style}:`, e);
-          }
-        }
+        // Note: Sprites and glyphs are loaded automatically by Mapbox GL JS
+        // when the style is actually used. No need to preload them manually.
+        // Manual preloading causes CORS errors and 404s.
 
         this.preloadedStyles.set(style, {
           styleUrl,

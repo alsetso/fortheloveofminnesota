@@ -157,14 +157,16 @@ export default function EditMapPostPage() {
         const { supabase } = await import('@/lib/supabase');
         // Get live map ID first
         const { data: liveMap } = await supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id')
           .eq('slug', 'live')
           .eq('is_active', true)
           .single();
 
         const { data, error: err } = await supabase
-          .from('map_pins')
+          .schema('maps')
+          .from('pins')
           .select(`
             id,
             description,

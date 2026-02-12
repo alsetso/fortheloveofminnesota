@@ -45,7 +45,8 @@ export async function GET(
 
         // Verify user owns the map
         const { data: mapData } = await supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('account_id')
           .eq('id', mapId)
           .single();

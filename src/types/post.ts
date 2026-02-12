@@ -13,6 +13,7 @@ export interface Post {
   group_id: string | null;
   mention_type_id: string | null;
   mention_ids: string[] | null;
+  tagged_account_ids: string[] | null;
   map_id: string | null;
   images: Array<{
     url: string;
@@ -26,6 +27,7 @@ export interface Post {
     address?: string;
     place_name?: string;
   } | null;
+  background_color: 'black' | 'red' | 'blue' | null;
   created_at: string;
   updated_at: string;
   account?: {
@@ -36,6 +38,13 @@ export interface Post {
     image_url: string | null;
     plan: string | null;
   } | null;
+  tagged_accounts?: Array<{
+    id: string;
+    username: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    image_url: string | null;
+  }> | null;
   map?: {
     id: string;
     name: string;
@@ -59,6 +68,8 @@ export interface Post {
       name: string;
     } | null;
   }> | null;
+  shared_post_id?: string | null;
+  shared_post?: Post | null;
 }
 
 export interface CreatePostData {
@@ -68,6 +79,7 @@ export interface CreatePostData {
   group_id?: string | null;
   mention_type_id?: string | null;
   mention_ids?: string[] | null;
+  tagged_account_ids?: string[] | null;
   map_id?: string | null;
   images?: Array<{
     url: string;
@@ -90,6 +102,7 @@ export interface UpdatePostData {
   group_id?: string | null;
   mention_type_id?: string | null;
   mention_ids?: string[] | null;
+  tagged_account_ids?: string[] | null;
   map_id?: string | null;
   images?: Array<{
     url: string;
@@ -103,11 +116,11 @@ export interface UpdatePostData {
     address?: string;
     place_name?: string;
   } | null;
+  background_color?: 'black' | 'red' | 'blue' | null;
 }
 
 export interface PostFilters {
   account_id?: string;
-  group_id?: string;
   map_id?: string;
   visibility?: PostVisibility;
   limit?: number;

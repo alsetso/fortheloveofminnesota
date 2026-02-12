@@ -65,11 +65,11 @@ function PinSkeleton({ onClick, isLast, hasImage }: { onClick?: () => void; isLa
 
 function getViewOnMapHref(pin: ProfilePin): string {
   const isLive = pin.map?.slug === 'live';
-  if (isLive) return `/live?pin=${encodeURIComponent(pin.id)}`;
+  if (isLive) return `/maps?pin=${encodeURIComponent(pin.id)}`;
   if (pin.map && Number.isFinite(pin.lat) && Number.isFinite(pin.lng)) {
     return getMapUrlWithPin({ id: pin.map.id, slug: pin.map.slug ?? null }, pin.lat, pin.lng);
   }
-  return `/live?pin=${encodeURIComponent(pin.id)}`;
+  return `/maps?pin=${encodeURIComponent(pin.id)}`;
 }
 
 export default function ProfileMentionsList({ pins: initialPins, collections = [], isOwnProfile = false, onViewMap, onCollectionsUpdate }: ProfileMentionsListProps) {

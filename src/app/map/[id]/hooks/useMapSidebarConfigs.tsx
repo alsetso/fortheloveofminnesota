@@ -161,9 +161,8 @@ export function useMapSidebarConfigs({
     }
 
     // Show join sidebar if user is not a member and not an owner
-    // Note: We allow joining regardless of collaboration settings - the map owner
-    // can configure membership rules/questions to control access
-    if (!isMember && !isOwner && currentAccountId) {
+    // Skip for public map - no membership model
+    if (!isMember && !isOwner && currentAccountId && mapId !== 'public') {
       configs.push({
         type: 'join' as const,
         title: 'Join Map',

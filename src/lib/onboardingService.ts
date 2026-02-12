@@ -1,6 +1,7 @@
 import type { Account } from '@/features/auth';
 
-export type OnboardingStep = 'welcome' | 'profile_photo' | 'username' | 'location' | 'name' | 'bio' | 'traits' | 'owns_business' | 'contact' | 'review';
+/** MVP: 3 steps only. Extended steps (location, name, bio, etc.) deferred. */
+export type OnboardingStep = 'welcome' | 'username' | 'profile_photo';
 
 export interface OnboardingState {
   currentStep: OnboardingStep;
@@ -30,57 +31,28 @@ export function hasIncompleteBilling(account: Account | null): boolean {
 }
 
 /**
- * Determines if account has completed mandatory steps 1-2
- * Step 1: Profile photo (image_url)
- * Step 2: Username
+ * MVP: Only username is required. Profile photo is optional.
  */
 export function hasCompletedMandatorySteps(account: Account | null): boolean {
   if (!account) return false;
-  
-  const hasPhoto = !!account.image_url;
-  const hasUsername = !!account.username;
-  
-  return hasPhoto && hasUsername;
+  return !!account.username;
 }
 
 /**
- * Determines the current onboarding step based on account state
+ * MVP: 3 steps only — welcome → username → profile_photo.
+ * All other fields (location, name, bio, etc.) deferred to settings.
  */
 export function determineOnboardingStep(account: Account | null): OnboardingState {
-  // Always start with welcome step for new users
-  // Welcome step is informational only, no validation needed
-  // The UI will handle navigation from welcome to profile_photo
-  
   if (!account) {
     return { currentStep: 'welcome' };
   }
-  
-  // Step 1: Profile photo
-  if (!account.image_url) {
-    return { currentStep: 'profile_photo' };
-  }
-  
-  // Step 2: Username
   if (!account.username) {
     return { currentStep: 'username' };
   }
-  
-  // Step 3: Location
-  if (!account.city_id) {
-    return { currentStep: 'location' };
+  if (!account.image_url) {
+    return { currentStep: 'profile_photo' };
   }
-  
-  // Steps 4-8: Optional account information (name, bio, traits, etc.)
-  // Check each step in order and return first incomplete one
-  if (!account.first_name && !account.last_name) {
-    return { currentStep: 'name' };
-  }
-  
-  // Note: bio, traits, owns_business, contact are optional
-  // We'll let the UI handle progression through these
-  
-  // All steps complete - return review step
-  return { currentStep: 'review' };
+  return { currentStep: 'profile_photo' };
 }
 
 /**

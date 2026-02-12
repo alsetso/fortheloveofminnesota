@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabaseServer';
+import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
 import { createErrorResponse, createSuccessResponse } from '@/lib/server/apiError';
 import { cache } from 'react';
 
-// Cache the most recent 100 mentions for the live map
+// Cache the most recent 100 pins for the live map
 // Revalidates every 5 minutes (300 seconds) for freshness
 export const revalidate = 300; // 5 minutes
 export const dynamic = 'force-dynamic'; // Allow dynamic params but cache responses
 
 /**
- * Cached function to fetch the 100 most recent public mentions for the live map
- * This includes mentions with NULL map_id or explicitly linked to the live map
+ * Cached function to fetch the 100 most recent public pins for the live map
  */
-const getCachedLiveMentions = cache(async () => {
-  const supabase = createServerClient();
+const getCachedLivePins = cache(async () => {
+  // Use createServerClientWithAuth with empty cookies to ensure schema access
+  // This works for both anonymous and authenticated users
+  const { cookies } = await import('next/headers');
+  const supabase = await createServerClientWithAuth(cookies());
   
   // Get the live map ID first
   // Use slug (new system) or custom_slug (legacy fallback)
@@ -22,8 +24,9 @@ const getCachedLiveMentions = cache(async () => {
   let liveMap: { id: string } | null = null;
   
   // Get live map by slug
-  const { data: slugMap, error: slugError } = await supabase
-    .from('map')
+  const { data: slugMap, error: slugError } = await (supabase as any)
+    .schema('maps')
+    .from('maps')
     .select('id')
     .eq('slug', 'live')
     .eq('is_active', true)
@@ -34,7 +37,7 @@ const getCachedLiveMentions = cache(async () => {
   } else {
     // Log detailed error for debugging
     if (process.env.NODE_ENV === 'development') {
-      console.error('[Live Map Mentions API] Live map lookup failed:', {
+      console.error('[Live Map Pins API] Live map lookup failed:', {
         slugError,
         slugMap,
       });
@@ -48,33 +51,37 @@ const getCachedLiveMentions = cache(async () => {
   
   const liveMapId = (liveMap as { id: string }).id;
   
-  // Fetch the 100 most recent public map_pins from live map
-  // All mentions are now map_pins linked to the live map
-  const { data: mentions, error } = await supabase
-    .from('map_pins')
+  // Fetch the 100 most recent public pins from live map
+  // Extract lat/lng from PostGIS geometry
+  // Note: Cannot join accounts across schemas, so fetch pins first, then accounts separately
+  const { data: pins, error } = await (supabase as any)
+    .schema('maps')
+    .from('pins')
     .select(`
       id,
       map_id,
-      lat,
-      lng,
-      description,
+      geometry,
+      body,
+      caption,
+      emoji,
       image_url,
       video_url,
+      icon_url,
       media_type,
-      account_id,
-      city_id,
-      collection_id,
-      mention_type_id,
+      full_address,
+      map_meta,
+      atlas_meta,
+      view_count,
+      tagged_account_ids,
       visibility,
       archived,
+      is_active,
       post_date,
       created_at,
       updated_at,
-      view_count,
-      accounts(
-        image_url
-      ),
-      mention_type:mention_types(
+      author_account_id,
+      tag_id,
+      mention_type:tags(
         id,
         emoji,
         name
@@ -91,12 +98,74 @@ const getCachedLiveMentions = cache(async () => {
     throw error;
   }
   
-  return mentions || [];
+  // Fetch account images separately (cross-schema join not supported)
+  const accountIds = [...new Set((pins || [])
+    .map((p: any) => p.author_account_id)
+    .filter((id: any) => id !== null))];
+  
+  let accountImages: Record<string, string | null> = {};
+  if (accountIds.length > 0) {
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('id, image_url')
+      .in('id', accountIds);
+    
+    if (accounts) {
+      accountImages = accounts.reduce((acc: Record<string, string | null>, account: any) => {
+        acc[account.id] = account.image_url || null;
+        return acc;
+      }, {});
+    }
+  }
+  
+  // Transform pins to include lat/lng from geometry
+  const transformedPins = (pins || []).map((pin: any) => {
+    let lat: number | null = null;
+    let lng: number | null = null;
+    
+    if (pin.geometry) {
+      try {
+        // Parse GeoJSON format
+        const geom = typeof pin.geometry === 'string' ? JSON.parse(pin.geometry) : pin.geometry;
+        if (geom && geom.type === 'Point' && Array.isArray(geom.coordinates) && geom.coordinates.length >= 2) {
+          lng = geom.coordinates[0];
+          lat = geom.coordinates[1];
+        } else if (typeof pin.geometry === 'string') {
+          // Fallback: parse WKT format "POINT(lng lat)"
+          const match = pin.geometry.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/);
+          if (match) {
+            lng = parseFloat(match[1]);
+            lat = parseFloat(match[2]);
+          }
+        }
+      } catch (e) {
+        // Geometry parsing failed
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Live Map Pins API] Failed to parse geometry:', e);
+        }
+      }
+    }
+    
+    return {
+      ...pin,
+      lat,
+      lng,
+      description: pin.body || null,
+      account_id: pin.author_account_id || null,
+      // Add account image_url from separate query
+      account: pin.author_account_id ? {
+        image_url: accountImages[pin.author_account_id] || null
+      } : null,
+    };
+  });
+  
+  return transformedPins;
 });
 
 /**
- * GET /api/maps/live/mentions
- * Get the 100 most recent public mentions for the live map
+ * GET /api/maps/live/mentions (kept for backward compatibility)
+ * GET /api/maps/live/pins (new endpoint name)
+ * Get the 100 most recent public pins for the live map
  * 
  * Caching:
  * - Server-side: React cache() with 5-minute revalidation
@@ -106,20 +175,21 @@ const getCachedLiveMentions = cache(async () => {
  * Security:
  * - Rate limited: 200 requests/minute (authenticated) or 100/min (public)
  * - Public endpoint (no auth required)
- * - Only returns public mentions
+ * - Only returns public pins
  */
 export async function GET(request: NextRequest) {
   return withSecurity(
     request,
     async (req) => {
       try {
-        // Fetch cached mentions
-        const mentions = await getCachedLiveMentions();
+        // Fetch cached pins
+        const pins = await getCachedLivePins();
         
         // Create response with cache headers
         const response = NextResponse.json({
-          mentions,
-          count: mentions.length,
+          pins, // New field name
+          mentions: pins, // Keep for backward compatibility
+          count: pins.length,
           cached: true,
           timestamp: new Date().toISOString(),
         });
@@ -136,10 +206,10 @@ export async function GET(request: NextRequest) {
         return response;
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
-          console.error('[Live Map Mentions API] Error:', error);
+          console.error('[Live Map Pins API] Error:', error);
         }
         return createErrorResponse(
-          error instanceof Error ? error.message : 'Failed to fetch live map mentions',
+          error instanceof Error ? error.message : 'Failed to fetch live map pins',
           500
         );
       }

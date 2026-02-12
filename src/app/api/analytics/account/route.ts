@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
 
     // Get live map ID
     const { data: liveMap } = await supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select('id')
       .eq('slug', 'live')
       .eq('is_active', true)
@@ -42,7 +43,8 @@ export async function GET(request: NextRequest) {
 
     // Get live mentions count (pins on live map)
     const { data: liveMentionsData, error: liveMentionsError } = await supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .select('id', { count: 'exact', head: false })
       .eq('map_id', liveMapId || '')
       .eq('account_id', accountId)
@@ -53,7 +55,8 @@ export async function GET(request: NextRequest) {
 
     // Get all pin IDs for this account
     const { data: allPinsData } = await supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .select('id')
       .eq('account_id', accountId)
       .eq('is_active', true)

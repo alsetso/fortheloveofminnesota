@@ -1,9 +1,9 @@
 'use client';
 
 import { ReactNode } from 'react';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import HomePageLayout from '@/app/HomePageLayout';
 import HomeDashboardContent from '@/features/homepage/components/HomeDashboardContent';
 import ViewAsSelector from '@/features/profiles/components/ViewAsSelector';
@@ -48,14 +48,18 @@ export default function UsernamePageShell({ children, isOwnProfile, profileAccou
     children
   );
 
+  // Own dashboard uses LeftSidebar; profile view uses ProfileViewContent (separate component)
+  const leftSidebar = showDashboard ? <LeftSidebar /> : <LeftSidebar />;
+
   return (
-    <PageWrapper
+    <NewPageWrapper
+      leftSidebar={leftSidebar}
+      rightSidebar={<RightSidebar />}
       headerContent={isOwnProfile || showViewAsSelector ? <ViewAsSelector visible darkText /> : null}
-      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
-      accountDropdownProps={{ onAccountClick: () => {}, onSignInClick: openWelcome }}
-      searchResultsComponent={<SearchResults />}
     >
-      {content}
-    </PageWrapper>
+      <div className="w-full py-6">
+        {content}
+      </div>
+    </NewPageWrapper>
   );
 }

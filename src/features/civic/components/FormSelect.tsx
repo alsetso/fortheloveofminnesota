@@ -15,13 +15,13 @@ export default function FormSelect({
 }: FormSelectProps) {
   return (
     <div>
-      <label className="block text-[10px] font-medium text-gray-700 mb-0.5">
+      <label className="block text-[10px] font-medium text-foreground mb-0.5">
         {label}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        className="w-full text-xs border border-border rounded px-2 py-1 bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-foreground-muted"
         required={required}
       >
         {options.map(option => (

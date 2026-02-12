@@ -5,7 +5,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 export interface HeaderThemeValue {
   /** True when header uses default iOS light gray background (#F2F2F7) */
   isDefaultLightBg: boolean;
-  /** True when header should use white background (e.g. when search is active on /live) */
+  /** True when header should use white background (e.g. when search is active on /maps) */
   isSearchActive: boolean;
 }
 

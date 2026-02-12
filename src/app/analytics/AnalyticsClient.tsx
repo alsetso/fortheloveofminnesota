@@ -4,10 +4,9 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { ChartBarIcon, EyeIcon, ChevronDownIcon, ChevronUpIcon, ArrowTopRightOnSquareIcon, UserIcon, ClockIcon, InformationCircleIcon, MapIcon } from '@heroicons/react/24/outline';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
-import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import Image from 'next/image';
 import { isCardVisible, type AnalyticsCardId } from '@/lib/analytics/cardVisibility';
 
@@ -445,24 +444,12 @@ export default function AnalyticsClient({
   };
 
   return (
-    <PageWrapper
-      headerContent={null}
-      searchComponent={
-        <MapSearchInput
-          onLocationSelect={() => {
-            // Handle location selection if needed
-          }}
-        />
-      }
-      accountDropdownProps={{
-        onAccountClick: () => {
-          // Handle account click
-        },
-        onSignInClick: openWelcome,
-      }}
-      searchResultsComponent={<SearchResults />}
+    <NewPageWrapper
+      leftSidebar={<LeftSidebar />}
+      rightSidebar={<RightSidebar />}
     >
-      <div className="max-w-[600px] mx-auto px-4 py-6 space-y-6">
+      <div className="w-full py-6">
+        <div className="max-w-[600px] mx-auto px-4 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -481,7 +468,8 @@ export default function AnalyticsClient({
             </p>
           </div>
         </div>
+        </div>
       </div>
-    </PageWrapper>
+    </NewPageWrapper>
   );
 }

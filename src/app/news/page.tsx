@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
-import SearchResults from '@/components/layout/SearchResults';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import RightSidebar from '@/components/layout/RightSidebar';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useAuthStateSafe } from '@/features/auth';
 import { PlusIcon } from '@heroicons/react/24/outline';
@@ -85,25 +85,12 @@ export default function NewsPage() {
   };
 
   return (
-    <PageWrapper
-      headerContent={null}
-      searchComponent={
-        <MapSearchInput
-          onLocationSelect={() => {
-            // Handle location selection if needed
-          }}
-        />
-      }
-      accountDropdownProps={{
-        onAccountClick: () => {
-          // Handle account click
-        },
-        onSignInClick: openWelcome,
-      }}
-      searchResultsComponent={<SearchResults />}
+    <NewPageWrapper
+      leftSidebar={<LeftSidebar />}
+      rightSidebar={<RightSidebar />}
     >
-      <div className="h-full overflow-y-auto scrollbar-hide">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-3">
+      <div className="w-full py-6">
+        <div className="max-w-4xl mx-auto px-4 space-y-3">
           <div className="mb-4 flex items-start justify-between">
             <div>
               <h1 className="text-sm font-semibold text-gray-900">Minnesota News</h1>
@@ -203,6 +190,6 @@ export default function NewsPage() {
           )}
         </div>
       </div>
-    </PageWrapper>
+    </NewPageWrapper>
   );
 }

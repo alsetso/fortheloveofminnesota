@@ -335,7 +335,7 @@ export default function MapSearchInput({ map, onLocationSelect, modalState, isAc
     );
   }, [searchResults, isSearching, searchQuery]);
 
-  const inputTextClass = 'text-[#3C3C43] placeholder:text-[#3C3C43]/60 caret-[#3C3C43]';
+  const inputTextClass = 'text-foreground placeholder:text-foreground-muted/80 caret-foreground';
 
   // Handle click on search bar container - disabled
   const handleSearchBarClick = useCallback((e: React.MouseEvent) => {
@@ -358,7 +358,7 @@ export default function MapSearchInput({ map, onLocationSelect, modalState, isAc
     <div ref={containerRef} className="relative w-full">
       {/* Search Bar */}
       <div 
-        className="rounded-xl px-2 py-1 flex items-center gap-1.5 relative bg-gray-100 h-8 cursor-grab active:cursor-grabbing"
+        className="rounded-xl px-2 py-1 flex items-center gap-1.5 relative bg-surface-accent h-8 cursor-grab active:cursor-grabbing"
         onClick={handleSearchBarClick}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}

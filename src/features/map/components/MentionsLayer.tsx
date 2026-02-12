@@ -29,14 +29,15 @@ interface MentionsLayerProps {
   mapId?: string | null;
   /** If true, skip registering click handlers (unified handler will handle clicks) */
   skipClickHandlers?: boolean;
-  /** When false (e.g. on /live until boundaries are done), defer fetching pins until it becomes true. */
+  /** When false (e.g. on /maps until boundaries are done), defer fetching pins until it becomes true. */
   startPinsLoad?: boolean;
   /** When false, show all pins unclustered. When true (default), cluster by data up to MENTIONS_CLUSTER_MAX_ZOOM. */
   clusterPins?: boolean;
-  /** When true on /live, show only current account's pins. Default false. */
+  /** When true on /maps, show only current account's pins. Default false. */
   showOnlyMyPins?: boolean;
-  /** When on /live: time filter for pins (24h, 7d, or null = all time). When provided, overrides internal state. */
+  /** When on /maps: time filter for pins (24h, 7d, or null = all time). When provided, overrides internal state. */
   timeFilter?: '24h' | '7d' | null;
+  /** When true, fetch pins from maps.pins table (admin view). Default false. */
 }
 
 /** In-memory cache for live map mentions so we don't heavy reload on remount/style change */
@@ -272,6 +273,19 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
     if (!map || !mapLoaded) return;
     if (startPinsLoad === false) return;
 
+    // Clear cache when switching admin view (always clear to force fresh fetch)
+    liveMapMentionsCache = null;
+    if (typeof window !== 'undefined') {
+      try {
+        // Clear both old and new cache keys
+        sessionStorage.removeItem('live_map_pins_cache');
+        sessionStorage.removeItem('live_map_mentions_cache');
+        sessionStorage.removeItem('live_map_mentions_cache_admin');
+      } catch {
+        // ignore
+      }
+    }
+
     let mounted = true;
 
     const loadMentions = async (showLoading = false) => {
@@ -279,7 +293,7 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
       if (isAddingLayersRef.current) return;
       
       // Check if this is the live map (needed for cache path)
-      const isLiveMap = pathname === '/map/live' || pathname === '/live';
+      const isLiveMap = pathname === '/map/live' || pathname === '/maps';
       const useCacheFirst = isLiveMap && liveMapMentionsCache?.data?.length;
       
       // Only show loading when we don't have in-memory cache (avoids heavy reload UX)
@@ -292,51 +306,37 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         const yearParam = searchParams.get('year');
         const year = yearParam ? parseInt(yearParam, 10) : undefined;
         
-        // Get mention type filter from URL (support both single 'type' and multiple 'types')
+        // Get mention type filter from URL (support single 'type', CSV 'type=slug1,slug2', or 'types')
         const typeParam = searchParams.get('type');
         const typesParam = searchParams.get('types');
         let mentionTypeIds: string[] | undefined;
-        
+
+        const parseSlugsToIds = async (slugs: string[]) => {
+          const { data: allTypes } = await supabase
+            .from('mention_types')
+            .select('id, name')
+            .eq('is_active', true);
+
+          if (!allTypes) return undefined;
+          const matchingIds = slugs
+            .map((slug) => {
+              const matchingType = allTypes.find((type) => {
+                const typeSlug = mentionTypeNameToSlug(type.name);
+                return typeSlug === slug;
+              });
+              return matchingType?.id;
+            })
+            .filter(Boolean) as string[];
+          return matchingIds.length > 0 ? matchingIds : undefined;
+        };
+
         if (typesParam) {
-          // Multiple types - comma-separated slugs
-          const slugs = typesParam.split(',').map(s => s.trim());
-          const { data: allTypes } = await supabase
-            .from('mention_types')
-            .select('id, name')
-            .eq('is_active', true);
-          
-          if (allTypes) {
-            const matchingIds = slugs
-              .map(slug => {
-                const matchingType = allTypes.find(type => {
-                  const typeSlug = mentionTypeNameToSlug(type.name);
-                  return typeSlug === slug;
-                });
-                return matchingType?.id;
-              })
-              .filter(Boolean) as string[];
-            
-            if (matchingIds.length > 0) {
-              mentionTypeIds = matchingIds;
-            }
-          }
+          const slugs = typesParam.split(',').map((s) => s.trim()).filter(Boolean);
+          mentionTypeIds = await parseSlugsToIds(slugs);
         } else if (typeParam) {
-          // Single type
-          const { data: allTypes } = await supabase
-            .from('mention_types')
-            .select('id, name')
-            .eq('is_active', true);
-          
-          if (allTypes) {
-            const matchingType = allTypes.find(type => {
-              const typeSlug = mentionTypeNameToSlug(type.name);
-              return typeSlug === typeParam;
-            });
-            
-            if (matchingType) {
-              mentionTypeIds = [matchingType.id];
-            }
-          }
+          // Support both single slug and CSV: type=slug or type=slug1,slug2
+          const slugs = typeParam.split(',').map((s) => s.trim()).filter(Boolean);
+          mentionTypeIds = await parseSlugsToIds(slugs);
         }
         
         const applyFilters = (raw: Mention[]) => {
@@ -366,9 +366,13 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         
         let mentions: Mention[] = [];
         
-        // For live map: in-memory cache first (no heavy reload), then sessionStorage, then API
+        // For live/maps: in-memory cache first (no heavy reload), then sessionStorage, then API
+        // /maps uses public schema (public.map_pins), /map/live uses maps schema
         if (isLiveMap) {
-          const CACHE_KEY = 'live_map_mentions_cache';
+          const usePublicSchema = pathname === '/maps';
+          const pinsUrl = usePublicSchema ? '/api/maps/public/pins' : '/api/maps/live/pins';
+          const CACHE_KEY = usePublicSchema ? 'public_map_pins_cache' : 'live_map_pins_cache';
+          const CACHE_KEY_OLD = usePublicSchema ? 'public_map_mentions_cache' : 'live_map_mentions_cache';
           const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
           
           // 1) In-memory cache: use immediately, no loading spinner, revalidate in background
@@ -376,14 +380,16 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             mentions = applyFilters([...liveMapMentionsCache.data]);
             setIsLoadingMentions(false);
             // Background revalidate
-            fetch('/api/maps/live/mentions')
+            fetch(pinsUrl, { credentials: 'include' })
               .then(res => res.json())
               .then(data => {
-                if (data?.mentions && mounted) {
-                  liveMapMentionsCache = { data: data.mentions, timestamp: Date.now() };
+                // Support both "pins" (new) and "mentions" (backward compat) field names
+                const pins = data?.pins || data?.mentions || [];
+                if (pins.length > 0 && mounted) {
+                  liveMapMentionsCache = { data: pins, timestamp: Date.now() };
                   try {
                     sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-                      data: data.mentions,
+                      data: pins,
                       timestamp: Date.now(),
                     }));
                   } catch {
@@ -397,7 +403,11 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           // 2) SessionStorage cache (if no memory cache or memory was used but we need to continue to add layers)
           if (mentions.length === 0) {
           try {
-            const cached = sessionStorage.getItem(CACHE_KEY);
+            // Check new cache key first, then fallback to old key for backward compatibility
+            let cached = sessionStorage.getItem(CACHE_KEY);
+            if (!cached) {
+              cached = sessionStorage.getItem(CACHE_KEY_OLD);
+            }
             if (cached) {
               const { data, timestamp } = JSON.parse(cached);
               const age = Date.now() - timestamp;
@@ -407,16 +417,20 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 liveMapMentionsCache = { data, timestamp };
                 
                 // Fetch fresh data in background (stale-while-revalidate)
-                fetch('/api/maps/live/mentions')
+                fetch(pinsUrl, { credentials: 'include' })
                   .then(res => res.json())
                   .then(data => {
-                    if (data?.mentions && mounted) {
-                      liveMapMentionsCache = { data: data.mentions, timestamp: Date.now() };
+                    // Support both "pins" (new) and "mentions" (backward compat) field names
+                    const pins = data?.pins || data?.mentions || [];
+                    if (pins.length > 0 && mounted) {
+                      liveMapMentionsCache = { data: pins, timestamp: Date.now() };
                       try {
                         sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-                          data: data.mentions,
+                          data: pins,
                           timestamp: Date.now(),
                         }));
+                        // Remove old cache key if it exists
+                        sessionStorage.removeItem(CACHE_KEY_OLD);
                       } catch {
                         // ignore
                       }
@@ -433,10 +447,12 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           // 3) No valid cache, fetch from API
           if (mentions.length === 0) {
             try {
-              const response = await fetch('/api/maps/live/mentions');
+              const typeQ = typeParam || typesParam ? `?${typesParam ? `types=${encodeURIComponent(typesParam)}` : typeParam ? `type=${encodeURIComponent(typeParam)}` : ''}` : '';
+              const response = await fetch(`${pinsUrl}${typeQ}`, { credentials: 'include' });
               if (response.ok) {
                 const data = await response.json();
-                const raw = data.mentions || [];
+                // Support both "pins" (new) and "mentions" (backward compat) field names
+                const raw = data?.pins || data?.mentions || [];
                 mentions = applyFilters(raw);
                 const ts = Date.now();
                 liveMapMentionsCache = { data: raw, timestamp: ts };
@@ -448,7 +464,6 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 } catch {
                   // ignore
                 }
-                
               } else {
                 // API failed, fallback to MentionService
                 throw new Error('API fetch failed');
@@ -1204,8 +1219,9 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 (async () => {
                   try {
                     const { supabase } = await import('@/lib/supabase');
-                    const { data: mentionData } = await supabase
-                      .from('map_pins')
+                    const { data: mentionData } = await (supabase as any)
+                      .schema('maps')
+                      .from('pins')
                       .select('full_address, map_meta, description')
                       .eq('id', mentionId)
                       .eq('is_active', true)
@@ -1621,16 +1637,11 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             // Layer may not exist
           }
             
-            // Remove source
-              try {
-            if (mapboxMap.getSource(sourceId)) {
-                mapboxMap.removeSource(sourceId);
-              }
-          } catch (sourceError) {
-            // Source may not exist or may be in use
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('[MentionsLayer] Error removing source:', sourceError);
-            }
+            // Remove source - avoid getSource (can throw when map is destroyed); removeSource throws if source missing, we catch
+          try {
+            mapboxMap.removeSource(sourceId);
+          } catch {
+            // Source may not exist or map may be destroyed during unmount - ignore
           }
         } catch (e) {
           if (process.env.NODE_ENV === 'development') {

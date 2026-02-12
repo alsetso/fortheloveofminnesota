@@ -4,6 +4,7 @@
 
 export const STORAGE_BUCKETS = {
   GOV_PEOPLE: 'gov-people-storage',
+  CIVIC_BUILDING_COVER: 'civic_building_cover',
   PROFILE_IMAGES: 'profile-images',
   COVER_PHOTOS: 'cover-photos',
   ID_VERIFICATION: 'id-verification-documents',

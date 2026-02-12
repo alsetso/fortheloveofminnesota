@@ -18,7 +18,8 @@ export async function getAccessibleMaps(accountId: string | null): Promise<Acces
   if (!accountId) {
     // For anonymous users, only return public maps
     const { data: publicMaps, error } = await supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select('id, name, slug, visibility, account_id')
       .eq('visibility', 'public')
       .eq('is_active', true)
@@ -37,7 +38,8 @@ export async function getAccessibleMaps(accountId: string | null): Promise<Acces
   // 2. Private maps where user is a member
   const [publicMapsResult, memberMapsResult] = await Promise.all([
     supabase
-      .from('map')
+      .schema('maps')
+      .from('maps')
       .select('id, name, slug, visibility, account_id')
       .eq('visibility', 'public')
       .eq('is_active', true)

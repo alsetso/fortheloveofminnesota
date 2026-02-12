@@ -285,7 +285,7 @@ export default function AccountSettingsForm({
                       onClick={() => handleSwitchAccount(acc.id)}
                       disabled={isActive || switchingAccount === acc.id}
                       className={`w-full px-2 py-2 text-xs text-left rounded-md border transition-colors flex items-center justify-between ${
-                        isActive ? 'bg-gray-900 text-white border-gray-900 cursor-default' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                        isActive ? 'bg-gray-900 text-foreground border-gray-900 cursor-default' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <div className="flex-1 min-w-0">
@@ -362,7 +362,7 @@ export default function AccountSettingsForm({
                 {isUploadingCover ? (
                   <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <PencilIcon className="w-6 h-6 text-white" aria-hidden />
+                  <PencilIcon className="w-6 h-6 text-foreground" aria-hidden />
                 )}
               </button>
             </div>
@@ -414,7 +414,7 @@ export default function AccountSettingsForm({
                     {isUploadingProfile ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <PencilIcon className="w-5 h-5 text-white" aria-hidden />
+                      <PencilIcon className="w-5 h-5 text-foreground" aria-hidden />
                     )}
                   </button>
                 </div>
@@ -514,7 +514,7 @@ export default function AccountSettingsForm({
                       type="button"
                       onClick={() => toggleTrait(trait.id as TraitId)}
                       className={`w-full px-2 py-1.5 text-xs text-left rounded-md border transition-colors ${
-                        isSelected ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                        isSelected ? 'bg-gray-900 text-foreground border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       {trait.label}

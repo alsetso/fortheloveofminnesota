@@ -12,6 +12,7 @@ import type { Mention } from '@/types/mention';
 import type { Post } from '@/types/post';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import { Account } from '@/features/auth';
+import PostContent from '@/components/posts/PostContent';
 
 type ContentType = 'posts' | 'mentions' | 'users' | 'news';
 
@@ -304,9 +305,12 @@ export default function SearchResults() {
                           {post.title}
                         </h4>
                       )}
-                      <p className="text-sm text-gray-700 line-clamp-3">
-                        {post.content}
-                      </p>
+                      <div className="text-sm text-gray-700 line-clamp-3">
+                        <PostContent 
+                          content={post.content} 
+                          taggedAccounts={post.tagged_accounts}
+                        />
+                      </div>
                       <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100">
                         {post.account && (
                           <div className="flex items-center gap-2">

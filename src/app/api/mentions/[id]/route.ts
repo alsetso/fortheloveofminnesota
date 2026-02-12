@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     const auth = await getServerAuth();
     let accountId: string | null = null;
     
@@ -23,7 +23,8 @@ export async function GET(
 
     // Build query with relations - query map_pins (unified table)
     let query = supabase
-      .from('map_pins')
+      .schema('maps')
+      .from('pins')
       .select(`
         id,
         lat,

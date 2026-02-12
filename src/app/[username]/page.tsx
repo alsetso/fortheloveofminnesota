@@ -1,14 +1,10 @@
-import { createServerClientWithAuth } from '@/lib/supabaseServer';
+import { createServerClientWithAuth, createServiceClient } from '@/lib/supabaseServer';
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import type { ProfileAccount, ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
-import ProfileLayout from '@/features/profiles/components/ProfileLayout';
-import HomeDashboardContent from '@/features/homepage/components/HomeDashboardContent';
-import UsernamePageShell from './UsernamePageShell';
-import SignInGate from '@/components/auth/SignInGate';
-import ProfileMentionsSection from './ProfileMentionsSection';
+import ProfileViewContent from './ProfileViewContent';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,110 +126,89 @@ export default async function UsernamePage({ params, searchParams }: Props) {
     .order('created_at', { ascending: false });
   const collections: Collection[] = (collectionsData || []) as Collection[];
 
-  // Fetch mentions based on permissions:
-  // - Owners viewing their own profile: all mentions (public + private)
-  // - Public view (visitors or owner viewing as public): only public mentions
-  const mentionsQuery = supabase
+  // Fetch pins from public.map_pins (profile source of truth)
+  // Owners: all pins; public view: only visibility = 'public'
+  const pinsQuery = supabase
     .from('map_pins')
-    .select(`
+    .select(
+      `
       id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
       image_url, video_url, media_type, view_count, created_at, updated_at,
       collections (id, emoji, title),
-      mention_type:mention_types (id, emoji, name),
-      map:map (id, name, slug)
-    `)
+      mention_types (id, emoji, name)
+    `
+    )
     .eq('account_id', accountData.id)
     .eq('archived', false)
     .eq('is_active', true);
 
-  // Apply visibility filter for public view
   if (isViewingAsPublic) {
-    mentionsQuery.eq('visibility', 'public');
+    pinsQuery.eq('visibility', 'public');
   }
 
-  const { data: mentionsData, error: mentionsError } = await mentionsQuery.order('created_at', { ascending: false });
+  const { data: pinsData, error: pinsError } = await pinsQuery.order('created_at', { ascending: false });
 
-  // Log error in development for debugging
-  if (mentionsError && process.env.NODE_ENV === 'development') {
-    console.error('[UsernamePage] Error fetching mentions:', mentionsError);
+  if (pinsError && process.env.NODE_ENV === 'development') {
+    console.error('[UsernamePage] Error fetching pins:', pinsError);
   }
 
-  const mentionIds = (mentionsData || []).map((m: any) => m.id);
-  const likesCounts = new Map<string, number>();
-  if (mentionIds.length > 0) {
-    const { data: likesData } = await supabase
-      .from('map_pins_likes')
-      .select('map_pin_id')
-      .in('map_pin_id', mentionIds);
-    likesData?.forEach((like: { map_pin_id: string }) => {
-      likesCounts.set(like.map_pin_id, (likesCounts.get(like.map_pin_id) || 0) + 1);
-    });
-  }
-
-  // Handle case where mentionsData might be null or empty
-  const mentions: ProfilePin[] = (mentionsData && Array.isArray(mentionsData) ? mentionsData : []).map((mention: any) => ({
-    id: mention.id,
-    lat: mention.lat,
-    lng: mention.lng,
-    description: mention.description,
-    collection_id: mention.collection_id,
-    collection: mention.collections ? { id: mention.collections.id, emoji: mention.collections.emoji, title: mention.collections.title } : null,
-    mention_type: mention.mention_type ? { id: mention.mention_type.id, emoji: mention.mention_type.emoji, name: mention.mention_type.name } : null,
-    visibility: mention.visibility || 'public',
-    image_url: mention.image_url,
-    video_url: mention.video_url,
-    media_type: mention.media_type || 'none',
-    view_count: mention.view_count || 0,
-    likes_count: likesCounts.get(mention.id) || 0,
-    created_at: mention.created_at,
-    updated_at: mention.updated_at,
-    map_id: mention.map_id,
-    map: mention.map ? { id: mention.map.id, name: mention.map.name, slug: mention.map.slug } : undefined,
+  const mentions: ProfilePin[] = (pinsData && Array.isArray(pinsData) ? pinsData : []).map((row: any) => ({
+    id: row.id,
+    lat: row.lat,
+    lng: row.lng,
+    description: row.description ?? null,
+    collection_id: row.collection_id ?? null,
+    collection: row.collections
+      ? { id: row.collections.id, emoji: row.collections.emoji ?? '📍', title: row.collections.title }
+      : null,
+    mention_type: row.mention_types
+      ? { id: row.mention_types.id, emoji: row.mention_types.emoji ?? '', name: row.mention_types.name ?? '' }
+      : null,
+    visibility: (row.visibility ?? 'public') as ProfilePin['visibility'],
+    image_url: row.image_url ?? null,
+    video_url: row.video_url ?? null,
+    media_type: (row.media_type ?? 'none') as 'image' | 'video' | 'none',
+    view_count: row.view_count ?? 0,
+    likes_count: 0,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    map_id: row.map_id ?? undefined,
+    map: undefined,
   }));
 
-  // For owner viewing their own profile (not as public), show dashboard by default
-  // But allow them to switch to profile view via viewAsPublic
-  if (isOwnProfile && !viewAsPublic) {
-    return (
-      <>
-        <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
-        <UsernamePageShell isOwnProfile profileAccountData={profileAccountData} />
-      </>
-    );
+  // Fetch city name if city_id exists (for profile card in left sidebar)
+  let cityName: string | null = null;
+  if (accountData.city_id) {
+    try {
+      const { data: cityData } = await (supabase as any)
+        .schema('layers')
+        .from('cities_and_towns')
+        .select('feature_name')
+        .eq('id', accountData.city_id)
+        .single();
+      
+      if (cityData) {
+        cityName = cityData.feature_name || null;
+      }
+    } catch (error) {
+      // Silently fail - city name is optional
+    }
   }
 
-  // Unified profile view: works for both owner (viewing as public) and visitors
-  const profileContent = (
-    <ProfileLayout account={profileAccountData} isOwnProfile={isOwnProfile && !isViewingAsPublic}>
-      <div className="space-y-6">
-        {/* Profile Mentions Section - Map + Collections Panel with Toggle */}
-        <ProfileMentionsSection
-          pins={mentions}
-          accountId={accountData.id}
-          isOwnProfile={isOwnProfile && !isViewingAsPublic}
-          accountUsername={accountData.username}
-          accountImageUrl={accountData.image_url}
-          collections={collections}
-        />
-        
-        {/* Sign in prompt for non-authenticated visitors */}
-        {!isAuthenticated && (
-          <SignInGate
-            title={`Sign in to view ${profileAccountData.username || profileAccountData.first_name || 'this user'}'s profile`}
-            description={`See full mentions, like posts, and connect with ${profileAccountData.username || profileAccountData.first_name || 'the community'}.`}
-            subtle={false}
-          />
-        )}
-      </div>
-    </ProfileLayout>
-  );
-
+  // Single layout for both owner and visitor: left = profile card + collections + analytics/live map, center = map, right = sponsored + following
+  // isOwnProfile drives what owner sees (e.g. analytics link, private pins, edit capabilities); showViewAsSelector lets owner preview as public
   return (
     <>
       <PageViewTracker page_url={`/${encodeURIComponent(username)}`} />
-      <UsernamePageShell showViewAsSelector={isOwnProfile && viewAsPublic}>
-        {profileContent}
-      </UsernamePageShell>
+      <ProfileViewContent
+        account={profileAccountData}
+        pins={mentions}
+        collections={collections}
+        cityName={cityName}
+        isOwnProfile={isOwnProfile && !isViewingAsPublic}
+        isProfileOwner={isOwnProfile}
+        isAuthenticated={isAuthenticated}
+      />
     </>
   );
 }

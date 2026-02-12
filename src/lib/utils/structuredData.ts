@@ -35,7 +35,7 @@ export function generateCitiesStructuredData(
     '@type': 'CollectionPage',
     name: 'Minnesota Cities Directory',
     description: `Complete directory of all ${cities.length} cities in Minnesota with population data and city profiles.`,
-    url: `${BASE_URL}/explore/cities`,
+    url: `${BASE_URL}/explore/cities-and-towns`,
     mainEntity: {
       '@type': 'ItemList',
       numberOfItems: cities.length,
@@ -45,7 +45,7 @@ export function generateCitiesStructuredData(
         item: {
           '@type': 'City',
           name: city.name,
-          url: `${BASE_URL}/explore/city/${city.slug}`,
+          url: city.id ? `${BASE_URL}/explore/cities-and-towns/${city.id}` : `${BASE_URL}/explore/cities-and-towns`,
           population: city.population,
           containedInPlace: city.county ? {
             '@type': 'County',
@@ -93,7 +93,7 @@ export function generateCountiesStructuredData(
           item: {
             '@type': 'County',
             name: county.name,
-            url: `${BASE_URL}/explore/county/${county.slug}`,
+            url: `${BASE_URL}/explore/counties/${county.id}`,
             population: county.population,
             area: county.area_sq_mi ? {
               '@type': 'QuantitativeValue',
@@ -141,7 +141,7 @@ export function generateExploreStructuredData(
           item: {
             '@type': 'CollectionPage',
             name: 'Minnesota Cities Directory',
-            url: `${BASE_URL}/explore/cities`,
+            url: `${BASE_URL}/explore/cities-and-towns`,
             description: `Complete directory of all ${cityCount} cities in Minnesota`,
           },
         },
@@ -169,7 +169,7 @@ export function generateExploreStructuredData(
       .map((county) => ({
         '@type': 'County',
         name: county.name,
-        url: `${BASE_URL}/explore/county/${county.slug}`,
+        url: `${BASE_URL}/explore/counties/${county.id || county.slug}`,
         ...(county.website_url && { sameAs: county.website_url }),
       })),
   };

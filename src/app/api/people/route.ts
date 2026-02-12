@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabaseServer';
+import { cookies } from 'next/headers';
+import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity, REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 import { validateQueryParams } from '@/lib/security/validation';
 import { z } from 'zod';
@@ -32,12 +33,11 @@ export async function GET(request: NextRequest) {
           .replaceAll('%', '\\%')
           .replaceAll('_', '\\_');
 
-        const supabase = createServerClient();
+        const supabase = await createServerClientWithAuth(cookies());
         let query = supabase
           .from('accounts')
           .select('id,username,first_name,last_name,image_url,bio,created_at,plan,traits')
           .not('username', 'is', null)
-          .eq('search_visibility', true)
           .order('created_at', { ascending: false });
 
         if (qEscaped) {

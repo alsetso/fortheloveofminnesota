@@ -299,8 +299,9 @@ export default function EditMentionPage() {
 
       // Update mention_type_id if changed
       if (selectedMentionTypeId !== mention?.mention_type?.id) {
-        await supabase
-          .from('map_pins')
+        await (supabase as any)
+          .schema('maps')
+          .from('pins')
           .update({ mention_type_id: selectedMentionTypeId })
           .eq('id', mentionId)
           .eq('is_active', true);

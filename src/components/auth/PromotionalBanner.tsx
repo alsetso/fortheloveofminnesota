@@ -1178,36 +1178,47 @@ export default function PromotionalBanner({ isOpen, onClose }: PromotionalBanner
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[50] w-screen h-screen bg-white overflow-hidden">
-      {isBannerLoading ? (
-        <div className="w-full h-full flex items-center justify-center">
-          <Image
-            src="/full_text_split.png"
-            alt="Loading"
-            width={400}
-            height={100}
-            className="w-auto h-auto max-w-[90%] max-h-[20%] object-contain"
-            priority
-          />
-        </div>
-      ) : (
-        <div className="w-full h-full flex flex-col">
-          {/* Header - Optional close button */}
-          {onClose && (
-            <div className="flex-shrink-0 flex justify-end p-4">
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-                aria-label="Close"
-              >
-                <XMarkIcon className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
-          )}
+    <div className="fixed inset-0 z-[50] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/40"
+        onClick={onClose}
+      />
 
-          {/* Main Content - Scrollable */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col items-center px-4 py-8 min-h-0">
-          <div className="max-w-md w-full text-center space-y-6 flex flex-col items-center py-8">
+      {/* Modal */}
+      <div 
+        className="relative w-full max-w-md rounded-md bg-white border border-gray-200 shadow-xl transition-all duration-200 max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {isBannerLoading ? (
+          <div className="flex items-center justify-center p-8 min-h-[400px]">
+            <Image
+              src="/full_text_split.png"
+              alt="Loading"
+              width={400}
+              height={100}
+              className="w-auto h-auto max-w-[90%] max-h-[20%] object-contain"
+              priority
+            />
+          </div>
+        ) : (
+          <>
+            {/* Header - Close button */}
+            {onClose && (
+              <div className="flex-shrink-0 flex justify-end p-[10px]">
+                <button
+                  onClick={onClose}
+                  className="w-6 h-6 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  aria-label="Close"
+                >
+                  <XMarkIcon className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            )}
+
+            {/* Main Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col items-center px-4 pb-8 min-h-0">
+            <div className="w-full text-center space-y-6 flex flex-col items-center py-8">
             {/* Logo with Navigation Arrows */}
             <div className="relative flex items-center justify-between w-full">
               {/* Left Arrow */}
@@ -1449,10 +1460,11 @@ export default function PromotionalBanner({ isOpen, onClose }: PromotionalBanner
             <p className="text-xs text-gray-500 pt-2">
               Free to join • No credit card required
             </p>
-          </div>
-        </div>
+            </div>
+            </div>
+          </>
+        )}
       </div>
-      )}
     </div>
   );
 }

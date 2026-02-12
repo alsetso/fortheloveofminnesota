@@ -58,7 +58,8 @@ export async function GET(
         if (isUUID(identifier)) {
           mapId = identifier;
           const { data: map } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id, account_id')
             .eq('id', identifier)
             .single();
@@ -69,7 +70,8 @@ export async function GET(
           mapOwnerId = (map as any).account_id;
         } else {
           const { data: map } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id, account_id')
             .eq('slug', identifier)
             .single();
@@ -188,8 +190,9 @@ export async function POST(
         const { account_id: inviteAccountId, role } = validation.data;
 
         // Resolve identifier to map_id
-        let mapQuery = supabase
-          .from('map')
+        let mapQuery = (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('id, account_id, settings, member_count');
         
         if (isUUID(identifier)) {

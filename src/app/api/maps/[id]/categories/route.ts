@@ -50,7 +50,8 @@ export async function GET(
           mapId = identifier;
         } else {
           const { data: map } = await supabase
-            .from('map')
+            .schema('maps')
+            .from('maps')
             .select('id')
             .eq('slug', identifier)
             .single();
@@ -136,8 +137,9 @@ export async function POST(
         const { category } = validation.data;
 
         // Resolve identifier to map_id
-        let mapQuery = supabase
-          .from('map')
+        let mapQuery = (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('id, account_id');
         
         if (isUUID(identifier)) {
@@ -263,8 +265,9 @@ export async function DELETE(
         const validCategory = categoryValidation.data;
 
         // Resolve identifier to map_id
-        let mapQuery = supabase
-          .from('map')
+        let mapQuery = (supabase as any)
+          .schema('maps')
+          .from('maps')
           .select('id, account_id');
         
         if (isUUID(identifier)) {

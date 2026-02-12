@@ -133,95 +133,51 @@ export default async function UsernameCollectionPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser();
   const isOwnProfile = !!(user && accountData.user_id === user.id);
 
-  const { data: ownedMaps } = await supabase
-    .from('map')
-    .select('id')
+  // Fetch pins from public.map_pins by account_id and collection_id
+  let pinsQuery = supabase
+    .from('map_pins')
+    .select(
+      `
+      id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
+      image_url, video_url, media_type, view_count, created_at, updated_at,
+      collections (id, emoji, title),
+      mention_types (id, emoji, name)
+    `
+    )
     .eq('account_id', accountData.id)
-    .eq('is_active', true);
-  const { data: memberRows } = await supabase
-    .from('map_members')
-    .select('map_id')
-    .eq('account_id', accountData.id);
-  const ownedIds = (ownedMaps || []).map((m: { id: string }) => m.id);
-  const memberIds = (memberRows || []).map((m: { map_id: string }) => m.map_id);
-  const profileMapIds = Array.from(new Set([...ownedIds, ...memberIds]));
+    .eq('collection_id', selectedCollection.id)
+    .eq('archived', false)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false });
 
-  interface MapPinRow {
-    id: string;
-    lat: number;
-    lng: number;
-    description: string | null;
-    visibility: string;
-    collection_id: string | null;
-    map_id: string;
-    image_url: string | null;
-    video_url: string | null;
-    media_type: string;
-    view_count: number | null;
-    created_at: string;
-    updated_at: string;
-    collections?: { id: string; emoji: string; title: string } | null;
-    mention_type?: { id: string; emoji: string; name: string } | null;
-    map?: { id: string; name: string | null; slug: string | null } | null;
-  }
-  let mentionsData: MapPinRow[] | null = null;
-  if (profileMapIds.length > 0) {
-    // Build query - show all pins for owner, only public for visitors
-    let query = supabase
-      .from('map_pins')
-      .select(`
-        id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,
-        image_url, video_url, media_type, view_count, created_at, updated_at,
-        collections (id, emoji, title),
-        mention_type:mention_types (id, emoji, name),
-        map:map (id, name, slug)
-      `)
-      .eq('account_id', accountData.id)
-      .eq('collection_id', selectedCollection.id)
-      .in('map_id', profileMapIds)
-      .eq('archived', false)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
-    
-    // Only filter by visibility for non-owners
-    if (!isOwnProfile) {
-      query = query.eq('visibility', 'public');
-    }
-    
-    const { data } = await query;
-    mentionsData = data as MapPinRow[] | null;
+  if (!isOwnProfile) {
+    pinsQuery = pinsQuery.eq('visibility', 'public');
   }
 
-  const mentionIds = (mentionsData || []).map((m) => m.id);
-  const likesCounts = new Map<string, number>();
-  if (mentionIds.length > 0) {
-    const { data: likesData } = await supabase
-      .from('map_pins_likes')
-      .select('map_pin_id')
-      .in('map_pin_id', mentionIds);
-    likesData?.forEach((like: { map_pin_id: string }) => {
-      likesCounts.set(like.map_pin_id, (likesCounts.get(like.map_pin_id) || 0) + 1);
-    });
-  }
+  const { data: pinsData } = await pinsQuery;
 
-  const mentions: ProfilePin[] = (mentionsData || []).map((mention: MapPinRow) => ({
-    id: mention.id,
-    lat: mention.lat,
-    lng: mention.lng,
-    description: mention.description,
-    collection_id: mention.collection_id,
-    collection: mention.collections ? { id: mention.collections.id, emoji: mention.collections.emoji, title: mention.collections.title } : null,
-    mention_type: mention.mention_type ? { id: mention.mention_type.id, emoji: mention.mention_type.emoji, name: mention.mention_type.name } : null,
-    visibility: (mention.visibility || 'public') as PinVisibility,
-    image_url: mention.image_url,
-    video_url: mention.video_url,
-    media_type: (mention.media_type || 'none') as 'image' | 'video' | 'none',
-    view_count: mention.view_count || 0,
-    likes_count: likesCounts.get(mention.id) || 0,
-    created_at: mention.created_at,
-    updated_at: mention.updated_at,
-    map_id: mention.map_id,
-    map: mention.map ? { id: mention.map.id, name: mention.map.name || null, slug: mention.map.slug } : undefined,
+  const mentions: ProfilePin[] = (pinsData && Array.isArray(pinsData) ? pinsData : []).map((row: any) => ({
+    id: row.id,
+    lat: row.lat,
+    lng: row.lng,
+    description: row.description ?? null,
+    collection_id: row.collection_id ?? null,
+    collection: row.collections
+      ? { id: row.collections.id, emoji: row.collections.emoji ?? '📍', title: row.collections.title }
+      : null,
+    mention_type: row.mention_types
+      ? { id: row.mention_types.id, emoji: row.mention_types.emoji ?? '', name: row.mention_types.name ?? '' }
+      : null,
+    visibility: (row.visibility ?? 'public') as PinVisibility,
+    image_url: row.image_url ?? null,
+    video_url: row.video_url ?? null,
+    media_type: (row.media_type ?? 'none') as 'image' | 'video' | 'none',
+    view_count: row.view_count ?? 0,
+    likes_count: 0,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    map_id: row.map_id ?? undefined,
+    map: undefined,
   }));
 
   const displayName = getDisplayName(profileAccountData);

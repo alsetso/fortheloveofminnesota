@@ -14,7 +14,6 @@ import { MentionService } from '@/features/mentions/services/mentionService';
 import { useAuthStateSafe } from '@/features/auth';
 import EditMentionModal from '@/components/modals/EditMentionModal';
 import ImagePreviewContainer from '@/components/modals/ImagePreviewContainer';
-import LikeButton from '@/components/mentions/LikeButton';
 
 interface ProfileModalProps {
   account: ProfileAccount;
@@ -368,16 +367,6 @@ export default function ProfileModal({ account: initialAccount, isOwnProfile, co
 
                             {/* Actions */}
                             <div className="flex items-center gap-1 flex-shrink-0">
-                              {/* Like Button - Show for all authenticated users */}
-                              {currentAccount && (
-                                <LikeButton
-                                  mentionId={pin.id}
-                                  initialLiked={pin.is_liked || false}
-                                  initialCount={pin.likes_count || 0}
-                                  size="sm"
-                                  showCount={true}
-                                />
-                              )}
                               {/* Edit Icon - Only for own profile */}
                               {isOwnProfile && (
                                 <button

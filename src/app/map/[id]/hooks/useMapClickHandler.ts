@@ -286,8 +286,8 @@ export function useMapClickHandler({
             };
           }
         }
-      } catch (err) {
-        console.debug('[MapPage] Error capturing map feature:', err);
+      } catch {
+        // Non-critical: feature capture failed
       }
       
       // Update location select popup with new coordinates (even if already open)

@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useCallback, useEffect, useRef } from 'react';
+import { ReactNode, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import AppHeader from './AppHeader';
 import HeaderMentionTypeCards from './HeaderMentionTypeCards';
 import { useSearchState } from '@/contexts/SearchStateContext';
@@ -23,6 +23,8 @@ interface MapControlsProps {
   onLocationSelect?: (coordinates: { lat: number; lng: number }, placeName: string) => void;
   /** Whether to show mention types */
   showMentionTypes?: boolean;
+  /** When provided, position relative to this element (absolute); otherwise viewport-fixed */
+  anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 const CONTAINER_WIDTH = 500;
@@ -54,17 +56,25 @@ export default function MapControls({
   map,
   onLocationSelect,
   showMentionTypes = false,
+  anchorRef,
 }: MapControlsProps) {
   const { isSearching } = useSearchState();
-  
+
+  // Effective height for snap calculations (anchor height when anchored, else viewport)
+  const getEffectiveHeight = useCallback(() => {
+    if (anchorRef?.current) {
+      return anchorRef.current.getBoundingClientRect().height;
+    }
+    return typeof window !== 'undefined' ? window.innerHeight : 800;
+  }, [anchorRef]);
+
   // Calculate "low" position (second snap position)
   const getLowHeight = useCallback(() => {
-    if (typeof window === 'undefined') return 140;
-    const viewportHeight = window.innerHeight;
-    const availableHeight = viewportHeight - HEADER_HEIGHT;
+    const effectiveHeight = getEffectiveHeight();
+    const availableHeight = effectiveHeight - HEADER_HEIGHT;
     const sectionHeight = availableHeight / 4;
-    return HEADER_HEIGHT + sectionHeight; // Second snap position (low)
-  }, []);
+    return HEADER_HEIGHT + sectionHeight;
+  }, [getEffectiveHeight]);
   
   // Drag state - initialize to "low" position
   const [heightFromBottom, setHeightFromBottom] = useState(140); // Temporary, will update on mount
@@ -81,34 +91,54 @@ export default function MapControls({
   const contentRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(CONTAINER_WIDTH);
   const [leftPosition, setLeftPosition] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
-  // Calculate responsive container width and left position
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculate responsive container width and left position (viewport or anchor)
+  useLayoutEffect(() => {
     const updateDimensions = () => {
-      if (typeof window !== 'undefined') {
+      if (typeof window === 'undefined') return;
+      const anchor = anchorRef?.current;
+      if (anchor) {
+        const rect = anchor.getBoundingClientRect();
+        const anchorWidth = rect.width;
+        const width = Math.min(anchorWidth - 16, CONTAINER_WIDTH);
+        setContainerWidth(width);
+        setLeftPosition((anchorWidth - width) / 2);
+      } else {
         const width = getContainerWidth();
         setContainerWidth(width);
-        // Center on larger screens, full width on mobile
         const viewportWidth = window.innerWidth;
         if (viewportWidth >= 640) {
           setLeftPosition((viewportWidth - width) / 2);
         } else {
-          setLeftPosition(8); // 8px padding on mobile
+          setLeftPosition(8);
         }
       }
     };
-    
+
     updateDimensions();
+    const anchor = anchorRef?.current;
+    if (anchor) {
+      const ro = new ResizeObserver(updateDimensions);
+      ro.observe(anchor);
+      window.addEventListener('resize', updateDimensions);
+      return () => {
+        ro.disconnect();
+        window.removeEventListener('resize', updateDimensions);
+      };
+    }
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+  }, [anchorRef]);
 
   // Calculate snap positions
   const getSnapPositions = useCallback(() => {
-    if (typeof window === 'undefined') return [60, 140, 220, 300, 380];
-    
-    const viewportHeight = window.innerHeight;
-    const availableHeight = viewportHeight - HEADER_HEIGHT;
+    const effectiveHeight = getEffectiveHeight();
+    const availableHeight = effectiveHeight - HEADER_HEIGHT;
     const sectionHeight = availableHeight / 4;
     
     return [
@@ -118,7 +148,7 @@ export default function MapControls({
       HEADER_HEIGHT + sectionHeight * 3,
       HEADER_HEIGHT + sectionHeight * 4,
     ];
-  }, []);
+  }, [getEffectiveHeight]);
 
   // Find closest snap position
   const findClosestSnapPosition = useCallback((currentHeight: number) => {
@@ -184,10 +214,10 @@ export default function MapControls({
     const newHeight = dragStartHeight + deltaY;
     
     const minHeight = HEADER_HEIGHT;
-    const maxHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const maxHeight = getEffectiveHeight();
     
     setHeightFromBottom(Math.max(minHeight, Math.min(maxHeight, newHeight)));
-  }, [isDragging, dragStartY, dragStartHeight, isAnimating]);
+  }, [isDragging, dragStartY, dragStartHeight, isAnimating, getEffectiveHeight]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
@@ -260,60 +290,39 @@ export default function MapControls({
   // Determine if content should be visible
   const shouldShowContent = heightFromBottom > actualHeaderHeight + 20;
 
+  const positionClass = anchorRef ? 'absolute' : 'fixed';
+
   return (
     <div
       ref={containerRef}
-      className={`fixed z-[3000] select-none ${
-        isDragging ? 'cursor-grabbing' : 'cursor-move'
-      } ${isAnimating ? 'transition-none' : ''}`}
+      className={`${positionClass} z-[3000] select-none rounded-t-lg flex flex-col overflow-hidden
+        bg-[hsl(var(--header)/0.95)] backdrop-blur-sm
+        border-t border-l border-r border-border-muted
+        shadow-[0_-2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_-2px_12px_rgba(0,0,0,0.35)]
+        ${isDragging ? 'cursor-grabbing' : 'cursor-move'}
+        ${isAnimating ? 'transition-none' : ''}`}
       style={{
-        left: `${leftPosition}px`,
+        left: mounted ? `${leftPosition}px` : '0px',
         bottom: 0,
-        width: `${containerWidth}px`,
+        width: mounted ? `${containerWidth}px` : `${CONTAINER_WIDTH}px`,
         height: `${heightFromBottom}px`,
         maxWidth: `${CONTAINER_WIDTH}px`,
-        maxHeight: '100vh',
-        borderTopLeftRadius: '8px',
-        borderTopRightRadius: '8px',
-        borderBottomLeftRadius: '0px',
-        borderBottomRightRadius: '0px',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        backdropFilter: 'blur(2px)',
-        WebkitBackdropFilter: 'blur(2px)',
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-        borderTop: '1px solid rgba(0, 0, 0, 0.1)',
-        borderLeft: '1px solid rgba(0, 0, 0, 0.1)',
-        borderRight: '1px solid rgba(0, 0, 0, 0.1)',
+        maxHeight: mounted ? (anchorRef ? `${getEffectiveHeight()}px` : '100vh') : '800px',
         userSelect: 'none',
-        transition: isAnimating ? 'none' : undefined,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
+        ...(mounted && isAnimating && { transition: 'none' }),
       }}
     >
       {/* 1. Status Content (optional) */}
       {statusContent && (
-        <div 
-          className="flex-shrink-0 px-[10px] rounded-t-md"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(2px)',
-            WebkitBackdropFilter: 'blur(2px)',
-          }}
-        >
+        <div className="flex-shrink-0 px-[10px] rounded-t-md bg-[hsl(var(--header)/0.95)] backdrop-blur-sm">
           {statusContent}
         </div>
       )}
 
       {/* 2. AppHeader (always visible, draggable) */}
       <div
-        className="w-full flex-shrink-0 cursor-grab active:cursor-grabbing"
+        className="w-full flex-shrink-0 cursor-grab active:cursor-grabbing bg-[hsl(var(--header)/0.95)] backdrop-blur-sm"
         data-draggable-container="true"
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(2px)',
-          WebkitBackdropFilter: 'blur(2px)',
-        }}
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
       >
@@ -331,42 +340,23 @@ export default function MapControls({
       
       {/* 3. HeaderMentionTypeCards (when showMentionTypes and no children) */}
       {showMentionTypes && shouldShowContent && !children && (
-        <div 
-          className="flex-shrink-0 px-[10px]"
-          style={{
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(2px)',
-            WebkitBackdropFilter: 'blur(2px)',
-          }}
-        >
+        <div className="flex-shrink-0 px-[10px] bg-[hsl(var(--header)/0.95)] backdrop-blur-sm">
           <HeaderMentionTypeCards />
         </div>
       )}
       
       {/* 4. Content Area - Shows children when provided */}
       {shouldShowContent && children && (
-        <div 
+        <div
           ref={contentRef}
-          className="flex-1 min-h-0 overflow-y-auto flex flex-col scrollbar-hide"
+          className="flex-1 min-h-0 overflow-y-auto flex flex-col scrollbar-hide bg-[hsl(var(--header)/0.95)] backdrop-blur-sm"
           style={{
-            maxHeight: heightFromBottom > actualHeaderHeight 
-              ? `${heightFromBottom - actualHeaderHeight}px` 
+            maxHeight: heightFromBottom > actualHeaderHeight
+              ? `${heightFromBottom - actualHeaderHeight}px`
               : 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(2px)',
-            WebkitBackdropFilter: 'blur(2px)',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
           }}
         >
-          <div 
-            className="flex-1 min-h-0"
-            style={{
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              backdropFilter: 'blur(2px)',
-              WebkitBackdropFilter: 'blur(2px)',
-            }}
-          >
+          <div className="flex-1 min-h-0 px-[10px] bg-[hsl(var(--header)/0.95)] backdrop-blur-sm">
             {children}
           </div>
         </div>

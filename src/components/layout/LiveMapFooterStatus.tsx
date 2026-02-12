@@ -62,7 +62,7 @@ function StatusDot({ state }: { state: 'pending' | 'loading' | 'done' | 'error' 
       : state === 'error'
         ? 'bg-red-500'
         : state === 'pending'
-          ? 'bg-gray-300'
+          ? 'bg-foreground-subtle'
           : 'bg-emerald-500';
   return (
     <span
@@ -73,7 +73,7 @@ function StatusDot({ state }: { state: 'pending' | 'loading' | 'done' | 'error' 
 }
 
 /**
- * Collapsible accordion for the transparent footer strip on /live.
+ * Collapsible accordion for the transparent footer strip on /maps.
  * Header: "Review +N" when all done (N = load count), or "Loading…" when loading.
  * Expanded: list of layers (map data, map, boundaries, pins, selected). Boundary layers are toggled
  * in the main menu Live map section (one at a time); boundary rows show pending/loading/done per type.
@@ -155,7 +155,7 @@ export default function LiveMapFooterStatus({ status, onItemClick }: LiveMapFoot
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className={`w-full h-[25px] min-h-[25px] flex items-center justify-between gap-2 px-2 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white/5 transition-colors text-left ${expanded ? 'rounded-t-md' : 'rounded-md'}`}
+        className={`w-full h-[25px] min-h-[25px] flex items-center justify-between gap-2 px-2 text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface-accent transition-colors text-left ${expanded ? 'rounded-t-md' : 'rounded-md'}`}
         aria-expanded={expanded}
         aria-controls="live-map-footer-status-content"
         id="live-map-footer-status-toggle"
@@ -168,7 +168,7 @@ export default function LiveMapFooterStatus({ status, onItemClick }: LiveMapFoot
             </span>
           )}
         </span>
-        <span className="flex-shrink-0 text-gray-500">
+        <span className="flex-shrink-0 text-foreground-muted">
           {expanded ? (
             <ChevronDownIcon className="w-3.5 h-3.5" />
           ) : (
@@ -189,7 +189,7 @@ export default function LiveMapFooterStatus({ status, onItemClick }: LiveMapFoot
             return (
               <li
                 key={index < 3 ? label : type === 'clicked' ? `clicked-${item?.type}-${item?.id || 'map'}-${index}` : `sel-${selectedBoundaries[index - 3].layer}-${selectedBoundaries[index - 3].id}`}
-                className={`flex items-center gap-2 text-xs ${isClickable ? 'cursor-pointer hover:text-gray-900 hover:bg-white/5 rounded px-1 -mx-1 transition-colors' : 'text-gray-600'}`}
+                className={`flex items-center gap-2 text-xs ${isClickable ? 'cursor-pointer hover:text-foreground hover:bg-surface-accent rounded px-1 -mx-1 transition-colors' : 'text-foreground-muted'}`}
                 onClick={isClickable ? () => onItemClick(item!) : undefined}
                 role={isClickable ? 'button' : undefined}
                 tabIndex={isClickable ? 0 : undefined}

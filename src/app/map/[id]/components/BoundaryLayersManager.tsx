@@ -16,11 +16,11 @@ interface BoundaryLayersManagerProps {
   showCTU: boolean;
   showStateBoundary: boolean;
   showCountyBoundaries: boolean;
-  /** When true (e.g. /live), all boundary layers are mounted with minzoom/maxzoom; Mapbox hides by zoom. No unmount on zoom = no refetch, smooth transitions. */
+  /** When true (e.g. /maps), all boundary layers are mounted with minzoom/maxzoom; Mapbox hides by zoom. No unmount on zoom = no refetch, smooth transitions. */
   liveMapBoundaryZoom?: boolean;
-  /** Called when a boundary layer load starts (true) or finishes (false). For Review accordion on /live. */
+  /** Called when a boundary layer load starts (true) or finishes (false). For Review accordion on /maps. */
   onLayerLoadChange?: (layerId: 'state' | 'county' | 'district' | 'ctu', loading: boolean) => void;
-  /** Called when a boundary is clicked. Single item for toggle selection; passed to /live footer. */
+  /** Called when a boundary is clicked. Single item for toggle selection; passed to /maps footer. */
   onBoundarySelect?: (item: { layer: 'state' | 'county' | 'district' | 'ctu'; id: string; name: string; lat: number; lng: number }) => void;
 }
 

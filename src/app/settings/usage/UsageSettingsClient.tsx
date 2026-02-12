@@ -110,15 +110,15 @@ export default function UsageSettingsClient() {
   return (
     <div className="space-y-3">
       {/* Current Plan */}
-      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-        <h3 className="text-sm font-semibold text-gray-900 mb-2">Current Plan</h3>
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <h3 className="text-sm font-semibold text-foreground mb-2">Current Plan</h3>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium text-gray-900">{planLabel}</p>
+            <p className="text-xs font-medium text-foreground">{planLabel}</p>
             {account?.plan && account.plan !== 'hobby' && (
               <Link
                 href="/settings/plans"
-                className="text-xs text-blue-600 hover:text-blue-800 hover:underline mt-0.5 inline-block"
+                className="text-xs text-lake-blue hover:text-lake-blue/80 hover:underline mt-0.5 inline-block"
               >
                 Upgrade or change plan
               </Link>
@@ -127,7 +127,7 @@ export default function UsageSettingsClient() {
           {account?.plan === 'hobby' && (
             <Link
               href="/settings/plans"
-              className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-foreground bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
             >
               Upgrade
             </Link>
@@ -137,40 +137,40 @@ export default function UsageSettingsClient() {
 
       {/* Features by Category */}
       {loading ? (
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <p className="text-xs text-gray-500">Loading features...</p>
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+          <p className="text-xs text-foreground/60">Loading features...</p>
         </div>
       ) : error ? (
-        <div className="bg-white border border-red-200 rounded-md p-[10px]">
-          <p className="text-xs text-red-600">{error}</p>
+        <div className="bg-surface border border-red-500/50 rounded-md p-[10px]">
+          <p className="text-xs text-red-400">{error}</p>
         </div>
       ) : features.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
-          <p className="text-xs text-gray-500">No features found.</p>
+        <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+          <p className="text-xs text-foreground/60">No features found.</p>
         </div>
       ) : (
         Object.entries(groupedFeatures).map(([category, categoryFeatures]) => (
-          <div key={category} className="bg-white border border-gray-200 rounded-md overflow-hidden">
-            <div className="px-[10px] py-2 border-b border-gray-200">
-              <h3 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">
+          <div key={category} className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+            <div className="px-[10px] py-2 border-b border-border-muted dark:border-white/10 bg-surface-accent">
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">
                 {category}
               </h3>
             </div>
-            <div className="divide-y divide-gray-200">
+            <div className="divide-y divide-white/10">
               {categoryFeatures.map((feature) => {
                 const hasAccess = hasFeature(feature);
                 return (
                   <div
                     key={feature.slug}
-                    className="px-[10px] py-3 flex items-center justify-between"
+                    className="px-[10px] py-3 flex items-center justify-between hover:bg-surface-accent transition-colors"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       {hasAccess ? (
-                        <CheckCircleIcon className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0" />
                       ) : (
-                        <XCircleIcon className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                        <XCircleIcon className="w-4 h-4 text-foreground-subtle flex-shrink-0" />
                       )}
-                      <span className="text-xs font-medium text-gray-900 truncate">
+                      <span className="text-xs font-medium text-foreground truncate">
                         {feature.name}
                       </span>
                     </div>
@@ -178,9 +178,9 @@ export default function UsageSettingsClient() {
                       className={`text-xs font-medium flex-shrink-0 ml-2 ${
                         hasAccess
                           ? feature.is_unlimited
-                            ? 'text-green-600'
-                            : 'text-gray-600'
-                          : 'text-gray-400'
+                            ? 'text-green-400'
+                            : 'text-foreground-muted'
+                          : 'text-foreground/50'
                       }`}
                     >
                       {formatLimit(feature)}
@@ -195,14 +195,14 @@ export default function UsageSettingsClient() {
 
       {/* Upgrade CTA for Hobby plan */}
       {account?.plan === 'hobby' && (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-[10px]">
-          <h3 className="text-sm font-semibold text-blue-900 mb-1">Upgrade for More Features</h3>
-          <p className="text-xs text-blue-700 mb-2">
+        <div className="bg-lake-blue/10 border border-lake-blue/30 rounded-md p-[10px]">
+          <h3 className="text-sm font-semibold text-lake-blue mb-1">Upgrade for More Features</h3>
+          <p className="text-xs text-foreground/80 mb-2">
             Unlock unlimited maps, advanced analytics, and more with a paid plan.
           </p>
           <Link
             href="/settings/plans"
-            className="inline-block px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
+            className="inline-block px-3 py-1.5 text-xs font-medium text-foreground bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
           >
             View Plans
           </Link>

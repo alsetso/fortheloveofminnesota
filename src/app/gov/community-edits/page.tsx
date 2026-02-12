@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import SimplePageLayout from '@/components/layout/SimplePageLayout';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import { getServerAuth } from '@/lib/authServer';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { getAccountIdForUser } from '@/lib/server/getAccountId';
@@ -50,8 +50,8 @@ export default async function CommunityEditsPage() {
   }
 
   return (
-    <SimplePageLayout contentPadding="px-[10px] py-3">
-      <div className="max-w-4xl mx-auto">
+    <NewPageWrapper>
+      <div className="max-w-4xl mx-auto px-[10px] py-3">
         {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
           { label: 'Minnesota', href: '/' },
@@ -71,7 +71,7 @@ export default async function CommunityEditsPage() {
 
         <CommunityEditsClient accountId={accountId} />
       </div>
-    </SimplePageLayout>
+    </NewPageWrapper>
   );
 }
 

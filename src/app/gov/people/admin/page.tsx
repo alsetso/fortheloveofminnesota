@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import StandardPageClient from '@/components/layout/StandardPageClient';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import GovTablesClient from '../../GovTablesClient';
 import { GovTabProvider } from '../../contexts/GovTabContext';
 import GovPageViewTracker from '../../components/GovPageViewTracker';
@@ -30,8 +30,8 @@ export default async function PeopleAdminPage() {
   }
 
   return (
-    <StandardPageClient>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <NewPageWrapper>
+      <div className="max-w-7xl mx-auto px-[10px] py-3">
         <GovPageViewTracker />
         
         {/* Breadcrumb Navigation */}
@@ -56,6 +56,6 @@ export default async function PeopleAdminPage() {
           <GovTablesClient showTablesOnly={true} />
         </GovTabProvider>
       </div>
-    </StandardPageClient>
+    </NewPageWrapper>
   );
 }

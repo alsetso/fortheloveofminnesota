@@ -210,7 +210,7 @@ export default function JoinMapSidebar({
 
   // Check for pending request when component loads or account changes
   useEffect(() => {
-    if (!mapId || !currentAccountId) {
+    if (!mapId || !currentAccountId || mapId === 'public') {
       setHasPendingRequest(false);
       setPendingRequestId(null);
       setIsCheckingRequest(false);

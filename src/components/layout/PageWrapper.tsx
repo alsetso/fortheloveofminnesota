@@ -24,7 +24,6 @@ import {
   UsersIcon,
   UserCircleIcon,
   SparklesIcon,
-  PlusCircleIcon,
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { 
@@ -33,7 +32,6 @@ import {
   UsersIcon as UsersIconSolid,
   UserCircleIcon as UserCircleIconSolid,
   SparklesIcon as SparklesIconSolid,
-  PlusCircleIcon as PlusCircleIconSolid,
   ChartBarIcon as ChartBarIconSolid
 } from '@heroicons/react/24/solid';
 
@@ -417,7 +415,6 @@ export default function PageWrapper({
     }> = [
       { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
       { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
-      { label: 'Contribute', href: '/contribute', icon: PlusCircleIcon, iconSolid: PlusCircleIconSolid },
     ];
     
     // Only show Analytics to admins
@@ -450,10 +447,9 @@ export default function PageWrapper({
     }
 
     // Profile: link to /:username when username is set
-    // On contribute page, label is "Add to map" instead of "Profile"
     if (account?.username) {
       items.push({
-        label: pathname === '/contribute' ? 'Add to map' : 'Profile',
+        label: 'Profile',
         href: `/${encodeURIComponent(account.username)}`,
         icon: UserCircleIcon,
         iconSolid: UserCircleIconSolid,
@@ -469,7 +465,6 @@ export default function PageWrapper({
     if (pathname === '/') return 'Home';
     if (pathname === '/maps' || pathname === '/map') return 'Maps';
     if (pathname === '/settings') return 'Settings';
-    if (pathname === '/contribute' || pathname.startsWith('/contribute')) return 'Contribute';
     if (isMapPage && mapInfo?.name) return mapInfo.name;
     if (isMapPage) return 'Map';
     if (pathname.startsWith('/news')) return 'News';
@@ -479,9 +474,8 @@ export default function PageWrapper({
     if (pathname.startsWith('/admin')) return 'Admin';
     if (pathname.startsWith('/onboarding')) return 'Onboarding';
     // Single segment (e.g. /username) - profile
-    // Explicitly exclude /contribute to prevent it from being treated as a profile
     const segment = pathname.replace(/^\/|\/$/g, '').split('/')[0];
-    if (segment && segment !== 'contribute' && !pathname.startsWith('/map') && !pathname.startsWith('/news') && !pathname.startsWith('/gov') && !pathname.startsWith('/settings') && !pathname.startsWith('/analytics') && !pathname.startsWith('/billing') && !pathname.startsWith('/upgrade') && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/signup') && !pathname.startsWith('/contribute')) return 'Profile';
+    if (segment && !pathname.startsWith('/map') && !pathname.startsWith('/news') && !pathname.startsWith('/gov') && !pathname.startsWith('/settings') && !pathname.startsWith('/analytics') && !pathname.startsWith('/billing') && !pathname.startsWith('/upgrade') && !pathname.startsWith('/admin') && !pathname.startsWith('/login') && !pathname.startsWith('/signup')) return 'Profile';
     return 'Home';
   }, [pathname, isMapPage, mapInfo?.name]);
 

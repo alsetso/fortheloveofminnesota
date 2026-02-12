@@ -47,6 +47,7 @@ export function useAppModalContextSafe(): UseAppModalsReturn {
       openComingSoon: () => {},
       openSuccessPin: () => {},
       updateSuccessPin: () => {},
+      openMission: () => {},
       closeModal: () => {},
       getIntelligenceContext: () => null,
       getAtlasContext: () => undefined,

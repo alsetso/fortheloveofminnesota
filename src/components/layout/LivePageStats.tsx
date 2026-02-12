@@ -17,7 +17,7 @@ interface Mention {
 
 /**
  * Live Page Stats Component
- * Displays 24-hour and total visit statistics for the /live page
+ * Displays 24-hour and total visit statistics for the /maps page
  * Also shows user's mentions with view counts filtered by time period
  */
 export default function LivePageStats() {

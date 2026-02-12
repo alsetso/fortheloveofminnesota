@@ -1,13 +1,13 @@
 'use client';
 
-import PageWrapper from '@/components/layout/PageWrapper';
+import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 export default function SignUpPage() {
   const { openWelcome } = useAppModalContextSafe();
 
   return (
-    <PageWrapper>
+    <NewPageWrapper>
       <div className="flex flex-col items-center justify-center min-h-full py-12 px-[10px]">
         <div className="w-full max-w-sm mx-auto space-y-3">
           <div className="text-center space-y-1.5 mb-6">
@@ -42,7 +42,7 @@ export default function SignUpPage() {
           </p>
         </div>
       </div>
-    </PageWrapper>
+    </NewPageWrapper>
   );
 }
 

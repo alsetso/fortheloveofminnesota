@@ -35,8 +35,8 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const pathname = usePathname();
   const { user, signInWithOtp, verifyOtp, isLoading: authLoading } = useAuthStateSafe();
   
-  // Check if we're on the live page
-  const isLivePage = pathname === '/live' || pathname === '/map/live';
+  // Check if we're on the maps page (shows live map)
+  const isLivePage = pathname === '/maps' || pathname === '/map/live';
   
   // Detect if we're on localhost
   const isLocalhost = typeof window !== 'undefined' && 

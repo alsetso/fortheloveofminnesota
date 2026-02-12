@@ -11,7 +11,6 @@ import { Account, useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { findYouTubeUrls } from '@/features/mentions/utils/youtubeHelpers';
 import YouTubePreview from '@/features/mentions/components/YouTubePreview';
-import LikeButton from '@/components/mentions/LikeButton';
 import { mentionTypeNameToSlug } from '@/features/mentions/utils/mentionTypeHelpers';
 import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 
@@ -87,8 +86,6 @@ export default function MentionLocationSheet({
   const [isLoadingNearby, setIsLoadingNearby] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showMapMetaInfo, setShowMapMetaInfo] = useState(false);
-  const [likesCount, setLikesCount] = useState(selectedMention?.likes_count || 0);
-  const [isLiked, setIsLiked] = useState(selectedMention?.is_liked || false);
   const menuRef = useRef<HTMLDivElement>(null);
   const mapMetaInfoRef = useRef<HTMLDivElement>(null);
   const { user, account } = useAuthStateSafe();
@@ -192,14 +189,6 @@ export default function MentionLocationSheet({
       document.body.style.overflow = '';
     };
   }, [isOpen]);
-
-  // Update likes state when selected mention changes
-  useEffect(() => {
-    if (selectedMention) {
-      setLikesCount(selectedMention.likes_count || 0);
-      setIsLiked(selectedMention.is_liked || false);
-    }
-  }, [selectedMention]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -557,18 +546,6 @@ export default function MentionLocationSheet({
               {/* Actions Row */}
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-3">
-                  {fullMention?.id && (
-                    <LikeButton
-                      mentionId={fullMention.id}
-                      initialLiked={isLiked}
-                      initialCount={likesCount}
-                      onLikeChange={(liked: boolean, count: number) => {
-                        setIsLiked(liked);
-                        setLikesCount(count);
-                      }}
-                      size="sm"
-                    />
-                  )}
                   {(fullMention?.view_count !== null && fullMention?.view_count !== undefined) && (
                     <div className="flex items-center gap-1 text-xs text-gray-500">
                       <EyeIcon className="w-3.5 h-3.5" />

@@ -848,13 +848,13 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
 
   const handleLogoClick = useCallback(() => {
     // Route-aware navigation:
-    // - On /:username (profile) pages: go to /live
-    // - On /live page: go to / (homepage)
+    // - On /:username (profile) pages: go to /maps
+    // - On /maps page: go to / (homepage)
     const isUsernamePage = pathname && pathname !== '/' && pathname.split('/').filter(Boolean).length === 1
-      && !['live', 'settings', 'map', 'maps', 'onboarding', 'analytics', 'billing', 'plans', 'login', 'signup', 'news', 'search', 'admin', 'api', 'privacy', 'terms', 'gov', 'contact', 'contribute', 'download'].includes(pathname.slice(1).split('/')[0]);
+      && !['live', 'settings', 'map', 'maps', 'onboarding', 'analytics', 'billing', 'plans', 'login', 'signup', 'news', 'search', 'admin', 'api', 'privacy', 'terms', 'gov', 'contact', 'download'].includes(pathname.slice(1).split('/')[0]);
     if (isUsernamePage) {
-      router.push('/live');
-    } else if (pathname === '/live') {
+      router.push('/maps');
+    } else if (pathname === '/maps') {
       router.push('/');
     } else {
       router.push('/');

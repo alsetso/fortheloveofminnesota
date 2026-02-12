@@ -117,7 +117,8 @@ export default function HomepageMapView() {
       try {
         // Try slug first (new system)
         const { data: slugMap, error: slugError } = await supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id')
           .eq('slug', 'live')
           .eq('is_active', true)
@@ -130,7 +131,8 @@ export default function HomepageMapView() {
         
         // Fallback to custom_slug (legacy)
         const { data: legacyMap, error: legacyError } = await supabase
-          .from('map')
+          .schema('maps')
+          .from('maps')
           .select('id')
           .eq('custom_slug', 'live')
           .eq('is_primary', true)
@@ -163,7 +165,7 @@ export default function HomepageMapView() {
 
       {/* Floating "See map" button */}
       <Link
-        href="/live"
+        href="/maps"
         className="absolute bottom-4 right-4 z-20 flex items-center gap-2 px-3 py-2 bg-red-500 text-white text-xs font-medium rounded-md hover:bg-red-600 transition-colors shadow-lg"
       >
         <MapIcon className="w-4 h-4" />

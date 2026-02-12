@@ -7,7 +7,6 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'fs';
 import { join, relative, dirname } from 'path';
-import { glob } from 'glob';
 
 export interface SystemFileInfo {
   type: 'page' | 'component' | 'service' | 'api' | 'hook' | 'type' | 'util' | 'other';
@@ -237,6 +236,26 @@ function findRouteDependencies(routeInfo: SystemRouteInfo, visited: Set<string> 
   }
 }
 
+/** Recursively find route.ts files under a directory */
+function findRouteFiles(dir: string, baseDir: string, results: string[] = []): string[] {
+  try {
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const fullPath = join(dir, entry);
+      const stat = statSync(fullPath);
+      if (stat.isDirectory()) {
+        if (entry.startsWith('.') || entry === 'node_modules' || entry === '.next') continue;
+        findRouteFiles(fullPath, baseDir, results);
+      } else if (entry === 'route.ts') {
+        results.push(relative(process.cwd(), fullPath));
+      }
+    }
+  } catch {
+    /* skip */
+  }
+  return results;
+}
+
 /**
  * Find API routes related to a system
  */
@@ -246,35 +265,27 @@ function findApiRoutesForSystem(schemaName: string, appDir: string): string[] {
   
   if (!existsSync(apiDir)) return apiRoutes;
   
-  function scanApiDir(dir: string, baseDir: string) {
+  function scanApiDir(dir: string) {
     try {
       const entries = readdirSync(dir);
-      
       for (const entry of entries) {
         const fullPath = join(dir, entry);
         const stat = statSync(fullPath);
-        
         if (stat.isDirectory()) {
-          // Check if directory name matches schema or system name
           if (entry === schemaName || entry.toLowerCase().includes(schemaName.toLowerCase())) {
-            // Find all route.ts files in this directory tree
-            const routeFiles = glob.sync('**/route.ts', { cwd: fullPath });
+            const routeFiles = findRouteFiles(fullPath, fullPath);
             routeFiles.forEach(file => {
-              const routePath = relative(process.cwd(), join(fullPath, file));
-              if (!apiRoutes.includes(routePath)) {
-                apiRoutes.push(routePath);
-              }
+              if (!apiRoutes.includes(file)) apiRoutes.push(file);
             });
           }
-          scanApiDir(fullPath, baseDir);
+          scanApiDir(fullPath);
         }
       }
-    } catch (error) {
-      // Skip directories that can't be read
+    } catch {
+      /* skip */
     }
   }
-  
-  scanApiDir(apiDir, apiDir);
+  scanApiDir(apiDir);
   return apiRoutes;
 }
 

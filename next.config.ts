@@ -22,13 +22,28 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true, // Database type is incomplete; regenerate with npm run types:generate
     tsconfigPath: './tsconfig.json',
   },
-  // Exclude _archive folders from build output tracing
+  // Exclude _archive folders and heavy deps from build output tracing
   outputFileTracingExcludes: {
     '*': [
       '**/_archive/**',
       '**/*_archive/**',
       '**/features/_archive/**',
       '**/components/_archive/**',
+    ],
+    // Admin API routes: exclude heavy packages not needed for admin endpoints
+    '/api/admin/**': [
+      'node_modules/exceljs/**',
+      'node_modules/xlsx/**',
+      'node_modules/mapbox-gl/**',
+      'node_modules/@mapbox/**',
+      'node_modules/jspdf/**',
+      'node_modules/html2canvas/**',
+      'node_modules/canvas/**',
+      'node_modules/reactflow/**',
+      'node_modules/@tiptap/**',
+      'node_modules/prosemirror-*/**',
+      'node_modules/dompurify/**',
+      'node_modules/jsdom/**',
     ],
   },
   images: {

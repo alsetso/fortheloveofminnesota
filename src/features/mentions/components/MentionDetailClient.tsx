@@ -3,11 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MapPinIcon, EyeIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon, ShareIcon, CheckIcon, UserPlusIcon, CalendarIcon, ClockIcon, UserGroupIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
+import {
+  MapPinIcon, LinkIcon, PencilIcon, TrashIcon, EllipsisVerticalIcon,
+  ShareIcon, CheckIcon, CalendarIcon,
+  UserGroupIcon, ClipboardDocumentIcon, ArrowTopRightOnSquareIcon,
+} from '@heroicons/react/24/outline';
 import { MentionService } from '../services/mentionService';
 import { useRouter } from 'next/navigation';
 import { usePageView } from '@/hooks/usePageView';
-import { useAuthStateSafe } from '@/features/auth';
 import { getMapUrlWithPin } from '@/lib/maps/urls';
 import { type MultiImage } from '@/components/shared/MultiImageGrid';
 import ImageOverlay from './ImageOverlay';
@@ -21,13 +24,12 @@ interface MentionDetailClientProps {
     description: string | null;
     visibility: 'public' | 'only_me';
     image_url: string | null;
-    image_urls?: string[] | null;
     video_url: string | null;
     media_type: 'image' | 'video' | 'none' | null;
     full_address: string | null;
-    view_count: number | null;
-    likes_count?: number;
-    is_liked?: boolean;
+    view_count?: number | null;
+    pin_view_count?: number;
+    page_view_count?: number;
     created_at: string;
     updated_at: string;
     post_date?: string | null;
@@ -64,108 +66,78 @@ function getViewOnMapHref(mention: MentionDetailClientProps['mention']): string 
   return `/maps?pin=${encodeURIComponent(mention.id)}`;
 }
 
+function relativeTime(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  const days = Math.floor(sec / 86400);
+  if (days < 30) return `${days}d ago`;
+  return new Date(Date.now() - ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function shortDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
 export default function MentionDetailClient({ mention, isOwner }: MentionDetailClientProps) {
-  const { account } = useAuthStateSafe();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [viewCount, setViewCount] = useState(mention.view_count || 0);
   const [showMenu, setShowMenu] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // Track page view
+  const pinViews = mention.pin_view_count ?? mention.view_count ?? 0;
+  const pageViews = mention.page_view_count ?? 0;
+
   usePageView({ page_url: `/mention/${mention.id}` });
 
-  // Optimistically increment view count on mount
-  useEffect(() => {
-    setViewCount(prev => prev + 1);
-  }, []);
-
   const accountName = mention.accounts?.first_name || mention.accounts?.username || 'Anonymous';
-  const createdDate = new Date(mention.created_at).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  
-  // Event date (post_date) - show if different from created_at
-  const eventDate = mention.post_date 
-    ? new Date(mention.post_date).toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
-  const showEventDate = eventDate && eventDate !== createdDate;
-  
-  // Updated date - show if different from created_at
-  const updatedDate = new Date(mention.updated_at).toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-  const showUpdatedDate = updatedDate !== createdDate;
-  
-  // Format coordinates
+  const placeName = mention.map_meta?.place_name || mention.map_meta?.name || null;
   const coordinates = Number.isFinite(mention.lat) && Number.isFinite(mention.lng)
     ? `${mention.lat.toFixed(6)}, ${mention.lng.toFixed(6)}`
     : null;
-  
-  // Extract place name from map_meta if available
-  const placeName = mention.map_meta?.place_name || mention.map_meta?.name || null;
-  
-  // Copy coordinates handler
+
+  const createdMs = new Date(mention.created_at).getTime();
+  const updatedMs = new Date(mention.updated_at).getTime();
+  const wasEdited = updatedMs > createdMs;
+
+  // Defer Date.now()-dependent values to client to avoid hydration mismatch
+  const [editedLabel, setEditedLabel] = useState<string | null>(null);
+  useEffect(() => {
+    if (wasEdited) setEditedLabel(relativeTime(Date.now() - updatedMs));
+  }, [wasEdited, updatedMs]);
+
+  const eventDate = mention.post_date ? shortDate(mention.post_date) : null;
+  const showEventDate = eventDate && eventDate !== shortDate(mention.created_at);
+
+  // Media
+  const images: MultiImage[] = [];
+  if (mention.media_type !== 'video' && mention.image_url) {
+    images.push({ url: mention.image_url, alt: mention.description ?? undefined });
+  }
+
+  // Handlers
   const handleCopyCoordinates = async () => {
     if (!coordinates) return;
     try {
       await navigator.clipboard.writeText(coordinates);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[MentionDetailClient] Error copying coordinates:', error);
-      }
-    }
+    } catch {}
   };
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this mention?')) {
-      setShowMenu(false);
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      await MentionService.deleteMention(mention.id);
-      router.push('/');
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[MentionDetailClient] Error deleting mention:', error);
-      }
-      alert('Failed to delete mention');
-      setIsDeleting(false);
-      setShowMenu(false);
-    }
-  };
-
-  // Close menu when clicking outside
+  const [shareUrl, setShareUrl] = useState('');
   useEffect(() => {
-    if (!showMenu) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showMenu]);
-
-  const shareUrl = typeof window !== 'undefined' ? `${window.location.origin}/mention/${mention.id}` : '';
+    setShareUrl(`${window.location.origin}/mention/${mention.id}`);
+  }, [mention.id]);
 
   const handleCopyLink = async () => {
     if (!shareUrl) return;
@@ -174,11 +146,7 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
       setShowMenu(false);
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('[MentionDetailClient] Error copying to clipboard:', error);
-      }
-    }
+    } catch {}
   };
 
   const handleShare = async () => {
@@ -189,116 +157,141 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
       url: shareUrl,
     };
     try {
-      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      if (navigator.share && navigator.canShare?.(shareData)) {
         await navigator.share(shareData);
       } else {
         handleCopyLink();
       }
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[MentionDetailClient] Share cancelled or failed:', error);
-      }
-    }
+    } catch {}
     setShowMenu(false);
   };
 
+  const handleDelete = async () => {
+    if (!confirm('Are you sure you want to delete this mention?')) {
+      setShowMenu(false);
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await MentionService.deleteMention(mention.id);
+      router.push('/');
+    } catch {
+      alert('Failed to delete mention');
+      setIsDeleting(false);
+      setShowMenu(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
+
   return (
     <>
-      <div className="min-h-screen bg-white">
-        {/* Header */}
-        <header className="border-b border-gray-200 bg-white sticky top-0 z-10">
-          <div className="max-w-[600px] mx-auto px-4 py-3 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <Image
-                src="/logo.png"
-                alt="Love of Minnesota"
-                width={32}
-                height={32}
-                className="w-8 h-8"
-              />
-              <span className="text-sm font-semibold text-gray-900">Love of Minnesota</span>
+      <article className="space-y-3">
+        {/* ── Card: Author + Actions ── */}
+        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          <div className="flex items-center gap-2">
+            {/* Avatar */}
+            <Link href={mention.accounts?.username ? `/${mention.accounts.username}` : '#'} className="flex-shrink-0">
+              {mention.accounts?.image_url ? (
+                <Image
+                  src={mention.accounts.image_url}
+                  alt={accountName}
+                  width={28}
+                  height={28}
+                  className="w-7 h-7 rounded-full object-cover"
+                  unoptimized={mention.accounts.image_url.includes('supabase.co')}
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-medium text-gray-500">
+                  {accountName.charAt(0).toUpperCase()}
+                </div>
+              )}
             </Link>
-            <div className="relative" ref={menuRef}>
+
+            {/* Name + timestamp */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href={mention.accounts?.username ? `/${mention.accounts.username}` : '#'}
+                  className="text-xs font-semibold text-gray-900 truncate hover:text-gray-700 transition-colors"
+                >
+                  {accountName}
+                </Link>
+                <span className="text-[10px] text-gray-400">&middot;</span>
+                <span className="text-[10px] text-gray-500 flex-shrink-0">{shortDate(mention.created_at)}</span>
+                {wasEdited && (
+                  <>
+                    <span className="text-[10px] text-gray-400">&middot;</span>
+                    <span className="text-[10px] text-gray-400 italic flex-shrink-0">edited {editedLabel}</span>
+                  </>
+                )}
+              </div>
+              {mention.accounts?.username && (
+                <Link
+                  href={`/${mention.accounts.username}`}
+                  className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  @{mention.accounts.username}
+                </Link>
+              )}
+            </div>
+
+            {/* Type badge */}
+            {mention.mention_type && (
+              <Link
+                href={`/maps?type=${encodeURIComponent(mentionTypeNameToSlug(mention.mention_type.name))}`}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors flex-shrink-0"
+              >
+                <span className="text-xs">{mention.mention_type.emoji}</span>
+                <span className="text-[10px] font-medium text-gray-600">{mention.mention_type.name}</span>
+              </Link>
+            )}
+
+            {/* Collection badge */}
+            {mention.collection && (
+              <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 flex-shrink-0">
+                <span className="text-xs">{mention.collection.emoji}</span>
+                <span className="text-[10px] font-medium text-blue-700">{mention.collection.title}</span>
+              </div>
+            )}
+
+            {/* Menu */}
+            <div className="relative flex-shrink-0" ref={menuRef}>
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1 text-gray-500 hover:text-gray-900 transition-colors"
+                className="p-0.5 text-gray-400 hover:text-gray-700 transition-colors"
                 aria-label="More options"
               >
-                <EllipsisVerticalIcon className="w-5 h-5" />
+                <EllipsisVerticalIcon className="w-4 h-4" />
               </button>
               {showMenu && (
-                <div className="absolute right-0 top-full mt-1 rounded-md shadow-lg z-10 min-w-[160px] bg-white border border-gray-200">
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    {isCopied ? (
-                      <>
-                        <CheckIcon className="w-4 h-4 text-green-600" />
-                        <span className="text-green-600">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <span>Copy URL</span>
-                      </>
-                    )}
+                <div className="absolute right-0 top-full mt-1 rounded-md shadow-lg z-20 min-w-[140px] bg-white border border-gray-200 py-0.5">
+                  <button onClick={handleCopyLink} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                    {isCopied ? <><CheckIcon className="w-3 h-3 text-green-600" /><span className="text-green-600">Copied!</span></> : <><ClipboardDocumentIcon className="w-3 h-3" /><span>Copy URL</span></>}
                   </button>
-                  <button
-                    onClick={handleShare}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <ShareIcon className="w-4 h-4" />
-                    <span>Share</span>
+                  <button onClick={handleShare} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                    <ShareIcon className="w-3 h-3" /><span>Share</span>
                   </button>
                   {mention.accounts?.username && (
-                    <Link
-                      href={`/${mention.accounts.username}?mentionId=${mention.id}`}
-                      onClick={() => setShowMenu(false)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <MapPinIcon className="w-4 h-4" />
-                      <span>View on Profile</span>
-                    </Link>
-                  )}
-                  <Link
-                    href={`/maps?lat=${mention.lat}&lng=${mention.lng}`}
-                    onClick={() => setShowMenu(false)}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <MapPinIcon className="w-4 h-4" />
-                    <span>Live Map</span>
-                  </Link>
-                  {mention.accounts?.username && mention.accounts?.account_taggable && (
-                    <Link
-                      href={`/maps?username=${encodeURIComponent(mention.accounts.username)}`}
-                      onClick={() => setShowMenu(false)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                    >
-                      <UserPlusIcon className="w-4 h-4" />
-                      <span>Tag User</span>
+                    <Link href={`/${mention.accounts.username}?mentionId=${mention.id}`} onClick={() => setShowMenu(false)} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                      <MapPinIcon className="w-3 h-3" /><span>View on Profile</span>
                     </Link>
                   )}
                   {isOwner && (
                     <>
-                      <div className="border-t border-gray-200 my-1" />
-                      <Link
-                        href={`/mention/${mention.id}/edit`}
-                        onClick={() => setShowMenu(false)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                        <span>Edit</span>
+                      <div className="border-t border-gray-200 my-0.5" />
+                      <Link href={`/mention/${mention.id}/edit`} onClick={() => setShowMenu(false)} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors">
+                        <PencilIcon className="w-3 h-3" /><span>Edit</span>
                       </Link>
-                      <button
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                      <button onClick={handleDelete} disabled={isDeleting} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                        <TrashIcon className="w-3 h-3" /><span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
                       </button>
                     </>
                   )}
@@ -306,272 +299,160 @@ export default function MentionDetailClient({ mention, isOwner }: MentionDetailC
               )}
             </div>
           </div>
-        </header>
+        </div>
 
-        {/* Content */}
-        <main className="max-w-[600px] mx-auto px-4 py-6">
-          {/* Author Info */}
-          {mention.accounts && (
-            <div className="flex items-center gap-2 mb-4">
-              {mention.accounts.image_url ? (
-                <Image
-                  src={mention.accounts.image_url}
-                  alt={accountName}
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded-full object-cover"
-                  unoptimized={mention.accounts.image_url.includes('supabase.co')}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-600">
-                    {accountName.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">{accountName}</div>
-                {mention.accounts.username && (
-                  <Link
-                    href={`/${mention.accounts.username}`}
-                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    @{mention.accounts.username}
-                  </Link>
-                )}
-              </div>
-              {/* Labels: Mention Type and Collection */}
-              <div className="flex items-center gap-2">
-                {mention.mention_type && (
-                  <Link
-                    href={`/maps?type=${encodeURIComponent(mentionTypeNameToSlug(mention.mention_type.name))}`}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors"
-                  >
-                    <span className="text-sm">{mention.mention_type.emoji}</span>
-                    <span className="text-xs font-medium text-gray-700">{mention.mention_type.name}</span>
-                  </Link>
-                )}
-                {mention.collection && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200">
-                    <span className="text-sm">{mention.collection.emoji}</span>
-                    <span className="text-xs font-medium text-blue-700">{mention.collection.title}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Media */}
+        {/* ── Card: Content (media + description) ── */}
+        <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+          {/* Video */}
           {mention.media_type === 'video' && mention.video_url && (
-            <div className="mb-4 rounded-lg overflow-hidden border border-gray-200 bg-black">
+            <div className="bg-black">
               <video
                 src={mention.video_url}
                 controls
                 playsInline
                 muted
                 preload="metadata"
-                className="w-full h-auto max-h-[600px] object-contain"
-                onError={(e) => {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.error('[MentionDetailClient] Video load error:', e);
-                    const target = e.target as HTMLVideoElement;
-                    if (target.error) {
-                      console.error('[MentionDetailClient] Video error code:', target.error.code, 'Message:', target.error.message);
-                      console.error('[MentionDetailClient] Video URL:', mention.video_url);
-                    }
-                  }
-                }}
+                className="w-full h-auto max-h-[400px] object-contain"
               />
             </div>
           )}
 
-          {/* Description - moved above images */}
+          {/* Image */}
+          {images.length > 0 && (
+            <button
+              onClick={() => setSelectedImageIndex(0)}
+              className="block w-full aspect-[4/3] bg-gray-100 hover:opacity-95 transition-opacity cursor-pointer"
+              aria-label="View full image"
+            >
+              <img src={images[0].url} alt={images[0].alt || 'Pin image'} className="w-full h-full object-cover" />
+            </button>
+          )}
+
+          {/* Description */}
           {mention.description && (
-            <div className="mb-4">
-              <p className="text-base font-semibold text-gray-900 leading-relaxed">{mention.description}</p>
+            <div className="p-[10px]">
+              <p className="text-sm text-gray-900 leading-relaxed whitespace-pre-line">{mention.description}</p>
             </div>
           )}
 
-          {/* Images - use MultiImageGrid for single or multiple images */}
-          {mention.media_type !== 'video' && (() => {
-            // Build images array: use image_urls if available, otherwise fall back to image_url
-            const images: MultiImage[] = [];
-            
-            if (mention.image_urls && Array.isArray(mention.image_urls) && mention.image_urls.length > 0) {
-              // Multiple images from image_urls array
-              images.push(...mention.image_urls.map(url => ({ url, alt: mention.description ?? undefined })));
-            } else if (mention.image_url) {
-              // Single image from image_url
-              images.push({ url: mention.image_url, alt: mention.description ?? undefined });
-            }
-            
-            if (images.length > 0) {
-              return (
-                <>
-                  <div className="mb-4">
-                    <div className="rounded-lg overflow-hidden">
-                      {images.length === 1 ? (
-                        <button
-                          onClick={() => setSelectedImageIndex(0)}
-                          className="block relative w-full aspect-[4/3] rounded-md overflow-hidden border border-gray-200 bg-gray-100 hover:opacity-90 transition-opacity cursor-pointer"
-                          aria-label="View full image"
-                        >
-                          <img 
-                            src={images[0].url} 
-                            alt={images[0].alt || 'Mention image'} 
-                            className="w-full h-full object-cover" 
-                          />
-                        </button>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          {images.slice(0, 4).map((image, index) => (
-                            <button
-                              key={`${image.url}-${index}`}
-                              onClick={() => setSelectedImageIndex(index)}
-                              className="relative w-full aspect-square rounded-md overflow-hidden border border-gray-200 bg-gray-100 hover:opacity-90 transition-opacity cursor-pointer"
-                              aria-label={`View image ${index + 1}`}
-                            >
-                              <img 
-                                src={image.url} 
-                                alt={image.alt || `Mention image ${index + 1}`} 
-                                className="w-full h-full object-cover" 
-                              />
-                              {images.length > 4 && index === 3 && (
-                                <div className="absolute inset-0 bg-gray-900/60 flex items-center justify-center">
-                                  <div className="text-xs font-medium text-white">+{images.length - 3} more</div>
-                                </div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Full-screen image overlay */}
-                  {selectedImageIndex !== null && (
-                    <ImageOverlay
-                      images={images}
-                      currentIndex={selectedImageIndex}
-                      onClose={() => setSelectedImageIndex(null)}
-                      onNavigate={(index) => setSelectedImageIndex(index)}
-                    />
-                  )}
-                </>
-              );
-            }
-            return null;
-          })()}
+          {/* Event date */}
+          {showEventDate && (
+            <div className="px-[10px] pb-[10px] flex items-center gap-1.5 text-[10px] text-gray-500">
+              <CalendarIcon className="w-3 h-3" />
+              <span>Event: {eventDate}</span>
+            </div>
+          )}
+        </div>
 
-
-          {/* Location */}
-          <div className="mb-4 space-y-2">
-            {mention.full_address && (
-              <div className="flex items-start gap-2 text-xs text-gray-600">
-                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                <span>{mention.full_address}</span>
-              </div>
-            )}
-            
-            {/* Place Name from map_meta */}
+        {/* ── Card: Location ── */}
+        {(mention.full_address || placeName || coordinates) && (
+          <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
             {placeName && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs text-gray-900 font-medium">
+                <MapPinIcon className="w-3 h-3 text-gray-500 flex-shrink-0" />
                 <span>{placeName}</span>
               </div>
             )}
-            
-            {/* Coordinates */}
+            {mention.full_address && (
+              <div className="flex items-start gap-1.5 text-[10px] text-gray-600">
+                <MapPinIcon className="w-3 h-3 text-gray-400 flex-shrink-0 mt-px" />
+                <span>{mention.full_address}</span>
+              </div>
+            )}
             {coordinates && (
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                <MapPinIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
                 <button
                   onClick={handleCopyCoordinates}
-                  className="flex items-center gap-1 hover:text-gray-900 transition-colors"
-                  title="Click to copy coordinates"
+                  className="flex items-center gap-1 font-mono hover:text-gray-900 transition-colors"
+                  title="Copy coordinates"
                 >
-                  <span className="font-mono">{coordinates}</span>
-                  <ClipboardDocumentIcon className="w-3 h-3 text-gray-400" />
+                  {coordinates}
+                  {isCopied ? <CheckIcon className="w-2.5 h-2.5 text-green-600" /> : <ClipboardDocumentIcon className="w-2.5 h-2.5 text-gray-400" />}
                 </button>
               </div>
             )}
           </div>
+        )}
 
-          {/* Tagged Users */}
-          {mention.tagged_accounts && mention.tagged_accounts.length > 0 && (
-            <div className="mb-4 flex items-center gap-2 text-xs text-gray-600">
-              <UserGroupIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-gray-500">Tagged:</span>
-                {mention.tagged_accounts.map((tagged, idx) => (
-                  <span key={tagged.id}>
-                    {tagged.username ? (
-                      <Link
-                        href={`/${encodeURIComponent(tagged.username)}`}
-                        className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
-                      >
-                        @{tagged.username}
-                      </Link>
-                    ) : (
-                      <span className="text-gray-500">Unknown</span>
-                    )}
-                    {idx < mention.tagged_accounts!.length - 1 && <span className="text-gray-400">,</span>}
-                  </span>
-                ))}
-              </div>
+        {/* ── Card: Tagged accounts ── */}
+        {mention.tagged_accounts && mention.tagged_accounts.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+            <div className="flex items-center gap-1.5 text-[10px] text-gray-600 flex-wrap">
+              <UserGroupIcon className="w-3 h-3 text-gray-400 flex-shrink-0" />
+              {mention.tagged_accounts.map((tagged, idx) => (
+                <span key={tagged.id}>
+                  {tagged.username ? (
+                    <Link href={`/${encodeURIComponent(tagged.username)}`} className="text-blue-600 hover:text-blue-700 hover:underline font-medium">
+                      @{tagged.username}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">Unknown</span>
+                  )}
+                  {idx < mention.tagged_accounts!.length - 1 && <span className="text-gray-300">, </span>}
+                </span>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Map Name */}
-          {mention.map?.name && (
-            <div className="mb-4 flex items-center gap-2 text-xs text-gray-600">
-              <MapPinIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-              <span className="text-gray-500">Map:</span>
-              <Link
-                href={mention.map.slug === 'live' ? '/maps' : `/map/${mention.map.slug || mention.map.id}`}
-                className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
-              >
-                {mention.map.name}
-              </Link>
-            </div>
-          )}
-
-          {/* Meta Info */}
-          <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 mb-6 pb-6 border-b border-gray-200">
-            <div className="flex items-center gap-1">
-              <EyeIcon className="w-4 h-4" />
-              <span>{viewCount} views</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <CalendarIcon className="w-4 h-4" />
-              <span>Posted {createdDate}</span>
-            </div>
-            {showEventDate && (
-              <div className="flex items-center gap-1">
-                <CalendarIcon className="w-4 h-4" />
-                <span>Happened {eventDate}</span>
-              </div>
-            )}
-            {showUpdatedDate && (
-              <div className="flex items-center gap-1">
-                <ClockIcon className="w-4 h-4" />
-                <span>Updated {updatedDate}</span>
-              </div>
-            )}
+        {/* ── Card: Stats + CTA ── */}
+        <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+          {/* Stats row */}
+          <div className="flex items-center gap-3 text-[10px] text-gray-500 mb-2">
+            <span className="flex items-center gap-1"><MapPinIcon className="w-3 h-3" />{pinViews} map {pinViews === 1 ? 'view' : 'views'}</span>
+            <span className="flex items-center gap-1"><LinkIcon className="w-3 h-3" />{pageViews} page {pageViews === 1 ? 'view' : 'views'}</span>
+            <span className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" />{shortDate(mention.created_at)}</span>
+            {wasEdited && <span className="italic">edited</span>}
           </div>
 
-          <div className="pt-4">
+          {/* Actions row */}
+          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
             <Link
               href={getViewOnMapHref(mention)}
-              className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-900 text-white text-xs font-medium hover:bg-gray-800 transition-colors"
             >
-              <MapPinIcon className="w-4 h-4 text-gray-500" />
+              <MapPinIcon className="w-3 h-3" />
               View on Map
             </Link>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-2 py-1 rounded border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <ShareIcon className="w-3 h-3" />
+              Share
+            </button>
+            {isOwner && (
+              <Link
+                href={`/mention/${mention.id}/edit`}
+                className="flex items-center gap-1.5 px-2 py-1 rounded border border-gray-200 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <PencilIcon className="w-3 h-3" />
+                Edit
+              </Link>
+            )}
+            {mention.accounts?.username && (
+              <Link
+                href={`/${mention.accounts.username}`}
+                className="ml-auto flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                Profile
+              </Link>
+            )}
           </div>
+        </div>
+      </article>
 
-        </main>
-      </div>
+      {/* Full-screen image overlay */}
+      {selectedImageIndex !== null && (
+        <ImageOverlay
+          images={images}
+          currentIndex={selectedImageIndex}
+          onClose={() => setSelectedImageIndex(null)}
+          onNavigate={(index) => setSelectedImageIndex(index)}
+        />
+      )}
     </>
   );
 }

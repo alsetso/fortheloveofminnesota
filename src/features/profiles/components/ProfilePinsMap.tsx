@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import ProfileMap from './ProfileMap';
-import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
+import LocationPinPopup from '@/components/layout/LocationPinPopup';
 import { usePinMarker } from '@/hooks/usePinMarker';
 import type { ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
@@ -32,8 +32,8 @@ interface ProfilePinsMapProps {
   /** Controlled location popup state (for temp pin + slide-up modal). */
   locationPopup?: LocationPopupState;
   onLocationPopupClose?: () => void;
-  /** When user confirms "Add to map" in popup (profile: create pin via API). */
-  onAddPin?: (coordinates: { lat: number; lng: number }, mapMeta?: Record<string, unknown> | null, mentionTypeId?: string | null) => void;
+  /** Called after pin is created in LocationPinPopup. */
+  onPinCreated?: (pin: import('@/types/profile').ProfilePin) => void;
   /** When set, fly to this pin and open its popup (e.g. from sidebar click). */
   focusPin?: ProfilePin | null;
   /** Incremented on each focus request; use in effect deps so same-pin reclick retriggers. */
@@ -58,7 +58,7 @@ export default function ProfilePinsMap({
   onMapClickForPin,
   locationPopup,
   onLocationPopupClose,
-  onAddPin,
+  onPinCreated,
   focusPin,
   focusTrigger = 0,
 }: ProfilePinsMapProps) {
@@ -74,6 +74,7 @@ export default function ProfilePinsMap({
     coordinates: pinCoordinates,
     color: 'white',
     enabled: !!locationPopup?.isOpen && !!pinCoordinates && !!mapInstance,
+    behindModal: true,
   });
 
   const handleMapInstanceReady = useCallback((map: MapboxMapInstance) => {
@@ -97,17 +98,16 @@ export default function ProfilePinsMap({
         focusPin={focusPin}
         focusTrigger={focusTrigger}
       />
-      {locationPopup && (
-        <LocationSelectPopup
+      {locationPopup && isOwnProfile && (
+        <LocationPinPopup
           isOpen={locationPopup.isOpen}
           onClose={onLocationPopupClose ?? (() => {})}
           lat={locationPopup.lat}
           lng={locationPopup.lng}
           address={locationPopup.address}
-          mapMeta={locationPopup.mapMeta ?? undefined}
-          onAddToMap={onAddPin}
-          allowPins
-          isOwner={isOwnProfile}
+          accountId={accountId}
+          collections={collections ?? []}
+          onPinCreated={onPinCreated}
         />
       )}
     </div>

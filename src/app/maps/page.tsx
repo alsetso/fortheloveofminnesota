@@ -1,61 +1,73 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
 import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import LeftSidebar from '@/components/layout/LeftSidebar';
 import RightSidebar from '@/components/layout/RightSidebar';
-import MapInfo, { type MapInfoLocation } from '@/components/layout/MapInfo';
-import LivePinCard, { type LivePinData } from '@/components/layout/LivePinCard';
-import MapPage from '../map/[id]/page';
-import MapsPageFooter from '@/components/maps/MapsPageFooter';
-import MentionTypeFilter from './components/MentionTypeFilter';
-import MapStylesPopup from '@/components/layout/MapStylesPopup';
+import type { LivePinData } from '@/components/layout/LivePinCard';
+import LocationPinPopup from '@/components/layout/LocationPinPopup';
+import FinishPinModal from '@/components/modals/FinishPinModal';
+import PublicMapView from '@/features/maps/PublicMapView';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
+import { useToastContext } from '@/features/ui/contexts/ToastContext';
+import { createToast } from '@/features/ui/services/toast';
+import { useReverseGeocode } from '@/hooks/useReverseGeocode';
+import type { ProfilePin } from '@/types/profile';
+import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
+import type { Collection } from '@/types/collection';
 
 export interface LiveMapData {
   map: { id: string; name?: string; slug?: string };
-  pins: any[];
+  pins: { id: string; lat: number; lng: number; [key: string]: unknown }[];
   tags: { id: string; emoji: string; name: string }[];
 }
 
 function MapsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeAccountId, account } = useAuthStateSafe();
+  const { activeAccountId } = useAuthStateSafe();
   const currentAccountId = activeAccountId ?? null;
-  const { modal } = useAppModalContextSafe();
-  const isWelcomeModalOpen = modal.type === 'welcome';
+  const { openWelcome } = useAppModalContextSafe();
+  const { addToast } = useToastContext();
 
   const [liveData, setLiveData] = useState<LiveMapData | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [mapInstance, setMapInstance] = useState<any>(null);
-  const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | 'all'>('7d');
-  const [showDistricts, setShowDistricts] = useState(false);
-  const [showCTU, setShowCTU] = useState(false);
-  const [showStateBoundary, setShowStateBoundary] = useState(false);
-  const [showCountyBoundaries, setShowCountyBoundaries] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedLocation, setSelectedLocation] = useState<MapInfoLocation | null>(null);
-  const [liveStatus, setLiveStatus] = useState({ loadingData: true, mapLoaded: false, loadingPins: false, currentZoom: 0 });
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number; address: string | null; mapMeta?: Record<string, unknown> | null } | null>(null);
   const [selectedPin, setSelectedPin] = useState<LivePinData | null>(null);
+  const [selectedPinCoords, setSelectedPinCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [isLoadingPin, setIsLoadingPin] = useState(false);
-  const pinCacheRef = useRef<Map<string, LivePinData>>(new Map());
-  const clearMapSelectionRef = useRef<(() => void) | null>(null);
 
   const pinIdFromUrl = searchParams.get('pin');
-  const latFromUrl = searchParams.get('lat');
-  const lngFromUrl = searchParams.get('lng');
+  const atFromUrl = searchParams.get('at');
   const hasPinSelection = Boolean(pinIdFromUrl);
-  const hasLocationSelection = Boolean(latFromUrl && lngFromUrl);
-  const hasSelection = hasPinSelection || hasLocationSelection;
-  const showMentionTypes = !hasPinSelection && !hasLocationSelection;
+  const hasLocationSelection = Boolean(atFromUrl);
 
-  // Single fetch: public.map_pins + public.mention_types (no map lookup)
+  const atCoords = useMemo(() => {
+    if (!atFromUrl) return null;
+    const [latStr, lngStr] = atFromUrl.split(',');
+    const lat = parseFloat(latStr);
+    const lng = parseFloat(lngStr);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }, [atFromUrl]);
+
+  const { address: reverseAddress } = useReverseGeocode(
+    selectedLocation?.lat ?? atCoords?.lat ?? null,
+    selectedLocation?.lng ?? atCoords?.lng ?? null
+  );
+
+  const [collections, setCollections] = useState<Collection[]>([]);
+  useEffect(() => {
+    if (!currentAccountId) return;
+    fetch(`/api/accounts/${currentAccountId}/collections`)
+      .then((res) => res.json())
+      .then((data) => setCollections(data?.collections ?? []))
+      .catch(() => {});
+  }, [currentAccountId]);
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/maps/public')
@@ -75,19 +87,14 @@ function MapsPageContent() {
     return () => { cancelled = true; };
   }, []);
 
-  const buildLiveUrl = useCallback(
-    (updates: { pin?: string | null; lat?: number | null; lng?: number | null; clearSelection?: boolean }) => {
+  const buildUrl = useCallback(
+    (updates: { pin?: string | null; at?: string | null; clear?: boolean }) => {
       const next = new URLSearchParams(searchParams);
       next.delete('pin');
-      next.delete('lat');
-      next.delete('lng');
-      if (!updates.clearSelection) {
-        if (updates.pin != null && updates.pin !== '') {
-          next.set('pin', updates.pin);
-        } else if (updates.lat != null && updates.lng != null) {
-          next.set('lat', updates.lat.toString());
-          next.set('lng', updates.lng.toString());
-        }
+      next.delete('at');
+      if (!updates.clear) {
+        if (updates.pin) next.set('pin', updates.pin);
+        else if (updates.at) next.set('at', updates.at);
       }
       const q = next.toString();
       return q ? `/maps?${q}` : '/maps';
@@ -95,141 +102,142 @@ function MapsPageContent() {
     [searchParams]
   );
 
-  const fetchPinData = useCallback(async (pinId: string): Promise<LivePinData | null> => {
-    const cached = pinCacheRef.current.get(pinId);
-    if (cached) return cached;
-    const res = await fetch(`/api/pins/${pinId}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data) pinCacheRef.current.set(pinId, data);
-    return data;
-  }, []);
+  const handleClearSelection = useCallback(() => {
+    router.replace(buildUrl({ clear: true }));
+    setSelectedLocation(null);
+    setSelectedPin(null);
+    setSelectedPinCoords(null);
+  }, [router, buildUrl]);
+
+  const handlePinSelect = useCallback(
+    (pinId: string, coords?: { lat: number; lng: number }) => {
+      setSelectedLocation(null);
+      setSelectedPinCoords(coords ?? null);
+      const pin = liveData?.pins.find((p) => String(p.id) === pinId);
+      if (pin) {
+        setSelectedPin(pin as unknown as LivePinData);
+        setIsLoadingPin(false);
+      } else {
+        setSelectedPin(null);
+        setIsLoadingPin(true);
+        fetch(`/api/pins/${pinId}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            setSelectedPin(data);
+            setIsLoadingPin(false);
+          })
+          .catch(() => setIsLoadingPin(false));
+      }
+      router.replace(buildUrl({ pin: pinId }));
+    },
+    [router, buildUrl, liveData?.pins]
+  );
+
+  const handleLocationSelect = useCallback(
+    (info: { lat: number; lng: number; address: string | null; mapMeta?: Record<string, unknown> | null }) => {
+      if (!MinnesotaBoundsService.isWithinMinnesota({ lat: info.lat, lng: info.lng })) {
+        addToast(createToast('info', 'Pins can only be placed within Minnesota', { duration: 3000 }));
+        return;
+      }
+      if (!currentAccountId) {
+        openWelcome();
+        addToast(createToast('info', 'Sign in to add pins', { duration: 3000 }));
+        return;
+      }
+      setSelectedPin(null);
+      setSelectedLocation({ lat: info.lat, lng: info.lng, address: info.address ?? null, mapMeta: info.mapMeta ?? null });
+      router.replace(buildUrl({ at: `${info.lat.toFixed(6)},${info.lng.toFixed(6)}` }));
+    },
+    [router, buildUrl, currentAccountId, openWelcome, addToast]
+  );
+
+  useEffect(() => {
+    if (!hasLocationSelection || !atCoords) {
+      setSelectedLocation(null);
+      return;
+    }
+    setSelectedPin(null);
+    setSelectedLocation((prev) =>
+      prev && prev.lat === atCoords.lat && prev.lng === atCoords.lng
+        ? prev
+        : { ...atCoords, address: prev?.address ?? null, mapMeta: prev?.mapMeta ?? null }
+    );
+  }, [hasLocationSelection, atCoords]);
 
   useEffect(() => {
     if (!hasPinSelection || !pinIdFromUrl) {
       setSelectedPin(null);
+      setSelectedPinCoords(null);
       setIsLoadingPin(false);
       return;
     }
-    const cached = pinCacheRef.current.get(pinIdFromUrl);
-    if (cached) {
-      setSelectedPin(cached);
+    const pin = liveData?.pins.find((p) => String(p.id) === pinIdFromUrl);
+    if (pin) {
+      setSelectedPin(pin as unknown as LivePinData);
+      setSelectedPinCoords(null);
       setIsLoadingPin(false);
-      return;
-    }
-    setIsLoadingPin(true);
-    setSelectedPin(null);
-    let cancelled = false;
-    fetchPinData(pinIdFromUrl).then((data) => {
-      if (!cancelled) {
-        setSelectedPin(data);
-        setIsLoadingPin(Boolean(data && (data.description || data.caption || data.emoji || data.image_url || data.video_url)));
-      }
-    }).finally(() => {
-      if (!cancelled) setIsLoadingPin(false);
-    });
-    return () => { cancelled = true; };
-  }, [hasPinSelection, pinIdFromUrl, fetchPinData]);
-
-  useEffect(() => {
-    if (!hasLocationSelection || !latFromUrl || !lngFromUrl) {
-      setSelectedLocation(null);
-      return;
-    }
-    setSelectedPin(null);
-    const lat = parseFloat(latFromUrl);
-    const lng = parseFloat(lngFromUrl);
-    if (!isNaN(lat) && !isNaN(lng)) {
-      setSelectedLocation({ lat, lng, address: null, mapMeta: null });
-    }
-  }, [hasLocationSelection, latFromUrl, lngFromUrl]);
-
-  const handleLocationSelect = useCallback(
-    (info: { lat: number; lng: number; address: string | null; isOpen: boolean }) => {
-      if (!info.isOpen) return;
-      setSelectedPin(null);
-      setSelectedLocation({
-        lat: info.lat,
-        lng: info.lng,
-        address: info.address,
-        mapMeta: null,
-      });
-      router.replace(buildLiveUrl({ lat: info.lat, lng: info.lng }));
-    },
-    [router, buildLiveUrl]
-  );
-
-  const handleLivePinSelect = useCallback(
-    (pinId: string, pinData?: Record<string, unknown> | null) => {
-      setSelectedLocation(null);
-      if (pinData) {
-        const pin = pinData as unknown as LivePinData;
-        if (String(pin.id) === pinId) {
-          pinCacheRef.current.set(pinId, pin);
-          setSelectedPin(pin);
-          setIsLoadingPin(false);
-          router.replace(buildLiveUrl({ pin: pinId }));
-          return;
-        }
-      }
-      const cached = pinCacheRef.current.get(pinId);
-      if (cached) {
-        setSelectedPin(cached);
-        setIsLoadingPin(false);
-        router.replace(buildLiveUrl({ pin: pinId }));
-        return;
-      }
+    } else {
       setIsLoadingPin(true);
       setSelectedPin(null);
-      router.replace(buildLiveUrl({ pin: pinId }));
-    },
-    [router, buildLiveUrl]
-  );
-
-  const handleClearSelection = useCallback(() => {
-    router.replace('/maps');
-    setSelectedLocation(null);
-    setSelectedPin(null);
-    setIsLoadingPin(false);
-    clearMapSelectionRef.current?.();
-  }, [router]);
-
-  const footerContent = useMemo(() => {
-    if (hasPinSelection && pinIdFromUrl) {
-      const pin = selectedPin && String(selectedPin.id) === pinIdFromUrl ? selectedPin : null;
-      return (
-        <LivePinCard
-          pinId={pinIdFromUrl}
-          pin={pin}
-          currentAccountId={currentAccountId}
-        />
-      );
+      fetch(`/api/pins/${pinIdFromUrl}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          setSelectedPin(data);
+          setIsLoadingPin(false);
+        })
+        .catch(() => setIsLoadingPin(false));
     }
-    return (
-      <MapInfo
-        location={selectedLocation}
-        zoom={liveStatus.currentZoom}
-        emptyLabel="Explore public pins on the map."
-        onClose={handleClearSelection}
-      />
-    );
-  }, [hasPinSelection, pinIdFromUrl, selectedPin, currentAccountId, selectedLocation, liveStatus.currentZoom, handleClearSelection]);
+  }, [hasPinSelection, pinIdFromUrl, liveData?.pins]);
 
-  const initialData = useMemo(() => {
-    if (!liveData) return null;
-    return {
-      map: liveData.map as any,
-      pins: liveData.pins,
-      areas: [],
-      members: null,
-      tags: liveData.tags,
-    };
-  }, [liveData]);
+  const locationPopupAddress = selectedLocation?.address ?? (hasLocationSelection && atCoords ? reverseAddress : null);
+
+  const handleViewRecorded = useCallback((pinId: string, viewCount: number) => {
+    setLiveData((prev) => {
+      if (!prev) return prev;
+      const idx = prev.pins.findIndex((p) => String(p.id) === pinId);
+      if (idx === -1) return prev;
+      const updated = [...prev.pins];
+      updated[idx] = { ...updated[idx], view_count: viewCount };
+      return { ...prev, pins: updated };
+    });
+  }, []);
+
+  // Finish-pin modal state
+  const [finishPin, setFinishPin] = useState<ProfilePin | null>(null);
+  const [finishPinAddress, setFinishPinAddress] = useState<string | null>(null);
+
+  const handlePinCreated = useCallback((pin: ProfilePin) => {
+    handleClearSelection();
+    setLiveData((prev) =>
+      prev && pin ? { ...prev, pins: [{ ...pin, lat: pin.lat ?? 0, lng: pin.lng ?? 0 }, ...(prev.pins ?? [])] } : prev
+    );
+    // Open the finish-pin modal so user can add description, media, collection
+    setFinishPin(pin);
+    setFinishPinAddress(locationPopupAddress);
+  }, [handleClearSelection, locationPopupAddress]);
+
+  const handleFinishPinUpdated = useCallback((updatedPin: ProfilePin) => {
+    setLiveData((prev) => {
+      if (!prev) return prev;
+      const idx = prev.pins.findIndex((p) => String(p.id) === String(updatedPin.id));
+      if (idx === -1) return prev;
+      const updated = [...prev.pins];
+      updated[idx] = { ...updated[idx], ...updatedPin };
+      return { ...prev, pins: updated };
+    });
+    setFinishPin(null);
+    setFinishPinAddress(null);
+  }, []);
+
+  const handleFinishPinClose = useCallback(() => {
+    setFinishPin(null);
+    setFinishPinAddress(null);
+  }, []);
 
   if (loading || !liveData?.pins) {
     return (
-      <div className="flex items-center justify-center w-full h-[calc(100vh-3.5rem)] bg-gray-50">
-        <div className="text-sm text-gray-500">Loading map…</div>
+      <div className="flex items-center justify-center w-full h-[calc(100vh-3.5rem)] bg-gray-50 dark:bg-surface-muted">
+        <div className="text-sm text-gray-500 dark:text-foreground-muted">Loading map…</div>
       </div>
     );
   }
@@ -237,62 +245,44 @@ function MapsPageContent() {
   return (
     <>
       <PageViewTracker />
-      <NewPageWrapper leftSidebar={<LeftSidebar />} rightSidebar={<RightSidebar />}>
+      <NewPageWrapper leftSidebar={<LeftSidebar />} rightSidebar={<RightSidebar />} hideRightSidebar>
         <div className="relative w-full h-[calc(100vh-3.5rem)] overflow-hidden">
-          {showMentionTypes && (
-            <MentionTypeFilter
-              tags={liveData.tags}
-              visible={showMentionTypes}
-              leftSlot={
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(true)}
-                  className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-md text-gray-600 hover:bg-white/90 hover:text-gray-900 transition-colors border border-gray-200 bg-white/90"
-                  aria-label="Map settings"
-                >
-                  <Cog6ToothIcon className="w-4 h-4" />
-                </button>
-              }
-            />
-          )}
-          <MapPage
-            params={Promise.resolve({ id: 'public' })}
-            skipPageWrapper
+          <PublicMapView
+            pins={liveData.pins}
+            selectedPinId={pinIdFromUrl}
+            selectedPin={selectedPin}
+            currentAccountId={currentAccountId}
+            locationMarker={hasLocationSelection && atCoords && !finishPin ? atCoords : null}
+            selectedPinCoords={selectedPinCoords}
+            isLoadingPin={isLoadingPin}
+            onPinSelect={handlePinSelect}
+            onPinDeselect={handleClearSelection}
             onLocationSelect={handleLocationSelect}
-            onLiveStatusChange={setLiveStatus}
-            onLivePinSelect={handleLivePinSelect}
-            onRegisterClearSelection={(fn) => { clearMapSelectionRef.current = fn; }}
-            initialData={initialData}
-            onMapInstanceReady={setMapInstance}
-            timeFilter={timeFilter === 'all' ? null : timeFilter}
-            controlledBoundaryState={{
-              showDistricts,
-              showCTU,
-              showStateBoundary,
-              showCountyBoundaries,
-            }}
+            onViewRecorded={handleViewRecorded}
           />
-          {!isWelcomeModalOpen && hasSelection && (
-            <MapsPageFooter
-              children={footerContent}
+          {hasLocationSelection && atCoords && !finishPin && (
+            <LocationPinPopup
+              isOpen
               onClose={handleClearSelection}
-              showCloseIcon={hasSelection}
+              lat={atCoords.lat}
+              lng={atCoords.lng}
+              address={locationPopupAddress}
+              mapMeta={selectedLocation?.mapMeta}
+              accountId={currentAccountId}
+              onPinCreated={handlePinCreated}
             />
           )}
-          <MapStylesPopup
-            isOpen={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-            map={mapInstance}
-            timeFilter={timeFilter}
-            onTimeFilterChange={(f) => setTimeFilter(f)}
-            account={account ?? undefined}
-            onUpgrade={() => router.push('/billing')}
-            onProToast={(feature) => { /* no-op on maps page */ }}
-            districtsState={{ showDistricts, setShowDistricts }}
-            ctuState={{ showCTU, setShowCTU }}
-            stateBoundaryState={{ showStateBoundary, setShowStateBoundary }}
-            countyBoundariesState={{ showCountyBoundaries, setShowCountyBoundaries }}
-          />
+          {finishPin && currentAccountId && (
+            <FinishPinModal
+              isOpen
+              onClose={handleFinishPinClose}
+              pin={finishPin}
+              accountId={currentAccountId}
+              address={finishPinAddress}
+              onPinUpdated={handleFinishPinUpdated}
+              collections={collections}
+            />
+          )}
         </div>
       </NewPageWrapper>
     </>

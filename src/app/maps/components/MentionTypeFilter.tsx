@@ -50,33 +50,45 @@ export default function MentionTypeFilter({ tags, visible = true, leftSlot }: Me
 
   return (
     <div
-      className="absolute top-0 left-0 right-0 z-[100] px-2 pb-2 flex items-center gap-2 bg-[hsl(var(--header)/0.9)] backdrop-blur-sm"
-      style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))' }}
+      className="absolute top-0 left-0 z-[100] flex max-w-[80%] items-center gap-2 px-2 pb-2"
+      style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top))', right: '2rem' }}
     >
       {leftSlot}
-      <div className="flex gap-2 min-w-max flex-1 overflow-x-auto scrollbar-hide">
-        {tags.map((tag) => {
-          const slug = mentionTypeNameToSlug(tag.name);
-          const isSelected = selectedSlugs.includes(slug);
-          return (
-            <button
-              key={tag.id}
-              type="button"
-              onClick={() => handleChipClick(slug)}
-              className={`
-                flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap
-                transition-colors border
-                ${isSelected
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white/90 text-gray-700 border-gray-200 hover:bg-gray-50'
-                }
-              `}
-            >
-              <span>{tag.emoji}</span>
-              <span>{tag.name}</span>
-            </button>
-          );
-        })}
+      <div
+        className="min-w-0 flex-1 overflow-x-auto scrollbar-hide"
+        style={{
+          maskImage: 'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+          maskSize: '100% 100%',
+          WebkitMaskSize: '100% 100%',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+        } as React.CSSProperties}
+      >
+        <div className="flex gap-2">
+          {tags.map((tag) => {
+            const slug = mentionTypeNameToSlug(tag.name);
+            const isSelected = selectedSlugs.includes(slug);
+            return (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => handleChipClick(slug)}
+                className={`
+                  flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border px-3 py-1.5 text-xs font-medium
+                  transition-colors
+                  ${isSelected
+                    ? 'border-gray-900 bg-gray-900 text-white'
+                    : 'border-gray-200 bg-white/90 text-gray-700 hover:bg-gray-50'
+                  }
+                `}
+              >
+                <span>{tag.emoji}</span>
+                <span>{tag.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

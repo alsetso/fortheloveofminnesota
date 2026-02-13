@@ -55,7 +55,12 @@ export default function PostMapDrawer({ onClose, onMapDataSave, initialMapData }
           style: MAP_CONFIG.MAPBOX_STYLE,
           center: initialMapData?.center ? [initialMapData.center.lng, initialMapData.center.lat] : MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
-          preserveDrawingBuffer: true, // Required for canvas.toDataURL() screenshot capture
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
+          maxBounds: [
+            [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+            [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+          ],
+          preserveDrawingBuffer: true,
         });
 
         map.on('load', () => {

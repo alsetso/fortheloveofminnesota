@@ -75,6 +75,15 @@ Points to `analytics.url_visits`. Used by PostgREST and analytics page queries.
 - **Profile**: Increments `accounts.view_count` when someone views another user’s profile (no self-views).
 - **Pin**: Increments the pin’s view_count (target table varies by migration history: `public.mentions` or `maps.pins`).
 
+### 3.4 Mention detail page (`/mention/[id]`) — objective and view separation
+
+**Objective:** The mention id page is the canonical, shareable page for a single pin. Its purpose is to give each pin a stable URL for linking and SEO, show full content (media, description, type, owner), and support edit/delete for owners. We keep the page focused: server-rendered metadata for crawlers, one main data fetch for the pin, and `usePageView` for analytics. No extra complexity; optimization is “one pin, one page, one view event.”
+
+**Pin views vs mention (detail) page views — kept separate:**
+
+- **Pin view (map):** When a user opens the pin popup on the map, the client calls `POST /api/analytics/pin-view` with the pin id. That API records a visit with URL `/map?pin={id}` via `record_url_visit`. Only this flow increments `map_pins.view_count`. So “pin views” = map popup opens only.
+- **Mention (detail) page view:** When a user lands on `/mention/[id]`, the page uses `usePageView({ page_url: \`/mention/${id}\` })`, which posts to `POST /api/analytics/view`. That records a visit with URL `/mention/{id}` in the events table. We do **not** use that to increment `map_pins.view_count`; detail-page traffic is distinct and can be queried from events/url_visits by URL pattern (`/mention/` vs `/map?pin=`). So “mention id page views” = visits to the dedicated pin page; “pin views” = map popup only. Keeping them separate gives accurate map-engagement vs deep-link/share metrics.
+
 ---
 
 ## 4. API Surface

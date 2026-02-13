@@ -162,6 +162,7 @@ export default function NewMapPage() {
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
           pitch: meta.pitch,
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],

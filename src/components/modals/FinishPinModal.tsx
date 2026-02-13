@@ -1,9 +1,15 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import Image from 'next/image';
-import { XMarkIcon, PhotoIcon, UserPlusIcon, CheckIcon } from '@heroicons/react/24/outline';
+import {
+  XMarkIcon,
+  PhotoIcon,
+  UserPlusIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MapPinIcon,
+} from '@heroicons/react/24/outline';
 import { supabase } from '@/lib/supabase';
 import { useAuthStateSafe } from '@/features/auth';
 import { parseAndResolveUsernames } from '@/lib/posts/parseUsernames';
@@ -40,12 +46,9 @@ export default function FinishPinModal({
   const [collections, setCollections] = useState<Collection[]>(initialCollections);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(pin.collection_id ?? null);
   const [visibility, setVisibility] = useState<'public' | 'only_me'>(pin.visibility ?? 'public');
-  const [mounted, setMounted] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (isOpen && pin) {
@@ -55,7 +58,10 @@ export default function FinishPinModal({
       setTagInput('');
       setSelectedCollectionId(pin.collection_id ?? null);
       setVisibility(pin.visibility ?? 'public');
+      setShowMore(false);
       setError(null);
+      // Auto-focus description after render
+      requestAnimationFrame(() => descRef.current?.focus());
     }
   }, [isOpen, pin]);
 
@@ -148,62 +154,64 @@ export default function FinishPinModal({
     setError(null);
   };
 
-  if (!isOpen || !mounted) return null;
+  if (!isOpen) return null;
 
-  const modalContent = (
-    <div className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center sm:p-4">
+  const displayAddress = address ?? (pin.lat != null && pin.lng != null ? `${Number(pin.lat).toFixed(5)}, ${Number(pin.lng).toFixed(5)}` : null);
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[2100] flex justify-center pointer-events-none">
       <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        className="relative w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col rounded-t-2xl sm:rounded-xl bg-surface border border-border-muted dark:border-white/10 shadow-xl"
+        className="pointer-events-auto w-full max-w-[500px] mx-2 mb-2 rounded-md border border-gray-200 dark:border-white/10 bg-white dark:bg-surface shadow-sm overflow-hidden flex flex-col max-h-[80vh]"
         role="dialog"
         aria-labelledby="finish-pin-title"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-border-muted dark:border-white/10 flex-shrink-0">
-          <h2 id="finish-pin-title" className="text-sm font-semibold text-foreground">
-            Pin added
+        <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-white/10 flex-shrink-0">
+          <div />
+          <h2 id="finish-pin-title" className="text-sm font-semibold text-gray-900 dark:text-foreground">
+            Add details
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-surface-accent dark:hover:bg-white/10 transition-colors text-foreground-muted hover:text-foreground"
+            className="p-1 -mr-1 text-gray-500 hover:text-gray-700 dark:text-foreground-muted dark:hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Congratulation */}
-        <div className="px-3 pt-2 pb-1">
-          <p className="text-xs text-foreground-muted">
-            Nice work. Add a description, photo, or tag friends to make it shine.
-          </p>
-        </div>
+        {/* Address context */}
+        {displayAddress && (
+          <div className="px-3 pt-2 flex items-center gap-1.5">
+            <MapPinIcon className="w-3 h-3 text-gray-400 dark:text-foreground-muted flex-shrink-0" />
+            <p className="text-[10px] text-gray-500 dark:text-foreground-muted truncate">
+              {displayAddress}
+            </p>
+          </div>
+        )}
 
         {/* Form */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-3">
           {/* Description */}
           <div>
-            <label htmlFor="finish-pin-desc" className="block text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-1">
+            <label htmlFor="finish-pin-desc" className="block text-[10px] font-medium text-gray-500 dark:text-foreground-muted uppercase tracking-wide mb-1">
               Description
             </label>
             <textarea
+              ref={descRef}
               id="finish-pin-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What makes this place special?"
               rows={3}
-              className="w-full px-2.5 py-2 text-xs border border-border-muted dark:border-white/10 rounded-md bg-surface focus:outline-none focus:ring-2 focus:ring-lake-blue/30 text-foreground placeholder:text-foreground-muted resize-none"
+              className="w-full px-2.5 py-2 text-xs border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-white/20 text-gray-900 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-foreground-muted resize-none"
             />
           </div>
 
-          {/* Image */}
+          {/* Photo */}
           <div>
-            <label className="block text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-1">
+            <label className="block text-[10px] font-medium text-gray-500 dark:text-foreground-muted uppercase tracking-wide mb-1">
               Photo
             </label>
             <input
@@ -214,7 +222,7 @@ export default function FinishPinModal({
               className="hidden"
             />
             {imagePreview ? (
-              <div className="relative rounded-md overflow-hidden border border-border-muted dark:border-white/10 aspect-video bg-surface-accent dark:bg-white/5">
+              <div className="relative rounded-md overflow-hidden border border-gray-200 dark:border-white/10 aspect-video bg-gray-50 dark:bg-white/5">
                 <Image
                   src={imagePreview}
                   alt="Pin preview"
@@ -235,7 +243,7 @@ export default function FinishPinModal({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center gap-2 px-3 py-4 border border-dashed border-border-muted dark:border-white/10 rounded-md text-foreground-muted hover:text-foreground hover:border-foreground-muted transition-colors text-xs"
+                className="w-full flex items-center justify-center gap-2 px-3 py-3 border border-dashed border-gray-200 dark:border-white/10 rounded-md text-gray-500 dark:text-foreground-muted hover:text-gray-700 dark:hover:text-foreground hover:border-gray-400 dark:hover:border-white/20 transition-colors text-xs"
               >
                 <PhotoIcon className="w-4 h-4" />
                 Add photo
@@ -243,93 +251,102 @@ export default function FinishPinModal({
             )}
           </div>
 
-          {/* Tag users */}
-          <div>
-            <label htmlFor="finish-pin-tags" className="block text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-1">
-              <UserPlusIcon className="w-3 h-3 inline-block mr-1 align-middle" />
-              Tag friends
-            </label>
-            <input
-              id="finish-pin-tags"
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              placeholder="@username"
-              className="w-full px-2.5 py-2 text-xs border border-border-muted dark:border-white/10 rounded-md bg-surface focus:outline-none focus:ring-2 focus:ring-lake-blue/30 text-foreground placeholder:text-foreground-muted"
+          {/* More options disclosure */}
+          <button
+            type="button"
+            onClick={() => setShowMore((v) => !v)}
+            className="flex items-center gap-1 text-[10px] text-gray-500 hover:text-gray-700 dark:text-foreground-muted dark:hover:text-foreground transition-colors"
+          >
+            <ChevronDownIcon
+              className={`w-3 h-3 transition-transform ${showMore ? 'rotate-180' : ''}`}
             />
-          </div>
+            More options
+          </button>
 
-          {/* Collection */}
-          {collections.length > 0 && (
-            <div>
-              <label className="block text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-1">
-                Collection
-              </label>
-              <select
-                value={selectedCollectionId ?? ''}
-                onChange={(e) => setSelectedCollectionId(e.target.value || null)}
-                className="w-full px-2.5 py-2 text-xs border border-border-muted dark:border-white/10 rounded-md bg-surface focus:outline-none focus:ring-2 focus:ring-lake-blue/30 text-foreground"
-              >
-                <option value="">None</option>
-                {collections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.emoji} {c.title}
-                  </option>
-                ))}
-              </select>
+          {showMore && (
+            <div className="space-y-3">
+              {/* Tag friends */}
+              <div>
+                <label htmlFor="finish-pin-tags" className="block text-[10px] font-medium text-gray-500 dark:text-foreground-muted uppercase tracking-wide mb-1">
+                  <UserPlusIcon className="w-3 h-3 inline-block mr-1 align-middle" />
+                  Tag friends
+                </label>
+                <input
+                  id="finish-pin-tags"
+                  type="text"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  placeholder="@username"
+                  className="w-full px-2.5 py-2 text-xs border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-white/20 text-gray-900 dark:text-foreground placeholder:text-gray-400 dark:placeholder:text-foreground-muted"
+                />
+              </div>
+
+              {/* Collection */}
+              {collections.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-medium text-gray-500 dark:text-foreground-muted uppercase tracking-wide mb-1">
+                    Collection
+                  </label>
+                  <select
+                    value={selectedCollectionId ?? ''}
+                    onChange={(e) => setSelectedCollectionId(e.target.value || null)}
+                    className="w-full px-2.5 py-2 text-xs border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-white/20 text-gray-900 dark:text-foreground"
+                  >
+                    <option value="">None</option>
+                    {collections.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.emoji} {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Visibility */}
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 dark:text-foreground-muted uppercase tracking-wide mb-1">
+                  Visibility
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVisibility('public')}
+                    className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded border transition-colors ${
+                      visibility === 'public'
+                        ? 'border-lake-blue bg-lake-blue/10 text-lake-blue'
+                        : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-foreground-muted hover:bg-gray-50 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    Public
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVisibility('only_me')}
+                    className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded border transition-colors ${
+                      visibility === 'only_me'
+                        ? 'border-lake-blue bg-lake-blue/10 text-lake-blue'
+                        : 'border-gray-200 dark:border-white/10 text-gray-500 dark:text-foreground-muted hover:bg-gray-50 dark:hover:bg-white/5'
+                    }`}
+                  >
+                    Only me
+                  </button>
+                </div>
+              </div>
             </div>
           )}
-
-          {/* Visibility */}
-          <div>
-            <label className="block text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-1">
-              Visibility
-            </label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setVisibility('public')}
-                className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded border transition-colors ${
-                  visibility === 'public'
-                    ? 'border-lake-blue bg-lake-blue/10 text-lake-blue'
-                    : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'
-                }`}
-              >
-                Public
-              </button>
-              <button
-                type="button"
-                onClick={() => setVisibility('only_me')}
-                className={`flex-1 px-2 py-1.5 text-[10px] font-medium rounded border transition-colors ${
-                  visibility === 'only_me'
-                    ? 'border-lake-blue bg-lake-blue/10 text-lake-blue'
-                    : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'
-                }`}
-              >
-                Only me
-              </button>
-            </div>
-          </div>
 
           {error && (
             <p className="text-xs text-red-500">{error}</p>
           )}
         </div>
 
-        {/* Actions */}
-        <div className="p-3 border-t border-border-muted dark:border-white/10 flex gap-2 flex-shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-3 py-2 text-xs font-medium text-foreground-muted border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent dark:hover:bg-white/5 transition-colors"
-          >
-            Done
-          </button>
+        {/* Action */}
+        <div className="p-3 border-t border-gray-200 dark:border-white/10 flex-shrink-0">
           <button
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 px-3 py-2 text-xs font-medium text-white bg-lake-blue rounded-md hover:bg-lake-blue/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="w-full px-4 py-2.5 text-sm font-medium rounded-md text-white bg-lake-blue hover:bg-lake-blue/90 disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors"
           >
             {isSaving ? (
               'Saving…'
@@ -344,6 +361,4 @@ export default function FinishPinModal({
       </div>
     </div>
   );
-
-  return createPortal(modalContent, document.body);
 }

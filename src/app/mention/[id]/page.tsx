@@ -15,15 +15,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const supabase = await createServerClientWithAuth();
 
-  const { data: mention } = await (supabase as any)
-    .schema('maps')
-    .from('pins')
+  const { data: mention } = await supabase
+    .from('map_pins')
     .select(`
       id,
       description,
       image_url,
       full_address,
-      accounts (
+      accounts:account_id (
         username,
         first_name
       )
@@ -76,45 +75,21 @@ export default async function MentionPage({ params }: Props) {
   const { id } = await params;
   const supabase = await createServerClientWithAuth();
 
-  // Fetch mention with all details (now map_pins)
-  const { data: mention, error } = await (supabase as any)
-    .schema('maps')
-    .from('pins')
+  // Fetch pin + account + mention_type in a single query from public.map_pins
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: mention, error } = await supabase
+    .from('map_pins')
     .select(`
-      id,
-      lat,
-      lng,
-      map_id,
-      description,
-      visibility,
-      archived,
-      image_url,
-      video_url,
-      media_type,
-      full_address,
-      view_count,
-      created_at,
-      updated_at,
-      post_date,
-      tagged_account_ids,
-      map_meta,
-      account_id,
-      map:map (
-        id,
-        name,
-        slug
+      id, lat, lng, description,
+      visibility, archived, image_url, video_url, media_type,
+      full_address, view_count, created_at, updated_at, post_date,
+      tagged_account_ids, map_meta, account_id,
+      accounts:account_id (
+        id, username, first_name, image_url, account_taggable, user_id
       ),
-      accounts (
-        id,
-        username,
-        first_name,
-        image_url,
-        account_taggable
-      ),
-      mention_type:mention_types (
-        id,
-        emoji,
-        name
+      mention_type:mention_type_id (
+        id, emoji, name
       )
     `)
     .eq('id', id)
@@ -122,100 +97,56 @@ export default async function MentionPage({ params }: Props) {
     .eq('is_active', true)
     .single();
 
-  if (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('[MentionPage] Error fetching mention:', error);
-    }
-    notFound();
-  }
-
-  if (!mention) {
+  if (error || !mention) {
     notFound();
   }
 
   const mentionData = mention as any;
-  
-  // Transform mention_type relationship (Supabase returns it as an object when using alias)
-  // Since we're using mention_type:mention_types(...), it should already be an object, not an array
-  if (mentionData.mention_type && Array.isArray(mentionData.mention_type)) {
-    // If it's an array (legacy format), take the first item
-    mentionData.mention_type = mentionData.mention_type.length > 0 ? mentionData.mention_type[0] : null;
-  } else if (!mentionData.mention_type) {
-    // If mention_type is missing, set it to null
-    mentionData.mention_type = null;
-  }
-  
-  // Clean up any legacy mention_types array if it exists
-  if (mentionData.mention_types) {
-    delete mentionData.mention_types;
-  }
-  
-  // Collection data is not fetched due to RLS restrictions for anonymous users
-  // Set collection to null - it can be fetched separately if needed
-  mentionData.collection = null;
 
-  // Transform map relationship
-  if (mentionData.map && Array.isArray(mentionData.map)) {
-    mentionData.map = mentionData.map.length > 0 ? mentionData.map[0] : null;
-  } else if (!mentionData.map) {
-    mentionData.map = null;
+  // Page view count (detail page only); map view count is mentionData.view_count
+  const { data: pageViewCount } = await supabase.rpc('get_mention_page_view_count', {
+    p_mention_id: id,
+  }) as { data: number | null; error: unknown };
+  mentionData.pin_view_count = mentionData.view_count ?? 0;
+  mentionData.page_view_count = typeof pageViewCount === 'number' ? pageViewCount : 0;
+
+  // Ownership: compare auth user_id with the account's user_id (already fetched)
+  const accountUserId = mentionData.accounts?.user_id ?? null;
+  const isOwner = Boolean(user && accountUserId && user.id === accountUserId);
+
+  // Visibility gate
+  if (mentionData.visibility === 'only_me' && !isOwner) {
+    notFound();
   }
 
-  // Resolve tagged accounts
+  // Strip user_id from accounts before passing to client (not needed, avoid leaking)
+  if (mentionData.accounts) {
+    delete mentionData.accounts.user_id;
+  }
+
+  // Normalize mention_type (array → object if needed)
+  if (Array.isArray(mentionData.mention_type)) {
+    mentionData.mention_type = mentionData.mention_type[0] ?? null;
+  }
+
+  // Resolve tagged accounts (one extra query only if tags exist)
   const rawTagged = mentionData.tagged_account_ids;
   const taggedIdsList = Array.isArray(rawTagged)
-    ? (rawTagged as unknown[]).filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ? (rawTagged as unknown[]).filter((tid): tid is string => typeof tid === 'string' && tid.length > 0)
     : [];
-  let tagged_accounts: { id: string; username: string | null }[] | null = null;
   if (taggedIdsList.length > 0) {
     const { data: taggedRows } = await supabase
       .from('accounts')
       .select('id, username')
       .in('id', taggedIdsList);
-    tagged_accounts =
-      (taggedRows || []).map((r: { id: string; username: string | null }) => ({
-        id: r.id,
-        username: r.username ?? null,
-      })) as { id: string; username: string | null }[];
-    if (tagged_accounts.length === 0) tagged_accounts = null;
-  }
-  mentionData.tagged_accounts = tagged_accounts;
-  
-  // Debug: Log the transformed data
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[MentionPage] Transformed mention data:', {
-      id: mentionData.id,
-      mention_type: mentionData.mention_type,
-      collection: mentionData.collection,
-      has_mention_type: !!mentionData.mention_type,
-      has_collection: !!mentionData.collection,
-      tagged_accounts: mentionData.tagged_accounts?.length || 0,
-    });
+    mentionData.tagged_accounts = (taggedRows || []).length > 0 ? taggedRows : null;
+  } else {
+    mentionData.tagged_accounts = null;
   }
 
-  // Check if user is authenticated and owns this mention
-  const { data: { user } } = await supabase.auth.getUser();
-  let isOwner = false;
+  mentionData.collection = null;
+  mentionData.map = null;
 
-  if (user && mentionData.account_id) {
-    const { data: accountData } = await supabase
-      .from('accounts')
-      .select('user_id')
-      .eq('id', mentionData.account_id)
-      .single();
-
-    const accountInfo = accountData as { user_id: string } | null;
-    if (accountInfo?.user_id === user.id) {
-      isOwner = true;
-    }
-  }
-
-  // Check visibility
-  if (mentionData.visibility === 'only_me' && !isOwner) {
-    notFound();
-  }
-
-  // Check authentication - require sign-in for viewing mentions
   const isAuthenticated = Boolean(user);
 
   return (
@@ -223,7 +154,7 @@ export default async function MentionPage({ params }: Props) {
       leftSidebar={<LeftSidebar />}
       rightSidebar={<RightSidebar />}
     >
-      <div className="w-full py-6">
+      <div className="w-full max-w-[600px] mx-auto py-3 px-2">
         {isAuthenticated ? (
           <MentionDetailClient mention={mentionData as any} isOwner={isOwner} />
         ) : (

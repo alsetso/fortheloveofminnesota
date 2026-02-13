@@ -5,14 +5,13 @@ import { MapPinIcon, HeartIcon, UserPlusIcon, EyeIcon } from '@heroicons/react/2
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { MultiImageGrid, type MultiImage } from '@/components/shared/MultiImageGrid';
+import { type MultiImage, MultiImageGrid } from '@/components/shared/MultiImageGrid';
 
 interface MentionDetailGateProps {
   mention: {
     id: string;
     description: string | null;
     image_url: string | null;
-    image_urls?: string[] | null;
     accounts?: {
       username: string | null;
       first_name: string | null;
@@ -28,140 +27,110 @@ interface MentionDetailGateProps {
 export default function MentionDetailGate({ mention }: MentionDetailGateProps) {
   const { openWelcome } = useAppModalContextSafe();
   const accountName = mention.accounts?.first_name || mention.accounts?.username || 'Someone';
-  
-  // Truncate description to 10 characters with "..."
-  const previewDescription = mention.description 
+
+  const previewDescription = mention.description
     ? (mention.description.length > 10 ? `${mention.description.slice(0, 10)}...` : mention.description)
     : null;
 
+  // Build images
+  const images: MultiImage[] = [];
+  if (mention.image_url) {
+    images.push({ url: mention.image_url, alt: mention.description ?? undefined });
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Preview Section - Teaser Content */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-[600px] mx-auto px-4 py-6">
-          {/* Author Preview */}
-          {mention.accounts && (
-            <div className="flex items-center gap-2 mb-4">
-              {mention.accounts.image_url ? (
-                <Image
-                  src={mention.accounts.image_url}
-                  alt={accountName}
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded-full object-cover"
-                  unoptimized={mention.accounts.image_url.includes('supabase.co')}
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-600">
-                    {accountName.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-              )}
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">{accountName}</div>
-                {mention.accounts.username && (
-                  <Link
-                    href={`/${mention.accounts.username}`}
-                    className="text-xs text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                  >
-                    @{mention.accounts.username}
-                  </Link>
-                )}
-              </div>
-              {mention.mention_type && (
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-gray-50 border border-gray-200">
-                  <span className="text-sm">{mention.mention_type.emoji}</span>
-                  <span className="text-xs font-medium text-gray-700">{mention.mention_type.name}</span>
-                </div>
-              )}
+    <div className="space-y-3">
+      {/* ── Card: Author preview ── */}
+      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+        <div className="flex items-center gap-2">
+          {mention.accounts?.image_url ? (
+            <Image
+              src={mention.accounts.image_url}
+              alt={accountName}
+              width={28}
+              height={28}
+              className="w-7 h-7 rounded-full object-cover"
+              unoptimized={mention.accounts.image_url.includes('supabase.co')}
+            />
+          ) : (
+            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-medium text-gray-500">
+              {accountName.charAt(0).toUpperCase()}
             </div>
           )}
-
-          {/* Image Preview (blurred/teaser) - use MultiImageGrid for single or multiple images */}
-          {(() => {
-            // Build images array: use image_urls if available, otherwise fall back to image_url
-            const images: MultiImage[] = [];
-            
-            if (mention.image_urls && Array.isArray(mention.image_urls) && mention.image_urls.length > 0) {
-              // Multiple images from image_urls array
-              images.push(...mention.image_urls.map(url => ({ url, alt: mention.description ?? undefined })));
-            } else if (mention.image_url) {
-              // Single image from image_url
-              images.push({ url: mention.image_url, alt: mention.description ?? undefined });
-            }
-            
-            if (images.length > 0) {
-              return (
-                <div 
-                  className="mb-4 relative cursor-pointer"
-                  onClick={openWelcome}
-                >
-                  <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                    <div className="bg-white/90 backdrop-blur-sm rounded-md px-4 py-2 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-700">Sign in to view full images</p>
-                    </div>
-                  </div>
-                  <div className="opacity-30 blur-sm pointer-events-none">
-                    <MultiImageGrid
-                      images={images}
-                      postHref={`/mention/${mention.id}`}
-                      className="rounded-lg overflow-hidden"
-                    />
-                  </div>
-                </div>
-              );
-            }
-            return null;
-          })()}
-
-          {/* Description Preview */}
-          {previewDescription && (
-            <div className="mb-4">
-              <p className="text-sm text-gray-900 leading-relaxed">{previewDescription}</p>
-              {mention.description && mention.description.length > 10 && (
-                <button
-                  onClick={openWelcome}
-                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline mt-2 font-medium"
-                >
-                  Sign in to read more...
-                </button>
-              )}
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-gray-900 truncate">{accountName}</div>
+            {mention.accounts?.username && (
+              <Link
+                href={`/${mention.accounts.username}`}
+                className="text-[10px] text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                @{mention.accounts.username}
+              </Link>
+            )}
+          </div>
+          {mention.mention_type && (
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200 flex-shrink-0">
+              <span className="text-xs">{mention.mention_type.emoji}</span>
+              <span className="text-[10px] font-medium text-gray-600">{mention.mention_type.name}</span>
             </div>
           )}
-
-          {/* Loading Skeletons for Hidden Data */}
-          <div className="mb-4 space-y-2">
-            {/* Location skeleton */}
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 w-32 bg-gray-200 rounded animate-pulse" />
-            </div>
-            {/* Coordinates skeleton */}
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-200 rounded animate-pulse" />
-              <div className="h-4 w-40 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-
-          {/* Meta info skeleton */}
-          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200">
-            <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
-            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
-            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-          </div>
         </div>
       </div>
 
-      {/* Sign In Gate */}
+      {/* ── Card: Content teaser ── */}
+      <div className="bg-white border border-gray-200 rounded-md overflow-hidden">
+        {images.length > 0 && (
+          <div className="relative cursor-pointer" onClick={openWelcome}>
+            <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+              <div className="bg-white/90 backdrop-blur-sm rounded-md px-3 py-1.5 border border-gray-200">
+                <p className="text-[10px] font-medium text-gray-700">Sign in to view full images</p>
+              </div>
+            </div>
+            <div className="opacity-30 blur-sm pointer-events-none">
+              <MultiImageGrid
+                images={images}
+                postHref={`/mention/${mention.id}`}
+                className="rounded-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {previewDescription && (
+          <div className="p-[10px]">
+            <p className="text-xs text-gray-900 leading-relaxed">{previewDescription}</p>
+            {mention.description && mention.description.length > 10 && (
+              <button onClick={openWelcome} className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline mt-1 font-medium">
+                Sign in to read more...
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Skeletons for hidden data ── */}
+      <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-200 rounded animate-pulse" /><div className="h-3 w-28 bg-gray-200 rounded animate-pulse" /></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-200 rounded animate-pulse" /><div className="h-3 w-36 bg-gray-200 rounded animate-pulse" /></div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-md p-[10px]">
+        <div className="flex items-center gap-3">
+          <div className="h-3 w-14 bg-gray-200 rounded animate-pulse" />
+          <div className="h-3 w-18 bg-gray-200 rounded animate-pulse" />
+          <div className="h-3 w-20 bg-gray-200 rounded animate-pulse" />
+        </div>
+      </div>
+
+      {/* ── Sign In Gate ── */}
       <SignInGate
         title="Sign in to view this mention"
         description={`See what ${accountName} shared and join thousands of Minnesotans exploring their state.`}
         features={[
-          { icon: <EyeIcon className="w-5 h-5" />, text: 'View full mentions and images' },
-          { icon: <HeartIcon className="w-5 h-5" />, text: 'Like and interact with posts' },
-          { icon: <MapPinIcon className="w-5 h-5" />, text: 'Explore the live map' },
-          { icon: <UserPlusIcon className="w-5 h-5" />, text: 'Connect with the community' },
+          { icon: <EyeIcon className="w-4 h-4" />, text: 'View full mentions and images' },
+          { icon: <HeartIcon className="w-4 h-4" />, text: 'Like and interact with posts' },
+          { icon: <MapPinIcon className="w-4 h-4" />, text: 'Explore the live map' },
+          { icon: <UserPlusIcon className="w-4 h-4" />, text: 'Connect with the community' },
         ]}
       />
     </div>

@@ -65,6 +65,7 @@ export async function GET(
       video_url: pin.video_url || null,
       account_id: pin.account_id || null,
       created_at: pin.created_at,
+      view_count: (pin as { view_count?: number }).view_count ?? null,
       account: accountRes.data || null,
       mention_type: typeRes.data || null,
     });

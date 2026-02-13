@@ -665,12 +665,16 @@ export default function LiveMap({ mapInstanceRef: externalMapInstanceRef, select
         const mapInstance = new mapbox.Map({
           container: mapContainer.current,
           style: MAP_CONFIG.STRATEGIC_STYLES.streets,
-          center: MAP_CONFIG.DEFAULT_CENTER, // Center of Minnesota
-          zoom: 7, // Zoomed out to show all of Minnesota
-          pitch: 60, // Start at 60 degrees
-          minZoom: MAP_CONFIG.MIN_ZOOM,
+          center: MAP_CONFIG.DEFAULT_CENTER,
+          zoom: 7,
+          pitch: 60,
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
-          preserveDrawingBuffer: true, // REQUIRED for canvas.toDataURL() screenshot capture
+          preserveDrawingBuffer: true,
+          maxBounds: [
+            [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+            [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+          ],
         });
 
         mapInstanceRef.current = mapInstance as MapboxMapInstance;

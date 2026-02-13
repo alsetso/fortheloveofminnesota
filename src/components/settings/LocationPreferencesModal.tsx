@@ -65,6 +65,11 @@ export default function LocationPreferencesModal({
           style: MAP_CONFIG.STRATEGIC_STYLES.streets,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: 8,
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
+          maxBounds: [
+            [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+            [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+          ],
         });
 
         map.on('load', () => {

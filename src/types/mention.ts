@@ -110,6 +110,8 @@ export interface MentionGeoJSONFeature {
     account_image_url: string | null;
     account_plan?: string | null; // Account plan for gold border on map pins
     account_username?: string | null; // Username for fast click reporting
+    mention_type_id?: string | null; // For category-specific map icons
+    mention_type_emoji?: string | null;
   };
 }
 

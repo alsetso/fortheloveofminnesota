@@ -447,6 +447,7 @@ export class MentionService {
   /**
    * Update an existing mention
    * User must own the mention
+   * Handles dual-write to maps.pins and public.map_pins atomically
    */
   static async updateMention(
     mentionId: string, 
@@ -457,6 +458,10 @@ export class MentionService {
       image_url?: string | null;
       video_url?: string | null;
       media_type?: 'image' | 'video' | 'none';
+      lat?: number;
+      lng?: number;
+      full_address?: string | null;
+      mention_type_id?: string | null;
     }
   ): Promise<Mention> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -471,33 +476,66 @@ export class MentionService {
     if (data.image_url !== undefined) updateData.image_url = data.image_url;
     if (data.video_url !== undefined) updateData.video_url = data.video_url;
     if (data.media_type !== undefined) updateData.media_type = data.media_type;
+    if (data.full_address !== undefined) updateData.full_address = data.full_address;
+    if (data.mention_type_id !== undefined) updateData.tag_id = data.mention_type_id;
     // Note: collection_id doesn't exist in maps.pins, so it's ignored
 
-    const { data: mention, error } = await supabase
-      .schema('maps')
-      .from('pins')
-      .update(updateData)
-      .eq('id', mentionId)
-      .eq('is_active', true)
-      .select()
-      .single();
+    // Update maps.pins — don't chain .select().single() because the SELECT RLS
+    // policy is stricter than the UPDATE policy and can return 0 rows even on success.
+    if (Object.keys(updateData).length > 0) {
+      const { error } = await supabase
+        .schema('maps')
+        .from('pins')
+        .update(updateData)
+        .eq('id', mentionId)
+        .eq('is_active', true);
 
-    if (error) {
-      console.error('[MentionService] Error updating mention:', error);
-      throw new Error(`Failed to update mention: ${error.message}`);
+      if (error) {
+        console.error('[MentionService] Error updating mention:', error);
+        throw new Error(`Failed to update mention: ${error.message}`);
+      }
     }
 
-    // Transform back to Mention format
-    const transformedMention = {
-      ...mention,
-      description: mention.body || null,
-      account_id: mention.author_account_id || null,
-      mention_type_id: mention.tag_id || null,
-      city_id: null,
-      collection_id: null,
-    };
+    // Update location via RPC if lat/lng changed (handles PostGIS geometry in maps.pins + lat/lng in map_pins)
+    if (data.lat !== undefined && data.lng !== undefined) {
+      const { error: locError } = await supabase.rpc('update_pin_location', {
+        p_pin_id: mentionId,
+        p_lat: data.lat,
+        p_lng: data.lng,
+        p_full_address: data.full_address ?? null,
+      });
+      if (locError) {
+        console.error('[MentionService] Error updating pin location:', locError);
+      }
+    }
 
-    return transformedMention as Mention;
+    // Keep public.map_pins in sync so mention page and map popups show correct updated_at
+    const publicUpdates: Record<string, unknown> = {};
+    if (data.description !== undefined) publicUpdates.description = data.description;
+    if (data.archived !== undefined) publicUpdates.archived = data.archived;
+    if (data.image_url !== undefined) publicUpdates.image_url = data.image_url;
+    if (data.video_url !== undefined) publicUpdates.video_url = data.video_url;
+    if (data.media_type !== undefined) publicUpdates.media_type = data.media_type;
+    if (data.mention_type_id !== undefined) publicUpdates.mention_type_id = data.mention_type_id;
+    if (data.full_address !== undefined) publicUpdates.full_address = data.full_address;
+    if (Object.keys(publicUpdates).length > 0) {
+      await supabase.from('map_pins').update(publicUpdates).eq('id', mentionId);
+    }
+
+    // Return a minimal Mention — callers that need fresh data should re-fetch
+    return {
+      id: mentionId,
+      map_id: '',
+      lat: data.lat ?? 0,
+      lng: data.lng ?? 0,
+      description: data.description ?? null,
+      account_id: null,
+      city_id: null,
+      collection_id: data.collection_id ?? null,
+      visibility: 'public' as const,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Mention;
   }
 
   /**
@@ -561,6 +599,8 @@ export class MentionService {
         account_image_url: (mention as any).accounts?.image_url || null,
         account_plan: (mention as any).accounts?.plan || null, // Include plan for gold border on map pins
         account_username: mention.account?.username || (mention as any).accounts?.username || null, // Include username for fast click reporting
+        mention_type_id: mention.mention_type?.id || null,
+        mention_type_emoji: mention.mention_type?.emoji || null,
       };
       
       // Include description if it exists

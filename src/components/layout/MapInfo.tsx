@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { MapIcon, XMarkIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { MapIcon, XMarkIcon, CameraIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { MentionService } from '@/features/mentions/services/mentionService';
@@ -51,6 +51,8 @@ interface MapInfoProps {
   onClose?: () => void;
   /** Called when mention is successfully created */
   onMentionCreated?: (mention: any) => void;
+  /** When true, show only location/coords and close; no create-pin form (e.g. on /maps). */
+  readOnly?: boolean;
 }
 
 function getMapMetaCardInfo(mapMeta: Record<string, any> | null | undefined): { emoji: string; name: string } | null {
@@ -144,7 +146,7 @@ export function MapInfoSkeleton({ onClose }: { onClose?: () => void }) {
   );
 }
 
-export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentionType, onClose, onMentionCreated }: MapInfoProps) {
+export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentionType, onClose, onMentionCreated, readOnly = false }: MapInfoProps) {
   const { user, account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const isAuthenticated = Boolean(account || activeAccountId);
@@ -160,6 +162,15 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
     mentionType?.id || null
   );
   const [showMentionTypeDropdown, setShowMentionTypeDropdown] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
+
+  const filteredMentionTypes = useMemo(() => {
+    const q = tagSearch.trim().toLowerCase();
+    if (!q) return mentionTypes;
+    return mentionTypes.filter(
+      (t) => t.name.toLowerCase().includes(q) || (t.emoji && t.emoji.toLowerCase().includes(q))
+    );
+  }, [mentionTypes, tagSearch]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mentionTypeDropdownRef = useRef<HTMLDivElement>(null);
   const lastSubmitTimeRef = useRef<number>(0);
@@ -207,6 +218,11 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
       setSelectedMentionTypeId(mentionType.id);
     }
   }, [mentionType]);
+
+  // Reset search when dropdown closes
+  useEffect(() => {
+    if (!showMentionTypeDropdown) setTagSearch('');
+  }, [showMentionTypeDropdown]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -453,7 +469,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
       )}
       
       {/* Image preview - full width with no outer padding */}
-      {imagePreview && (
+      {!readOnly && imagePreview && (
         <div className="relative -mx-[10px] w-[calc(100%+20px)]">
           <div className="relative w-full aspect-video overflow-hidden bg-surface-accent">
             <Image
@@ -475,7 +491,7 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
         </div>
       )}
 
-      {error && (
+      {!readOnly && error && (
         <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-md p-2">
           {error}
         </div>
@@ -498,133 +514,171 @@ export default function MapInfo({ location, emptyLabel, zoom, onAddToMap, mentio
           {lat.toFixed(5)}, {lng.toFixed(5)}
         </div>
         
-        {/* What's going on here textarea */}
-        <div>
-          <label htmlFor="map-info-description" className="sr-only">
-            What's going on here
-          </label>
-          <textarea
-            id="map-info-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="What's going on here"
-            rows={3}
-            className="w-full py-1.5 text-[20px] font-bold text-foreground placeholder-foreground-muted resize-none focus:outline-none"
-            style={{ paddingLeft: 0, paddingRight: 0 }}
-          />
-        </div>
-        
-        {/* Hidden file input for image upload */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleImageSelect}
-          className="hidden"
-          disabled={isUploadingImage}
-        />
-
-        <div className="flex items-center justify-between gap-2">
-          {/* Left side: Label and camera button */}
-          <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-            {/* Camera Icon Button - Upload image from device */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploadingImage}
-              className="flex-shrink-0 flex items-center justify-center h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Upload image"
-            >
-              <CameraIcon className="w-4 h-4" />
-            </button>
+        {!readOnly && (
+          <>
+            {/* What's going on here textarea */}
+            <div>
+              <label htmlFor="map-info-description" className="sr-only">
+                What's going on here
+              </label>
+              <textarea
+                id="map-info-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's going on here"
+                rows={3}
+                className="w-full py-1.5 text-[20px] font-bold text-foreground placeholder-foreground-muted resize-none focus:outline-none"
+                style={{ paddingLeft: 0, paddingRight: 0 }}
+              />
+            </div>
             
-            {/* Mention Type Selector */}
-            <div className="relative" ref={mentionTypeDropdownRef}>
-              {selectedMentionTypeId ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
-                    className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
-                    aria-label="Change mention type"
-                  >
-                    <span className="text-base">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.emoji}</span>
-                    <span className="truncate">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedMentionTypeId(null)}
-                    className="flex-shrink-0 h-8 w-8 flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors"
-                    aria-label="Remove mention type"
-                  >
-                    <XMarkIcon className="w-3 h-3" />
-                  </button>
-                </div>
-              ) : (
+            {/* Hidden file input for image upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+              disabled={isUploadingImage}
+            />
+
+            <div className="flex items-center justify-between gap-2">
+              {/* Left side: Label and camera button */}
+              <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                {/* Camera Icon Button - Upload image from device */}
                 <button
                   type="button"
-                  onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
-                  className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
-                  aria-label="Select mention type"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingImage}
+                  className="flex-shrink-0 flex items-center justify-center h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Upload image"
                 >
-                  <span className="text-xs">#</span>
-                  <span>Add tag</span>
+                  <CameraIcon className="w-4 h-4" />
                 </button>
-              )}
-              
-              {showMentionTypeDropdown && (
-                <div className="absolute left-0 top-full mt-1 z-50 bg-surface border border-border rounded-md shadow-lg max-h-[300px] overflow-y-auto min-w-[200px]">
-                  {loadingMentionTypes ? (
-                    <div className="px-3 py-2 text-xs text-foreground-muted">Loading...</div>
+                
+                {/* Mention Type Selector */}
+                <div className="relative" ref={mentionTypeDropdownRef}>
+                  {selectedMentionTypeId ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
+                        className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
+                        aria-label="Change mention type"
+                      >
+                        <span className="text-base">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.emoji}</span>
+                        <span className="truncate">{mentionTypes.find(t => t.id === selectedMentionTypeId)?.name}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMentionTypeId(null)}
+                        className="flex-shrink-0 h-8 w-8 flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors"
+                        aria-label="Remove mention type"
+                      >
+                        <XMarkIcon className="w-3 h-3" />
+                      </button>
+                    </div>
                   ) : (
-                    <div className="p-1">
-                      {mentionTypes.map((type) => (
-                        <button
-                          key={type.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedMentionTypeId(type.id);
-                            setShowMentionTypeDropdown(false);
-                          }}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left hover:bg-surface-accent rounded transition-colors"
-                        >
-                          <span className="text-base">{type.emoji}</span>
-                          <span className="text-foreground">{type.name}</span>
-                        </button>
-                      ))}
+                    <button
+                      type="button"
+                      onClick={() => setShowMentionTypeDropdown(!showMentionTypeDropdown)}
+                      className="flex-shrink-0 flex items-center gap-1.5 h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors"
+                      aria-label="Select mention type"
+                    >
+                      <span className="text-xs">#</span>
+                      <span>Add tag</span>
+                    </button>
+                  )}
+                  
+                  {showMentionTypeDropdown && (
+                    <div className="absolute left-0 top-full mt-1 z-50 bg-surface border border-border rounded-md shadow-lg min-w-[220px] overflow-hidden">
+                      <div className="p-1.5 border-b border-border">
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted" />
+                          <input
+                            type="text"
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            placeholder="Search tags…"
+                            className="w-full h-7 pl-7 pr-2 text-xs border border-border rounded bg-surface-accent text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-gray-300"
+                            aria-label="Search tags"
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[240px] overflow-y-auto p-1.5 scrollbar-hide">
+                        {loadingMentionTypes ? (
+                          <div className="px-3 py-2 text-xs text-foreground-muted">Loading…</div>
+                        ) : filteredMentionTypes.length === 0 ? (
+                          <div className="px-3 py-2 text-xs text-foreground-muted">
+                            {mentionTypes.length === 0 ? 'Loading…' : 'No tags match'}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {filteredMentionTypes.map((type) => (
+                              <button
+                                key={type.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedMentionTypeId(type.id);
+                                  setShowMentionTypeDropdown(false);
+                                }}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md border transition-colors ${
+                                  selectedMentionTypeId === type.id
+                                    ? 'border-lake-blue bg-lake-blue/15 text-lake-blue dark:bg-lake-blue/20 dark:border-lake-blue/50'
+                                    : 'border-gray-200 dark:border-white/10 bg-white dark:bg-surface hover:bg-gray-50 dark:hover:bg-surface-accent'
+                                }`}
+                              >
+                                <span className="text-base">{type.emoji}</span>
+                                <span className="text-foreground">{type.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+              
+              {/* Right side: Button */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {isAuthenticated ? onAddToMap ? (
+                  <button
+                    type="button"
+                    onClick={() => onAddToMap(location, selectedMentionTypeId ?? undefined)}
+                    disabled={isSubmitting}
+                    className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label={selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map'}
+                  >
+                    <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+                    {isSubmitting ? 'Adding...' : (selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map')}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || isUploadingImage || !selectedMentionTypeId || !description.trim()}
+                    className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label={selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map'}
+                  >
+                    <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+                    {isSubmitting ? 'Submitting...' : (selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map')}
+                  </button>
+                ) : !isAuthenticated && onAddToMap ? (
+                  <button
+                    type="button"
+                    onClick={openWelcome}
+                    className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                    aria-label="Sign in to add to map"
+                  >
+                    <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+                    Sign in to add to map
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
-          
-          {/* Right side: Button */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {isAuthenticated ? (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting || isUploadingImage || !selectedMentionTypeId || !description.trim()}
-                className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-foreground bg-surface border border-border rounded-md hover:bg-surface-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label={selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map'}
-              >
-                <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-                {isSubmitting ? 'Submitting...' : (selectedMentionTypeId ? `Add ${mentionTypes.find(t => t.id === selectedMentionTypeId)?.name} to map` : 'Add to map')}
-              </button>
-            ) : !isAuthenticated && onAddToMap ? (
-              <button
-                type="button"
-                onClick={openWelcome}
-                className="flex items-center justify-center gap-1.5 max-w-fit h-8 px-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
-                aria-label="Sign in to add to map"
-              >
-                <MapIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
-                Sign in to add to map
-              </button>
-            ) : null}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

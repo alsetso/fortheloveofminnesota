@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { MAP_CONFIG } from '@/features/map/config';
 
 interface MentionMapOverlayProps {
   isOpen: boolean;
@@ -40,6 +41,11 @@ export default function MentionMapOverlay({ isOpen, onClose, lat, lng }: Mention
       style: 'mapbox://styles/mapbox/streets-v12',
       center: [lng, lat],
       zoom: 14,
+      minZoom: MAP_CONFIG.MIN_ZOOM_MN,
+      maxBounds: [
+        [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+        [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+      ],
     });
 
     mapRef.current = map;

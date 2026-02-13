@@ -94,13 +94,14 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, onGeoloc
         };
         const style = getStyleUrl();
 
-        const center = restrictToMinnesota
-          ? (meta?.center || MAP_CONFIG.DEFAULT_CENTER)
-          : (meta?.center ?? MAP_CONFIG.DEFAULT_CENTER);
-        const zoom = restrictToMinnesota
-          ? (meta?.zoom ?? MAP_CONFIG.DEFAULT_ZOOM)
-          : (meta?.zoom ?? 4);
+        const center = meta?.center || MAP_CONFIG.DEFAULT_CENTER;
+        const zoom = meta?.zoom ?? (restrictToMinnesota ? MAP_CONFIG.DEFAULT_ZOOM : 7);
         const pitch = restrictToMinnesota ? (meta?.pitch ?? 60) : (meta?.pitch ?? 0);
+
+        // Always constrain to Minnesota region; tight bounds for restricted, padded for unrestricted
+        const bounds = restrictToMinnesota
+          ? MAP_CONFIG.MINNESOTA_BOUNDS
+          : MAP_CONFIG.MINNESOTA_VIEWPORT_BOUNDS;
 
         const mapInstance = new mapbox.Map({
           container: containerRef.current,
@@ -109,14 +110,12 @@ export function useMapboxMap({ mapStyle, containerRef, meta, onMapLoad, onGeoloc
           zoom,
           pitch,
           bearing: 0,
-          minZoom: restrictToMinnesota ? undefined : MAP_CONFIG.MIN_ZOOM,
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
-          ...(restrictToMinnesota && {
-            maxBounds: [
-              [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
-              [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
-            ],
-          }),
+          maxBounds: [
+            [bounds.west, bounds.south],
+            [bounds.east, bounds.north],
+          ],
         });
 
         mapInstanceRef.current = mapInstance as MapboxMapInstance;

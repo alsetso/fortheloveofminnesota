@@ -6,11 +6,14 @@ import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import ProfileLeftSidebar from '@/features/profiles/components/ProfileLeftSidebar';
 import ProfilePinsMap, { type LocationPopupState } from '@/features/profiles/components/ProfilePinsMap';
 import ProfileCardSlideDown from '@/features/profiles/components/ProfileCardSlideDown';
-import FinishPinModal from '@/components/modals/FinishPinModal';
 import { useProfileFollow } from '@/features/profiles/hooks/useProfileFollow';
 import { useAuthStateSafe } from '@/features/auth';
 import { useReverseGeocode } from '@/hooks/useReverseGeocode';
 import SignInGate from '@/components/auth/SignInGate';
+import FinishPinModal from '@/components/modals/FinishPinModal';
+import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
+import { useToastContext } from '@/features/ui/contexts/ToastContext';
+import { createToast } from '@/features/ui/services/toast';
 import type { ProfileAccount } from '@/types/profile';
 import type { ProfilePin } from '@/types/profile';
 import type { Collection } from '@/types/collection';
@@ -52,10 +55,9 @@ export default function ProfileViewContent({
     address: null,
     mapMeta: null,
   });
-  const [finishPinModalPin, setFinishPinModalPin] = useState<ProfilePin | null>(null);
-  const [finishPinModalAddress, setFinishPinModalAddress] = useState<string | null>(null);
 
   const { account: viewerAccount } = useAuthStateSafe();
+  const { addToast } = useToastContext();
   const { followSlot } = useProfileFollow(account.id, isOwnProfile, viewerAccount?.id);
   const { address: reverseGeocodeAddress } = useReverseGeocode(
     clickedCoordinates?.lat ?? null,
@@ -69,6 +71,10 @@ export default function ProfileViewContent({
   }, [locationPopup.isOpen, reverseGeocodeAddress]);
 
   const handleMapClickForPin = useCallback((coords: { lat: number; lng: number }) => {
+    if (!MinnesotaBoundsService.isWithinMinnesota(coords)) {
+      addToast(createToast('info', 'Pins can only be placed within Minnesota', { duration: 3000 }));
+      return;
+    }
     setClickedCoordinates(coords);
     setLocationPopup({
       isOpen: true,
@@ -77,31 +83,35 @@ export default function ProfileViewContent({
       address: null,
       mapMeta: null,
     });
-  }, []);
+  }, [addToast]);
 
   const handleLocationPopupClose = useCallback(() => {
     setLocationPopup((prev) => ({ ...prev, isOpen: false }));
     setClickedCoordinates(null);
   }, []);
 
-  const handleAddPin = useCallback(
-    async (coordinates: { lat: number; lng: number }, _mapMeta?: Record<string, unknown> | null, _mentionTypeId?: string | null) => {
-      const addressToUse = locationPopup.address;
-      const res = await fetch(`/api/accounts/${account.id}/pins`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: coordinates.lat, lng: coordinates.lng }),
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const { pin: createdPin } = await res.json();
-        handleLocationPopupClose();
-        setFinishPinModalAddress(addressToUse);
-        setFinishPinModalPin(createdPin);
-      }
-    },
-    [account.id, handleLocationPopupClose, locationPopup.address]
-  );
+  // Finish-pin modal state
+  const [finishPin, setFinishPin] = useState<ProfilePin | null>(null);
+  const [finishPinAddress, setFinishPinAddress] = useState<string | null>(null);
+
+  const handlePinCreated = useCallback((pin: ProfilePin) => {
+    handleLocationPopupClose();
+    // Open finish-pin modal so owner can add description, media, collection
+    setFinishPin(pin);
+    setFinishPinAddress(locationPopup.address);
+    router.refresh();
+  }, [handleLocationPopupClose, locationPopup.address, router]);
+
+  const handleFinishPinUpdated = useCallback((_updatedPin: ProfilePin) => {
+    setFinishPin(null);
+    setFinishPinAddress(null);
+    router.refresh();
+  }, [router]);
+
+  const handleFinishPinClose = useCallback(() => {
+    setFinishPin(null);
+    setFinishPinAddress(null);
+  }, []);
 
   const visiblePins = useMemo(
     () => (isOwnProfile ? pins : pins.filter((p) => p.visibility === 'public')),
@@ -145,7 +155,7 @@ export default function ProfileViewContent({
             onMapClickForPin={isProfileOwner ? handleMapClickForPin : undefined}
             locationPopup={locationPopup}
             onLocationPopupClose={handleLocationPopupClose}
-            onAddPin={isProfileOwner ? handleAddPin : undefined}
+            onPinCreated={isProfileOwner ? handlePinCreated : undefined}
             focusPin={focusedPin}
             focusTrigger={focusTrigger}
           />
@@ -169,19 +179,14 @@ export default function ProfileViewContent({
           )}
         </div>
       </div>
-
-      {finishPinModalPin && (
+      {finishPin && (
         <FinishPinModal
-          isOpen={!!finishPinModalPin}
-          onClose={() => {
-            setFinishPinModalPin(null);
-            setFinishPinModalAddress(null);
-            router.refresh();
-          }}
-          pin={finishPinModalPin}
+          isOpen
+          onClose={handleFinishPinClose}
+          pin={finishPin}
           accountId={account.id}
-          address={finishPinModalAddress}
-          onPinUpdated={() => router.refresh()}
+          address={finishPinAddress}
+          onPinUpdated={handleFinishPinUpdated}
           collections={collections}
         />
       )}

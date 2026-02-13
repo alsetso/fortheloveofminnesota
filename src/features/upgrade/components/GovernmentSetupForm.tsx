@@ -78,6 +78,7 @@ export default function GovernmentSetupForm({ onBack, onSubmit }: GovernmentSetu
           style: MAP_CONFIG.STRATEGIC_STYLES.streets,
           center: MAP_CONFIG.DEFAULT_CENTER,
           zoom: MAP_CONFIG.DEFAULT_ZOOM,
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],

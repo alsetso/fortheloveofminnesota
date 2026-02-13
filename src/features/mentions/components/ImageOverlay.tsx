@@ -102,12 +102,12 @@ export default function ImageOverlay({
         </div>
       )}
 
-      {/* Image Container */}
-      <div 
-        className="relative w-full h-full flex items-center justify-center p-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="relative max-w-full max-h-full">
+      {/* Image Container — clicking the image itself does nothing; clicking the padding area closes */}
+      <div className="relative w-full h-full flex items-center justify-center p-4">
+        <div
+          className="relative max-w-full max-h-full"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Image
             src={currentImage.url}
             alt={currentImage.alt || `Image ${currentIndex + 1}`}

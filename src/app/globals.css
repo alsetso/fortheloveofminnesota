@@ -433,6 +433,11 @@ body {
   z-index: 1000 !important;
 }
 
+/* Location-selection marker stays behind LocationPinPopup modal */
+.mapboxgl-marker:has(.map-location-marker-behind) {
+  z-index: 1 !important;
+}
+
 /* Ensure pin markers specifically are on top */
 .pin-marker {
   z-index: 1000 !important;
@@ -448,6 +453,28 @@ body {
 }
 
 /* Contain profile map mention popups within their container */
+.map-mention-popup .mapboxgl-popup-content {
+  padding: 0 !important;
+}
+.map-mention-popup .mapboxgl-popup-close-button {
+  color: white !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  margin-top: 8px !important;
+  margin-right: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.map-mention-popup .mapboxgl-popup-close-button:hover {
+  color: white !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+}
 .map-mention-popup {
   max-width: 100% !important;
 }

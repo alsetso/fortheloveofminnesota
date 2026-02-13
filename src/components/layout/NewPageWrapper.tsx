@@ -11,10 +11,8 @@ import {
   UserCircleIcon,
   ChartBarIcon,
   EllipsisHorizontalIcon,
-  BookmarkIcon,
-  ClockIcon,
-  DocumentTextIcon,
-  CameraIcon,
+  BuildingOfficeIcon,
+  NewspaperIcon,
   XMarkIcon,
   SunIcon,
   MoonIcon,
@@ -41,6 +39,8 @@ interface NewPageWrapperProps {
   headerContent?: ReactNode;
   /** When true, main content area does not scroll (e.g. profile map). Root uses h-screen; main uses overflow-hidden and flex so a single full-height child fills the area. */
   mainNoScroll?: boolean;
+  /** When true, hide right sidebar in main content area only (header unaffected). Center expands to fill available space. */
+  hideRightSidebar?: boolean;
 }
 
 /**
@@ -56,6 +56,7 @@ export default function NewPageWrapper({
   rightSidebar,
   headerContent,
   mainNoScroll = false,
+  hideRightSidebar = false,
 }: NewPageWrapperProps) {
   const pathname = usePathname();
   const { account } = useAuthStateSafe();
@@ -106,9 +107,10 @@ export default function NewPageWrapper({
   const minWidthForLeftOnly = LAYOUT_CONSTANTS.MIN_CENTER_WIDTH + LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH; // 656px
   const minWidthForBoth = LAYOUT_CONSTANTS.MIN_CENTER_WIDTH + LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH + LAYOUT_CONSTANTS.RIGHT_SIDEBAR_WIDTH; // 976px
 
-  // Determine what can fit
+  // Determine what can fit (header: viewport-only; main content: viewport + !hideRightSidebar)
   const effectiveCanShowLeftSidebar = leftSidebar && viewportWidth >= minWidthForLeftOnly;
-  const effectiveCanShowRightSidebar = rightSidebar && viewportWidth >= minWidthForBoth;
+  const headerCanShowRightSidebar = rightSidebar && viewportWidth >= minWidthForBoth;
+  const effectiveCanShowRightSidebar = headerCanShowRightSidebar && !hideRightSidebar;
 
   // Use constants for consistency
   const { LEFT_SIDEBAR_WIDTH, RIGHT_SIDEBAR_WIDTH, MIN_CENTER_WIDTH } = LAYOUT_CONSTANTS;
@@ -146,13 +148,13 @@ export default function NewPageWrapper({
     });
   }
 
-  // Additional navigation items for "More" menu (from LeftSidebar)
-  const moreNavItems: Array<{ label: string; icon: typeof BookmarkIcon; href?: string; onClick?: () => void }> = [
-    { label: 'Friends', icon: UsersIcon, href: '/friends' },
-    { label: 'Saved', icon: BookmarkIcon, href: '/saved' },
-    { label: 'Memories', icon: ClockIcon, href: '/memories' },
-    { label: 'Pages', icon: DocumentTextIcon, href: '/pages' },
-    { label: 'Stories', icon: CameraIcon, href: '/stories' },
+  // Additional navigation items for "More" menu (matches LeftSidebar)
+  const moreNavItems: Array<{ label: string; icon: typeof UserCircleIcon; href?: string; onClick?: () => void }> = [
+    { label: 'Documentation', icon: UserCircleIcon, href: '/docs' },
+    { label: 'Home', icon: HomeIcon, href: '/' },
+    { label: 'Explore', icon: MapIcon, href: '/explore' },
+    { label: 'Government', icon: BuildingOfficeIcon, href: '/gov' },
+    { label: 'News', icon: NewspaperIcon, href: '/news' },
   ];
 
   // Close menu when clicking outside
@@ -280,8 +282,8 @@ export default function NewPageWrapper({
           </nav>
           )}
 
-          {/* Right Column - w-80, aligns with right sidebar, shows when space allows */}
-          {effectiveCanShowRightSidebar && (
+          {/* Right Column - w-80, aligns with right sidebar, shows when space allows (viewport only) */}
+          {headerCanShowRightSidebar && (
             <div className="flex items-center justify-end w-80 flex-shrink-0 px-4 border-l border-border-muted dark:border-white/10">
             <div className="flex items-center gap-2">
               <button
@@ -329,8 +331,8 @@ export default function NewPageWrapper({
           </div>
           )}
 
-          {/* Mobile/Tablet Right: Messages + Notifications + Account (when right sidebar hidden) */}
-          {!effectiveCanShowRightSidebar && (
+          {/* Mobile/Tablet Right: Messages + Notifications + Account (when right header section hidden by viewport) */}
+          {!headerCanShowRightSidebar && (
             <div className="flex items-center gap-2 px-4">
             <button
               type="button"

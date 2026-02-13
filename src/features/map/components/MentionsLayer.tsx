@@ -273,19 +273,6 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
     if (!map || !mapLoaded) return;
     if (startPinsLoad === false) return;
 
-    // Clear cache when switching admin view (always clear to force fresh fetch)
-    liveMapMentionsCache = null;
-    if (typeof window !== 'undefined') {
-      try {
-        // Clear both old and new cache keys
-        sessionStorage.removeItem('live_map_pins_cache');
-        sessionStorage.removeItem('live_map_mentions_cache');
-        sessionStorage.removeItem('live_map_mentions_cache_admin');
-      } catch {
-        // ignore
-      }
-    }
-
     let mounted = true;
 
     const loadMentions = async (showLoading = false) => {
@@ -444,11 +431,10 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           }
           }
           
-          // 3) No valid cache, fetch from API
+          // 3) No valid cache, fetch from API (always fetch all pins; type filter applied client-side for graceful switching)
           if (mentions.length === 0) {
             try {
-              const typeQ = typeParam || typesParam ? `?${typesParam ? `types=${encodeURIComponent(typesParam)}` : typeParam ? `type=${encodeURIComponent(typeParam)}` : ''}` : '';
-              const response = await fetch(`${pinsUrl}${typeQ}`, { credentials: 'include' });
+              const response = await fetch(pinsUrl, { credentials: 'include' });
               if (response.ok) {
                 const data = await response.json();
                 // Support both "pins" (new) and "mentions" (backward compat) field names
@@ -658,11 +644,57 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           }
         }
 
-        // Load account images and fallback heart icon
-        // Optimized: Load fallback first, then add map layers, then lazy load account images
+        // Load category (mention_type) emoji icons, account images, and fallback heart icon
         const fallbackImageId = 'map-mention-heart-fallback';
         const accountImageIds = new Map<string, string>();
-        
+        const mentionTypeImageIds = new Map<string, string>();
+
+        // Helper: render emoji to 64x64 canvas for map pin icon
+        const renderEmojiToImageData = (emoji: string): ImageData | null => {
+          const size = 64;
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return null;
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#e5e7eb';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.font = '36px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(emoji, size / 2, size / 2);
+          return ctx.getImageData(0, 0, size, size);
+        };
+
+        // Load mention_type emoji icons (category-specific)
+        const uniqueMentionTypes = new Map<string, string>();
+        geoJSON.features.forEach((feature: any) => {
+          const typeId = feature.properties?.mention_type_id;
+          const emoji = feature.properties?.mention_type_emoji;
+          if (typeId && emoji && !uniqueMentionTypes.has(typeId)) {
+            uniqueMentionTypes.set(typeId, emoji);
+          }
+        });
+        for (const [typeId, emoji] of uniqueMentionTypes.entries()) {
+          const imageId = `map-mention-type-${typeId.replace(/[^a-zA-Z0-9-]/g, '_')}`;
+          if (!mapboxMap.hasImage(imageId)) {
+            const imageData = renderEmojiToImageData(emoji);
+            if (imageData) {
+              try {
+                mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
+              } catch (e: any) {
+                if (!e?.message?.includes('already exists')) console.warn('[MentionsLayer] Failed to add type icon:', typeId, e);
+              }
+            }
+          }
+          mentionTypeImageIds.set(typeId, imageId);
+        }
+
         // Load fallback heart icon (required before adding layers)
         if (!mapboxMap.hasImage(fallbackImageId)) {
           try {
@@ -863,36 +895,34 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         // Optimized: Load in smaller batches to prevent blocking
         await Promise.all(imageLoadPromises);
         
-        // Build case expression for icon selection (match by image URL and plan)
-        let iconExpression: any;
-        if (accountImageIds.size === 0) {
-          // No account images, just use fallback
-          iconExpression = fallbackImageId;
-        } else {
-          // Build case expression with conditions
-          iconExpression = ['case'];
-          accountImageIds.forEach((imageId, key) => {
+        // Build case expression: mention_type (category) first, then account image, then fallback
+        const iconExpressionParts: any[] = [];
+        mentionTypeImageIds.forEach((imageId, typeId) => {
+          iconExpressionParts.push(['==', ['get', 'mention_type_id'], typeId]);
+          iconExpressionParts.push(imageId);
+        });
+        accountImageIds.forEach((imageId, key) => {
             const [imageUrl, planType] = key.split('|');
             if (planType === 'contributor') {
               // Match contributor or plus accounts with this image URL
-              iconExpression.push([
+              iconExpressionParts.push([
                 'all',
                 ['==', ['get', 'account_image_url'], imageUrl],
                 ['in', ['get', 'account_plan'], ['literal', ['contributor', 'plus']]]
               ]);
-              iconExpression.push(imageId);
+              iconExpressionParts.push(imageId);
             } else {
               // Match regular accounts (plan is null or not contributor/plus) with this image URL
-              iconExpression.push([
+              iconExpressionParts.push([
                 'all',
                 ['==', ['get', 'account_image_url'], imageUrl],
                 ['!', ['in', ['get', 'account_plan'], ['literal', ['contributor', 'plus']]]]
               ]);
-              iconExpression.push(imageId);
+              iconExpressionParts.push(imageId);
             }
-          });
-          iconExpression.push(fallbackImageId); // Fallback to heart icon
-        }
+        });
+        const iconExpression: any =
+          iconExpressionParts.length === 0 ? fallbackImageId : ['case', ...iconExpressionParts, fallbackImageId];
 
         // Store layer data for re-adding after style changes (before adding layers)
         layersDataRef.current = {

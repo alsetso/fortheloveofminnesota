@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
+import { MinnesotaBoundsService } from '@/features/map/services/minnesotaBoundsService';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
 import { MagnifyingGlassIcon, XMarkIcon, MapPinIcon, ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 
@@ -157,6 +158,7 @@ export default function InlineMap({
   // Handle address selection
   const handleAddressSelect = useCallback((feature: any) => {
     const [lng, lat] = feature.center;
+    if (!MinnesotaBoundsService.isWithinMinnesota({ lat, lng })) return;
     setAddressSearch(feature.place_name);
     setShowSuggestions(false);
     onLocationSelect(lat, lng);
@@ -232,6 +234,7 @@ export default function InlineMap({
           style: MAP_CONFIG.STRATEGIC_STYLES.streets,
           center: lat && lng ? [parseFloat(lng), parseFloat(lat)] : MAP_CONFIG.DEFAULT_CENTER,
           zoom: zoomLevel,
+          minZoom: MAP_CONFIG.MIN_ZOOM_MN,
           maxZoom: MAP_CONFIG.MAX_ZOOM,
           maxBounds: [
             [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
@@ -346,6 +349,7 @@ export default function InlineMap({
           if (!mounted) return;
           try {
             const { lng: clickedLng, lat: clickedLat } = e.lngLat;
+            if (!MinnesotaBoundsService.isWithinMinnesota({ lat: clickedLat, lng: clickedLng })) return;
             onLocationSelect(clickedLat, clickedLng);
             updateMarker(clickedLng, clickedLat);
           } catch (err) {

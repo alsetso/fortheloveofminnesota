@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { withSecurity } from '@/lib/security/middleware';
+import { MAP_CONFIG } from '@/features/map/config';
 
 /**
  * GET /api/accounts/[id]/pins
@@ -84,6 +85,10 @@ export async function POST(
       const lng = typeof body.lng === 'number' ? body.lng : parseFloat(String(body.lng ?? ''));
       if (Number.isNaN(lat) || Number.isNaN(lng)) {
         return NextResponse.json({ error: 'lat and lng are required numbers' }, { status: 400 });
+      }
+      const { north, south, east, west } = MAP_CONFIG.MINNESOTA_BOUNDS;
+      if (lat < south || lat > north || lng < west || lng > east) {
+        return NextResponse.json({ error: 'Location must be within Minnesota' }, { status: 400 });
       }
       const row = {
         account_id: id,

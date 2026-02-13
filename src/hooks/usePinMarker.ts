@@ -8,13 +8,16 @@ interface UsePinMarkerOptions {
   coordinates: { lat: number; lng: number } | null;
   color?: PinColor;
   enabled?: boolean;
+  /** When true, marker uses lower z-index so it stays behind modals (e.g. location-selected popup). */
+  behindModal?: boolean;
 }
 
 export function usePinMarker({ 
   map, 
   coordinates, 
   color = 'white',
-  enabled = true 
+  enabled = true,
+  behindModal = false,
 }: UsePinMarkerOptions) {
   const markerRef = useRef<any>(null);
   const mapboxRef = useRef<any>(null);
@@ -52,8 +55,8 @@ export function usePinMarker({
 
         // Create marker element
         const el = document.createElement('div');
-        el.className = 'map-click-pin-marker';
-        
+        el.className = 'map-click-pin-marker' + (behindModal ? ' map-location-marker-behind' : '');
+
         const isRed = color === 'red';
         const bgColor = isRed ? '#ef4444' : '#ffffff';
         const borderColor = isRed ? '#ef4444' : 'rgba(0, 0, 0, 0.2)';
@@ -103,8 +106,8 @@ export function usePinMarker({
         `;
         el.appendChild(dot);
 
-        // Create marker
-        // Use 'bottom' anchor so marker sits above click point, avoiding footer/UI overlays
+        // Create marker (behindModal adds class for CSS to lower z-index via :has())
+        // Use 'bottom' anchor so marker sits above click point
         const marker = new mapbox.Marker({
           element: el,
           anchor: 'bottom',
@@ -130,7 +133,7 @@ export function usePinMarker({
         markerRef.current = null;
       }
     };
-  }, [map, coordinates, color, enabled]);
+  }, [map, coordinates, color, enabled, behindModal]);
 
   return {
     remove: () => {

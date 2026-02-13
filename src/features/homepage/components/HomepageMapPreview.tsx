@@ -54,20 +54,18 @@ export default function HomepageMapPreview() {
 
     mapboxgl.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
 
-    // Minnesota bounds
-    const minnesotaBounds = [
-      [-97.5, 43.5], // Southwest corner
-      [-89.5, 49.5], // Northeast corner
-    ] as [[number, number], [number, number]];
-
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: MAP_CONFIG.MAPBOX_STYLE,
-      center: [-93.273945, 45.045283], // Minnesota center
+      center: MAP_CONFIG.DEFAULT_CENTER,
       zoom: 7,
       interactive: true,
       attributionControl: false,
-      maxBounds: minnesotaBounds, // Constrain to Minnesota
+      minZoom: MAP_CONFIG.MIN_ZOOM_MN,
+      maxBounds: [
+        [MAP_CONFIG.MINNESOTA_BOUNDS.west, MAP_CONFIG.MINNESOTA_BOUNDS.south],
+        [MAP_CONFIG.MINNESOTA_BOUNDS.east, MAP_CONFIG.MINNESOTA_BOUNDS.north],
+      ],
     });
 
     map.current.on('load', () => {

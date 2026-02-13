@@ -67,16 +67,16 @@ export async function POST(request: NextRequest) {
         // Use accountId from security middleware context if available
         const finalAccountId = accountId || null;
 
-        // Record mention view using record_url_visit function
+        // Record mention view using record_url_visit function (server increments view_count)
         // Convert mention ID to URL format: /map?pin={mention_id}
         const mentionUrl = `/map?pin=${pin_id}`;
-        const { data, error } = await supabase.rpc('record_url_visit', {
+        const { error } = await supabase.rpc('record_url_visit', {
           p_url: mentionUrl,
           p_account_id: finalAccountId,
           p_user_agent: user_agent || null,
           p_referrer_url: referrer_url || null,
           p_session_id: session_id || null,
-        } as any) as { data: string | null; error: any };
+        } as any) as { error: any };
 
         if (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -88,9 +88,18 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        return NextResponse.json({ 
+        // Return current view_count from map_pins (after increment)
+        const { data: pinRow } = await supabase
+          .from('map_pins')
+          .select('view_count')
+          .eq('id', pin_id)
+          .single();
+
+        const viewCount = pinRow?.view_count ?? 0;
+
+        return NextResponse.json({
           success: true,
-          view_id: data 
+          view_count: viewCount,
         });
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {

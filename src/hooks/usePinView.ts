@@ -12,12 +12,12 @@ interface UsePinViewOptions {
  * Tracks views via URL format: /map?pin={mention_id}
  */
 export function usePinView({ pin_id, enabled = true }: UsePinViewOptions) {
-  const hasTracked = useRef(false);
+  const lastTrackedPinId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || hasTracked.current || !pin_id) return;
-
-    hasTracked.current = true;
+    if (!enabled || !pin_id) return;
+    if (lastTrackedPinId.current === pin_id) return;
+    lastTrackedPinId.current = pin_id;
 
     // Get additional metadata
     const referrer = typeof document !== 'undefined' ? document.referrer : null;

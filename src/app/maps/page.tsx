@@ -245,7 +245,7 @@ function MapsPageContent() {
   return (
     <>
       <PageViewTracker />
-      <NewPageWrapper leftSidebar={<LeftSidebar />} rightSidebar={<RightSidebar />} hideRightSidebar>
+      <NewPageWrapper leftSidebar={<LeftSidebar />} rightSidebar={<RightSidebar />}>
         <div className="relative w-full h-[calc(100vh-3.5rem)] overflow-hidden">
           <PublicMapView
             pins={liveData.pins}

@@ -18,15 +18,14 @@ import {
   UsersIcon,
   IdentificationIcon,
   ChartBarIcon,
-  ArrowRightOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
   AtSymbolIcon,
+  ServerStackIcon,
+  CircleStackIcon,
 } from '@heroicons/react/24/outline';
 import { useSettings } from '@/features/settings/contexts/SettingsContext';
-import { useAuth } from '@/features/auth';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { getDisplayName } from '@/types/profile';
+import SignOutButton from '@/components/settings/SignOutButton';
 
 /**
  * Left Sidebar for Settings page
@@ -35,35 +34,18 @@ import { getDisplayName } from '@/types/profile';
 export default function SettingsLeftSidebar() {
   const pathname = usePathname();
   const { account, userEmail } = useSettings();
-  const { signOut } = useAuth();
-  const router = useRouter();
   const isAdmin = account?.role === 'admin';
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   
   const displayName = getDisplayName(account);
   const subtitle = account.username ? `@${account.username}` : userEmail || '';
   const profileUrl = account.username ? `/${encodeURIComponent(account.username)}` : null;
 
-  const handleSignOutClick = () => setShowSignOutConfirm(true);
-
-  const handleSignOutConfirm = async () => {
-    setIsSigningOut(true);
-    try {
-      await signOut();
-      localStorage.removeItem('freemap_sessions');
-      localStorage.removeItem('freemap_current_session');
-      router.replace('/');
-    } catch (error) {
-      console.error('Sign out error:', error);
-    } finally {
-      setIsSigningOut(false);
-      setShowSignOutConfirm(false);
-    }
-  };
-
   const adminNavItems = isAdmin
-    ? [{ label: 'Accounts', href: '/settings/accounts', Icon: UsersIcon }]
+    ? [
+        { label: 'Accounts', href: '/settings/accounts', Icon: UsersIcon },
+        { label: 'Systems', href: '/settings/systems', Icon: ServerStackIcon },
+        { label: 'Data Explorer', href: '/settings/data', Icon: CircleStackIcon },
+      ]
     : [];
 
   const generalNavItems = [
@@ -234,47 +216,8 @@ export default function SettingsLeftSidebar() {
 
       {/* Sign Out */}
       <div className="mt-auto p-3 border-t border-border-muted dark:border-white/10">
-        <button
-          onClick={handleSignOutClick}
-          disabled={isSigningOut}
-          className="w-full flex items-center gap-3 px-2 py-2 text-sm rounded-md text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/10 hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ArrowRightOnRectangleIcon className="w-5 h-5 text-red-400" />
-          <span className="flex-1 text-left">{isSigningOut ? 'Signing out...' : 'Sign Out'}</span>
-        </button>
+        <SignOutButton />
       </div>
-
-      {/* Sign Out Confirmation Modal */}
-      {showSignOutConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => e.target === e.currentTarget && setShowSignOutConfirm(false)}
-        >
-          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-4 max-w-sm w-full mx-4">
-            <h3 className="text-sm font-semibold text-foreground mb-2">Sign out of your account?</h3>
-            <p className="text-xs text-foreground-muted mb-4">
-              You'll need to sign in again to access your account.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowSignOutConfirm(false)}
-                className="flex-1 px-3 py-2 text-xs font-medium text-foreground-muted bg-surface-accent rounded-md hover:bg-surface-accent/80 dark:hover:bg-white/10 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSignOutConfirm}
-                disabled={isSigningOut}
-                className="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

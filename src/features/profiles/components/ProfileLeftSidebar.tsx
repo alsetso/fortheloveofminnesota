@@ -260,11 +260,7 @@ export default function ProfileLeftSidebar({
             </Link>
           )}
         </div>
-        {pins.length === 0 ? (
-          <p className="text-[10px] text-foreground-muted px-1 mb-2">
-            No pins yet. Add pins from the live map, then assign visibility and collection here.
-          </p>
-        ) : (
+        {pins.length === 0 ? null : (
           <div className="space-y-1.5">
             {pins.map((pin) => {
               const isUpdating = updatingPinId === pin.id;

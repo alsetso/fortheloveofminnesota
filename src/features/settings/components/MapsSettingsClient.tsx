@@ -198,7 +198,7 @@ export default function MapsSettingsClient() {
         <span className="text-xs font-medium text-foreground/70">Create new map</span>
       </button>
 
-      {/* Maps you own - Grey container with "Create Custom Maps On February 15th" */}
+      {/* Maps you own */}
       <div className="bg-surface-accent border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
         <h3 className="text-sm font-semibold text-foreground px-[10px] py-3 border-b border-border-muted dark:border-white/10">
           Maps you own
@@ -207,10 +207,6 @@ export default function MapsSettingsClient() {
           <div className="px-[10px] py-4 text-xs text-foreground/60">Loading...</div>
         ) : (
           <div className="px-[10px] py-4">
-            {/* Always show "Create Custom Maps On February 15th" message */}
-            <div className="mb-3 text-center pb-3 border-b border-border-muted dark:border-white/10">
-              <p className="text-xs font-medium text-foreground">Create Custom Maps On February 15th</p>
-            </div>
             {ownedMaps.length === 0 ? (
               <div className="text-center py-2">
                 <p className="text-xs text-foreground/70">No maps yet.</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useState, useEffect, useRef } from 'react';
+import { ReactNode, useState, useEffect, useRef, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -24,13 +24,33 @@ import {
   UserCircleIcon as UserCircleIconSolid,
   ChartBarIcon as ChartBarIconSolid,
 } from '@heroicons/react/24/solid';
-import { HeartIcon } from '@heroicons/react/24/solid';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { useAuthStateSafe } from '@/features/auth';
 import MessagesDropdown from './MessagesDropdown';
 import NotificationsDropdown from './NotificationsDropdown';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import { useTheme } from '@/contexts/ThemeContext';
+
+/** Known top-level app route segments. Anything at the root not in this set is treated as a /:username route. */
+const KNOWN_APP_ROUTES = new Set([
+  'feed', 'maps', 'map', 'people', 'analytics', 'settings', 'admin',
+  'explore', 'gov', 'news', 'docs', 'mention', 'page', 'pages',
+  'messages', 'search', 'collections', 'saved', 'memories', 'friends',
+  'stories', 'billing', 'plans', 'onboarding', 'signup', 'login',
+  'terms', 'post', 'marketplace', 'ad_center', 'contact', 'download',
+  'privacy', 'not-found',
+]);
+
+/** Routes where the right sidebar should be suppressed in the main content area. */
+function shouldHideRightSidebar(pathname: string | null): boolean {
+  if (!pathname) return false;
+  // Exact or prefix match on explicit routes
+  if (pathname === '/maps' || pathname.startsWith('/maps/')) return true;
+  // Username routes: single root segment not matching a known app route
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length >= 1 && !KNOWN_APP_ROUTES.has(segments[0])) return true;
+  return false;
+}
 
 interface NewPageWrapperProps {
   children: ReactNode;
@@ -39,8 +59,6 @@ interface NewPageWrapperProps {
   headerContent?: ReactNode;
   /** When true, main content area does not scroll (e.g. profile map). Root uses h-screen; main uses overflow-hidden and flex so a single full-height child fills the area. */
   mainNoScroll?: boolean;
-  /** When true, hide right sidebar in main content area only (header unaffected). Center expands to fill available space. */
-  hideRightSidebar?: boolean;
 }
 
 /**
@@ -56,9 +74,9 @@ export default function NewPageWrapper({
   rightSidebar,
   headerContent,
   mainNoScroll = false,
-  hideRightSidebar = false,
 }: NewPageWrapperProps) {
   const pathname = usePathname();
+  const hideRightSidebar = useMemo(() => shouldHideRightSidebar(pathname), [pathname]);
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const { theme, toggleTheme } = useTheme();
@@ -175,7 +193,13 @@ export default function NewPageWrapper({
   }, [isMoreMenuOpen]);
 
   return (
-    <div className={mainNoScroll ? 'h-screen flex flex-col bg-surface-muted overflow-hidden' : 'min-h-screen flex flex-col bg-surface-muted'}>
+    <div
+      className={
+        mainNoScroll
+          ? 'h-screen flex flex-col bg-surface-muted overflow-hidden'
+          : 'h-screen flex flex-col bg-surface-muted overflow-hidden min-h-0'
+      }
+    >
       {/* Fixed Header - z-50, pt-14 offset for content */}
       {/* Three-column layout matching sidebars: w-64 (lg:), flex-1 (center), w-80 (xl:) */}
       <header className="fixed top-0 left-0 right-0 z-50 h-14 bg-header border-b border-border-muted dark:border-white/10">
@@ -185,7 +209,14 @@ export default function NewPageWrapper({
             <div className="flex items-center w-64 flex-shrink-0 px-4 border-r border-border-muted dark:border-white/10">
             <div className="flex items-center gap-3 min-w-0 w-full">
               <Link href="/feed" className="flex-shrink-0 hover:opacity-80 transition-opacity flex items-center justify-center">
-                <HeartIcon className="w-8 h-8 text-red-500 dark:hidden" aria-hidden />
+                <Image
+                  src="/logo.png"
+                  alt="Love of Minnesota"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8 dark:hidden"
+                  priority
+                />
                 <Image
                   src="/white-logo.png"
                   alt="Love of Minnesota"
@@ -215,7 +246,14 @@ export default function NewPageWrapper({
           {!effectiveCanShowLeftSidebar && (
             <div className="flex items-center gap-3 px-4 flex-1 min-w-0">
             <Link href="/feed" className="flex-shrink-0 hover:opacity-80 transition-opacity flex items-center justify-center">
-              <HeartIcon className="w-8 h-8 text-red-500 dark:hidden" aria-hidden />
+              <Image
+                src="/logo.png"
+                alt="Love of Minnesota"
+                width={32}
+                height={32}
+                className="w-8 h-8 dark:hidden"
+                priority
+              />
               <Image
                 src="/white-logo.png"
                 alt="Love of Minnesota"
@@ -394,10 +432,13 @@ export default function NewPageWrapper({
           </aside>
         )}
 
-        {/* Center: scrollable feed (default) or no-scroll fill (mainNoScroll) */}
+        {/* Center: single scroll container when !mainNoScroll. Content should flow naturally (no nested overflow-y-auto). */}
         <main 
           className={`flex-1 min-w-0 min-h-0 transition-all duration-200 ease-out ${mainNoScroll ? 'overflow-hidden flex flex-col bg-surface-muted' : 'overflow-y-auto bg-surface-muted scrollbar-hide'}`}
-          style={{ minWidth: `${MIN_CENTER_WIDTH}px` }}
+          style={{
+            minWidth: `${MIN_CENTER_WIDTH}px`,
+            ...(mainNoScroll ? {} : { scrollbarWidth: 'none', msOverflowStyle: 'none' }),
+          }}
           role="main"
         >
           {children}

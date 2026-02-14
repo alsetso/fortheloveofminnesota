@@ -15,7 +15,7 @@ export async function GET(
     async (req) => {
       try {
         const { id } = await params;
-        const supabase = createServerClient();
+        const supabase = await createServerClient();
 
         const { data: account, error } = await supabase
           .from('accounts')

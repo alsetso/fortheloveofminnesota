@@ -5,7 +5,7 @@ import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface UseMapboxMapOptions {
   mapStyle: 'street' | 'satellite' | 'light' | 'dark';
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
   meta?: {
     buildingsEnabled?: boolean;
     pitch?: number;

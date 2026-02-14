@@ -507,74 +507,39 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
         // Cast to actual Mapbox Map type for methods not in interface
         const mapboxMap = map as any;
 
-        // Check if source already exists - if so, just update the data
+        // If source already exists, update data and remove point layers so we re-add them with current icon size/images
+        let sourceAlreadyExists = false;
         try {
           const existingSource = map.getSource(sourceId);
           if (existingSource && existingSource.type === 'geojson') {
-            // Update existing source data (no flash)
-            existingSource.setData(geoJSON);
-            isAddingLayersRef.current = false;
-            return;
+            (existingSource as any).setData(geoJSON);
+            sourceAlreadyExists = true;
+            // Remove point layers so they are re-added with current style (e.g. smaller 48px icons)
+            try {
+              if (mapboxMap.getLayer(pointLabelLayerId)) mapboxMap.removeLayer(pointLabelLayerId);
+              if (mapboxMap.getLayer(pointLayerId)) mapboxMap.removeLayer(pointLayerId);
+            } catch {
+              // ignore
+            }
           }
         } catch (e) {
-          // Source check failed - map may be in invalid state, continue with adding source
           if (process.env.NODE_ENV === 'development') {
             console.warn('[MentionsLayer] Error checking existing source:', e);
           }
         }
 
-        // Source doesn't exist - need to add source and layers
-        // First, clean up any existing layers (shouldn't exist if source doesn't, but be safe)
-        // IMPORTANT: Remove layers BEFORE removing source to avoid "source not found" errors
-        try {
-          // Remove layers first (cluster count, cluster circle, then point/label)
-          if (mapboxMap.getLayer(clusterCountLayerId)) {
-            try {
-              mapboxMap.removeLayer(clusterCountLayerId);
-            } catch (e) {
-              // Layer may already be removed or source missing - ignore
-            }
+        if (!sourceAlreadyExists) {
+          // Remove all layers and source, then add source
+          try {
+            if (mapboxMap.getLayer(clusterCountLayerId)) mapboxMap.removeLayer(clusterCountLayerId);
+            if (mapboxMap.getLayer(clusterCircleLayerId)) mapboxMap.removeLayer(clusterCircleLayerId);
+            if (mapboxMap.getLayer(pointLabelLayerId)) mapboxMap.removeLayer(pointLabelLayerId);
+            if (mapboxMap.getLayer(pointLayerId)) mapboxMap.removeLayer(pointLayerId);
+            if (mapboxMap.getSource(sourceId)) mapboxMap.removeSource(sourceId);
+          } catch (e) {
+            if (process.env.NODE_ENV === 'development') console.warn('[MentionsLayer] Error during cleanup:', e);
           }
-          if (mapboxMap.getLayer(clusterCircleLayerId)) {
-            try {
-              mapboxMap.removeLayer(clusterCircleLayerId);
-            } catch (e) {
-              // Layer may already be removed or source missing - ignore
-            }
-          }
-          if (mapboxMap.getLayer(pointLabelLayerId)) {
-            try {
-              mapboxMap.removeLayer(pointLabelLayerId);
-            } catch (e) {
-              // Layer may already be removed or source missing - ignore
-            }
-          }
-          if (mapboxMap.getLayer(pointLayerId)) {
-            try {
-              mapboxMap.removeLayer(pointLayerId);
-            } catch (e) {
-              // Layer may already be removed or source missing - ignore
-            }
-          }
-          // Then remove source (only if it exists)
-          if (mapboxMap.getSource(sourceId)) {
-            try {
-              mapboxMap.removeSource(sourceId);
-            } catch (e) {
-              // Source may already be removed - ignore
-            }
-          }
-        } catch (e) {
-          // Source or layers may already be removed (e.g., during style change)
-          // This is expected and safe to ignore
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('[MentionsLayer] Error during cleanup:', e);
-          }
-        }
-
-        // Add source: clustering when clusterPins true, else all pins as points
-        try {
-          if (!mapboxMap.getSource(sourceId)) {
+          try {
             mapboxMap.addSource(sourceId, {
               type: 'geojson',
               data: geoJSON,
@@ -582,16 +547,11 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
                 ? { cluster: true, clusterMaxZoom, clusterRadius: 40 }
                 : { cluster: false }),
             });
-          } else {
-            const existingSource = mapboxMap.getSource(sourceId) as any;
-            if (existingSource && existingSource.setData) {
-              existingSource.setData(geoJSON);
-            }
+          } catch (e) {
+            console.error('[MentionsLayer] Error adding source:', e);
+            isAddingLayersRef.current = false;
+            return;
           }
-        } catch (e) {
-          console.error('[MentionsLayer] Error adding/updating source:', e);
-          isAddingLayersRef.current = false;
-          return;
         }
 
         if (clusterPins) {
@@ -644,34 +604,29 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           }
         }
 
-        // Load category (mention_type) emoji icons, account images, and fallback heart icon
+        // Pins use only mention_type emoji — raw emoji, no background
+        const PIN_ICON_SIZE = 40;
+        const EMOJI_FONT_SIZE = 30;
         const fallbackImageId = 'map-mention-heart-fallback';
-        const accountImageIds = new Map<string, string>();
         const mentionTypeImageIds = new Map<string, string>();
 
-        // Helper: render emoji to 64x64 canvas for map pin icon
+        // Helper: render emoji to canvas (transparent background, emoji only)
         const renderEmojiToImageData = (emoji: string): ImageData | null => {
-          const size = 64;
+          const size = PIN_ICON_SIZE;
           const canvas = document.createElement('canvas');
           canvas.width = size;
           canvas.height = size;
           const ctx = canvas.getContext('2d');
           if (!ctx) return null;
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#e5e7eb';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          ctx.font = '36px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+          ctx.clearRect(0, 0, size, size);
+          ctx.font = `${EMOJI_FONT_SIZE}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(emoji, size / 2, size / 2);
+          ctx.fillText(emoji, size / 2, size / 2 + size * 0.03);
           return ctx.getImageData(0, 0, size, size);
         };
 
-        // Load mention_type emoji icons (category-specific)
+        // Load mention_type emoji icons only
         const uniqueMentionTypes = new Map<string, string>();
         geoJSON.features.forEach((feature: any) => {
           const typeId = feature.properties?.mention_type_id;
@@ -695,39 +650,33 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           mentionTypeImageIds.set(typeId, imageId);
         }
 
-        // Load fallback heart icon (required before adding layers)
+        // Load fallback heart icon (same size as emoji pins)
         if (!mapboxMap.hasImage(fallbackImageId)) {
           try {
             const img = new Image();
             img.crossOrigin = 'anonymous';
-            
+
             await new Promise((resolve, reject) => {
               img.onload = resolve;
               img.onerror = reject;
               img.src = '/heart.png';
             });
-            
+
             const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
+            canvas.width = PIN_ICON_SIZE;
+            canvas.height = PIN_ICON_SIZE;
             const ctx = canvas.getContext('2d');
-            
+
             if (ctx) {
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'high';
-              ctx.drawImage(img, 0, 0, 64, 64);
-              const imageData = ctx.getImageData(0, 0, 64, 64);
-              // Double-check before adding (race condition protection)
+              ctx.drawImage(img, 0, 0, PIN_ICON_SIZE, PIN_ICON_SIZE);
+              const imageData = ctx.getImageData(0, 0, PIN_ICON_SIZE, PIN_ICON_SIZE);
               if (!mapboxMap.hasImage(fallbackImageId)) {
                 try {
                   mapboxMap.addImage(fallbackImageId, imageData, { pixelRatio: 2 });
                 } catch (addError: any) {
-                  // Ignore "already exists" errors (can happen in React Strict Mode)
-                  if (addError?.message?.includes('already exists')) {
-                    // Image was added by another render, that's fine
-                  } else {
-                    throw addError;
-                  }
+                  if (!(addError as any)?.message?.includes('already exists')) throw addError;
                 }
               }
             }
@@ -735,200 +684,21 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
             console.error('[MentionsLayer] Failed to load fallback icon:', error);
           }
         }
-        
-        // Collect unique account images (will be loaded asynchronously after map renders)
-        const uniqueAccountImages = new Map<string, { imageUrl: string; isPro: boolean }>();
-        geoJSON.features.forEach((feature: any) => {
-          const accountImageUrl = feature.properties.account_image_url;
-          const accountPlan = feature.properties.account_plan;
-          const isPro = accountPlan === 'contributor' || accountPlan === 'plus';
-          
-          if (accountImageUrl) {
-            const key = `${accountImageUrl}|${isPro ? 'contributor' : 'regular'}`;
-            if (!uniqueAccountImages.has(key)) {
-              uniqueAccountImages.set(key, { imageUrl: accountImageUrl, isPro });
-            }
-          }
-        });
-        
-        // Load each unique account image (separate for contributor vs non-contributor)
-        const imageLoadPromises = Array.from(uniqueAccountImages.entries()).map(async ([key, { imageUrl, isPro }]) => {
-          const imageId = `map-mention-account-${imageUrl.replace(/[^a-zA-Z0-9]/g, '_')}-${isPro ? 'contributor' : 'regular'}`;
-          
-          if (mapboxMap.hasImage(imageId)) {
-            accountImageIds.set(key, imageId);
-            return;
-          }
-          
-          try {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = () => {
-                // If account image fails, use fallback
-                accountImageIds.set(key, fallbackImageId);
-                resolve(null);
-              };
-              img.src = imageUrl;
-            });
-            
-            if (img.complete && img.naturalWidth > 0) {
-              const canvas = document.createElement('canvas');
-              const padding = 4; // Add padding to prevent square cropping
-              const size = 64;
-              const borderWidth = 3; // Border width
-              const contentSize = size - (padding * 2); // Size of the actual circle content
-              const radius = (contentSize - borderWidth * 2) / 2;
-              const centerX = size / 2;
-              const centerY = size / 2;
-              
-              canvas.width = size;
-              canvas.height = size;
-              const ctx = canvas.getContext('2d');
-              
-              if (ctx) {
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                
-                // Draw shadow/glow behind the circle for prominence
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 2;
-                
-                // Draw border circle - gold gradient for contributor, white for regular
-                if (isPro) {
-                  // Gold gradient border for contributor accounts
-                  const gradient = ctx.createLinearGradient(0, 0, size, size);
-                  gradient.addColorStop(0, '#fbbf24'); // yellow-400
-                  gradient.addColorStop(0.5, '#f59e0b'); // yellow-500
-                  gradient.addColorStop(1, '#d97706'); // yellow-600
-                  
-                  ctx.beginPath();
-                  ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
-                  ctx.fillStyle = gradient;
-                  ctx.fill();
-                } else {
-                  // White border for regular accounts
-                  ctx.beginPath();
-                  ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
-                  ctx.fillStyle = '#ffffff';
-                  ctx.fill();
-                }
-                
-                // Reset shadow for image
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                
-                // Clip to inner circle for image
-                ctx.save();
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                ctx.clip();
-                
-                // Calculate image dimensions to fill circle (cover behavior)
-                const imgAspect = img.width / img.height;
-                let drawWidth = contentSize;
-                let drawHeight = contentSize;
-                let drawX = centerX - (drawWidth / 2);
-                let drawY = centerY - (drawHeight / 2);
-                
-                if (imgAspect > 1) {
-                  // Image is wider - fit to height
-                  drawHeight = contentSize;
-                  drawWidth = contentSize * imgAspect;
-                  drawX = centerX - (drawWidth / 2);
-                } else {
-                  // Image is taller - fit to width
-                  drawWidth = contentSize;
-                  drawHeight = contentSize / imgAspect;
-                  drawY = centerY - (drawHeight / 2);
-                }
-                
-                // Draw image centered and cropped to circle
-                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                ctx.restore();
-                
-                // Draw border outline with subtle shadow
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-                ctx.shadowBlur = 4;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 1;
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius + borderWidth, 0, Math.PI * 2);
-                ctx.strokeStyle = isPro ? '#f59e0b' : '#ffffff'; // Gold for contributor, white for regular
-                ctx.lineWidth = borderWidth;
-                ctx.stroke();
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                
-                const imageData = ctx.getImageData(0, 0, size, size);
-                // Double-check before adding (race condition protection)
-                if (!mapboxMap.hasImage(imageId)) {
-                  try {
-                    mapboxMap.addImage(imageId, imageData, { pixelRatio: 2 });
-                  } catch (addError: any) {
-                    // Ignore "already exists" errors (can happen in React Strict Mode)
-                    if (addError?.message?.includes('already exists')) {
-                      // Image was added by another render, that's fine
-                    } else {
-                      throw addError;
-                    }
-                  }
-                }
-                accountImageIds.set(key, imageId);
-              }
-            }
-          } catch (error) {
-            console.warn('[MentionsLayer] Failed to load account image:', imageUrl, error);
-            accountImageIds.set(key, fallbackImageId);
-          }
-        });
-        
-        // Load images in parallel (but still await for icon expression)
-        // Optimized: Load in smaller batches to prevent blocking
-        await Promise.all(imageLoadPromises);
-        
-        // Build case expression: mention_type (category) first, then account image, then fallback
+
+        // Icon expression: mention_type only → fallback for pins without type
         const iconExpressionParts: any[] = [];
         mentionTypeImageIds.forEach((imageId, typeId) => {
           iconExpressionParts.push(['==', ['get', 'mention_type_id'], typeId]);
           iconExpressionParts.push(imageId);
         });
-        accountImageIds.forEach((imageId, key) => {
-            const [imageUrl, planType] = key.split('|');
-            if (planType === 'contributor') {
-              // Match contributor or plus accounts with this image URL
-              iconExpressionParts.push([
-                'all',
-                ['==', ['get', 'account_image_url'], imageUrl],
-                ['in', ['get', 'account_plan'], ['literal', ['contributor', 'plus']]]
-              ]);
-              iconExpressionParts.push(imageId);
-            } else {
-              // Match regular accounts (plan is null or not contributor/plus) with this image URL
-              iconExpressionParts.push([
-                'all',
-                ['==', ['get', 'account_image_url'], imageUrl],
-                ['!', ['in', ['get', 'account_plan'], ['literal', ['contributor', 'plus']]]]
-              ]);
-              iconExpressionParts.push(imageId);
-            }
-        });
         const iconExpression: any =
           iconExpressionParts.length === 0 ? fallbackImageId : ['case', ...iconExpressionParts, fallbackImageId];
 
-        // Store layer data for re-adding after style changes (before adding layers)
+        // Store layer data for re-adding after style changes
         layersDataRef.current = {
           geoJSON,
           iconExpression,
-          accountImageIds: new Map(accountImageIds),
+          accountImageIds: new Map(),
           fallbackImageId,
         };
 
@@ -939,25 +709,21 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
           return;
         }
 
-        // Build icon-size expression - make selected mention larger
-        // Mapbox requires 'zoom' to be at top level, so we always use interpolate with zoom
-        // and for each zoom level, use a case expression to return the size directly
-        // When selectedMentionId is null, just use base sizes
+        // Build icon-size expression - make selected mention larger (1.5x)
         const baseIconSize = mentionsLayerStyles.point.icon.size;
         const iconSizeExpression = selectedMentionId
           ? [
               'interpolate',
               ['linear'],
               ['zoom'],
-              // For each zoom level, use case to return 1.5x size if selected, normal size otherwise
-              0, ['case', ['==', ['get', 'id'], selectedMentionId], 0.234, 0.156],
-              5, ['case', ['==', ['get', 'id'], selectedMentionId], 0.375, 0.25],
-              10, ['case', ['==', ['get', 'id'], selectedMentionId], 0.609, 0.406],
-              12, ['case', ['==', ['get', 'id'], selectedMentionId], 0.75, 0.5],
-              14, ['case', ['==', ['get', 'id'], selectedMentionId], 1.031, 0.688],
-              16, ['case', ['==', ['get', 'id'], selectedMentionId], 1.219, 0.813],
-              18, ['case', ['==', ['get', 'id'], selectedMentionId], 1.406, 0.938],
-              20, ['case', ['==', ['get', 'id'], selectedMentionId], 1.688, 1.125],
+              0, ['case', ['==', ['get', 'id'], selectedMentionId], 0.495, 0.33],
+              5, ['case', ['==', ['get', 'id'], selectedMentionId], 0.765, 0.51],
+              10, ['case', ['==', ['get', 'id'], selectedMentionId], 1.17, 0.78],
+              12, ['case', ['==', ['get', 'id'], selectedMentionId], 1.44, 0.96],
+              14, ['case', ['==', ['get', 'id'], selectedMentionId], 1.845, 1.23],
+              16, ['case', ['==', ['get', 'id'], selectedMentionId], 2.16, 1.44],
+              18, ['case', ['==', ['get', 'id'], selectedMentionId], 2.475, 1.65],
+              20, ['case', ['==', ['get', 'id'], selectedMentionId], 2.925, 1.95],
             ]
           : baseIconSize;
 
@@ -1315,8 +1081,8 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               });
             }
 
-            // Check if user is authenticated before showing mention details
-            if (!accountRef.current) {
+            // On non-public pages, require auth for flyTo + view tracking
+            if (!accountRef.current && pathname !== '/maps') {
               showErrorToastRef.current('Must be logged in', 'Please sign in to view mention details');
               return;
             }

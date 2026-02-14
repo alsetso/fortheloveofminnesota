@@ -1,12 +1,11 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useMapboxMap } from '@/app/map/[id]/hooks/useMapboxMap';
 import { usePinMarker } from '@/hooks/usePinMarker';
 import { queryFeatureAtPoint } from '@/features/map-metadata/services/featureService';
+import MentionsLayer from '@/features/map/components/MentionsLayer';
 import type { MapboxMapInstance } from '@/types/mapbox-events';
-
-const PIN_MARKER_CLASS = 'public-map-pin-marker';
 
 export interface PublicMapPin {
   id: string;
@@ -34,10 +33,6 @@ interface PublicMapViewProps {
   onViewRecorded?: (pinId: string, viewCount: number) => void;
 }
 
-/**
- * Thin Mapbox view: pins only, no boundaries or map page extras.
- * Used on /maps for simplified public map.
- */
 function escapeHtml(s: string | null | undefined): string {
   if (s == null) return '';
   const d = document.createElement('div');
@@ -56,8 +51,11 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
 }
 
+/**
+ * Public map view for /maps. Uses MentionsLayer (GPU symbol layer) for pins
+ * instead of DOM markers, so pin rendering respects layerStyles.ts icon-size.
+ */
 export default function PublicMapView({
-  pins,
   selectedPinId,
   selectedPin,
   currentAccountId,
@@ -88,60 +86,61 @@ export default function PublicMapView({
     behindModal: true,
   });
 
-  // Custom pin markers (DOM elements so emoji render natively)
-  const markersRef = useRef<{ marker: mapboxgl.Marker; id: string; lng: number; lat: number }[]>([]);
-
+  // Track zoom level for indicator
+  const [zoom, setZoom] = useState<number | null>(null);
   useEffect(() => {
     if (!mapLoaded || !mapInstance) return;
     const map = mapInstance as any;
     if (map.removed) return;
+    const update = () => setZoom(map.getZoom());
+    update();
+    map.on('zoom', update);
+    return () => { if (!map.removed) map.off('zoom', update); };
+  }, [mapLoaded, mapInstance]);
 
-    const list = pins.filter((p) => p.lat != null && p.lng != null && !Number.isNaN(p.lat) && !Number.isNaN(p.lng));
-    markersRef.current.forEach(({ marker }) => marker.remove());
-    markersRef.current = [];
-
-    if (list.length === 0) return;
-
-    import('mapbox-gl').then((mapboxMod) => {
-      if (!map || map.removed) return;
-      markersRef.current.forEach(({ marker }) => marker.remove());
-      markersRef.current = [];
-      const Mapbox = mapboxMod.default;
-      list.forEach((p) => {
-        const typeEmoji = (p as { mention_type?: { emoji?: string | null } | null }).mention_type?.emoji ?? '❤️';
-        const el = document.createElement('div');
-        el.className = PIN_MARKER_CLASS;
-        el.setAttribute('aria-label', `Pin ${p.id}`);
-        el.textContent = typeEmoji;
-        el.style.cssText = 'font-size:22px;line-height:1;cursor:pointer;user-select:none;pointer-events:auto;text-shadow:0 0 2px #fff, 0 0 4px #fff;';
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          onPinSelect(String(p.id), { lat: p.lat, lng: p.lng });
-        });
-        const marker = new Mapbox.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat([p.lng, p.lat])
-          .addTo(map);
-        markersRef.current.push({ marker, id: String(p.id), lng: p.lng, lat: p.lat });
-      });
-    });
-
-    return () => {
-      markersRef.current.forEach(({ marker }) => marker.remove());
-      markersRef.current = [];
+  // Listen for MentionsLayer pin clicks and forward to parent.
+  // MentionsLayer dispatches mention-click twice (immediate + enriched data).
+  // Deduplicate so onPinSelect only fires once per pin click.
+  const lastHandledPinRef = useRef<{ id: string; ts: number } | null>(null);
+  useEffect(() => {
+    const handleMentionClick = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.mention?.id) return;
+      const mention = detail.mention;
+      const id = String(mention.id);
+      const now = Date.now();
+      // Skip duplicate dispatch for same pin within 2s
+      if (lastHandledPinRef.current?.id === id && now - lastHandledPinRef.current.ts < 2000) return;
+      lastHandledPinRef.current = { id, ts: now };
+      onPinSelect(id, { lat: mention.lat, lng: mention.lng });
     };
-  }, [mapLoaded, mapInstance, pins, onPinSelect]);
 
-  // Map click: empty map -> close popup and open location flow (pin clicks handled by custom marker)
+    window.addEventListener('mention-click', handleMentionClick);
+    return () => {
+      window.removeEventListener('mention-click', handleMentionClick);
+    };
+  }, [onPinSelect]);
+
+  // Map click on empty area: open location flow
   useEffect(() => {
     if (!mapLoaded || !mapInstance) return;
     const map = mapInstance as any;
     if (map.removed) return;
 
     const handleClick = (e: { point: { x: number; y: number }; lngLat: { lng: number; lat: number } }) => {
+      // Check if the click hit a MentionsLayer pin; if so, skip location flow
+      try {
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: ['map-mentions-point', 'map-mentions-point-label'],
+        });
+        if (features && features.length > 0) return;
+      } catch {
+        // Layer may not exist yet; continue with location flow
+      }
+
       if (selectedPinId) onPinDeselect();
       const { lng, lat } = e.lngLat;
 
-      // Capture mapbox feature at click point for map_meta
       let mapMeta: Record<string, unknown> | null = null;
       try {
         const point = map.project([lng, lat]);
@@ -176,7 +175,7 @@ export default function PublicMapView({
   const isProgrammaticRemoveRef = useRef(false);
   const popupPinIdRef = useRef<string | null>(null);
 
-  // Popup + pin-view POST. View count = d.view_count only (no realtime update from POST response).
+  // Popup + pin-view POST
   useEffect(() => {
     if (!mapLoaded || !mapInstance || !selectedPinId) {
       if (popupRef.current) {
@@ -191,13 +190,11 @@ export default function PublicMapView({
     const map = mapInstance as any;
     if (map.removed) return;
 
-    const pin = pins.find((p) => String(p.id) === selectedPinId);
-    const lat = pin?.lat ?? selectedPin?.lat ?? selectedPinCoords?.lat;
-    const lng = pin?.lng ?? selectedPin?.lng ?? selectedPinCoords?.lng;
+    const lat = selectedPin?.lat ?? selectedPinCoords?.lat;
+    const lng = selectedPin?.lng ?? selectedPinCoords?.lng;
     if (lat == null || lng == null) return;
 
-    const data = selectedPin ?? pin;
-    const d = data as any;
+    const d = selectedPin as any;
     const showSkeleton = isLoadingPin || !d;
     const accountUsername = d?.account?.username ?? null;
     const accountImageUrl = d?.account?.image_url ?? null;
@@ -352,9 +349,25 @@ export default function PublicMapView({
         popupRef.current = null;
       }
     };
-  }, [mapLoaded, mapInstance, selectedPinId, selectedPin, pins, selectedPinCoords, isLoadingPin, currentAccountId, onPinDeselect]);
+  }, [mapLoaded, mapInstance, selectedPinId, selectedPin, selectedPinCoords, isLoadingPin, currentAccountId, onPinDeselect, onViewRecorded]);
 
   return (
-    <div ref={containerRef} className="w-full h-full min-h-[400px]" aria-label="Map" />
+    <>
+      <div ref={containerRef} className="w-full h-full min-h-[400px]" aria-label="Map" />
+      {mapInstance && mapLoaded && (
+        <MentionsLayer
+          map={mapInstance}
+          mapLoaded={mapLoaded}
+          clusterPins={false}
+          skipClickHandlers={false}
+          selectedMentionId={selectedPinId}
+        />
+      )}
+      {zoom != null && (
+        <div className="absolute bottom-3 right-3 px-2 py-1 bg-white/90 border border-gray-200 rounded-md text-xs text-gray-600 font-medium pointer-events-none select-none">
+          z{zoom.toFixed(1)}
+        </div>
+      )}
+    </>
   );
 }

@@ -593,8 +593,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         .from('accounts')
         .select('id, username, image_url, plan')
         .in('id', viewerIds);
+      type AccountRow = { id: string; username: string | null; image_url: string | null; plan: string | null };
       if (viewers) {
-        for (const a of viewers) {
+        for (const a of viewers as AccountRow[]) {
           accountLookup.set(a.id, { username: a.username ?? null, image_url: a.image_url ?? null, plan: a.plan ?? null });
         }
       }
@@ -757,7 +758,8 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           .select('id, username, image_url, plan')
           .in('id', visitorAccountIds);
         if (visitors) {
-          for (const a of visitors) {
+          type AccountRow = { id: string; username: string | null; image_url: string | null; plan: string | null };
+          for (const a of visitors as AccountRow[]) {
             accountLookup.set(a.id, {
               username: a.username ?? null,
               image_url: a.image_url ?? null,

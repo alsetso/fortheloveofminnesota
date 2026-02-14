@@ -108,7 +108,7 @@ export async function POST(
       const supabase = await createServerClientWithAuth(cookies());
       const { data, error } = await supabase
         .from('map_pins')
-        .insert(row)
+        .insert(row as never)
         .select(
           `
           id, lat, lng, description, visibility, city_id, collection_id, mention_type_id, map_id,

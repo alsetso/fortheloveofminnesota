@@ -31,7 +31,7 @@ export async function POST(
 
         // Try to find the pin by querying in batches
         while (!found && offset < 10000) { // Safety limit
-          const { data: queryResult, error: queryError } = await supabase.rpc('query_table', {
+          const { data: queryResult, error: queryError } = await (supabase as any).rpc('query_table', {
             p_schema_name: 'maps',
             p_table_name: 'pins',
             p_limit: batchSize,

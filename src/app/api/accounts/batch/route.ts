@@ -47,7 +47,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Return accounts in the same order as requested IDs
-        const accountMap = new Map(accounts?.map(acc => [acc.id, acc]) || []);
+        type AccountRow = { id: string; username?: string | null; first_name?: string | null; last_name?: string | null; image_url?: string | null; bio?: string | null; created_at?: string; plan?: string | null; traits?: unknown };
+        const accountMap = new Map(((accounts ?? []) as AccountRow[]).map(acc => [acc.id, acc]));
         const orderedAccounts = ids
           .map(id => accountMap.get(id))
           .filter(Boolean);

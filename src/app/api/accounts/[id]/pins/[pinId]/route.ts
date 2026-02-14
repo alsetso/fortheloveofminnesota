@@ -86,7 +86,7 @@ export async function PATCH(
       const supabase = await createServerClientWithAuth(cookies());
       const { data, error } = await supabase
         .from('map_pins')
-        .update(updates)
+        .update(updates as never)
         .eq('id', pinId)
         .eq('account_id', id)
         .select(
@@ -130,7 +130,7 @@ export async function DELETE(
       const supabase = await createServerClientWithAuth(cookies());
       const { error } = await supabase
         .from('map_pins')
-        .update({ archived: true, updated_at: new Date().toISOString() })
+        .update({ archived: true, updated_at: new Date().toISOString() } as never)
         .eq('id', pinId)
         .eq('account_id', id);
 

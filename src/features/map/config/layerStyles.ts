@@ -65,7 +65,7 @@ export const atlasLayerStyles = {
   },
 };
 
-// Mentions layer styles
+// Mentions layer styles (mention-type emoji only)
 export const mentionsLayerStyles = {
   // Point layer styles
   point: {
@@ -74,14 +74,14 @@ export const mentionsLayerStyles = {
         'interpolate',
         ['linear'],
         ['zoom'],
-        0, 0.156,
-        5, 0.25,
-        10, 0.406,
-        12, 0.5,
-        14, 0.688,
-        16, 0.813,
-        18, 0.938,
-        20, 1.125,
+        0, 0.33,
+        5, 0.51,
+        10, 0.78,
+        12, 0.96,
+        14, 1.23,
+        16, 1.44,
+        18, 1.65,
+        20, 1.95,
       ],
       anchor: 'center' as const,
       allowOverlap: true,
@@ -229,6 +229,13 @@ export const buildMentionsLabelPaint = () => {
     'text-halo-color': label.halo.color,
     'text-halo-width': label.halo.width,
     'text-halo-blur': label.halo.blur,
+    'text-opacity': [
+      'interpolate',
+      ['linear'],
+      ['zoom'],
+      9, 0,
+      10, 1,
+    ],
   };
 };
 

@@ -67,7 +67,7 @@ export async function GET(
 
         // Use admin.query_table function for all schemas
         // This works for public and non-public schemas
-        const { data: queryResult, error: queryError } = await supabase.rpc('query_table', {
+        const { data: queryResult, error: queryError } = await (supabase as any).rpc('query_table', {
           p_schema_name: schema,
           p_table_name: table,
           p_limit: limit,
@@ -81,15 +81,15 @@ export async function GET(
         if (queryError) {
           console.error('[Admin Database API] RPC Error:', queryError);
           return NextResponse.json(
-            { error: `Failed to fetch table data: ${queryError.message}` },
+            { error: `Failed to fetch table data: ${(queryError as Error)?.message ?? 'Unknown'}` },
             { status: 500 }
           );
         }
 
         // Extract data and count from result
-        const resultRow = queryResult && queryResult[0];
-        const dataArray = resultRow?.data || [];
-        const totalCount = resultRow?.total_count || 0;
+        const resultRow = queryResult && (queryResult as any[])[0];
+        const dataArray = (resultRow as { data?: unknown; total_count?: number } | null)?.data || [];
+        const totalCount = (resultRow as { data?: unknown; total_count?: number } | null)?.total_count ?? 0;
 
         // Convert JSONB array to regular array
         const data = Array.isArray(dataArray) ? dataArray : [];

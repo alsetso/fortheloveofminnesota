@@ -42,17 +42,10 @@ export async function GET(request: NextRequest) {
             .select('id', { count: 'exact', head: true })
             .eq('status', 'active'),
           
-          // Total maps
-          supabase
-            .schema('maps')
-            .from('maps')
-            .select('id', { count: 'exact', head: true }),
-          
-          // Total posts
-          supabase
-            .schema('content')
-            .from('posts')
-            .select('id', { count: 'exact', head: true }),
+          // Total maps (typed client only has 'public' schema; use any for maps schema)
+          (supabase as any).schema('maps').from('maps').select('id', { count: 'exact', head: true }),
+          // Total posts (content schema)
+          (supabase as any).schema('content').from('posts').select('id', { count: 'exact', head: true }),
         ]);
 
         // Process subscription status counts

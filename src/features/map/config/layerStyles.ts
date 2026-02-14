@@ -74,14 +74,14 @@ export const mentionsLayerStyles = {
         'interpolate',
         ['linear'],
         ['zoom'],
-        0, 0.25,   // Larger than atlas (0.3 vs 0.25, but mentions start bigger)
-        5, 0.4,    // Larger than atlas
-        10, 0.65,  // Larger than atlas (0.5 vs 0.65)
-        12, 0.8,   // Larger than atlas (0.5 vs 0.8)
-        14, 1.1,   // Much larger than atlas (0.8 vs 1.1)
-        16, 1.3,   // Much larger than atlas
-        18, 1.5,   // Much larger than atlas (1.0 vs 1.5)
-        20, 1.8,   // Much larger than atlas (1.2 vs 1.8)
+        0, 0.156,
+        5, 0.25,
+        10, 0.406,
+        12, 0.5,
+        14, 0.688,
+        16, 0.813,
+        18, 0.938,
+        20, 1.125,
       ],
       anchor: 'center' as const,
       allowOverlap: true,

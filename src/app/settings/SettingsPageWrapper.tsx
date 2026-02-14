@@ -225,7 +225,7 @@ function SettingsHomeSidebar() {
       </div>
 
       {/* Sign Out */}
-      <div className="mt-auto p-3 border-t border-border-muted dark:border-white/10">
+      <div className="p-3">
         <SignOutButton />
       </div>
     </div>

@@ -14,6 +14,30 @@
     --safe-area-inset-right: env(safe-area-inset-right, 0px);
     --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
     --safe-area-inset-left: env(safe-area-inset-left, 0px);
+
+    /* ── Z-Index Tier System ──────────────────────────────────
+     * Group elements by function, not by arbitrary numbers.
+     * Map internals (markers, popups) are isolated inside
+     * .mapboxgl-map and do NOT participate in this scale.
+     *
+     * Tier 0: Base content ............. z-auto / z-0
+     * Tier 1: Map surface UI ........... z-10 – z-30
+     *         (overlays, controls sitting on the map canvas)
+     * Tier 2: Navigation chrome ........ z-50
+     *         (header, footer, sticky bars)
+     * Tier 3: Dropdowns / popovers ..... z-60
+     *         (menus, tooltips, select popups)
+     * Tier 4: Modal backdrop ........... z-[100]
+     *         (full-screen backdrop overlays)
+     * Tier 5: Modal content ............ z-[110]
+     *         (dialog panels, bottom sheets, sign-in)
+     * Tier 6: Stacked / priority modal . z-[120]
+     *         (modals that open over other modals)
+     * Tier 7: Toast / notification ..... z-[200]
+     *         (transient success/error messages)
+     * Tier 8: Critical / dev ........... z-[9999]
+     *         (debug overlays, cursor labels)
+     * ──────────────────────────────────────────────────────── */
   }
 
   /* Light Theme - Default */
@@ -426,7 +450,19 @@ body {
   transform: translate(-50%, -50%) scale(1.1);
 }
 
-/* Ensure Mapbox markers are properly positioned and appear above area layers */
+/* ── Map Stacking Context ────────────────────────────────────
+ * isolation: isolate on the map container creates a local
+ * stacking context. ALL Mapbox DOM children (markers, popups)
+ * are confined here and cannot bleed z-index into the page.
+ * App-level modals use z-[1100]+ so they always paint above pins.
+ * ──────────────────────────────────────────────────────────── */
+.mapboxgl-map {
+  isolation: isolate;
+  /* Ensure map (and its isolated children) stays below app modals */
+  z-index: 0;
+}
+
+/* Markers above area/symbol layers — local to map context only */
 .mapboxgl-marker {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -438,12 +474,12 @@ body {
   z-index: 1 !important;
 }
 
-/* Ensure pin markers specifically are on top */
+/* Pin markers above standard markers — local to map context */
 .pin-marker {
   z-index: 1000 !important;
 }
 
-/* Ensure popups appear above everything */
+/* Popups above markers — local to map context */
 .mapboxgl-popup {
   z-index: 2000 !important;
 }

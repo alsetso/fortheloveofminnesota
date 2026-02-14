@@ -12,7 +12,7 @@ export default function ComingSoonModal({ isOpen, onClose, feature }: ComingSoon
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="bg-white rounded-md border border-gray-200 p-[10px] max-w-sm w-full">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-gray-900">Coming Soon</h2>

@@ -44,7 +44,7 @@ export default function BillingModal({
   // Sidebar overlay mode
   if (overlay === 'sidebar') {
     return (
-      <div className="fixed left-0 top-0 bottom-0 z-[52] w-[80vw] lg:w-80 bg-white border-r border-gray-200 shadow-xl flex flex-col">
+      <div className="fixed left-0 top-0 bottom-0 z-[100] w-[80vw] lg:w-80 bg-white border-r border-gray-200 shadow-xl flex flex-col">
         <div className="p-[10px] flex-shrink-0 border-b border-gray-200">
           {/* Close Button */}
           <button
@@ -129,7 +129,7 @@ export default function BillingModal({
 
   // Center modal mode (default)
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40"

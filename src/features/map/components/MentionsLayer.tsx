@@ -950,14 +950,14 @@ export default function MentionsLayer({ map, mapLoaded, onLoadingChange, selecte
               ['linear'],
               ['zoom'],
               // For each zoom level, use case to return 1.5x size if selected, normal size otherwise
-              0, ['case', ['==', ['get', 'id'], selectedMentionId], 0.375, 0.25],
-              5, ['case', ['==', ['get', 'id'], selectedMentionId], 0.6, 0.4],
-              10, ['case', ['==', ['get', 'id'], selectedMentionId], 0.975, 0.65],
-              12, ['case', ['==', ['get', 'id'], selectedMentionId], 1.2, 0.8],
-              14, ['case', ['==', ['get', 'id'], selectedMentionId], 1.65, 1.1],
-              16, ['case', ['==', ['get', 'id'], selectedMentionId], 1.95, 1.3],
-              18, ['case', ['==', ['get', 'id'], selectedMentionId], 2.25, 1.5],
-              20, ['case', ['==', ['get', 'id'], selectedMentionId], 2.7, 1.8],
+              0, ['case', ['==', ['get', 'id'], selectedMentionId], 0.234, 0.156],
+              5, ['case', ['==', ['get', 'id'], selectedMentionId], 0.375, 0.25],
+              10, ['case', ['==', ['get', 'id'], selectedMentionId], 0.609, 0.406],
+              12, ['case', ['==', ['get', 'id'], selectedMentionId], 0.75, 0.5],
+              14, ['case', ['==', ['get', 'id'], selectedMentionId], 1.031, 0.688],
+              16, ['case', ['==', ['get', 'id'], selectedMentionId], 1.219, 0.813],
+              18, ['case', ['==', ['get', 'id'], selectedMentionId], 1.406, 0.938],
+              20, ['case', ['==', ['get', 'id'], selectedMentionId], 1.688, 1.125],
             ]
           : baseIconSize;
 

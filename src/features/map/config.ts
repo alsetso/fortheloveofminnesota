@@ -2,7 +2,7 @@
 export const MAP_CONFIG = {
   MAPBOX_TOKEN: (() => {
     const token = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
-    if (!token || token === 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw') {
+    if (!token || token.length < 20) {
       console.error('Mapbox token not configured');
       return '';
     }
@@ -39,6 +39,17 @@ export const MAP_CONFIG = {
     east: -89.5,
     west: -97.5,
   },
+
+  /** Padded bounds for map viewport — allows context around MN without drifting globally. */
+  MINNESOTA_VIEWPORT_BOUNDS: {
+    north: 51.0,
+    south: 42.0,
+    east: -87.5,
+    west: -99.5,
+  },
+
+  /** Minimum zoom for any map (≈ multi-state view, keeps MN always in frame). */
+  MIN_ZOOM_MN: 5,
   
   GEOLOCATION_OPTIONS: {
     enableHighAccuracy: true,

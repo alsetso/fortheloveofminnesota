@@ -1,16 +1,16 @@
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import DocsLeftSidebar from '@/components/docs/DocsLeftSidebar';
-import DocsContent from '@/components/docs/DocsContent';
+import { redirect } from 'next/navigation';
+
+interface DocsPageProps {
+  searchParams: Promise<{ doc?: string }>;
+}
 
 /**
- * Documentation page - Help and guides for Love of Minnesota
+ * /docs — redirect to canonical path.
+ * /docs?doc=slug → /docs/slug
+ * /docs → /docs/getting-started
  */
-export default function DocsPage() {
-  return (
-    <NewPageWrapper
-      leftSidebar={<DocsLeftSidebar />}
-    >
-      <DocsContent />
-    </NewPageWrapper>
-  );
+export default async function DocsPage({ searchParams }: DocsPageProps) {
+  const { doc } = await searchParams;
+  const slug = doc?.trim() || 'getting-started';
+  redirect(`/docs/${encodeURIComponent(slug)}`);
 }

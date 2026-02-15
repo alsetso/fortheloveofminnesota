@@ -93,8 +93,8 @@ export default function NewsPage() {
         <div className="max-w-4xl mx-auto px-4 space-y-3">
           <div className="mb-4 flex items-start justify-between">
             <div>
-              <h1 className="text-sm font-semibold text-gray-900">Minnesota News</h1>
-              <p className="text-xs text-gray-500 mt-0.5">
+              <h1 className="text-sm font-semibold text-foreground">Minnesota News</h1>
+              <p className="text-xs text-foreground-muted mt-0.5">
                 Latest news articles about Minnesota
               </p>
             </div>
@@ -102,18 +102,18 @@ export default function NewsPage() {
             {isAdmin && (
               <Link
                 href="/news/generate"
-                className="flex items-center justify-center w-8 h-8 bg-white rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-center w-8 h-8 bg-surface rounded-md border border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/10 transition-colors"
                 aria-label="Generate news (Admin only)"
                 title="Generate news (Admin only)"
               >
-                <PlusIcon className="w-4 h-4 text-gray-900" />
+                <PlusIcon className="w-4 h-4 text-foreground" />
               </Link>
             )}
           </div>
 
           {loading && (
             <div className="text-center py-8">
-              <p className="text-xs text-gray-500">Loading news...</p>
+              <p className="text-xs text-foreground-muted">Loading news...</p>
             </div>
           )}
 
@@ -125,7 +125,7 @@ export default function NewsPage() {
 
           {!loading && !error && articles.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-xs text-gray-500">No news articles available</p>
+              <p className="text-xs text-foreground-muted">No news articles available</p>
             </div>
           )}
 
@@ -139,11 +139,11 @@ export default function NewsPage() {
                     href={article.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block border border-gray-200 rounded-md bg-white hover:bg-gray-50 transition-colors p-[10px]"
+                    className="block border border-border-muted dark:border-white/10 rounded-md bg-surface hover:bg-surface-accent dark:hover:bg-white/10 transition-colors p-[10px]"
                   >
                     <div className="flex gap-3">
                       {imageUrl && (
-                        <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100">
+                        <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-surface-accent dark:bg-white/10">
                           <Image
                             src={imageUrl}
                             alt={article.title}
@@ -161,23 +161,23 @@ export default function NewsPage() {
                       )}
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="flex items-start justify-between gap-2">
-                          <h2 className="text-sm font-semibold text-gray-900 line-clamp-2">
+                          <h2 className="text-sm font-semibold text-foreground line-clamp-2">
                             {article.title}
                           </h2>
                         </div>
                         {article.snippet && (
-                          <p className="text-xs text-gray-600 line-clamp-2">
+                          <p className="text-xs text-foreground-muted line-clamp-2">
                             {article.snippet}
                           </p>
                         )}
                         <div className="flex items-center gap-2 flex-wrap">
                           {article.source_name && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-foreground-muted">
                               {article.source_name}
                             </span>
                           )}
-                          <span className="text-xs text-gray-400">•</span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-foreground-muted">•</span>
+                          <span className="text-xs text-foreground-muted">
                             {formatDate(article.published_at)}
                           </span>
                         </div>

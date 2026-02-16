@@ -11,6 +11,8 @@ import {
   ExclamationTriangleIcon,
   ArrowPathIcon,
   ChevronRightIcon,
+  ShieldCheckIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 interface TableInfo {
@@ -78,6 +80,31 @@ export default function SystemsSettingsClient() {
 
   return (
     <div className="space-y-4">
+      {/* Admin Verification Header */}
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheckIcon className="w-5 h-5 text-green-500" />
+            <h2 className="text-sm font-semibold text-foreground">Systems</h2>
+          </div>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-500/50">
+            <CheckCircleIcon className="w-3 h-3 text-green-600 dark:text-green-400" />
+            <span className="text-xs font-medium text-green-700 dark:text-green-400">Admin Verified</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 p-[10px] border border-green-200 dark:border-green-500/50 rounded-md bg-green-50 dark:bg-green-900/20">
+          <div className="flex-1">
+            <p className="text-xs font-medium text-green-700 dark:text-green-400">Admin Access Granted</p>
+            <p className="text-[10px] text-green-600 dark:text-green-400/80 mt-0.5">
+              Account role: <span className="font-medium">{account?.role}</span>
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-foreground-muted mt-2">
+          Database tables and system overview. This page is restricted to administrators only.
+        </p>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

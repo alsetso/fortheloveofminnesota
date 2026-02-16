@@ -30,6 +30,7 @@ import {
   CircleStackIcon,
   ServerStackIcon,
   ChevronLeftIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 
 interface SettingsPageWrapperProps {
@@ -42,13 +43,32 @@ interface SettingsPageWrapperProps {
 export default function SettingsPageWrapper({ account, userEmail, mapLimit, children }: SettingsPageWrapperProps) {
   const pathname = usePathname();
   const isMainSettings = pathname === '/settings';
+  const [sidebarVisible, setSidebarVisible] = useState(true);
 
   return (
     <SettingsProvider account={account} userEmail={userEmail} mapLimit={mapLimit}>
       <NewPageWrapper
-        leftSidebar={isMainSettings ? <SettingsHomeSidebar /> : <SettingsLeftSidebar />}
+        leftSidebar={
+          sidebarVisible
+            ? isMainSettings
+              ? <SettingsHomeSidebar onHideSidebar={() => setSidebarVisible(false)} />
+              : <SettingsLeftSidebar onHideSidebar={() => setSidebarVisible(false)} />
+            : undefined
+        }
       >
         <div className="max-w-2xl mx-auto w-full px-4 py-6">
+          {!sidebarVisible && (
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={() => setSidebarVisible(true)}
+                className="inline-flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium text-foreground-muted hover:text-foreground bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 transition-colors"
+              >
+                <ChevronLeftIcon className="w-3.5 h-3.5 rotate-180" />
+                <span>Show sidebar</span>
+              </button>
+            </div>
+          )}
           {isMainSettings ? (
             <SettingsOverview />
           ) : (
@@ -84,7 +104,7 @@ const PLAN_LABELS: Record<string, string> = {
   gov: 'Government',
 };
 
-function SettingsHomeSidebar() {
+function SettingsHomeSidebar({ onHideSidebar }: { onHideSidebar?: () => void }) {
   const { account, userEmail, mapLimit } = useSettings();
   const supabase = useSupabaseClient();
   const displayName = getDisplayName(account);
@@ -122,6 +142,20 @@ function SettingsHomeSidebar() {
 
   return (
     <div className="h-full flex flex-col overflow-y-auto scrollbar-hide">
+      {/* Header with hide */}
+      {onHideSidebar && (
+        <div className="p-3 border-b border-border-muted dark:border-white/10 flex items-center justify-between">
+          <span className="text-sm font-semibold text-foreground">Settings</span>
+          <button
+            type="button"
+            onClick={onHideSidebar}
+            className="flex items-center justify-center w-7 h-7 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-accent transition-colors"
+            title="Hide sidebar"
+          >
+            <ChevronLeftIcon className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {/* Profile */}
       <div className="p-3 border-b border-border-muted dark:border-white/10">
         <div className="flex items-center gap-3">
@@ -488,7 +522,8 @@ const BILLING_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Accounts', href: '/settings/accounts', icon: UsersIcon, description: 'Manage all accounts' },
-  { label: 'Systems', href: '/settings/systems', icon: ServerStackIcon, description: 'Database tables and system' },
-  { label: 'Data Explorer', href: '/settings/data', icon: CircleStackIcon, description: 'Browse all public tables' },
+  { label: 'Accounts', href: '/settings/admin/accounts', icon: UsersIcon, description: 'Manage all accounts' },
+  { label: 'Systems', href: '/settings/admin/systems', icon: ServerStackIcon, description: 'Database tables and system' },
+  { label: 'Data Explorer', href: '/settings/admin/data', icon: CircleStackIcon, description: 'Browse all public tables' },
+  { label: 'Pricing', href: '/settings/admin/pricing', icon: CurrencyDollarIcon, description: 'Plan features and limits' },
 ];

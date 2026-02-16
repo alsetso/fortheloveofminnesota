@@ -49,3 +49,7 @@ export interface FeatureLimit {
 }
 
 export type FeatureCategory = 'maps' | 'analytics' | 'content' | 'profile' | string;
+
+export interface PlanWithFeatures extends BillingPlan {
+  features: (BillingFeature & { isInherited?: boolean })[];
+}

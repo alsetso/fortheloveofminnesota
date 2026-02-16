@@ -156,7 +156,7 @@ export default function UsageSettingsClient() {
                 {category}
               </h3>
             </div>
-            <div className="divide-y divide-white/10">
+            <div className="divide-y divide-border-muted dark:divide-white/10">
               {categoryFeatures.map((feature) => {
                 const hasAccess = hasFeature(feature);
                 return (

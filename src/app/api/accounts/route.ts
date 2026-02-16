@@ -104,8 +104,13 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/accounts
- * Create a new account for the current authenticated user
- * 
+ * Create a new account for the current authenticated user.
+ *
+ * Used by: (1) Onboarding after first sign-up (CreateAccountClient → POST /api/accounts),
+ *          (2) Settings → Accounts admin "Add account" (AccountsSettingsClient → POST /api/accounts).
+ * Same handler and same DB automation: trigger add_new_account_to_live_map() adds the new
+ * account to the live map (maps.maps slug=live) via maps.memberships.
+ *
  * Security:
  * - Rate limited: 60 requests/minute (strict) - prevent account spam
  * - Input validation with Zod

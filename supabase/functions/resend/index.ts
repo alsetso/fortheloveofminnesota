@@ -81,30 +81,34 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { user, email_data } = await req.json();
-    
+    const body = await req.json();
+    const user = body?.user ?? null;
+    const email_data = body?.email_data ?? null;
+
     if (!user?.email || !email_data?.token) {
-      return new Response(JSON.stringify({ success: false }), { status: 200, headers });
+      return new Response(JSON.stringify({ success: false, reason: 'missing_payload' }), { status: 500, headers });
     }
 
     if (!RESEND_API_KEY) {
-      console.error('RESEND_API_KEY not set');
-      return new Response(JSON.stringify({ success: false }), { status: 200, headers });
+      return new Response(JSON.stringify({ success: false, reason: 'missing_api_key' }), { status: 500, headers });
     }
 
     const resend = new Resend(RESEND_API_KEY);
     const html = getOtpTemplate(user.email, email_data.token);
 
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: 'For the Love of Minnesota <hi@fortheloveofminnesota.com>',
       to: user.email,
       subject: 'Your Access Code - For the Love of Minnesota',
       html,
     });
 
-    return new Response(JSON.stringify({ success: true }), { status: 200, headers });
+    if (error) {
+      return new Response(JSON.stringify({ success: false, reason: 'resend_failed', error: error.message ?? String(error) }), { status: 500, headers });
+    }
+
+    return new Response(JSON.stringify({ success: true, id: data?.id }), { status: 200, headers });
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(JSON.stringify({ success: false, error: String(error) }), { status: 200, headers });
+    return new Response(JSON.stringify({ success: false, error: String(error) }), { status: 500, headers });
   }
 });

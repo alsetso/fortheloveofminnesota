@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Get base URL for return redirect
+        // Return to settings billing when opened from settings
         const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const returnUrl = `${baseUrl}/billing`;
+        const returnUrl = `${baseUrl}/settings/billing`;
 
         // Create billing portal session
         const portalSession = await stripe.billingPortal.sessions.create({

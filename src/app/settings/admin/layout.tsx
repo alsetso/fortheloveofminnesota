@@ -48,7 +48,7 @@ export default async function AdminLayout({
     account = result.data;
   }
 
-  if (!account || account.role !== 'admin') {
+  if (!account || (account as any).role !== 'admin') {
     redirect('/settings');
   }
 

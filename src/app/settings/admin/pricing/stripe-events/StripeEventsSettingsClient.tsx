@@ -238,6 +238,7 @@ export default function StripeEventsSettingsClient() {
       const t = setTimeout(() => router.replace('/settings'), 1500);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [account, isAdmin, router]);
 
   // ── Derived stats ──

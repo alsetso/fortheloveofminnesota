@@ -25,7 +25,7 @@ export default async function PlansPage() {
   if (activeAccountId) {
     const result = await supabase
       .from('accounts')
-      .select('plan')
+      .select('plan, subscription_status')
       .eq('id', activeAccountId)
       .eq('user_id', auth.id)
       .maybeSingle();
@@ -35,14 +35,19 @@ export default async function PlansPage() {
   if (!account) {
     const result = await supabase
       .from('accounts')
-      .select('plan')
+      .select('plan, subscription_status')
       .eq('user_id', auth.id)
       .limit(1)
       .maybeSingle();
     account = result.data;
   }
 
-  type AccountRow = { plan: string | null };
+  type AccountRow = { plan: string | null; subscription_status: string | null };
   const accountData = account as AccountRow | null;
-  return <PlansPageClient currentPlanSlug={accountData?.plan || null} />;
+  return (
+    <PlansPageClient
+      currentPlanSlug={accountData?.plan || null}
+      subscriptionStatus={accountData?.subscription_status || null}
+    />
+  );
 }

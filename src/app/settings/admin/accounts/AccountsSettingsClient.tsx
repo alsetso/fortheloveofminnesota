@@ -70,6 +70,7 @@ export default function AccountsSettingsClient() {
     }
     
     fetchAccounts();
+    return undefined;
   }, [isAdmin, fetchAccounts, router]);
 
   const handleSwitchAccount = async (accountId: string) => {

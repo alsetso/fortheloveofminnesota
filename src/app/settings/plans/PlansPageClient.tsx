@@ -1,65 +1,102 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStateSafe } from '@/features/auth';
+import PlansPricingCards from '@/components/billing/PlansPricingCards';
 import PlansComparisonTable from '@/components/billing/PlansComparisonTable';
+import PlanPaymentModal from '@/components/billing/PlanPaymentModal';
+import type { PlanWithFeatures } from '@/lib/billing/types';
 
 interface PlansPageClientProps {
   currentPlanSlug?: string | null;
+  subscriptionStatus?: string | null;
 }
 
-export default function PlansPageClient({ currentPlanSlug }: PlansPageClientProps) {
+export default function PlansPageClient({ currentPlanSlug, subscriptionStatus }: PlansPageClientProps) {
   const { account } = useAuthStateSafe();
-  const [isAdminMode, setIsAdminMode] = useState(false);
-  
-  const isAdmin = account?.role === 'admin';
+  const [plans, setPlans] = useState<PlanWithFeatures[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewPlanSlug, setViewPlanSlug] = useState<string | null>(null);
+  const [viewPlanInitial, setViewPlanInitial] = useState<PlanWithFeatures | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/billing/plans');
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setPlans(data.plans ?? []);
+      } catch {
+        if (!cancelled) setPlans([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleViewPlan = (plan: PlanWithFeatures) => {
+    setViewPlanInitial(plan);
+    setViewPlanSlug(plan.slug);
+  };
 
   return (
     <div className="space-y-3">
       {/* Header */}
       <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">Plans & Features</h2>
-            <p className="text-xs text-foreground/60 mt-0.5">
-              Compare plans and their features
-            </p>
-          </div>
-          {isAdmin && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-foreground/70">View Mode:</span>
-              <button
-                onClick={() => setIsAdminMode(false)}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                  !isAdminMode
-                    ? 'bg-lake-blue text-foreground'
-                    : 'bg-surface-accent text-foreground/70 hover:bg-surface-accent/80'
-                }`}
-              >
-                Public
-              </button>
-              <button
-                onClick={() => setIsAdminMode(true)}
-                className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                  isAdminMode
-                    ? 'bg-lake-blue text-foreground'
-                    : 'bg-surface-accent text-foreground/70 hover:bg-surface-accent/80'
-                }`}
-              >
-                Admin
-              </button>
-            </div>
-          )}
-        </div>
+        <h2 className="text-sm font-semibold text-foreground">Plans & Features</h2>
+        <p className="text-xs text-foreground-muted mt-0.5">
+          Compare plans and their features
+        </p>
       </div>
 
-      {/* Plans Comparison Table */}
+      {/* Pricing cards (try this design) */}
       <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
-        <PlansComparisonTable 
-          currentPlanSlug={currentPlanSlug} 
-          isAdmin={isAdminMode && isAdmin}
+        <p className="text-xs font-medium text-foreground-muted mb-3">Plans</p>
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-200 border-t-gray-700" />
+          </div>
+        ) : (
+          <PlansPricingCards
+            plans={plans}
+            currentPlanSlug={currentPlanSlug}
+            subscriptionStatus={subscriptionStatus}
+            hasStripeCustomer={!!account?.stripe_customer_id}
+            onViewPlan={handleViewPlan}
+          />
+        )}
+      </div>
+
+      {/* Plans comparison table */}
+      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+        <p className="text-xs font-medium text-foreground-muted mb-3">Feature comparison</p>
+        <PlansComparisonTable
+          currentPlanSlug={currentPlanSlug}
+          initialPlans={plans}
+          onViewPlan={handleViewPlan}
         />
       </div>
+
+      {viewPlanSlug && (
+        <PlanPaymentModal
+          planSlug={viewPlanSlug}
+          isOpen
+          onClose={() => {
+            setViewPlanSlug(null);
+            setViewPlanInitial(null);
+          }}
+          account={account ?? undefined}
+          initialPlan={
+            viewPlanInitial?.slug.toLowerCase() === viewPlanSlug.toLowerCase() ? viewPlanInitial : undefined
+          }
+          currentPlanSlug={currentPlanSlug}
+          subscriptionStatus={subscriptionStatus}
+          allPlans={plans}
+        />
+      )}
     </div>
   );
 }

@@ -96,6 +96,7 @@ export default function PricingSettingsClient() {
       const t = setTimeout(() => router.push('/settings'), 2000);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [account, isAdmin, router]);
 
   /* ─── Derived data ─── */

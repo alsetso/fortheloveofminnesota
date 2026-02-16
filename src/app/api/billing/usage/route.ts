@@ -38,10 +38,10 @@ export async function GET(request: NextRequest) {
         // Feature-to-resource mapping: maps feature slugs to their database tables
         // This allows automatic usage counting for features
         const FEATURE_RESOURCE_MAP: Record<string, string> = {
-          // Map-related features all use the 'map' table
-          'custom_maps': 'map',
-          'map': 'map',
-          'unlimited_maps': 'map',
+          // Map-related features use maps.maps (queried via schema('maps').from('maps'))
+          'custom_maps': 'maps.maps',
+          'map': 'maps.maps',
+          'unlimited_maps': 'maps.maps',
           // Post-related features
           'posts': 'posts',
           'post': 'posts',
@@ -73,10 +73,14 @@ export async function GET(request: NextRequest) {
               // Count the table if we haven't already
               if (!countedTables.has(resourceTable)) {
                 try {
-                  const { count } = await supabase
-                    .from(resourceTable)
+                  const isMapsTable = resourceTable === 'maps.maps';
+                  const tableRef = isMapsTable
+                    ? supabase.schema('maps').from('maps')
+                    : supabase.from(resourceTable);
+                  const countCol = isMapsTable ? 'owner_account_id' : 'account_id';
+                  const { count } = await tableRef
                     .select('*', { count: 'exact', head: true })
-                    .eq('account_id', accountId);
+                    .eq(countCol, accountId);
                   tableCounts[resourceTable] = count ?? 0;
                   countedTables.add(resourceTable);
                 } catch (error) {
@@ -93,8 +97,8 @@ export async function GET(request: NextRequest) {
         }
         
         // Also set generic keys for backward compatibility
-        if (tableCounts['map'] !== undefined) {
-          usage.maps = tableCounts['map'];
+        if (tableCounts['maps.maps'] !== undefined) {
+          usage.maps = tableCounts['maps.maps'];
         }
         if (tableCounts['posts'] !== undefined) {
           usage.posts = tableCounts['posts'];

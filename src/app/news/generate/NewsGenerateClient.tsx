@@ -97,20 +97,23 @@ export default function NewsGenerateClient() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const inputClass =
+    'w-full px-2 py-1.5 text-xs bg-surface border border-border-muted dark:border-white/10 rounded-md focus:outline-none focus:ring-2 focus:ring-lake-blue focus:border-transparent text-foreground placeholder:text-foreground-muted';
+
   return (
     <div className="h-full overflow-y-auto scrollbar-hide">
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
         <div className="mb-4">
-          <h1 className="text-sm font-semibold text-gray-900">Generate News</h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <h1 className="text-sm font-semibold text-foreground">Generate News</h1>
+          <p className="text-xs text-foreground-muted mt-0.5">
             Admin only: Search for news articles using RapidAPI
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="border border-gray-200 rounded-md bg-white p-[10px] space-y-3">
+          <div className="border border-border-muted dark:border-white/10 rounded-md bg-surface p-[10px] space-y-3">
             <div>
-              <label htmlFor="query" className="block text-xs font-medium text-gray-900 mb-1.5">
+              <label htmlFor="query" className="block text-xs font-medium text-foreground mb-1.5">
                 Search Query
               </label>
               <input
@@ -119,20 +122,20 @@ export default function NewsGenerateClient() {
                 value={formData.query}
                 onChange={(e) => handleChange('query', e.target.value)}
                 required
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="e.g., Minnesota, MN"
               />
             </div>
 
             <div>
-              <label htmlFor="timePublished" className="block text-xs font-medium text-gray-900 mb-1.5">
+              <label htmlFor="timePublished" className="block text-xs font-medium text-foreground mb-1.5">
                 Time Published
               </label>
               <select
                 id="timePublished"
                 value={formData.timePublished}
                 onChange={(e) => handleChange('timePublished', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                className={inputClass}
               >
                 <option value="1d">Last 24 hours</option>
                 <option value="7d">Last 7 days</option>
@@ -141,7 +144,7 @@ export default function NewsGenerateClient() {
             </div>
 
             <div>
-              <label htmlFor="country" className="block text-xs font-medium text-gray-900 mb-1.5">
+              <label htmlFor="country" className="block text-xs font-medium text-foreground mb-1.5">
                 Country
               </label>
               <input
@@ -149,13 +152,13 @@ export default function NewsGenerateClient() {
                 id="country"
                 value={formData.country}
                 onChange={(e) => handleChange('country', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="US"
               />
             </div>
 
             <div>
-              <label htmlFor="lang" className="block text-xs font-medium text-gray-900 mb-1.5">
+              <label htmlFor="lang" className="block text-xs font-medium text-foreground mb-1.5">
                 Language
               </label>
               <input
@@ -163,21 +166,21 @@ export default function NewsGenerateClient() {
                 id="lang"
                 value={formData.lang}
                 onChange={(e) => handleChange('lang', e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent"
+                className={inputClass}
                 placeholder="en"
               />
             </div>
           </div>
 
           {error && (
-            <div className="p-[10px] bg-red-50 border border-red-200 rounded-md">
-              <p className="text-xs text-red-600">{error}</p>
+            <div className="p-[10px] bg-red-500/10 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-md">
+              <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
             </div>
           )}
 
           {success && (
-            <div className="p-[10px] bg-green-50 border border-green-200 rounded-md">
-              <p className="text-xs text-green-600">
+            <div className="p-[10px] bg-green-500/10 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 rounded-md">
+              <p className="text-xs text-green-600 dark:text-green-400">
                 Articles saved successfully! Redirecting...
               </p>
             </div>
@@ -187,14 +190,14 @@ export default function NewsGenerateClient() {
             <button
               type="submit"
               disabled={loading || !!previewArticles}
-              className="px-4 py-2 text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-xs font-semibold text-white bg-lake-blue hover:bg-lake-blue/90 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Generating...' : 'Generate News'}
             </button>
             <button
               type="button"
               onClick={() => router.push('/news')}
-              className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-foreground bg-surface border border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/10 rounded-md transition-colors"
             >
               Cancel
             </button>
@@ -203,8 +206,8 @@ export default function NewsGenerateClient() {
 
         {previewArticles && previewArticles.length > 0 && (
           <div className="mt-6 space-y-3">
-            <div className="border border-gray-200 rounded-md bg-white p-[10px]">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">
+            <div className="border border-border-muted dark:border-white/10 rounded-md bg-surface p-[10px]">
+              <h2 className="text-sm font-semibold text-foreground mb-2">
                 Preview: {previewArticles.length} articles found
               </h2>
               <div className="space-y-3 max-h-[600px] overflow-y-auto scrollbar-hide">
@@ -213,11 +216,11 @@ export default function NewsGenerateClient() {
                   return (
                     <div
                       key={idx}
-                      className="border border-gray-200 rounded-md p-[10px] space-y-1.5"
+                      className="border border-border-muted dark:border-white/10 rounded-md p-[10px] space-y-1.5"
                     >
                       <div className="flex gap-2">
                         {imageUrl && (
-                          <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-gray-100 relative">
+                          <div className="flex-shrink-0 w-20 h-20 rounded overflow-hidden bg-surface-accent dark:bg-white/10 relative">
                             <Image
                               src={imageUrl}
                               alt={article.title}
@@ -233,16 +236,16 @@ export default function NewsGenerateClient() {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-xs font-medium text-gray-900 line-clamp-2">
+                          <h3 className="text-xs font-medium text-foreground line-clamp-2">
                             {article.title}
                           </h3>
                           {article.source_name && (
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-foreground-muted mt-0.5">
                               {article.source_name}
                             </p>
                           )}
                           {article.snippet && (
-                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                            <p className="text-xs text-foreground-muted mt-1 line-clamp-2">
                               {article.snippet}
                             </p>
                           )}
@@ -258,14 +261,14 @@ export default function NewsGenerateClient() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 text-xs font-semibold text-white bg-gray-900 hover:bg-gray-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-xs font-semibold text-white bg-lake-blue hover:bg-lake-blue/90 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : `Save ${previewArticles.length} Articles`}
               </button>
               <button
                 onClick={handleCancel}
                 disabled={saving}
-                className="px-4 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-md transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-xs font-semibold text-foreground bg-surface border border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/10 rounded-md transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>

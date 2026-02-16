@@ -11,7 +11,7 @@ import { REQUEST_SIZE_LIMITS } from '@/lib/security/middleware';
 async function getPlanSlugFromPriceId(priceId: string | null): Promise<string | null> {
   if (!priceId) return null;
   
-  const supabase = createServiceClient() as any;
+  const supabase = await createServiceClient() as any;
   
   // Query billing.plans to find plan with matching price_id
   // Note: RPC function is in billing schema but called without schema prefix
@@ -37,7 +37,7 @@ async function updateAccountFromSubscription(
   customerId: string,
   subscription: Stripe.Subscription | null
 ): Promise<void> {
-  const supabase = createServiceClient() as any;
+  const supabase = await createServiceClient() as any;
 
   // Map Stripe subscription status to our subscription_status
   const statusMap: Record<string, string> = {
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log event to database immediately (before processing)
-    const supabase = createServiceClient() as any;
+    const supabase = await createServiceClient() as any;
     let eventRecordId: string | null = null;
     
     try {

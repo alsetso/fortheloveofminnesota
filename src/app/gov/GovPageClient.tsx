@@ -7,7 +7,7 @@ import GovBuildingsSidebar from './components/GovBuildingsSidebar';
 import GovDashboard from './components/GovDashboard';
 import GovToast from './components/GovToast';
 import { GovToastProvider } from './contexts/GovToastContext';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, BuildingOfficeIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 
 interface GovPageClientProps {
   isAuthenticated: boolean;
@@ -19,16 +19,39 @@ interface GovPageClientProps {
  */
 export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
   const [leaderSearchQuery, setLeaderSearchQuery] = useState('');
+  const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
 
   return (
     <GovToastProvider>
       <GovToast />
       <NewPageWrapper
-      leftSidebar={<GovOrgsSidebar />}
-      rightSidebar={<GovBuildingsSidebar />}
-    >
+        leftSidebar={<GovOrgsSidebar />}
+        rightSidebar={<GovBuildingsSidebar />}
+        mobileLeftSidebarOpen={mobileLeftOpen}
+        onMobileLeftSidebarOpenChange={setMobileLeftOpen}
+        mobileRightSidebarOpen={mobileRightOpen}
+        onMobileRightSidebarOpenChange={setMobileRightOpen}
+      >
       <div className="flex flex-col h-full min-h-0">
-        <div className="flex-shrink-0 py-10 px-4 border-b border-border-muted dark:border-white/10 bg-surface text-center">
+        <div className="flex-shrink-0 py-10 px-4 border-b border-border-muted dark:border-white/10 bg-surface text-center relative">
+          {/* Mobile: open left (organizations) and right (buildings) sidebars */}
+          <button
+            type="button"
+            onClick={() => setMobileLeftOpen(true)}
+            className="md:hidden absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+            aria-label="Open organizations"
+          >
+            <BuildingOfficeIcon className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileRightOpen(true)}
+            className="lg:hidden absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+            aria-label="Open buildings"
+          >
+            <BuildingStorefrontIcon className="w-4 h-4" />
+          </button>
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">
             Minnesota Civic
           </h1>

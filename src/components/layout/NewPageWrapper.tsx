@@ -59,6 +59,12 @@ interface NewPageWrapperProps {
   headerContent?: ReactNode;
   /** When true, main content area does not scroll (e.g. profile map). Root uses h-screen; main uses overflow-hidden and flex so a single full-height child fills the area. */
   mainNoScroll?: boolean;
+  /** When set, left sidebar can be shown as a mobile overlay when viewport is narrow. Gov page uses this. */
+  mobileLeftSidebarOpen?: boolean;
+  onMobileLeftSidebarOpenChange?: (open: boolean) => void;
+  /** When set, right sidebar can be shown as a mobile overlay when viewport is narrow. Gov page uses this. */
+  mobileRightSidebarOpen?: boolean;
+  onMobileRightSidebarOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -74,6 +80,10 @@ export default function NewPageWrapper({
   rightSidebar,
   headerContent,
   mainNoScroll = false,
+  mobileLeftSidebarOpen,
+  onMobileLeftSidebarOpenChange,
+  mobileRightSidebarOpen,
+  onMobileRightSidebarOpenChange,
 }: NewPageWrapperProps) {
   const pathname = usePathname();
   const hideRightSidebar = useMemo(() => shouldHideRightSidebar(pathname), [pathname]);
@@ -460,6 +470,60 @@ export default function NewPageWrapper({
           </aside>
         )}
       </div>
+
+      {/* Mobile overlay: left sidebar (e.g. /gov organizations) */}
+      {leftSidebar && !effectiveCanShowLeftSidebar && mobileLeftSidebarOpen && onMobileLeftSidebarOpenChange && (
+        <div className="fixed inset-0 z-[60] flex" role="dialog" aria-label="Organizations">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 transition-opacity"
+            onClick={() => onMobileLeftSidebarOpenChange(false)}
+            aria-label="Close"
+          />
+          <div className="relative w-64 max-w-[85vw] h-full bg-surface border-r border-border-muted dark:border-white/10 flex flex-col overflow-hidden">
+            <div className="flex-shrink-0 flex justify-end p-2 border-b border-border-muted dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => onMobileLeftSidebarOpenChange(false)}
+                className="w-8 h-8 rounded-md hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-4 h-4 text-foreground-muted" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+              {leftSidebar}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile overlay: right sidebar (e.g. /gov buildings) */}
+      {rightSidebar && !effectiveCanShowRightSidebar && mobileRightSidebarOpen && onMobileRightSidebarOpenChange && (
+        <div className="fixed inset-0 z-[60] flex justify-end" role="dialog" aria-label="Buildings">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50 transition-opacity"
+            onClick={() => onMobileRightSidebarOpenChange(false)}
+            aria-label="Close"
+          />
+          <div className="relative w-80 max-w-[85vw] h-full bg-surface border-l border-border-muted dark:border-white/10 flex flex-col overflow-hidden">
+            <div className="flex-shrink-0 flex justify-end p-2 border-b border-border-muted dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => onMobileRightSidebarOpenChange(false)}
+                className="w-8 h-8 rounded-md hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
+                aria-label="Close"
+              >
+                <XMarkIcon className="w-4 h-4 text-foreground-muted" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+              {rightSidebar}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Bottom Nav - Fixed at bottom, shows when left sidebar is hidden */}
       {!effectiveCanShowLeftSidebar && (

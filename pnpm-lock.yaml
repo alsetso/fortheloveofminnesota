@@ -71,6 +71,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.10.7
         version: 3.19.0
+      '@turf/area':
+        specifier: ^7.3.4
+        version: 7.3.4
       '@types/dompurify':
         specifier: ^3.0.5
         version: 3.2.0
@@ -1070,14 +1073,23 @@ packages:
   '@tiptap/starter-kit@3.19.0':
     resolution: {integrity: sha512-dTCkHEz+Y8ADxX7h+xvl6caAj+3nII/wMB1rTQchSuNKqJTOrzyUsCWm094+IoZmLT738wANE0fRIgziNHs/ug==}
 
+  '@turf/area@7.3.4':
+    resolution: {integrity: sha512-UEQQFw2XwHpozSBAMEtZI3jDsAad4NnHL/poF7/S6zeDCjEBCkt3MYd6DSGH/cvgcOozxH/ky3/rIVSMZdx4vA==}
+
   '@turf/clone@7.3.3':
     resolution: {integrity: sha512-IrG3zXKy++xmnQAuL3ZQDVHdsTpKoEY87cLwsKg1Z1VnH7egluxL0T6VTwcu1l64c0QeBtnTjXJBC8XiO4ajog==}
 
   '@turf/helpers@7.3.3':
     resolution: {integrity: sha512-9Ias0L1GuZPIzO6sk8jraTEuLJye6n9LYNEdw69ZGOQ6C1IigjxkPW49zmn21aTv1z27vxdVLSS3r+78DB2QnQ==}
 
+  '@turf/helpers@7.3.4':
+    resolution: {integrity: sha512-U/S5qyqgx3WTvg4twaH0WxF3EixoTCfDsmk98g1E3/5e2YKp7JKYZdz0vivsS5/UZLJeZDEElOSFH4pUgp+l7g==}
+
   '@turf/meta@7.3.3':
     resolution: {integrity: sha512-Tz1j4h70iFB5SebWWoVv/uL59x4aOngXU+d1xQDXzOCn/O6txnreGVGMcYU362c5F06yqZx38H9UFTQ553lK0w==}
+
+  '@turf/meta@7.3.4':
+    resolution: {integrity: sha512-tlmw9/Hs1p2n0uoHVm1w3ugw1I6L8jv9YZrcdQa4SH5FX5UY0ATrKeIvfA55FlL//PGuYppJp+eyg/0eb4goqw==}
 
   '@turf/projection@7.3.3':
     resolution: {integrity: sha512-yFPO74m0n/z9kO472AzyBkl9yMrMQJnUsh4O/Qr3FkGX0hauCWvkSkMrDS4Ax0fD/WoNJBjl84AimMtNs75h4g==}
@@ -4825,6 +4837,13 @@ snapshots:
       '@tiptap/extensions': 3.19.0(@tiptap/core@3.19.0(@tiptap/pm@3.19.0))(@tiptap/pm@3.19.0)
       '@tiptap/pm': 3.19.0
 
+  '@turf/area@7.3.4':
+    dependencies:
+      '@turf/helpers': 7.3.4
+      '@turf/meta': 7.3.4
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
   '@turf/clone@7.3.3':
     dependencies:
       '@turf/helpers': 7.3.3
@@ -4836,9 +4855,20 @@ snapshots:
       '@types/geojson': 7946.0.16
       tslib: 2.8.1
 
+  '@turf/helpers@7.3.4':
+    dependencies:
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
   '@turf/meta@7.3.3':
     dependencies:
       '@turf/helpers': 7.3.3
+      '@types/geojson': 7946.0.16
+      tslib: 2.8.1
+
+  '@turf/meta@7.3.4':
+    dependencies:
+      '@turf/helpers': 7.3.4
       '@types/geojson': 7946.0.16
       tslib: 2.8.1
 

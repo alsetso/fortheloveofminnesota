@@ -93,7 +93,8 @@ export default function EntityDetailPage({ entitySlug, recordId }: EntityDetailP
     if (!config || !record) return;
 
     config.relationships.forEach((rel) => {
-      const params = new URLSearchParams({ limit: '200' });
+      const targetConfig = getEntityConfigById(rel.targetType);
+      const params = new URLSearchParams({ limit: '200', ...targetConfig?.apiParams });
       if (rel.scopeParam && rel.scopeField) {
         const val = record[rel.scopeField];
         if (val != null) params.set(rel.scopeParam, String(val));
@@ -124,12 +125,15 @@ export default function EntityDetailPage({ entitySlug, recordId }: EntityDetailP
   /* ── aggregated stats for counties (from children) ── */
   const aggregatedStats = useMemo(() => {
     if (!config || config.id !== 'counties') return null;
-    const cities = (relatedData['cities-and-towns'] ?? []) as Record<string, unknown>[];
-    if (cities.length === 0) return null;
-    const pop = cities.reduce((s, c) => s + (Number(c.population) || 0), 0);
-    const acres = cities.reduce((s, c) => s + (Number(c.acres) || 0), 0);
+    const allPlaces = [
+      ...((relatedData['cities'] ?? []) as Record<string, unknown>[]),
+      ...((relatedData['towns'] ?? []) as Record<string, unknown>[]),
+    ];
+    if (allPlaces.length === 0) return null;
+    const pop = allPlaces.reduce((s, c) => s + (Number(c.population) || 0), 0);
+    const acres = allPlaces.reduce((s, c) => s + (Number(c.acres) || 0), 0);
     return {
-      places: cities.length,
+      places: allPlaces.length,
       population: pop,
       area: acres ? `${Math.round(acres / 640).toLocaleString()} sq mi` : null,
     };
@@ -283,13 +287,15 @@ function RelationshipSection({
   const targetConfig = getEntityConfigById(rel.targetType);
   if (!targetConfig) return null;
 
+  const isCtu = targetConfig.id === 'cities-and-towns' || targetConfig.id === 'cities' || targetConfig.id === 'towns';
+
   const sorted = useMemo(() => {
     const arr = records as Record<string, unknown>[];
-    if (targetConfig.id === 'cities-and-towns') {
+    if (isCtu) {
       return [...arr].sort((a, b) => (Number(b.population) || 0) - (Number(a.population) || 0));
     }
     return arr;
-  }, [records, targetConfig.id]);
+  }, [records, isCtu]);
 
   const visible = sorted.slice(0, 20);
   const hasMore = sorted.length > 20;
@@ -318,10 +324,11 @@ function RelationshipSection({
             const rName =
               r[targetConfig.nameField] != null ? String(r[targetConfig.nameField]) : 'Unknown';
             const rId = r.id as string | undefined;
+            const detailSlug = targetConfig.detailSlug ?? targetConfig.slug;
             return (
               <Link
                 key={rId ?? i}
-                href={rId ? `/explore/${targetConfig.slug}/${rId}` : '#'}
+                href={rId ? `/explore/${detailSlug}/${rId}` : '#'}
                 className="flex items-center justify-between px-2.5 py-2 hover:bg-surface-accent transition-colors group"
               >
                 <div className="flex items-center gap-2 min-w-0">
@@ -331,7 +338,7 @@ function RelationshipSection({
                   <span className="text-xs text-foreground group-hover:text-lake-blue transition-colors truncate">
                     {rName}
                   </span>
-                  {targetConfig.id === 'cities-and-towns' &&
+                  {isCtu &&
                     r.ctu_class &&
                     r.ctu_class !== 'CITY' && (
                       <span className="text-[9px] text-foreground-subtle uppercase tracking-wide">
@@ -340,7 +347,7 @@ function RelationshipSection({
                     )}
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  {targetConfig.id === 'cities-and-towns' && r.population != null && (
+                  {isCtu && r.population != null && (
                     <span className="text-[10px] text-foreground-muted tabular-nums">
                       {Number(r.population).toLocaleString()}
                     </span>

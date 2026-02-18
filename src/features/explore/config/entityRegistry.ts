@@ -41,6 +41,8 @@ export type EntityTypeId =
   | 'state'
   | 'counties'
   | 'cities-and-towns'
+  | 'cities'
+  | 'towns'
   | 'congressional-districts'
   | 'water'
   | 'school-districts'
@@ -126,6 +128,10 @@ export interface EntityTypeConfig {
   schema?: 'layers' | 'atlas';
   /** For atlas tables: the raw DB table name in the atlas schema */
   dbTable?: string;
+  /** Static query params appended to all API requests (e.g. filtering a shared table) */
+  apiParams?: Record<string, string>;
+  /** Slug to resolve individual record detail pages when different from this entity's slug */
+  detailSlug?: string;
   /**
    * Child point markers shown on the map when a record of this entity is focused.
    * e.g., school buildings shown inside a school district boundary.
@@ -193,8 +199,16 @@ export const ENTITY_REGISTRY: EntityTypeConfig[] = [
     parentType: 'state',
     relationships: [
       {
-        targetType: 'cities-and-towns',
-        label: 'Cities & Towns',
+        targetType: 'cities',
+        label: 'Cities',
+        kind: 'children',
+        apiEndpoint: '/api/civic/ctu-boundaries',
+        scopeParam: 'county_name',
+        scopeField: 'county_name',
+      },
+      {
+        targetType: 'towns',
+        label: 'Towns',
         kind: 'children',
         apiEndpoint: '/api/civic/ctu-boundaries',
         scopeParam: 'county_name',
@@ -218,6 +232,66 @@ export const ENTITY_REGISTRY: EntityTypeConfig[] = [
     description: 'Cities, townships, and municipalities',
     icon: BuildingOfficeIcon,
     apiEndpoint: '/api/civic/ctu-boundaries',
+    nameField: 'feature_name',
+    statsFields: [
+      { key: 'population', label: 'Population', format: 'number' },
+      { key: 'acres', label: 'Area', format: 'area-acres' },
+      { key: 'ctu_class', label: 'Type', format: 'string' },
+      { key: 'county_name', label: 'County', format: 'string' },
+    ],
+    hasGeometry: true,
+    parentType: 'counties',
+    relationships: [],
+    directoryColumns: [
+      { key: 'feature_name', label: 'Name' },
+      { key: 'ctu_class', label: 'Type' },
+      { key: 'county_name', label: 'County' },
+      { key: 'population', label: 'Population', format: 'number' },
+    ],
+    defaultSort: 'feature_name',
+    defaultSortDir: 'asc',
+  },
+
+  /* ── Cities (filtered subset of cities_and_towns) ── */
+  {
+    id: 'cities',
+    slug: 'cities',
+    label: 'Cities',
+    singular: 'City',
+    description: '856 incorporated cities in Minnesota',
+    icon: BuildingOfficeIcon,
+    apiEndpoint: '/api/civic/ctu-boundaries',
+    apiParams: { ctu_class: 'CITY' },
+    detailSlug: 'cities-and-towns',
+    nameField: 'feature_name',
+    statsFields: [
+      { key: 'population', label: 'Population', format: 'number' },
+      { key: 'acres', label: 'Area', format: 'area-acres' },
+      { key: 'county_name', label: 'County', format: 'string' },
+    ],
+    hasGeometry: true,
+    parentType: 'counties',
+    relationships: [],
+    directoryColumns: [
+      { key: 'feature_name', label: 'Name' },
+      { key: 'county_name', label: 'County' },
+      { key: 'population', label: 'Population', format: 'number' },
+    ],
+    defaultSort: 'feature_name',
+    defaultSortDir: 'asc',
+  },
+
+  /* ── Towns (townships + unorganized territories) ── */
+  {
+    id: 'towns',
+    slug: 'towns',
+    label: 'Towns',
+    singular: 'Town',
+    description: '1,837 townships and unorganized territories',
+    icon: HomeModernIcon,
+    apiEndpoint: '/api/civic/ctu-boundaries',
+    apiParams: { ctu_class: 'TOWNSHIP,UNORGANIZED TERRITORY' },
+    detailSlug: 'cities-and-towns',
     nameField: 'feature_name',
     statsFields: [
       { key: 'population', label: 'Population', format: 'number' },

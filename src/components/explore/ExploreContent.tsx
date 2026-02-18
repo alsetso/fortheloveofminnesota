@@ -166,19 +166,36 @@ export default function ExploreContent() {
       </div>
 
       {/* ── stats grid ── */}
-      <div className={`grid gap-2 ${selectedCounty ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3 sm:grid-cols-3'}`}>
+      <div className={`grid gap-2 ${selectedCounty ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3 sm:grid-cols-4'}`}>
         {stats.population != null && (
           <StatBlock label="Population" value={stats.population.toLocaleString()} loading={selectedCounty ? loadingCities : false} />
         )}
         {!selectedCounty && (
           <StatBlock label="Counties" value={String(layerCounts?.counties ?? 87)} href="/explore/counties" loading={layerCounts === null} />
         )}
-        <StatBlock
-          label={selectedCounty ? 'Places' : 'Cities & Towns'}
-          value={String(stats.placeCount)}
-          href="/explore/cities-and-towns"
-          loading={selectedCounty ? loadingCities : layerCounts === null}
-        />
+        {selectedCounty ? (
+          <StatBlock
+            label="Places"
+            value={String(stats.placeCount)}
+            href="/explore/cities-and-towns"
+            loading={loadingCities}
+          />
+        ) : (
+          <>
+            <StatBlock
+              label="Cities"
+              value={String(layerCounts?.cities ?? 0)}
+              href="/explore/cities"
+              loading={layerCounts === null}
+            />
+            <StatBlock
+              label="Towns"
+              value={String(layerCounts?.towns ?? 0)}
+              href="/explore/towns"
+              loading={layerCounts === null}
+            />
+          </>
+        )}
         {(stats.area || layerCounts === null) && (
           <StatBlock label="Area" value={stats.area ?? ''} href="/explore/state" loading={selectedCounty ? loadingCities : false} />
         )}
@@ -290,7 +307,7 @@ export default function ExploreContent() {
             {selectedCounty ? `Places in ${selectedCounty}` : 'Largest Cities'}
           </h2>
           <Link
-            href="/explore/cities-and-towns"
+            href="/explore/cities"
             className="text-[10px] text-lake-blue hover:underline"
           >
             All Cities →
@@ -351,7 +368,8 @@ export default function ExploreContent() {
           <div className="border border-border rounded-md divide-y divide-border">
             {[
               { label: 'Counties', href: '/explore/counties', count: layerCounts.counties },
-              { label: 'Cities & Towns', href: '/explore/cities-and-towns', count: layerCounts.cities_and_towns },
+              { label: 'Cities', href: '/explore/cities', count: layerCounts.cities },
+              { label: 'Towns', href: '/explore/towns', count: layerCounts.towns },
               { label: 'Congressional Districts', href: '/explore/congressional-districts', count: layerCounts.districts },
               { label: 'Water Bodies', href: '/explore/water', count: layerCounts.water },
               { label: 'School Districts', href: '/explore/school-districts', count: layerCounts.school_districts },

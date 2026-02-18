@@ -92,7 +92,8 @@ export default function ExploreRightSidebar() {
         <nav className="space-y-0.5">
           {[
             { label: 'Browse Counties', href: '/explore/counties' },
-            { label: 'Browse Cities & Towns', href: '/explore/cities-and-towns' },
+            { label: 'Browse Cities', href: '/explore/cities' },
+            { label: 'Browse Towns', href: '/explore/towns' },
             { label: 'Congressional Districts', href: '/explore/congressional-districts' },
             { label: 'Minnesota News', href: '/news' },
           ].map((link) => (

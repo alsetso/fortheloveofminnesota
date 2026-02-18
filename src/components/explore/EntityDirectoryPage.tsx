@@ -64,7 +64,7 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
   useEffect(() => {
     if (viewMode !== 'map' || !canShowInlineMap || !config || mapRecords != null) return;
     setMapLoading(true);
-    const params = new URLSearchParams({ limit: '1200', offset: '0' });
+    const params = new URLSearchParams({ limit: '1200', offset: '0', ...config.apiParams });
     fetch(`${config.apiEndpoint}?${params}`)
       .then((r) => (r.ok ? r.json() : { data: [] }))
       .then((json) => {
@@ -82,7 +82,7 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
     setTotalCount(null);
 
     if (isPaginated) {
-      const params = new URLSearchParams({ limit: String(pageSize), offset: '0' });
+      const params = new URLSearchParams({ limit: String(pageSize), offset: '0', ...config.apiParams });
       fetch(`${config.apiEndpoint}?${params}`)
         .then((r) => (r.ok ? r.json() : { data: [], total: 0 }))
         .then((json: { data?: unknown[]; total?: number }) => {
@@ -98,7 +98,7 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
       return;
     }
 
-    const params = new URLSearchParams({ limit: '3000' });
+    const params = new URLSearchParams({ limit: '3000', ...config.apiParams });
     const url =
       config.id === 'news'
         ? `${config.apiEndpoint}?limit=50`
@@ -161,7 +161,7 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
   async function loadMore() {
     if (!config || !isPaginated || loadingMore || totalCount == null || records.length >= totalCount) return;
     setLoadingMore(true);
-    const params = new URLSearchParams({ limit: String(pageSize), offset: String(records.length) });
+    const params = new URLSearchParams({ limit: String(pageSize), offset: String(records.length), ...config.apiParams });
     try {
       const r = await fetch(`${config.apiEndpoint}?${params}`);
       const json = r.ok ? (await r.json()) : { data: [], total: totalCount };
@@ -173,6 +173,7 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
   }
 
   const baseUrl = config ? entityUrl(config) : `/explore/${entitySlug}`;
+  const detailBaseUrl = config?.detailSlug ? `/explore/${config.detailSlug}` : baseUrl;
 
   function switchToMap() {
     const params = new URLSearchParams(searchParams.toString());
@@ -304,10 +305,11 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
               const rSlug = rec.slug as string | undefined;
               const rId = rec.id as string | undefined;
               const recordKey = (config.schema === 'atlas' && rSlug) ? rSlug : rId;
+              const recordHref = recordKey ? `${detailBaseUrl}/${recordKey}` : '#';
               return (
                 <Link
                   key={rId ?? i}
-                  href={recordKey ? entityUrl(config, recordKey) : '#'}
+                  href={recordHref}
                   className="flex items-center hover:bg-surface-accent transition-colors group"
                 >
                   <div className="w-10 flex-shrink-0 text-center text-[10px] text-foreground-subtle tabular-nums py-2">

@@ -15,9 +15,8 @@ import { commonSchemas } from '@/lib/security/validation';
  */
 const ctuBoundariesQuerySchema = z.object({
   id: commonSchemas.uuid.optional(),
-  ctu_class: z.enum(['CITY', 'TOWNSHIP', 'UNORGANIZED TERRITORY']).optional(),
+  ctu_class: z.string().max(100).optional(),
   county_name: z.string().max(200).optional(),
-  // Coerce string to number for limit parameter (query params come as strings)
   limit: z.coerce.number().int().positive().max(3000).optional(),
 });
 
@@ -32,15 +31,20 @@ export async function GET(request: NextRequest) {
           return validation.error;
         }
         
-        const { id, ctu_class: ctuClass, county_name: countyName, limit } = validation.data;
+        const { id, ctu_class: ctuClassRaw, county_name: countyName, limit } = validation.data;
         
-        // Use RPC function to query layers schema (public resources)
         const { createSupabaseClient } = await import('@/lib/supabase/unified');
         const supabase = await createSupabaseClient();
         
+        const classes = ctuClassRaw?.includes(',')
+          ? ctuClassRaw.split(',').map((s) => s.trim())
+          : null;
+        const singleClass = !classes ? (ctuClassRaw || null) : null;
+        
         const { data, error } = await supabase.rpc('get_ctu_boundaries', {
           p_id: id || null,
-          p_ctu_class: ctuClass || null,
+          p_ctu_class: singleClass,
+          p_ctu_classes: classes,
           p_county_name: countyName || null,
           p_limit: limit ?? 3000
         });

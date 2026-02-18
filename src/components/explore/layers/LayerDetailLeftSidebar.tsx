@@ -1,15 +1,24 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { getLayerConfigBySlug } from '@/features/map/config/layersConfig';
+import {
+  getStateBoundary,
+  getCountyBoundaries,
+  getCTUBoundaries,
+  getCongressionalDistricts,
+  getWater,
+  getSchoolDistricts,
+} from '@/features/map/services/liveBoundaryCache';
+
+type LayerType = 'state' | 'county' | 'ctu' | 'district' | 'water' | 'school-district';
 
 interface LayerDetailLeftSidebarProps {
   layerSlug: string;
-  /** Record id from /explore/[table]/[slug] path */
   selectedRecordId?: string;
   onRecordSelect?: (record: {
-    layer: 'state' | 'county' | 'ctu' | 'district';
+    layer: LayerType;
     id: string;
     name: string;
     lat: number;
@@ -24,9 +33,20 @@ interface LayerRecord {
   [key: string]: any;
 }
 
+const SLUG_TO_LAYER: Record<string, LayerType> = {
+  state: 'state',
+  counties: 'county',
+  'cities-and-towns': 'ctu',
+  'congressional-districts': 'district',
+  water: 'water',
+  'school-districts': 'school-district',
+};
+
 /**
- * Left Sidebar for Layer Detail Page
- * Shows all records for the layer with search functionality
+ * Left Sidebar for Layer Detail Page.
+ * Civic boundary layers (state, county, CTU, district) use liveBoundaryCache
+ * so they share the same in-memory data as the map layer components — no
+ * duplicate API calls. Water uses its own paginated API endpoint.
  */
 export default function LayerDetailLeftSidebar({
   layerSlug,
@@ -36,6 +56,7 @@ export default function LayerDetailLeftSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<LayerRecord[]>([]);
   const [loading, setLoading] = useState(true);
+
   const layerConfig = useMemo(() => {
     const config = getLayerConfigBySlug(layerSlug);
     if (!config) return null;
@@ -47,61 +68,106 @@ export default function LayerDetailLeftSidebar({
     };
   }, [layerSlug]);
 
-  // Fetch records
   useEffect(() => {
     if (!layerConfig) return;
 
-    const fetchRecords = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(layerConfig.apiEndpoint);
-        if (response.ok) {
-          const data = await response.json();
-          // Handle single object (state) vs array
-          const recordsList = Array.isArray(data) ? data : [data];
-          
-          // Transform to LayerRecord format
-          const transformed = recordsList.map((record: any) => ({
-            id: record.id || record.county_id || record.district_number?.toString() || '',
-            name: record[layerConfig.nameField] || record.feature_name || record.county_name || `District ${record.district_number}` || 'Unknown',
-            ...record,
-          }));
+    let cancelled = false;
+    setLoading(true);
 
-          // Sort by name
-          transformed.sort((a, b) => {
-            const nameA = String(a.name || '').toLowerCase();
-            const nameB = String(b.name || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-
-          setRecords(transformed);
-        }
-      } catch (error) {
-        console.error('Error fetching layer records:', error);
-      } finally {
-        setLoading(false);
-      }
+    const transformRecords = (rawList: any[], nameField: string): LayerRecord[] => {
+      const list = rawList.map((record: any) => ({
+        id: record.id || record.county_id || record.district_number?.toString() || '',
+        name:
+          record[nameField] ||
+          record.short_name ||
+          record.feature_name ||
+          record.county_name ||
+          (record.district_number != null ? `District ${record.district_number}` : '') ||
+          'Unknown',
+        ...record,
+      }));
+      list.sort((a: LayerRecord, b: LayerRecord) =>
+        String(a.name || '').toLowerCase().localeCompare(String(b.name || '').toLowerCase())
+      );
+      return list;
     };
 
-    fetchRecords();
-  }, [layerConfig]);
+    const handleResult = (data: any) => {
+      if (cancelled) return;
+      const arr = Array.isArray(data) ? data : [data];
+      setRecords(transformRecords(arr, layerConfig.nameField));
+    };
 
-  // Filter records based on search
+    // Civic boundary layers: reuse liveBoundaryCache (same promise the map layer uses)
+    if (layerSlug === 'state') {
+      getStateBoundary()
+        .then((d) => handleResult([d]))
+        .catch(() => !cancelled && setRecords([]))
+        .finally(() => !cancelled && setLoading(false));
+      return () => { cancelled = true; };
+    }
+    if (layerSlug === 'counties') {
+      getCountyBoundaries()
+        .then(handleResult)
+        .catch(() => !cancelled && setRecords([]))
+        .finally(() => !cancelled && setLoading(false));
+      return () => { cancelled = true; };
+    }
+    if (layerSlug === 'cities-and-towns') {
+      getCTUBoundaries()
+        .then(handleResult)
+        .catch(() => !cancelled && setRecords([]))
+        .finally(() => !cancelled && setLoading(false));
+      return () => { cancelled = true; };
+    }
+    if (layerSlug === 'congressional-districts') {
+      getCongressionalDistricts()
+        .then(handleResult)
+        .catch(() => !cancelled && setRecords([]))
+        .finally(() => !cancelled && setLoading(false));
+      return () => { cancelled = true; };
+    }
+    if (layerSlug === 'water') {
+      getWater()
+        .then(handleResult)
+        .catch(() => !cancelled && setRecords([]))
+        .finally(() => !cancelled && setLoading(false));
+      return () => { cancelled = true; };
+    }
+    if (layerSlug === 'school-districts') {
+      getSchoolDistricts()
+        .then(handleResult)
+        .catch(() => !cancelled && setRecords([]))
+        .finally(() => !cancelled && setLoading(false));
+      return () => { cancelled = true; };
+    }
+
+    // Fallback: fetch from API (e.g. future layers)
+    fetch(layerConfig.apiEndpoint)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (cancelled) return;
+        const arr = Array.isArray(data) ? data : [data];
+        setRecords(transformRecords(arr, layerConfig.nameField));
+      })
+      .catch(() => !cancelled && setRecords([]))
+      .finally(() => !cancelled && setLoading(false));
+
+    return () => { cancelled = true; };
+  }, [layerConfig, layerSlug]);
+
   const filteredRecords = useMemo(() => {
     if (!searchQuery.trim()) return records;
-    
     const query = searchQuery.toLowerCase();
     return records.filter((record) => {
       const name = String(record.name || '').toLowerCase();
-      // Also search in county_name for cities
       const countyName = String(record.county_name || '').toLowerCase();
       return name.includes(query) || countyName.includes(query);
     });
   }, [records, searchQuery]);
 
   const handleRecordClick = (record: LayerRecord) => {
-    const layerType =
-      layerSlug === 'state' ? 'state' : layerSlug === 'counties' ? 'county' : layerSlug === 'cities-and-towns' ? 'ctu' : 'district';
+    const layerType = SLUG_TO_LAYER[layerSlug] ?? 'state';
     onRecordSelect?.({
       layer: layerType,
       id: record.id,
@@ -164,18 +230,19 @@ export default function LayerDetailLeftSidebar({
               const isSelected = selectedRecordId === record.id;
               const displayName = record.name || 'Unknown';
               const countyName = record.county_name;
-              
+
               return (
-                <button
+                <ScrollIntoViewButton
                   key={record.id}
+                  isSelected={isSelected}
                   onClick={() => handleRecordClick(record)}
                   className={`w-full text-left px-2 py-1.5 text-xs rounded-md transition-colors ${
                     isSelected
-                      ? 'bg-lake-blue/20 text-foreground border border-lake-blue/40'
+                      ? 'bg-lake-blue/10 text-foreground font-semibold border-l-2 border-lake-blue'
                       : 'text-foreground-muted hover:bg-surface-accent hover:text-foreground'
                   }`}
                 >
-                  <div className="font-medium truncate">{displayName}</div>
+                  <div className="truncate">{displayName}</div>
                   {countyName && (
                     <div className="text-[10px] text-foreground-subtle truncate">{countyName}</div>
                   )}
@@ -187,12 +254,39 @@ export default function LayerDetailLeftSidebar({
                       {record.population.toLocaleString()} people
                     </div>
                   )}
-                </button>
+                </ScrollIntoViewButton>
               );
             })}
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/** Auto-scrolls into view on mount when selected */
+function ScrollIntoViewButton({
+  isSelected,
+  onClick,
+  className,
+  children,
+}: {
+  isSelected: boolean;
+  onClick: () => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isSelected && ref.current) {
+      ref.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [isSelected]);
+
+  return (
+    <button ref={ref} onClick={onClick} className={className}>
+      {children}
+    </button>
   );
 }

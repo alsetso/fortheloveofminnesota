@@ -5,7 +5,7 @@
  * Click: id + name + lat/lng from feature.
  */
 
-export type ExploreLayerType = 'state' | 'county' | 'ctu' | 'district';
+export type ExploreLayerType = 'state' | 'county' | 'ctu' | 'district' | 'water' | 'school-district';
 
 export interface ExploreLayerInteractionConfig {
   layer: ExploreLayerType;
@@ -49,6 +49,18 @@ const CONFIG: Record<string, ExploreLayerInteractionConfig> = {
       return num ? `District ${num}` : 'District';
     },
   },
+  water: {
+    layer: 'water',
+    fillLayerIds: ['water-boundaries-fill'],
+    getId: (p) => String(p.water_id ?? p.id ?? ''),
+    getName: (p) => String(p.name ?? p.gnis_name ?? p.nhd_feature_id ?? 'Water body'),
+  },
+  'school-districts': {
+    layer: 'school-district',
+    fillLayerIds: ['school-districts-fill'],
+    getId: (p) => String(p.id ?? ''),
+    getName: (p) => String(p.name ?? p.short_name ?? 'School District'),
+  },
 };
 
 export function getExploreLayerInteractionConfig(layerSlug: string): ExploreLayerInteractionConfig | null {
@@ -70,6 +82,8 @@ export const EXPLORE_HIERARCHY: Record<
   counties: { child: 'cities-and-towns', filterBy: 'county_name' },
   'cities-and-towns': { child: null, filterBy: null },
   'congressional-districts': { child: null, filterBy: null },
+  water: { child: null, filterBy: null },
+  'school-districts': { child: null, filterBy: null },
 };
 
 export function getExploreChildContext(
@@ -95,6 +109,8 @@ export function getConfigForLayerId(layerId: string | undefined): ExploreLayerIn
   if (layerId === 'state-boundary-fill') return CONFIG.state;
   if (layerId === 'county-boundaries-fill') return CONFIG.counties;
   if (layerId === 'ctu-boundaries-fill') return CONFIG['cities-and-towns'];
+  if (layerId === 'water-boundaries-fill') return CONFIG.water;
+  if (layerId === 'school-districts-fill') return CONFIG['school-districts'];
   const m = layerId.match(/^congressional-district-(\d+)-fill$/);
   return m ? CONFIG['congressional-districts'] : null;
 }

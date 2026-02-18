@@ -16,7 +16,7 @@ import { commonSchemas } from '@/lib/security/validation';
 const countyBoundariesQuerySchema = z.object({
   id: commonSchemas.uuid.optional(),
   county_name: z.string().max(200).optional(),
-  limit: commonSchemas.positiveInt.max(3000).optional(),
+  limit: z.coerce.number().int().positive().max(3000).optional(),
 });
 
 export async function GET(request: NextRequest) {

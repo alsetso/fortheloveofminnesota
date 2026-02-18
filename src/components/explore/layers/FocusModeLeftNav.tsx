@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { getLayerConfigBySlug } from '@/features/map/config/layersConfig';
+import { getEntityConfig } from '@/features/explore/config/entityRegistry';
+import ExploreBreadcrumb from '@/components/explore/ExploreBreadcrumb';
 
 interface FocusModeLeftNavProps {
   table: string;
@@ -14,7 +15,7 @@ interface FocusModeLeftNavProps {
  * Replaces the full list; provides back navigation and context.
  */
 export default function FocusModeLeftNav({ table, recordName }: FocusModeLeftNavProps) {
-  const config = getLayerConfigBySlug(table);
+  const config = getEntityConfig(table);
   const tableLabel = config?.label ?? table;
 
   return (
@@ -29,28 +30,7 @@ export default function FocusModeLeftNav({ table, recordName }: FocusModeLeftNav
         </Link>
       </div>
       <div className="p-[10px] flex-1">
-        <nav className="space-y-1">
-          <div className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide px-2">
-            Breadcrumb
-          </div>
-          <Link
-            href="/explore"
-            className="block px-2 py-1.5 text-xs rounded-md text-foreground-muted hover:bg-surface-accent hover:text-foreground transition-colors"
-          >
-            Explore
-          </Link>
-          <Link
-            href={`/explore/${table}`}
-            className="block px-2 py-1.5 text-xs rounded-md text-foreground-muted hover:bg-surface-accent hover:text-foreground transition-colors"
-          >
-            {tableLabel}
-          </Link>
-          {recordName && (
-            <div className="px-2 py-1.5 text-xs font-medium text-foreground truncate">
-              {recordName}
-            </div>
-          )}
-        </nav>
+        <ExploreBreadcrumb entitySlug={table} recordName={recordName} variant="stacked" />
       </div>
     </div>
   );

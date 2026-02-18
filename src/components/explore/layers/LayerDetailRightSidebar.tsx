@@ -1,220 +1,251 @@
 'use client';
 
-import { MapPinIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { getLayerConfigBySlug } from '@/features/map/config/layersConfig';
+import Link from 'next/link';
+import { MapPinIcon, XMarkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { getEntityConfig } from '@/features/explore/config/entityRegistry';
+import type { ChildFeature } from '@/features/map/components/ChildPinsLayer';
+
+interface BoundarySelection {
+  layer: string;
+  id: string;
+  name: string;
+  lat?: number;
+  lng?: number;
+  details?: Record<string, unknown>;
+}
 
 interface LayerDetailRightSidebarProps {
   layerSlug: string;
-  /** Selected from useExploreRecord—details already in boundary.details */
-  selectedBoundary: {
-    layer: 'state' | 'county' | 'ctu' | 'district';
-    id: string;
-    name: string;
-    lat?: number;
-    lng?: number;
-    details?: Record<string, unknown>;
-  } | null;
-  /** Hovered only; no API fetch—just show name */
+  selectedBoundary: BoundarySelection | null;
   hoveredBoundary?: { layer: string; id: string; name: string } | null;
-  /** Loading state from parent (useExploreRecord) */
   loading?: boolean;
   onClearSelection: () => void;
+  /** Child features loaded by map ChildPinsLayer */
+  childFeatures?: ChildFeature[];
 }
 
-/**
- * Right Sidebar for Layer Detail Page
- * Shows details from selected boundary (single fetch from parent, no duplicate API calls)
- */
 export default function LayerDetailRightSidebar({
   layerSlug,
   selectedBoundary,
   hoveredBoundary = null,
   loading = false,
   onClearSelection,
+  childFeatures,
 }: LayerDetailRightSidebarProps) {
-  const layerConfig = getLayerConfigBySlug(layerSlug);
-  const Icon = layerConfig?.icon ?? MapPinIcon;
-
+  const entityConfig = getEntityConfig(layerSlug);
+  const Icon = entityConfig?.icon ?? MapPinIcon;
   const displayBoundary = selectedBoundary || hoveredBoundary;
 
+  /* ── empty state ── */
   if (!displayBoundary) {
     return (
       <div className="h-full flex flex-col overflow-y-auto scrollbar-hide">
         <div className="p-[10px] border-b border-border flex-shrink-0">
           <h2 className="text-sm font-semibold text-foreground">Details</h2>
-          <p className="text-[10px] text-foreground-muted mt-0.5">Click a list item or hover over the map</p>
+          <p className="text-[10px] text-foreground-muted mt-0.5">
+            Select a record to view details
+          </p>
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
-            <Icon className="w-12 h-12 text-foreground-subtle mx-auto mb-3" />
+            <Icon className="w-10 h-10 text-foreground-subtle mx-auto mb-2" />
             <p className="text-xs text-foreground-muted">No area selected</p>
-            <p className="text-[10px] text-foreground-subtle mt-1">Click a list item or hover over a boundary</p>
+            <p className="text-[10px] text-foreground-subtle mt-0.5">
+              Click a record or boundary
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  const displayData = selectedBoundary?.details ?? {};
-  const showFullDetails = Boolean(selectedBoundary);
-  const displayName = displayBoundary.name;
+  const details = selectedBoundary?.details ?? {};
+  const showFull = Boolean(selectedBoundary);
+  const statsFields = entityConfig?.statsFields ?? [];
+  const childPinsConfig = entityConfig?.childPins;
+  const hasChildren = Boolean(childPinsConfig);
+  const childList = childFeatures ?? [];
 
   return (
     <div className="h-full flex flex-col overflow-y-auto scrollbar-hide">
+      {/* Header */}
       <div className="p-[10px] border-b border-border flex-shrink-0">
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-2">
-            <Icon className="w-4 h-4 text-lake-blue" />
-            <h2 className="text-sm font-semibold text-foreground">Details</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <Icon className="w-4 h-4 text-lake-blue flex-shrink-0" />
+            <h2 className="text-sm font-semibold text-foreground truncate">
+              {displayBoundary.name}
+            </h2>
           </div>
-          <button
-            onClick={onClearSelection}
-            className="p-1 hover:bg-surface-accent rounded transition-colors"
-            aria-label="Close"
-          >
-            <XMarkIcon className="w-4 h-4 text-foreground-muted" />
-          </button>
+          {showFull && (
+            <button
+              onClick={onClearSelection}
+              className="p-1 hover:bg-surface-accent rounded transition-colors flex-shrink-0"
+              aria-label="Close"
+            >
+              <XMarkIcon className="w-3.5 h-3.5 text-foreground-muted" />
+            </button>
+          )}
         </div>
-        <p className="text-xs font-medium text-foreground">{displayName}</p>
+        {entityConfig && (
+          <p className="text-[10px] text-foreground-muted mt-0.5">{entityConfig.singular}</p>
+        )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-[10px] space-y-3">
-        {!showFullDetails ? (
-          <p className="text-xs text-foreground-muted">Click to view details</p>
+      {/* Body */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+        {!showFull ? (
+          <div className="p-[10px] text-xs text-foreground-muted">Click to view details</div>
         ) : loading ? (
-          <div className="text-xs text-foreground-muted">Loading details...</div>
+          <div className="p-[10px] space-y-2">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-3 rounded bg-surface-accent animate-pulse" />
+            ))}
+          </div>
         ) : (
           <>
-            <div className="space-y-2">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Information</h3>
-              <div className="space-y-1.5">
-                {displayData.feature_name && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Name</div>
-                    <div className="text-xs text-foreground">{String(displayData.feature_name)}</div>
-                  </div>
-                )}
-                {displayData.county_name && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">County</div>
-                    <div className="text-xs text-foreground">{String(displayData.county_name)}</div>
-                  </div>
-                )}
-                {displayData.ctu_class && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Type</div>
-                    <div className="text-xs text-foreground">{String(displayData.ctu_class)}</div>
-                  </div>
-                )}
-                {displayData.district_number != null && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">District Number</div>
-                    <div className="text-xs text-foreground">{String(displayData.district_number)}</div>
-                  </div>
-                )}
-                {displayData.county_code && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">County Code</div>
-                    <div className="text-xs text-foreground">{String(displayData.county_code)}</div>
-                  </div>
-                )}
-                {typeof displayData.population === 'number' && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Population</div>
-                    <div className="text-xs text-foreground">{displayData.population.toLocaleString()}</div>
-                  </div>
-                )}
-                {typeof displayData.acres === 'number' && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Acres</div>
-                    <div className="text-xs text-foreground">{displayData.acres.toLocaleString()}</div>
-                  </div>
-                )}
-                {displayData.description && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Description</div>
-                    <div className="text-xs text-foreground">{String(displayData.description)}</div>
-                  </div>
-                )}
-                {displayData.publisher && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Source</div>
-                    <div className="text-xs text-foreground">{String(displayData.publisher)}</div>
-                  </div>
-                )}
-                {displayData.source_date && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">Source Date</div>
-                    <div className="text-xs text-foreground">{String(displayData.source_date)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-3 border-t border-border">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Location</h3>
-              <div className="space-y-1.5">
-                <div>
-                  <div className="text-[10px] text-foreground-subtle">Latitude</div>
-                  <div className="text-xs text-foreground font-mono">
-                    {selectedBoundary && typeof selectedBoundary.lat === 'number' && !Number.isNaN(selectedBoundary.lat)
-                      ? selectedBoundary.lat.toFixed(6)
-                      : String(selectedBoundary?.lat ?? '—')}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-foreground-subtle">Longitude</div>
-                  <div className="text-xs text-foreground font-mono">
-                    {selectedBoundary && typeof selectedBoundary.lng === 'number' && !Number.isNaN(selectedBoundary.lng)
-                      ? selectedBoundary.lng.toFixed(6)
-                      : String(selectedBoundary?.lng ?? '—')}
-                  </div>
-                </div>
-                {displayData.id && (
-                  <div>
-                    <div className="text-[10px] text-foreground-subtle">ID</div>
-                    <div className="text-xs text-foreground font-mono">{String(displayData.id)}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {Object.keys(displayData).length > 0 && (
-              <div className="space-y-2 pt-3 border-t border-border">
-                <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Additional Data</h3>
-                <div className="space-y-1.5">
-                  {Object.entries(displayData)
-                    .filter(
-                      ([key]) =>
-                        ![
-                          'geometry',
-                          'id',
-                          'feature_name',
-                          'county_name',
-                          'ctu_class',
-                          'district_number',
-                          'county_code',
-                          'population',
-                          'acres',
-                          'description',
-                          'publisher',
-                          'source_date',
-                        ].includes(key)
-                    )
-                    .map(([key, value]) => (
-                      <div key={key}>
-                        <div className="text-[10px] text-foreground-subtle capitalize">{key.replace(/_/g, ' ')}</div>
-                        <div className="text-xs text-foreground">
-                          {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                        </div>
-                      </div>
-                    ))}
-                </div>
+            {/* Stats from entityRegistry.statsFields */}
+            {statsFields.length > 0 && (
+              <div className="p-[10px] border-b border-border space-y-1.5">
+                <h3 className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
+                  Information
+                </h3>
+                {statsFields.map((sf) => {
+                  const raw = details[sf.key];
+                  if (raw == null || raw === '') return null;
+                  let display = String(raw);
+                  if (sf.format === 'number' && typeof raw === 'number') {
+                    display = raw.toLocaleString();
+                  } else if (sf.format === 'area-acres' && typeof raw === 'number') {
+                    display = `${Math.round(raw / 640).toLocaleString()} sq mi`;
+                  }
+                  // Render URLs as links
+                  if (sf.key === 'web_url' || sf.key === 'website_url') {
+                    return (
+                      <StatRow key={sf.key} label={sf.label}>
+                        <a
+                          href={display.startsWith('http') ? display : `https://${display}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-lake-blue hover:underline truncate block"
+                        >
+                          {display.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                        </a>
+                      </StatRow>
+                    );
+                  }
+                  return <StatRow key={sf.key} label={sf.label} value={display} />;
+                })}
               </div>
             )}
+
+            {/* Location */}
+            {selectedBoundary?.lat != null && (
+              <div className="p-[10px] border-b border-border space-y-1.5">
+                <h3 className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
+                  Location
+                </h3>
+                <StatRow
+                  label="Coordinates"
+                  value={`${selectedBoundary.lat.toFixed(4)}, ${selectedBoundary.lng?.toFixed(4)}`}
+                />
+              </div>
+            )}
+
+            {/* Child records (e.g. school buildings in district) */}
+            {hasChildren && (
+              <div className="p-[10px] space-y-2">
+                <h3 className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
+                  {entityConfig?.relationships.find(
+                    (r) => r.targetType === childPinsConfig?.linkSlug?.replace(/-/g, '-')
+                  )?.label ?? 'Related Records'}
+                  <span className="ml-1 font-normal text-foreground-subtle">
+                    ({childList.length})
+                  </span>
+                </h3>
+                {childList.length === 0 ? (
+                  <p className="text-[10px] text-foreground-subtle">
+                    No records found in this area
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {childList.map((child) => {
+                      const atlasSlug = child.meta?.atlas_school_slug as string | undefined;
+                      const href = atlasSlug
+                        ? `/explore/schools/${atlasSlug}`
+                        : childPinsConfig?.linkSlug
+                          ? `/explore/${childPinsConfig.linkSlug}/${child.id}`
+                          : '#';
+                      return (
+                      <Link
+                        key={child.id}
+                        href={href}
+                        className="flex items-center justify-between px-2 py-1.5 rounded text-xs text-foreground-muted hover:bg-surface-accent hover:text-foreground transition-colors group"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium truncate text-foreground group-hover:text-foreground">
+                            {child.name}
+                          </div>
+                          {child.meta?.address && (
+                            <div className="text-[10px] text-foreground-subtle truncate">
+                              {String(child.meta.address)}
+                            </div>
+                          )}
+                        </div>
+                        <ChevronRightIcon className="w-3 h-3 flex-shrink-0 text-foreground-subtle group-hover:text-foreground" />
+                      </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Remaining data not covered by statsFields */}
+            {(() => {
+              const knownKeys = new Set([
+                'id', 'geometry', 'geom', 'centroid',
+                ...statsFields.map((sf) => sf.key),
+              ]);
+              const extra = Object.entries(details).filter(
+                ([k, v]) => !knownKeys.has(k) && v != null && v !== '' && typeof v !== 'object'
+              );
+              if (extra.length === 0) return null;
+              return (
+                <div className="p-[10px] border-t border-border space-y-1.5">
+                  <h3 className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider">
+                    Additional Data
+                  </h3>
+                  {extra.map(([key, value]) => (
+                    <StatRow
+                      key={key}
+                      label={key.replace(/_/g, ' ')}
+                      value={String(value)}
+                    />
+                  ))}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatRow({
+  label,
+  value,
+  children,
+}: {
+  label: string;
+  value?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-[10px] text-foreground-subtle capitalize flex-shrink-0">{label}</span>
+      {children ?? <span className="text-xs text-foreground text-right truncate">{value}</span>}
     </div>
   );
 }

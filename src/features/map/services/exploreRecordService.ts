@@ -11,7 +11,7 @@ import {
   getCongressionalDistricts,
 } from './liveBoundaryCache';
 
-export type ExploreLayerType = 'state' | 'county' | 'ctu' | 'district';
+export type ExploreLayerType = 'state' | 'county' | 'ctu' | 'district' | 'water' | 'school-district';
 
 export type ExploreRecordResult = {
   record: Record<string, unknown>;
@@ -26,6 +26,8 @@ const TABLE_TO_LAYER: Record<string, ExploreLayerType> = {
   counties: 'county',
   'cities-and-towns': 'ctu',
   'congressional-districts': 'district',
+  water: 'water',
+  'school-districts': 'school-district',
 };
 
 /** In-memory cache for single-record fetches (when not in boundary cache) */
@@ -156,6 +158,42 @@ export async function fetchExploreRecord(
         geometry,
         centroid: [cen[0], cen[1]],
         layerType: 'district',
+      };
+      recordCache.set(key, result);
+      return result;
+    }
+
+    if (table === 'water') {
+      const res = await fetch(`/api/civic/water?id=${id}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const record = Array.isArray(data) ? data[0] : data;
+      if (!record) return null;
+      const geometry = extractGeometry(record);
+      const cen = centroidFromGeometry(geometry);
+      const result: ExploreRecordResult = {
+        record: { ...(record as object), geometry: undefined } as Record<string, unknown>,
+        geometry,
+        centroid: [cen[0], cen[1]],
+        layerType: 'water',
+      };
+      recordCache.set(key, result);
+      return result;
+    }
+
+    if (table === 'school-districts') {
+      const res = await fetch(`/api/civic/school-districts?id=${id}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const record = Array.isArray(data) ? data[0] : data;
+      if (!record) return null;
+      const geometry = extractGeometry(record);
+      const cen = centroidFromGeometry(geometry);
+      const result: ExploreRecordResult = {
+        record: { ...(record as object), geometry: undefined } as Record<string, unknown>,
+        geometry,
+        centroid: [cen[0], cen[1]],
+        layerType: 'school-district',
       };
       recordCache.set(key, result);
       return result;

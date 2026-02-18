@@ -2,14 +2,16 @@
  * Live map boundary data cache: one fetch per boundary type per session.
  * Data is cached in memory; we do not call the API again for the same boundary type
  * after the first successful load. Deduplicates in-flight requests so concurrent
- * callers share the same promise. Used by State, County, CTU, and Congressional
- * Districts layers on /live.
+ * callers share the same promise. Used by Explore map layers (state, county, CTU,
+ * congressional districts, water, school-districts).
  */
 
 export type StateBoundaryData = { geometry: GeoJSON.FeatureCollection; [key: string]: unknown };
 export type CountyBoundaryRecord = { id: string; geometry: GeoJSON.FeatureCollection; [key: string]: unknown };
 export type CTUBoundaryRecord = { id: string; geometry: GeoJSON.FeatureCollection; [key: string]: unknown };
 export type DistrictBoundaryRecord = { district_number: number; geometry: GeoJSON.FeatureCollection; [key: string]: unknown };
+export type WaterBoundaryRecord = { id: string; name?: string | null; gnis_name?: string | null; nhd_feature_id?: string | null; geometry?: GeoJSON.Geometry | null; [key: string]: unknown };
+export type SchoolDistrictBoundaryRecord = { id: string; name?: string | null; short_name?: string | null; geometry?: GeoJSON.Geometry | null; [key: string]: unknown };
 
 let stateCache: StateBoundaryData | null = null;
 let statePromise: Promise<StateBoundaryData> | null = null;
@@ -22,6 +24,14 @@ let ctuPromise: Promise<CTUBoundaryRecord[]> | null = null;
 
 let districtCache: DistrictBoundaryRecord[] | null = null;
 let districtPromise: Promise<DistrictBoundaryRecord[]> | null = null;
+
+const WATER_MAP_LIMIT = 2000;
+let waterCache: WaterBoundaryRecord[] | null = null;
+let waterPromise: Promise<WaterBoundaryRecord[]> | null = null;
+
+const SCHOOL_DISTRICTS_LIMIT = 500;
+let schoolDistrictsCache: SchoolDistrictBoundaryRecord[] | null = null;
+let schoolDistrictsPromise: Promise<SchoolDistrictBoundaryRecord[]> | null = null;
 
 function fetchState(): Promise<StateBoundaryData> {
   if (stateCache) return Promise.resolve(stateCache);
@@ -103,6 +113,56 @@ function fetchCTU(): Promise<CTUBoundaryRecord[]> {
   return ctuPromise;
 }
 
+function fetchWater(): Promise<WaterBoundaryRecord[]> {
+  if (waterCache) return Promise.resolve(waterCache);
+  if (waterPromise) return waterPromise;
+  waterPromise = fetch(`/api/civic/water?limit=${WATER_MAP_LIMIT}`)
+    .then((r) => {
+      if (!r.ok) throw new Error('Failed to fetch water');
+      return r.json();
+    })
+    .then((raw) => {
+      const data = Array.isArray(raw)
+        ? raw
+        : Array.isArray((raw as { data?: WaterBoundaryRecord[] })?.data)
+          ? ((raw as { data: WaterBoundaryRecord[] }).data)
+          : [];
+      waterCache = data;
+      waterPromise = null;
+      return data;
+    })
+    .catch((err) => {
+      waterPromise = null;
+      throw err;
+    });
+  return waterPromise;
+}
+
+function fetchSchoolDistricts(): Promise<SchoolDistrictBoundaryRecord[]> {
+  if (schoolDistrictsCache) return Promise.resolve(schoolDistrictsCache);
+  if (schoolDistrictsPromise) return schoolDistrictsPromise;
+  schoolDistrictsPromise = fetch(`/api/civic/school-districts?limit=${SCHOOL_DISTRICTS_LIMIT}`)
+    .then((r) => {
+      if (!r.ok) throw new Error('Failed to fetch school districts');
+      return r.json();
+    })
+    .then((raw) => {
+      const data = Array.isArray(raw)
+        ? raw
+        : Array.isArray((raw as { data?: SchoolDistrictBoundaryRecord[] })?.data)
+          ? ((raw as { data: SchoolDistrictBoundaryRecord[] }).data)
+          : [];
+      schoolDistrictsCache = data;
+      schoolDistrictsPromise = null;
+      return data;
+    })
+    .catch((err) => {
+      schoolDistrictsPromise = null;
+      throw err;
+    });
+  return schoolDistrictsPromise;
+}
+
 /** True if data is already in memory (no fetch needed). */
 export function hasStateCached(): boolean {
   return stateCache !== null;
@@ -115,6 +175,12 @@ export function hasCTUCached(): boolean {
 }
 export function hasDistrictsCached(): boolean {
   return districtCache !== null;
+}
+export function hasWaterCached(): boolean {
+  return waterCache !== null;
+}
+export function hasSchoolDistrictsCached(): boolean {
+  return schoolDistrictsCache !== null;
 }
 
 /** Get state boundary; returns cached or fetches once. */
@@ -137,6 +203,16 @@ export function getCongressionalDistricts(): Promise<DistrictBoundaryRecord[]> {
   return fetchDistricts();
 }
 
+/** Get water bodies; returns cached or fetches once. */
+export function getWater(): Promise<WaterBoundaryRecord[]> {
+  return fetchWater();
+}
+
+/** Get school districts; returns cached or fetches once. */
+export function getSchoolDistricts(): Promise<SchoolDistrictBoundaryRecord[]> {
+  return fetchSchoolDistricts();
+}
+
 /**
  * Preload all boundary data in the background. Call when live map mounts
  * so zoom transitions never wait on network. One API call per type per session.
@@ -146,6 +222,8 @@ export function preloadAll(): void {
   getCountyBoundaries().catch(() => {});
   getCTUBoundaries().catch(() => {});
   getCongressionalDistricts().catch(() => {});
+  getWater().catch(() => {});
+  getSchoolDistricts().catch(() => {});
 }
 
 /** Rough centroid from GeoJSON Polygon/MultiPolygon (first ring, first point). */

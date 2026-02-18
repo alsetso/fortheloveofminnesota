@@ -351,6 +351,8 @@ export async function middleware(req: NextRequest) {
     // Gov and news are public
     if (pathname === '/gov' || pathname.startsWith('/gov/')) return true;
     if (pathname === '/news' || pathname.startsWith('/news/')) return true;
+    // Explore (civic dashboard, counties, cities, etc.) is public
+    if (pathname === '/explore' || pathname.startsWith('/explore/')) return true;
     
     // Mention detail pages are allowed
     if (pathname.startsWith('/mention/')) {
@@ -367,7 +369,7 @@ export async function middleware(req: NextRequest) {
       const firstSegment = segments[0];
       // Exclude known routes that aren't usernames
       const excludedRoutes = [
-        'map', 'maps', 'settings', 'news', 'gov', 'analytics', 
+        'map', 'maps', 'settings', 'news', 'gov', 'explore', 'analytics',
         'billing', 'admin', 'login', 'signup', 'onboarding',
         'contact', 'privacy', 'terms', 'download', 'api', '_next', 'favicon.ico'
       ];

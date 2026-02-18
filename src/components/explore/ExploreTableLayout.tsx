@@ -11,10 +11,18 @@ import LayerDetailLeftSidebar from '@/components/explore/layers/LayerDetailLeftS
 import SubRecordsLeftSidebar from '@/components/explore/layers/SubRecordsLeftSidebar';
 import LayerDetailMap from '@/components/explore/layers/LayerDetailMap';
 import LayerDetailRightSidebar from '@/components/explore/layers/LayerDetailRightSidebar';
+import type { ChildFeature } from '@/features/map/components/ChildPinsLayer';
 import { getLayerConfigBySlug } from '@/features/map/config/layersConfig';
 import { getExploreChildContext } from '@/features/map/config/exploreLayerInteractionConfig';
 import { useExploreRecord } from '@/features/explore/hooks/useExploreRecord';
-import { preloadAll } from '@/features/map/services/liveBoundaryCache';
+import {
+  getStateBoundary,
+  getCountyBoundaries,
+  getCTUBoundaries,
+  getCongressionalDistricts,
+  getWater,
+  getSchoolDistricts,
+} from '@/features/map/services/liveBoundaryCache';
 
 const RIGHT_SIDEBAR_BREAKPOINT = 976;
 
@@ -24,7 +32,7 @@ interface ExploreTableLayoutProps {
 }
 
 type BoundarySelection = {
-  layer: 'state' | 'county' | 'ctu' | 'district';
+  layer: 'state' | 'county' | 'ctu' | 'district' | 'water' | 'school-district';
   id: string;
   name: string;
   lat?: number;
@@ -38,6 +46,8 @@ function nameFromRecord(record: Record<string, unknown>, table: string): string 
   if (table === 'counties') return String(record.county_name ?? 'County');
   if (table === 'cities-and-towns') return String(record.feature_name ?? 'CTU');
   if (table === 'congressional-districts') return `District ${record.district_number ?? ''}`;
+  if (table === 'water') return String(record.name ?? record.gnis_name ?? record.nhd_feature_id ?? 'Water body');
+  if (table === 'school-districts') return String(record.name ?? record.short_name ?? 'School District');
   return 'Unknown';
 }
 
@@ -47,6 +57,8 @@ const LAYER_TO_TABLE: Record<string, string> = {
   county: 'counties',
   ctu: 'cities-and-towns',
   district: 'congressional-districts',
+  water: 'water',
+  'school-district': 'school-districts',
 };
 
 /**
@@ -58,14 +70,35 @@ export default function ExploreTableLayout({ table, recordSlug }: ExploreTableLa
   const router = useRouter();
   const { record, loading } = useExploreRecord(table, recordSlug);
   const [hoveredBoundary, setHoveredBoundary] = useState<BoundarySelection | null>(null);
+  const [childFeatures, setChildFeatures] = useState<ChildFeature[]>([]);
   const [infoSheetOpen, setInfoSheetOpen] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
 
   const layerConfig = getLayerConfigBySlug(table);
 
+  // Preload ONLY the boundary data needed for the current layer — no cross-layer fetches
   useEffect(() => {
-    preloadAll();
-  }, []);
+    switch (table) {
+      case 'state':
+        getStateBoundary().catch(() => {});
+        break;
+      case 'counties':
+        getCountyBoundaries().catch(() => {});
+        break;
+      case 'cities-and-towns':
+        getCTUBoundaries().catch(() => {});
+        break;
+      case 'congressional-districts':
+        getCongressionalDistricts().catch(() => {});
+        break;
+      case 'water':
+        getWater().catch(() => {});
+        break;
+      case 'school-districts':
+        getSchoolDistricts().catch(() => {});
+        break;
+    }
+  }, [table]);
 
   // Derive selected boundary from single source of truth (useExploreRecord)
   const selectedBoundary: BoundarySelection | null =
@@ -87,8 +120,44 @@ export default function ExploreTableLayout({ table, recordSlug }: ExploreTableLa
     return () => window.removeEventListener('resize', check);
   }, []);
 
+  // Preview popup state — shown on first click, navigate on "View details"
+  const [previewBoundary, setPreviewBoundary] = useState<(BoundarySelection & { lngLat?: [number, number] }) | null>(null);
+
+  // Clear preview when URL changes (record selected via sidebar)
+  useEffect(() => {
+    setPreviewBoundary(null);
+  }, [recordSlug]);
+
   const handleBoundarySelect = useCallback(
     (boundary: BoundarySelection) => {
+      // If already focused on a record, navigate directly (e.g. clicking sub-record)
+      if (recordSlug) {
+        const targetTable = LAYER_TO_TABLE[boundary.layer] ?? table;
+        router.push(`/explore/${targetTable}/${boundary.id}`, { scroll: false });
+        return;
+      }
+      // Otherwise show preview popup
+      setPreviewBoundary({
+        ...boundary,
+        lngLat: boundary.lng != null && boundary.lat != null
+          ? [boundary.lng, boundary.lat]
+          : undefined,
+      });
+    },
+    [table, router, recordSlug]
+  );
+
+  const handlePreviewNavigate = useCallback(() => {
+    if (!previewBoundary) return;
+    const targetTable = LAYER_TO_TABLE[previewBoundary.layer] ?? table;
+    router.push(`/explore/${targetTable}/${previewBoundary.id}`, { scroll: false });
+    setPreviewBoundary(null);
+  }, [previewBoundary, table, router]);
+
+  // Direct navigation — used by left sidebar list clicks (skip popup)
+  const handleDirectSelect = useCallback(
+    (boundary: BoundarySelection) => {
+      setPreviewBoundary(null);
       const targetTable = LAYER_TO_TABLE[boundary.layer] ?? table;
       router.push(`/explore/${targetTable}/${boundary.id}`, { scroll: false });
     },
@@ -123,25 +192,29 @@ export default function ExploreTableLayout({ table, recordSlug }: ExploreTableLa
           details: selectedBoundary.details,
         }}
         childTable={childTable as 'counties' | 'cities-and-towns'}
-        onRecordSelect={handleBoundarySelect}
+        onRecordSelect={handleDirectSelect}
       />
     ) : (
       <FocusModeLeftNav table={table} recordName={displayName} />
     );
 
+  const showLeftSidebar = table !== 'counties';
+
   return (
     <NewPageWrapper
       mainNoScroll={true}
       leftSidebar={
-        isFocusMode ? (
-          focusLeftSidebar
-        ) : (
-          <LayerDetailLeftSidebar
-            layerSlug={table}
-            selectedRecordId={recordSlug}
-            onRecordSelect={handleBoundarySelect}
-          />
-        )
+        showLeftSidebar
+          ? isFocusMode
+            ? focusLeftSidebar
+            : (
+                <LayerDetailLeftSidebar
+                  layerSlug={table}
+                  selectedRecordId={recordSlug}
+                  onRecordSelect={handleDirectSelect}
+                />
+              )
+          : undefined
       }
       rightSidebar={
         <LayerDetailRightSidebar
@@ -150,39 +223,48 @@ export default function ExploreTableLayout({ table, recordSlug }: ExploreTableLa
           hoveredBoundary={hoveredBoundary}
           loading={loading}
           onClearSelection={handleClearSelection}
+          childFeatures={childFeatures}
         />
       }
     >
       <div className="h-[calc(100vh-3.5rem)] w-full flex flex-col min-h-0">
-        <div className="flex-shrink-0 z-10 p-[10px] bg-surface/95 backdrop-blur-sm border-b border-border flex items-start justify-between gap-2">
+        {/* Header bar */}
+        <div className="flex-shrink-0 z-10 px-3 py-2 bg-surface/95 backdrop-blur-sm border-b border-border flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Link
               href={recordSlug ? `/explore/${table}` : '/explore'}
-              className="flex-shrink-0 p-1.5 -ml-1 rounded-md hover:bg-surface-accent transition-colors"
+              className="flex-shrink-0 p-1 rounded-md hover:bg-surface-accent transition-colors"
               aria-label="Back"
             >
-              <ArrowLeftIcon className="w-5 h-5 text-foreground-muted" />
+              <ArrowLeftIcon className="w-4 h-4 text-foreground-muted" />
             </Link>
-            <div className="min-w-0">
-              <h1 className="text-sm font-semibold text-foreground mb-0.5 truncate">
-                {isFocusMode ? displayName : layerConfig.label}
-              </h1>
-              <p className="text-xs text-foreground-muted truncate">
-                {isFocusMode ? layerConfig.label : layerConfig.description}
-              </p>
-            </div>
+            <h1 className="text-xs font-semibold text-foreground truncate">
+              {isFocusMode ? displayName : layerConfig.label}
+            </h1>
+            {hoveredBoundary && !isFocusMode && hoveredBoundary.name !== displayName && (
+              <span className="text-[10px] text-foreground-muted truncate hidden sm:inline">
+                — {hoveredBoundary.name}
+              </span>
+            )}
           </div>
-          {isMobileLayout && (
-            <button
-              type="button"
-              onClick={() => setInfoSheetOpen(true)}
-              className="flex-shrink-0 p-1.5 rounded-md hover:bg-surface-accent transition-colors"
-              aria-label="View details"
-              title="View details"
-            >
-              <InformationCircleIcon className="w-5 h-5 text-foreground-muted" />
-            </button>
-          )}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {isFocusMode && (
+              <span className="text-[10px] text-foreground-muted hidden sm:inline">
+                {layerConfig.label}
+              </span>
+            )}
+            {isMobileLayout && (
+              <button
+                type="button"
+                onClick={() => setInfoSheetOpen(true)}
+                className="p-1 rounded-md hover:bg-surface-accent transition-colors"
+                aria-label="View details"
+                title="View details"
+              >
+                <InformationCircleIcon className="w-4 h-4 text-foreground-muted" />
+              </button>
+            )}
+          </div>
         </div>
 
         <DraggableBottomSheet
@@ -204,12 +286,14 @@ export default function ExploreTableLayout({ table, recordSlug }: ExploreTableLa
                 setInfoSheetOpen(false);
                 handleClearSelection();
               }}
+              childFeatures={childFeatures}
             />
           </div>
         </DraggableBottomSheet>
 
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex-1 min-h-0 relative">
+        {/* Map area with padded container on desktop */}
+        <div className="flex-1 min-h-0 p-0 sm:p-[10px] bg-surface-muted">
+          <div className="w-full h-full relative overflow-hidden sm:rounded-lg">
             <LayerDetailMap
               layerSlug={table}
               selectedId={recordSlug}
@@ -223,6 +307,10 @@ export default function ExploreTableLayout({ table, recordSlug }: ExploreTableLa
               }
               onBoundarySelect={handleBoundarySelect}
               onBoundaryHover={handleBoundaryHover}
+              onChildFeaturesLoaded={setChildFeatures}
+              previewBoundary={previewBoundary}
+              onPreviewNavigate={handlePreviewNavigate}
+              onPreviewDismiss={() => setPreviewBoundary(null)}
             />
           </div>
         </div>

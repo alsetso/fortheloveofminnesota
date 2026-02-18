@@ -9,10 +9,12 @@ import {
   BuildingOfficeIcon,
   MapPinIcon,
   RectangleStackIcon,
+  CloudIcon,
+  AcademicCapIcon,
 } from '@heroicons/react/24/outline';
 import type { ComponentType } from 'react';
 
-export type LayerId = 'state' | 'counties' | 'cities-and-towns' | 'congressional-districts';
+export type LayerId = 'state' | 'counties' | 'cities-and-towns' | 'congressional-districts' | 'water' | 'school-districts';
 
 export interface LayerConfig {
   id: LayerId;
@@ -77,6 +79,28 @@ export const LAYERS_CONFIG: LayerConfig[] = [
     icon: RectangleStackIcon,
     apiEndpoint: '/api/civic/congressional-districts',
     nameField: 'district_number',
+    countLabel: 'districts',
+  },
+  {
+    id: 'water',
+    table: 'water',
+    slug: 'water',
+    label: 'Water Bodies',
+    description: 'Lakes and ponds from National Hydrography Dataset',
+    icon: CloudIcon,
+    apiEndpoint: '/api/civic/water',
+    nameField: 'name',
+    countLabel: 'water bodies',
+  },
+  {
+    id: 'school-districts',
+    table: 'school_districts',
+    slug: 'school-districts',
+    label: 'School Districts',
+    description: 'School district boundaries from MDE',
+    icon: AcademicCapIcon,
+    apiEndpoint: '/api/civic/school-districts',
+    nameField: 'name',
     countLabel: 'districts',
   },
 ];

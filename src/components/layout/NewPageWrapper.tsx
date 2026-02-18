@@ -12,6 +12,7 @@ import {
   ChartBarIcon,
   EllipsisHorizontalIcon,
   BuildingOfficeIcon,
+  BuildingStorefrontIcon,
   NewspaperIcon,
   XMarkIcon,
   SunIcon,
@@ -38,7 +39,7 @@ const KNOWN_APP_ROUTES = new Set([
   'messages', 'search', 'collections', 'saved', 'memories', 'friends',
   'stories', 'billing', 'plans', 'onboarding', 'signup', 'login',
   'terms', 'post', 'marketplace', 'ad_center', 'contact', 'download',
-  'privacy', 'not-found',
+  'privacy', 'not-found', 'school',
 ]);
 
 /** Routes where the right sidebar should be suppressed in the main content area. */
@@ -470,6 +471,28 @@ export default function NewPageWrapper({
           </aside>
         )}
       </div>
+
+      {/* Fixed floating triggers: visible when sidebar is hidden and overlay callbacks are provided */}
+      {leftSidebar && !effectiveCanShowLeftSidebar && !mobileLeftSidebarOpen && onMobileLeftSidebarOpenChange && (
+        <button
+          type="button"
+          onClick={() => onMobileLeftSidebarOpenChange(true)}
+          className="fixed left-3 top-[4.25rem] z-40 w-8 h-8 rounded-md border border-gray-200 dark:border-white/10 bg-surface flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm"
+          aria-label="Open organizations"
+        >
+          <BuildingOfficeIcon className="w-4 h-4" />
+        </button>
+      )}
+      {rightSidebar && !effectiveCanShowRightSidebar && !mobileRightSidebarOpen && onMobileRightSidebarOpenChange && (
+        <button
+          type="button"
+          onClick={() => onMobileRightSidebarOpenChange(true)}
+          className="fixed right-3 top-[4.25rem] z-40 w-8 h-8 rounded-md border border-gray-200 dark:border-white/10 bg-surface flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm"
+          aria-label="Open buildings"
+        >
+          <BuildingStorefrontIcon className="w-4 h-4" />
+        </button>
+      )}
 
       {/* Mobile overlay: left sidebar (e.g. /gov organizations) */}
       {leftSidebar && !effectiveCanShowLeftSidebar && mobileLeftSidebarOpen && onMobileLeftSidebarOpenChange && (

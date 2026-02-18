@@ -57,7 +57,7 @@ export default function DirectoryMapView({ config, records }: DirectoryMapViewPr
 
       const map = new mapbox.Map({
         container: containerRef.current,
-        style: MAP_CONFIG.STRATEGIC_STYLES.light,
+        style: MAP_CONFIG.STRATEGIC_STYLES.streets,
         center: MAP_CONFIG.DEFAULT_CENTER,
         zoom: 6,
         maxBounds: [

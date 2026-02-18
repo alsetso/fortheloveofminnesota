@@ -20,6 +20,8 @@ interface MapWidgetProps {
   height?: number;
   /** Optional label shown above map */
   label?: string;
+  /** Max zoom when fitting to geometry bounds (default 12) */
+  maxZoom?: number;
 }
 
 function boundsFromGeometry(
@@ -48,7 +50,7 @@ function boundsFromGeometry(
   ];
 }
 
-export default function MapWidget({ geometry, lat, lng, height = 200, label }: MapWidgetProps) {
+export default function MapWidget({ geometry, lat, lng, height = 200, label, maxZoom = 12 }: MapWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const [loaded, setLoaded] = useState(false);
@@ -121,7 +123,7 @@ export default function MapWidget({ geometry, lat, lng, height = 200, label }: M
 
           const bounds = boundsFromGeometry(geometry);
           if (bounds) {
-            map.fitBounds(bounds, { padding: 24, maxZoom: 12, animate: false });
+            map.fitBounds(bounds, { padding: 24, maxZoom, animate: false });
           }
         } else if (hasPoint) {
           map.addSource('entity-point', {

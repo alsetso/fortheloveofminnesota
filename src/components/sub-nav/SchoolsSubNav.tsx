@@ -107,7 +107,7 @@ export default function SchoolsSubNav() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-border-muted dark:border-white/10">
+      <div className="p-3 border-b border-border-muted dark:border-white/10 bg-white dark:bg-surface">
         <Link href="/schools" className="block">
           <h2 className="text-xs font-semibold text-foreground">Schools</h2>
           <p className="text-[10px] text-foreground-muted mt-0.5">Search & browse MN schools</p>

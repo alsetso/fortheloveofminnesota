@@ -95,7 +95,7 @@ export default function ExploreSubNav() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-3 border-b border-border-muted dark:border-white/10">
+      <div className="p-3 border-b border-border-muted dark:border-white/10 bg-white dark:bg-surface">
         <Link href="/explore" className="block">
           <h2 className="text-xs font-semibold text-foreground">Explore</h2>
           <p className="text-[10px] text-foreground-muted mt-0.5">Browse Minnesota data layers</p>

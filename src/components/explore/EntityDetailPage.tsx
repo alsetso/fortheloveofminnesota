@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeftIcon,
   MapIcon,
   AcademicCapIcon,
   ChevronRightIcon,
+  HeartIcon,
 } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import {
   getEntityConfig,
   getEntityConfigById,
@@ -19,6 +21,7 @@ import {
 import { LAYER_SLUGS } from '@/features/map/config/layersConfig';
 import MapWidget from '@/components/explore/MapWidget';
 import ExploreBreadcrumb from '@/components/explore/ExploreBreadcrumb';
+import { useAuthStateSafe } from '@/features/auth';
 
 /* ─── helpers ─── */
 
@@ -62,10 +65,16 @@ interface EntityDetailPageProps {
 
 export default function EntityDetailPage({ entitySlug, recordId }: EntityDetailPageProps) {
   const config = getEntityConfig(entitySlug);
+  const { account } = useAuthStateSafe();
   const [record, setRecord] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [relatedData, setRelatedData] = useState<Record<string, unknown[]>>({});
   const [relatedLoading, setRelatedLoading] = useState<Record<string, boolean>>({});
+
+  /* ── follow state (school-districts only) ── */
+  const supportsFollow = entitySlug === 'school-districts';
+  const [following, setFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   /* ── fetch primary record ── */
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recordId);
@@ -116,6 +125,36 @@ export default function EntityDetailPage({ entitySlug, recordId }: EntityDetailP
         .finally(() => setRelatedLoading((p) => ({ ...p, [rel.targetType]: false })));
     });
   }, [config, record]);
+
+  /* ── follow: check status ── */
+  useEffect(() => {
+    if (!supportsFollow || !record || !account?.user_id) return;
+    const rid = record.id as string | undefined;
+    if (!rid) return;
+    fetch(`/api/civic/school-districts/follow?school_district_id=${rid}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setFollowing(data.following); })
+      .catch(() => {});
+  }, [supportsFollow, record, account?.user_id]);
+
+  const handleFollowToggle = useCallback(async () => {
+    if (!record || !account?.user_id) return;
+    const rid = record.id as string;
+    setFollowLoading(true);
+    try {
+      const res = await fetch('/api/civic/school-districts/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ school_district_id: rid }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFollowing(data.following);
+      }
+    } finally {
+      setFollowLoading(false);
+    }
+  }, [record, account?.user_id]);
 
   /* ── derived ── */
   const name = record && config ? displayName(record, config) : '';
@@ -177,15 +216,36 @@ export default function EntityDetailPage({ entitySlug, recordId }: EntityDetailP
               </div>
               <p className="text-xs text-foreground-muted">{config.description}</p>
             </div>
-            {config.hasGeometry && LAYER_SLUGS.includes(config.slug) && (
-              <Link
-                href={`${entityUrl(config, recordId)}?view=map`}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs text-foreground-muted hover:bg-surface-accent hover:text-foreground transition-colors flex-shrink-0"
-              >
-                <MapIcon className="w-3.5 h-3.5" />
-                Map View
-              </Link>
-            )}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {supportsFollow && account?.user_id && (
+                <button
+                  onClick={handleFollowToggle}
+                  disabled={followLoading}
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                    following
+                      ? 'border-red-300/40 bg-red-500/10 text-red-500 dark:text-red-400 hover:bg-red-500/20'
+                      : 'border-border text-foreground-muted hover:bg-surface-accent hover:text-foreground'
+                  } ${followLoading ? 'opacity-50' : ''}`}
+                  title={following ? 'Unfollow' : 'Follow'}
+                >
+                  {following ? (
+                    <HeartSolidIcon className="w-3.5 h-3.5" />
+                  ) : (
+                    <HeartIcon className="w-3.5 h-3.5" />
+                  )}
+                  {following ? 'Following' : 'Follow'}
+                </button>
+              )}
+              {config.hasGeometry && LAYER_SLUGS.includes(config.slug) && (
+                <Link
+                  href={`${entityUrl(config, recordId)}?view=map`}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border text-xs text-foreground-muted hover:bg-surface-accent hover:text-foreground transition-colors"
+                >
+                  <MapIcon className="w-3.5 h-3.5" />
+                  Map View
+                </Link>
+              )}
+            </div>
           </div>
 
           {/* ── atlas profile link (e.g. school building → school profile) ── */}

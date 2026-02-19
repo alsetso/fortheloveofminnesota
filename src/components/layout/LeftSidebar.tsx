@@ -12,6 +12,9 @@ import {
   AcademicCapIcon,
   TruckIcon,
   CloudIcon,
+  HomeModernIcon,
+  BriefcaseIcon,
+  TicketIcon,
   MagnifyingGlassIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
@@ -24,6 +27,9 @@ import {
   AcademicCapIcon as AcademicCapIconSolid,
   TruckIcon as TruckIconSolid,
   CloudIcon as CloudIconSolid,
+  HomeModernIcon as HomeModernIconSolid,
+  BriefcaseIcon as BriefcaseIconSolid,
+  TicketIcon as TicketIconSolid,
 } from '@heroicons/react/24/solid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStateSafe } from '@/features/auth';
@@ -118,6 +124,9 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
     { label: 'Schools', icon: AcademicCapIcon, iconSolid: AcademicCapIconSolid, href: '/schools' },
     { label: 'Transportation', icon: TruckIcon, iconSolid: TruckIconSolid, href: '/transportation' },
     { label: 'Government', icon: BuildingOfficeIcon, iconSolid: BuildingOfficeIconSolid, href: '/gov' },
+    { label: 'Realestate', icon: HomeModernIcon, iconSolid: HomeModernIconSolid, href: '/realestate' },
+    { label: 'Work', icon: BriefcaseIcon, iconSolid: BriefcaseIconSolid, href: '/work' },
+    { label: 'Things to Do', icon: TicketIcon, iconSolid: TicketIconSolid, href: '/things-to-do' },
     { label: 'Weather', icon: CloudIcon, iconSolid: CloudIconSolid, href: '/weather' },
     { label: 'News', icon: NewspaperIcon, iconSolid: NewspaperIconSolid, href: '/news' },
   ];

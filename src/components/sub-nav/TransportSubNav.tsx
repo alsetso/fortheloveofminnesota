@@ -17,6 +17,7 @@ interface NavItem {
   href: string;
   icon: ComponentType<{ className?: string }>;
   exact?: boolean;
+  disabled?: boolean;
 }
 
 const TRANSPORT_NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
@@ -31,20 +32,20 @@ const TRANSPORT_NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Roads',
     items: [
-      { label: 'MnDOT Traffic', href: '/transportation/mndot', icon: SignalIcon },
+      { label: 'MnDOT Traffic', href: '/transportation/mndot', icon: SignalIcon, disabled: true },
     ],
   },
   {
     label: 'Air',
     items: [
       { label: 'Flight Tracker', href: '/transportation/flights', icon: PaperAirplaneIcon },
-      { label: 'Airports', href: '/transportation/airports', icon: PaperAirplaneIcon },
+      { label: 'Airports', href: '/transportation/airports', icon: PaperAirplaneIcon, disabled: true },
     ],
   },
   {
     label: 'Active',
     items: [
-      { label: 'Bike & Trail', href: '/transportation/bike-trail', icon: MapIcon },
+      { label: 'Bike & Trail', href: '/transportation/bike-trail', icon: MapIcon, disabled: true },
     ],
   },
 ];
@@ -76,6 +77,20 @@ export default function TransportSubNav() {
               {section.items.map((item) => {
                 const active = isActive(item.href, item.exact);
                 const Icon = item.icon;
+
+                if (item.disabled) {
+                  return (
+                    <span
+                      key={item.href}
+                      className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-md text-foreground-muted/40 cursor-default select-none"
+                    >
+                      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span>{item.label}</span>
+                      <span className="ml-auto text-[9px] font-medium uppercase tracking-wider text-foreground-muted/30">Soon</span>
+                    </span>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.href}

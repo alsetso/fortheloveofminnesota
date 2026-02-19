@@ -49,6 +49,7 @@ function shouldHideRightSidebar(pathname: string | null): boolean {
   if (!pathname) return false;
   // Exact or prefix match on explicit routes
   if (pathname === '/maps' || pathname.startsWith('/maps/')) return true;
+  if (pathname === '/transportation/gtfs') return true;
   // Username routes: single root segment not matching a known app route
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length >= 1 && !KNOWN_APP_ROUTES.has(segments[0])) return true;

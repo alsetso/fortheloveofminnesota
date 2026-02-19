@@ -1,0 +1,101 @@
+﻿<metadata><idinfo><citation><citeinfo><origin>Metropolitan Council - Metro Transit</origin><pubinfo><publish>Metropolitan Council - Metro Transit</publish></pubinfo><pubdate>20191204</pubdate><title>Transit Stops</title><onlink>https://gisdata.mn.gov/dataset/us-mn-state-metc-trans-transit-stops</onlink></citeinfo></citation><descript><abstract>The Transit Stops layer contains over 20,000 active and inactive transit stops in the Twin Cities seven county metropolitan area. The dataset includes attributes from the primary transit stop database maintained for Metro Transit and for customer information for other transit provider transit services.  The locations are mapped referencing Road Centerlines (MN GAC standard) network along with streets generated internally at Metro Transit.  </abstract><purpose>To identify all stop locations in the Twin Cities metropolitan area. </purpose><supplinf>Twin Cities 7-county metropolitan area plus two non-metro counties. This includes Anoka, Carver, Dakota, Hennepin, Ramsey, Scott and Washington as well as Sherburne and Wright outside the metro. </supplinf></descript><timeperd><current>Transit Stop information is updated weekly.</current><timeinfo><sngdate><caldate>Updated Weekly</caldate></sngdate></timeinfo></timeperd><status><progress>Complete</progress><update>Weekly</update></status><spdom><bounding><westbc>-94.012</westbc><eastbc>-92.732</eastbc><northbc>45.415</northbc><southbc>44.471</southbc></bounding></spdom><keywords><place><placekey>Twin Cities, Anoka County, Carver County, Dakota County, Hennepin County, Ramsey County, Scott County, Washington County, Sherburne County, Wright County.</placekey></place><theme><themekey>transit, buses, bus stops, transportation</themekey></theme></keywords><crossref><citeinfo><title>TransitRoutes, Transit Shelters, Park and Ride Lots
+</title></citeinfo></crossref><accconst>None. This dataset is public domain under the Minnesota Government Data Practices Act (Minnesota Statutes Chapter 13). If the dataset is not available from the Online Linkage in Section 6, please contact the Distribution Contact Person.</accconst><useconst>None. This dataset is public domain under the Minnesota Government Data Practices Act (Minnesota Statutes Chapter 13).</useconst><ptcontac><cntinfo><cntperp><cntorg>Metropolitan Council</cntorg><cntper>GIS Contact</cntper></cntperp><cntaddr><addrtype>mailing and physical</addrtype><address>390 Robert Street North</address><city>St. Paul</city><state>MN</state><postal>55101-1805</postal></cntaddr><cntemail>gis-contact@metc.state.mn.us</cntemail></cntinfo></ptcontac></idinfo><dataqual><attracc><attraccr>Attributes randomly checked by Metro Transit staff.</attraccr></attracc><complete>All active and inactive transit stops. Does not include all retired stops.</complete><posacc><horizpa><horizpar>Positional accuracy reflects stops and their association with the street centerline network. </horizpar></horizpa></posacc></dataqual><distinfo><distliab>NOTICE:  The Geographic Information System (GIS) Data to which this notice is attached are made available pursuant to the Minnesota Government Data Practices Act (Minnesota Statutes Chapter 13).  THE GIS DATA ARE PROVIDED TO YOU AS IS AND WITHOUT ANY WARRANTY AS TO THEIR PERFORMANCE, MERCHANTABILITY, OR FITNESS FOR ANY PARTICULAR PURPOSE.  The GIS Data were developed by the Metropolitan Council for its own internal business purposes.  The Metropolitan Council does not represent or warrant that the GIS Data or the data documentation are error-free, complete, current, or accurate.  You are responsible for any consequences resulting from your use of the GIS Data or your reliance on the GIS Data.  You should consult the data documentation for this particular GIS Data to determine the limitations of the GIS Data and the precision with which the GIS Data may depict distance, direction, location, or other geographic features.  If you transmit or provide the GIS Data (or any portion of it) to another user, it is recommended that the GIS Data include a copy of this disclaimer and this metadata.</distliab><stdorder><ordering>See Online Linkage Below</ordering></stdorder><distrib><cntinfo><cntperp><cntorg>Metropolitan Council</cntorg><cntper>GIS Contact</cntper></cntperp><cntaddr><addrtype>mailing and physical</addrtype><address>390 Robert Street North</address><city>St. Paul</city><state>MN</state><postal>55101-1805</postal></cntaddr><cntemail>gis-contact@metc.state.mn.us</cntemail></cntinfo></distrib></distinfo><metainfo><metd>20251205</metd><metstdn>Minnesota Geographic Metadata Guidelines</metstdn><metstdv>1.2</metstdv><metextns><onlink>http://www.mngeo.state.mn.us/committee/standards/mgmg/metadata.htm</onlink></metextns><metc><cntinfo><cntperp><cntorg>Metropolitan Council</cntorg><cntper>GIS Contact</cntper></cntperp><cntaddr><addrtype>mailing and physical</addrtype><address>390 Robert Street North</address><city>St. Paul</city><state>MN</state><postal>55101-1805</postal></cntaddr><cntemail>gis-contact@metc.state.mn.us</cntemail></cntinfo></metc></metainfo><eainfo><overview><eaover>PLEASE NOTE: HASTUS is the schedule-maker software that Metro Transit uses to manage routes and stops.
+
+TRANSITSTOPS
+side_id:  The primary key field and unique stop identification number assigned by Metro Transit.
+ 
+site_on:  The street or address where the stop is found.
+ 
+site_at:  The cross street or address nearest the stop.
+
+CornerNumber: Unique id for corner location description that is used to locate a stop at an intersection by defining the direction of travel on the street where the stop is located and the stop's relationship to the nearest cross street.
+ 
+corn_desc:  The description of the corner the bus stop is on.
+
+city:  The city the stop is located in. 
+
+county: The county where the stop is located in.
+
+publiccomm:  Miscellaneous oomments about the stop.
+
+dt_zone:  The stop is part of the 50-cent Downtown Fare Zone.
+
+parkride:  The bus stop is at a park &amp; ride.
+
+adaaccess:  The stop has a firm surface.
+
+busstop_yn: Indicates whether boarding and alighting may occur at a stop. This is used to filter out timepoints and control points used in Metro Transit Scheduling.
+
+IsSuspended: The stop has been suspended temporarily but indefinitely from use in schedules. It will be flagged for installers to apply a “suspended” decal without removing the sign, if one is present.
+
+node_id:  For those sites that are nodes, this field contains their four letter identification.  Nodes are often timepoints, or places where the bus has to arrive/depart at a certain time.  Note, however, that more than one site can have the same Nodeid because a route will use different sites in different directions. 
+
+gate: The gate letter or number used for distinguishing stops at specific areas.
+
+T_Code: Transit code TxBase facility identifier. There are cases where stops are associated with a facility. This identifier establishes the relationship between the stop and the facility. 
+
+UNIQUE_ID: the street identification number the stop is localized on. Numbers match the road centerlines served on the MN Geospatial Commons, which has adopted the GAC standard. Please note that some IDs are custom HASTUS generated during street adjustment process.
+
+board_flag: this flag indicates if any bus trip allows boarding at the stop. 0 = No; 1 = Yes
+
+alight_flag: this flag indicates if any bus trip allows alighting at the stop. 0 = No; 1 = Yes
+
+active_status: indicates whether stop is active or archived. Active is defined as an available stop for Metro Transit scheduling department. Archived defined as stop that has been eliminated indefinitely for schedules. 
+
+itinerary_yn: indicates whether a stops is part of Service Week's active itinerary. Itinerary is defined as the route/path taken from one stop to the next stop.
+
+route_provider: indicates the line provider that serves the stop. Metro Transit trumps other providers if there are multiple providers servicing the stop. Met Council trumps other providers besides Metro Transit if there are multiple providers servicing a stop. Therefore, if just Metro Transit and just Met Council appear as value, it does not mean the sole provider for that stop. 
+
+TRANSITSTOPS_ROUTESSERVED_TBL
+site_id: The primary key field and unique stop identification number assigned by Metro Transit.
+
+ROUTES: The routes that use the transit stop (does not include seperation of terminal letters).
+
+NROUTES: The number of unique routes that use the transit stop (does include seperation of terminal letters).
+
+ROUTEDIRS: A list of routes and direction of travel seperated by a colon (does not include seperation of terminal letters). NB = Northbound; EB = Eastbound; SB = Southbound; and WB = Westbound.
+
+ROUTETERMDIRS: A list of routes with terminal letter included and direction of travel seperated by a colon (does include seperation of terminal letters). NB = Northbound; EB = Eastbound; SB = Southbound; and WB = Westbound.
+
+TRANSITSTOPS_TRIPCOUNT_TBL
+RouteID: A number identifying the route number associated with the route and
+its schedules.
+
+ScheduleTypeAbbr: Trips are seperated by day of week in which they occur. This field indicates which day of week is represented. See notes below.
+
+Service Abbr notes:
+WK = Trips that occur during weekdays.
+SAT = Trips that occur during Saturday.
+SUN = Trips that occur during Sunday.
+FRI = Additional trips to weekdays that occur on Friday.
+HOL = Trips that occur during holidays.
+
+ScheduleTypeName: Non-abbreviate ScheduleType.
+
+StopID: The primary key field and unique stop identification number assigned by Metro Transit.
+
+EAM: The number of trips in Early AM.
+
+AMP: The number of trips in AM Peak.
+
+MID: The number of trips in Midday.
+
+PMP: The number of trips in PM Peak.
+
+EVE: The number of trips in Evening.
+
+NIGHT: The number of trips in Night.
+
+OWL: The number of trips in very early morning (nicknamed Owl).
+
+TripCount: The total number of trips traveled during all time periods.
+
+Time period notes:
+a. EAM - Early Morning = 4:30AM to 6:00AM = 90 minute duration
+b. AMP - AM Peak = 6:00AM to 9:00AM = 180 minute duration
+c. MID - Midday = 9:00AM to 3:00PM = 360 minute duration
+d. PMP - PM Peak = 3:00PM to 6:30PM = 210 minute duration
+e. EVE - Evening = 6:30PM to 9:00PM = 150 minute duration
+f. NIGHT - Night = 9:00PM to 1:30AM = 270 minute duration
+g. OWL - Owl = 1:30AM to 4:30AM = 180 minute duration
+</eaover></overview></eainfo><spref><horizsys><planar><gridsys><gridsysn>Universal Transverse Mercator</gridsysn><utm><utmzone>15</utmzone></utm></gridsys><planci><plandu>meters</plandu></planci></planar><geodetic><horizdn>NAD83</horizdn><ellips>GRS80</ellips></geodetic></horizsys></spref></metadata>

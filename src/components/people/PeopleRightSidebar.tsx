@@ -99,7 +99,6 @@ export default function PeopleRightSidebar() {
 
   return (
     <div className="h-full flex flex-col overflow-y-auto scrollbar-hide">
-      {/* Header */}
       <div className="px-3 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <UserGroupIcon className="w-4 h-4 text-foreground-muted" />

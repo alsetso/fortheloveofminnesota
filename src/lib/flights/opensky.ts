@@ -65,6 +65,8 @@ export interface FlightsMeta {
 export interface FlightsFetchResult {
   flights: FlightState[];
   meta: FlightsMeta;
+  /** Set when API returns 200 but flights are unavailable (e.g. not configured, rate limited). */
+  error?: string;
 }
 
 function parseMeta(res: Response): FlightsMeta {
@@ -79,22 +81,26 @@ function parseMeta(res: Response): FlightsMeta {
 export async function fetchMinnesotaFlights(): Promise<FlightsFetchResult> {
   const res = await fetch('/api/flights');
 
+  const meta = parseMeta(res);
+  const data = await res.json().catch(() => ({}));
+
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const msg = body.error ?? `status ${res.status}`;
+    const msg = data.error ?? `status ${res.status}`;
     if (res.status === 429) {
       console.warn(`[FlightMap] Rate limited: ${msg}`);
-      return { flights: [], meta: parseMeta(res) };
+      return { flights: [], meta };
+    }
+    if (res.status === 502 || res.status === 503) {
+      console.warn(`[FlightMap] Flights API unavailable: ${msg}`);
+      return { flights: [], meta, error: msg };
     }
     throw new Error(`Flights API error: ${msg}`);
   }
 
-  const meta = parseMeta(res);
-  const data = await res.json();
-
   if (!data.states) {
-    console.warn('[FlightMap] OpenSky returned null states — rate-limited or no traffic');
-    return { flights: [], meta };
+    const errMsg = data.error ?? 'No flight data';
+    console.warn('[FlightMap]', errMsg);
+    return { flights: [], meta, error: data.error ?? undefined };
   }
 
   const flights = (data.states as unknown[][])

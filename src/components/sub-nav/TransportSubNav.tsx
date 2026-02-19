@@ -26,7 +26,7 @@ const TRANSPORT_NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { label: 'NexTrip', href: '/transportation/nextrip', icon: TruckIcon },
       { label: 'Trip Planner', href: '/transportation/trip-planner', icon: ArrowsRightLeftIcon },
-      { label: 'GTFS Live Map', href: '/transportation/gtfs', icon: SignalSlashIcon },
+      { label: 'Metro (•Live)', href: '/transportation/metro', icon: SignalSlashIcon },
     ],
   },
   {

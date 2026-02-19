@@ -80,6 +80,23 @@ async function getAccessToken(): Promise<string> {
 // --- Route handler ---
 
 export async function GET() {
+  const clientId = process.env.OPENSKY_CLIENT_ID;
+  const clientSecret = process.env.OPENSKY_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    return Response.json(
+      { states: null, error: 'Flights API not configured (OPENSKY_CLIENT_ID / OPENSKY_CLIENT_SECRET missing in this environment).' },
+      {
+        status: 200,
+        headers: {
+          'X-Credits-Remaining': '0',
+          'X-Requests-Remaining': '0',
+          'X-Cache-TTL': '0',
+          'X-Served-From-Cache': '0',
+        },
+      },
+    );
+  }
+
   resetDailyCounterIfNeeded();
 
   const remainingRequests = DAILY_REQUEST_BUDGET - dailyRequestCount;

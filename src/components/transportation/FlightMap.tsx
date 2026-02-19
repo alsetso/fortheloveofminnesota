@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
 import { MAP_CONFIG } from '@/features/map/config';
 import {
@@ -19,25 +20,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // ---------------------------------------------------------------------------
 
 const POLL_INTERVAL = 30_000;
-
-const ALTITUDE_BANDS = [
-  { id: 'ground', label: 'Ground', min: -Infinity, max: 0, color: '#94a3b8' },
-  { id: 'low',    label: '< 10k ft', min: 0, max: 10_000, color: '#38bdf8' },
-  { id: 'mid',    label: '10–25k ft', min: 10_000, max: 25_000, color: '#a78bfa' },
-  { id: 'high',   label: '25–35k ft', min: 25_000, max: 35_000, color: '#f472b6' },
-  { id: 'cruise', label: '35k+ ft', min: 35_000, max: Infinity, color: '#ffffff' },
-] as const;
-
-type AltBandId = (typeof ALTITUDE_BANDS)[number]['id'];
-
-function getAltBand(flight: FlightState): AltBandId {
-  if (flight.onGround) return 'ground';
-  const alt = flight.baroAltitudeFt ?? 0;
-  if (alt < 10_000) return 'low';
-  if (alt < 25_000) return 'mid';
-  if (alt < 35_000) return 'high';
-  return 'cruise';
-}
+const MAX_API_CALLS = 10;
 
 // ---------------------------------------------------------------------------
 // Canvas icon
@@ -80,12 +63,10 @@ export default function FlightMap() {
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [nextPollIn, setNextPollIn] = useState(POLL_INTERVAL / 1000);
   const [ready, setReady] = useState(false);
-  const [totalApiCalls, setTotalApiCalls] = useState(0);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [showBreakModal, setShowBreakModal] = useState(false);
+  const apiCallCountRef = useRef(0);
 
-  // Filters
-  const [activeBands, setActiveBands] = useState<Set<AltBandId>>(
-    () => new Set(ALTITUDE_BANDS.map(b => b.id)),
-  );
   const [searchQuery, setSearchQuery] = useState('');
 
   // Derived: unique countries from current data
@@ -99,7 +80,6 @@ export default function FlightMap() {
   const applyFilters = useCallback(
     (flights: FlightState[]): FlightState[] => {
       return flights.filter(f => {
-        if (!activeBands.has(getAltBand(f))) return false;
         if (selectedCountry !== 'all' && f.country !== selectedCountry) return false;
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
@@ -112,7 +92,7 @@ export default function FlightMap() {
         return true;
       });
     },
-    [activeBands, selectedCountry, searchQuery],
+    [selectedCountry, searchQuery],
   );
 
   // Push filtered GeoJSON to map whenever filters or data change
@@ -196,9 +176,15 @@ export default function FlightMap() {
           minzoom: 7,
           layout: {
             'text-field': [
-              'case',
-              ['!=', ['get', 'callsign'], ''], ['get', 'callsign'],
-              ['get', 'icao24'],
+              'format',
+              ['case', ['!=', ['get', 'callsign'], ''], ['get', 'callsign'], ['get', 'icao24']],
+              {},
+              '\n',
+              ['case',
+                ['all', ['>', ['coalesce', ['get', 'baroAltitudeFt'], 0], 0], ['!=', ['get', 'onGround'], 'true']],
+                ['concat', ['to-string', ['round', ['get', 'baroAltitudeFt']]], ' ft'],
+                'Ground',
+              ],
             ],
             'text-size': 10,
             'text-offset': [0, 1.4],
@@ -284,17 +270,28 @@ export default function FlightMap() {
 
         setReady(true);
 
-        // Initial fetch
+        // Initial fetch + strict rate limit: max MAX_API_CALLS then show break modal
         const doFetch = async () => {
+          if (apiCallCountRef.current >= MAX_API_CALLS) {
+            if (pollRef.current) {
+              clearInterval(pollRef.current);
+              pollRef.current = null;
+            }
+            setShowBreakModal(true);
+            return;
+          }
+          apiCallCountRef.current += 1;
+
           try {
             const result = await fetchMinnesotaFlights();
             setAllFlights(result.flights);
             setMeta(result.meta);
+            setApiError(result.error ?? null);
             setLastUpdate(new Date());
             setNextPollIn(POLL_INTERVAL / 1000);
-            setTotalApiCalls(prev => prev + 1);
           } catch (err) {
             console.warn('[FlightMap] Fetch failed:', err);
+            setApiError(err instanceof Error ? err.message : 'Failed to load flight data');
           }
         };
 
@@ -324,27 +321,9 @@ export default function FlightMap() {
     return () => observer.disconnect();
   }, [ready]);
 
-  // ---------------------------------------------------------------------------
-  // Derived stats
-  // ---------------------------------------------------------------------------
-
   const filtered = applyFilters(allFlights);
   const airborne = allFlights.filter(f => !f.onGround).length;
   const onGround = allFlights.filter(f => f.onGround).length;
-
-  const bandCounts = new Map<AltBandId, number>();
-  for (const f of allFlights) {
-    const band = getAltBand(f);
-    bandCounts.set(band, (bandCounts.get(band) ?? 0) + 1);
-  }
-
-  const toggleBand = (id: AltBandId) => {
-    setActiveBands(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
 
   // ---------------------------------------------------------------------------
   // Render
@@ -354,36 +333,29 @@ export default function FlightMap() {
     <div className="relative flex-1 min-h-0 rounded-md border border-gray-200 dark:border-white/10 overflow-hidden">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* ── Top-left: Altitude band filters ── */}
-      <div className="absolute top-2 left-2 z-10 flex flex-col gap-1.5">
-        <div className="flex flex-wrap gap-1">
-          {ALTITUDE_BANDS.map(band => {
-            const on = activeBands.has(band.id);
-            const count = bandCounts.get(band.id) ?? 0;
-            return (
-              <button
-                key={band.id}
-                type="button"
-                onClick={() => toggleBand(band.id)}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors border"
-                style={{
-                  backgroundColor: on ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.4)',
-                  color: on ? band.color : '#64748b',
-                  borderColor: on ? band.color + '66' : 'transparent',
-                }}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: on ? band.color : '#475569' }}
-                />
-                {band.label}
-                <span className="text-[9px] opacity-60">{count}</span>
-              </button>
-            );
-          })}
+      {apiError && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 rounded-md bg-amber-500/95 text-[11px] text-gray-900 font-medium shadow-lg max-w-[90%] text-center">
+          Flight data unavailable. {apiError.includes('not configured') ? 'OpenSky credentials are not set for this environment.' : apiError}
         </div>
+      )}
 
-        {/* Search + country filter row */}
+      {showBreakModal && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4">
+          <div className="rounded-lg border border-white/10 bg-gray-900 px-6 py-5 shadow-xl text-center max-w-sm">
+            <p className="text-sm font-medium text-white mb-1">Still here?</p>
+            <p className="text-xs text-gray-400 mb-4">Let&apos;s take a break.</p>
+            <Link
+              href="/"
+              className="inline-block px-4 py-2 rounded-md bg-white text-gray-900 text-xs font-medium hover:bg-gray-100 transition-colors"
+            >
+              Go to homepage
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ── Top-left: Search + country filter ── */}
+      <div className="absolute top-2 left-2 z-10 flex flex-col gap-1.5">
         <div className="flex items-center gap-1.5">
           <input
             type="text"
@@ -402,42 +374,6 @@ export default function FlightMap() {
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
-        </div>
-      </div>
-
-      {/* ── Top-right: API metrics panel ── */}
-      <div className="absolute top-2 right-12 z-10">
-        <div className="bg-black/75 border border-white/10 rounded-md px-2.5 py-1.5 space-y-1 min-w-[140px]">
-          <div className="text-[9px] font-semibold text-white/50 uppercase tracking-wider">API Usage</div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
-            <span className="text-white/50">Credits</span>
-            <span className="text-right font-mono text-white/80">
-              {meta ? `${meta.creditsRemaining.toLocaleString()} / 4,000` : '—'}
-            </span>
-            <span className="text-white/50">Requests</span>
-            <span className="text-right font-mono text-white/80">
-              {meta ? `${meta.requestsRemaining.toLocaleString()} left` : '—'}
-            </span>
-            <span className="text-white/50">Session calls</span>
-            <span className="text-right font-mono text-white/80">{totalApiCalls}</span>
-            <span className="text-white/50">Cache</span>
-            <span className="text-right font-mono text-white/80">
-              {meta ? (meta.fromCache ? 'HIT' : 'MISS') : '—'}
-            </span>
-          </div>
-          {meta && meta.creditsRemaining >= 0 && (
-            <div className="mt-1">
-              <div className="h-1 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.max(0, (meta.creditsRemaining / 4000) * 100)}%`,
-                    backgroundColor: meta.creditsRemaining > 1000 ? '#34d399' : meta.creditsRemaining > 200 ? '#fbbf24' : '#f87171',
-                  }}
-                />
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

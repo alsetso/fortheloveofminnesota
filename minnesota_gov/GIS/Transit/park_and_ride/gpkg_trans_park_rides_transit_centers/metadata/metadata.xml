@@ -1,0 +1,107 @@
+<metadata><idinfo><citation><citeinfo><title>Park &amp; Rides and Transit Centers</title><origin>Metro Transit</origin><pubinfo><publish>Metropolitan Council - Metro Transit</publish></pubinfo><pubdate>periodically revised</pubdate><onlink>https://gisdata.mn.gov/dataset/us-mn-state-metc-trans-park-rides-transit-centers</onlink></citeinfo></citation><descript><abstract>The Park &amp; Rides and Transit Centers layer contains a comprehensive inventory of park and ride and transit center facilities throughout the Twin Cities Metropolitan area and surrounding counties. Park &amp; Rides are defined as facilities with transit service and parking available, for transit customer and carpool use. Transit Centers are defined as facilities where: two or more routes connect to transfer passengers, buses connect off street (or in clearly designated on-street spaces), there are marked 'gates' for different routes and directions, the location serves a major activity center, and there is a standing facility, or in some cases, a collection of bus shelters. 
+
+The dataset was geocoded using TLG centerline streets. When specific site details were available, the geography was moved off street lines to actual facility locations using orthophotographic imagery as a base layer. All attempts were made to correctly reflect the real lot locations; however the positional accuracy of this data cannot be guaranteed. 
+
+The Park-and-Ride Annual Survey lookup table contains information about the capacity and usage at each park-and-ride facility. This table does not include data regarding transit center facilities. Capacity and usage at Park and Pool lots, which are found in a seperate geographic dataset, are also recorded in the Park-and-Ride Annual Survey Table. 
+
+Attribute information is considered current to the metadata date and will be updated as needed. </abstract><purpose>To identify all Park-and-Ride and Transit Center locations in the Twin Cities metropolitan area and provide historic parking utilization data for park-and-ride facilities. </purpose><supplinf>Twin Cities Metropolitan Area </supplinf></descript><timeperd><timeinfo><sngdate><caldate>20230519</caldate></sngdate></timeinfo><current>Facility locations are accurate as of the Time Period of Content date for the Twin Cities Metropolitan Area.</current></timeperd><status><progress>Complete</progress><update>As needed</update></status><spdom><bounding><westbc>-94.012</westbc><eastbc>-92.732</eastbc><northbc>45.415</northbc><southbc>44.471</southbc></bounding></spdom><keywords><place><placekey>Twin Cities, Minnesota, Anoka County, Carver County, Chisago County, Dakota County, Goodhue County, Hennepin County, Isanti County, Le Sueur County, Mille Lacs County, Ramsey County, Rice County, Scott County, Sherburne County, Stearns County, Washington County, Wright County, Dunn County, St. Croix County</placekey></place><theme><themekey>Park and Rides, Transit Centers, Transit Stops, Transit Routes, Transit Patterns by Node Segments, transit, buses, nodes, stops, transportation, facilities, routes</themekey></theme></keywords><accconst>None. This dataset is public domain under the Minnesota Government Data Practices Act (Minnesota Statutes Chapter 13). If the dataset is not available from the Online Linkage in Section 6, please contact the Distribution Contact Person.</accconst><useconst>None. This dataset is public domain under the Minnesota Government Data Practices Act (Minnesota Statutes Chapter 13).</useconst><crossref><citeinfo><title>Park and Pools, Park and Ride Annual Survey</title></citeinfo></crossref><native>ArcGIS 9x</native><ptcontac><cntinfo><cntperp><cntorg>Metropolitan Council - Metro Transit</cntorg><cntper>Jenny Ackerson</cntper></cntperp><cntpos>Planner - NR</cntpos><cntaddr><addrtype>mailing and physical</addrtype><address>560 6th Ave N</address><city>St. Paul</city><state>MN</state><postal>55106</postal></cntaddr><cntvoice>612.349.7366</cntvoice><cntemail>jenny.ackerson@metrotransit.org</cntemail></cntinfo></ptcontac></idinfo><dataqual><attracc><attraccr>Attributes are considered accurate. See the Entity and Attribute Overview for more details.</attraccr></attracc><logic>The dataset is topologically 'clean'.</logic><complete>All park-and-ride and transit center facilities in the metropolitan area that meet the regional transit providers definition are covered.</complete><posacc><horizpa><horizpar>Orthophotos were used in referencing facility locations. Positional accuracy varies throughout the dataset. </horizpar></horizpa></posacc></dataqual><spdoinfo><indspref>None</indspref><direct>Point</direct><mgmg3obj>Point</mgmg3obj><mgmg3til>One file for entire metro area.</mgmg3til></spdoinfo><eainfo><overview><eaover>Park &amp; Rides and Transit Centers Layer Attributes
+
+TCode: Unique value used by Metro Transit for identification of facilities
+
+PnRNum: Annual parking count unique facility identification number
+
+Name: Name of park and ride or transit center facility
+
+FcltyType: Classification of transit facility:
+PR = Park and Ride facility
+TC = Transit Center facility
+TC_w_PR = Transit Center with Park-and-Ride facility
+
+Status: Current status of the facility 
+Open = Facility is open for use
+Closed = Facility is permantly closed
+Inactive = Facility is not permanently closed, but is not actively being used.
+Future = Plannned future facility (determined by if a facility has been funded, or associated with a transitway project that has a locally-preferred alternative)
+Open - Planned Closure = Facility is currently open, and is expect to formally close with an upcoming service change.
+Inactive - Planned Closure = Facility is not currently in use, and is expected to formally close.
+Inactive - Planned Reopening = Facility is not currently in use, but is expected to reopen with a future service change.
+
+Address: Facility address
+
+City: City in which facility is located
+
+Provider: Transit service provider at the facility
+
+LocDetails: Facility location details (intersection, quadrant, portion of parking lot, etc.)
+
+YearOpen: The year in which this facility opened for service
+
+YearClose: The year in which this facility has closed down, if applicable
+
+CurrentCpct: Number of Parking spaced currently available at this facility
+
+PlanCpct: Number of parking spaces forecasted in the future, if applicable
+
+LandOwnr: Owner of the land facility is located on 
+
+FcltyOwnr: Owner of the facility itself
+
+SharedUse: Indicates whether the facility is shared with another use
+Y = Yes, facility is shared with another non-transit use
+N = No, facility is standalone and not shared with another use
+
+ShrUseDesc: Description of the shared or complementary use of the facility, if applicable
+
+PrkngType: Physical characteristics of the parking facility
+Surface = Surface parking lot
+Structured = Structured parking ramp
+Surface &amp; Structured = Combination of parking in a structured ramp and surface lot
+Blank = No parking, unknown, or inactive facility
+
+Mpls_Corr: Downtown Minneapolis express bus corridor served by the facility
+
+Stp_Corr: Downtown St. Paul express bus corridor served by the facility
+
+Shelter: Shelter available at this facility (either bus shelter, canopy, or structural protection from elements)
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+Bench: Standalone bench present at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+IndoorWt: Indoot waiting area(s) present at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+TrashRec: Trash receptacle present at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+DropOff: Designated drop-off area (kiss-and-ride) present at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+BikeRacks: Bike parking via bike racks/loops present at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+BikeLockr: Bike Lockers available for rent at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+RT_Sign: Real time transit information signage present at this facility
+Y = Yes
+N = No
+Blank = Unknown or not applicable
+
+Notes: Any additional notes regarding this facility
+
+ATIS_ID: the unique identifier assigned by the ATIS trip planning software used on MetroTransit.org. The field serves a key for updating park and ride data in the finder tool on the MetroTransit.org website.</eaover><eadetcit>None.</eadetcit></overview></eainfo><distinfo><resdesc>ParkAndRideLotsTransitCenters</resdesc><distliab>NOTICE: The Geographic Information System (GIS) Data to which this notice is attached are made available pursuant to the Minnesota Government Data Practices Act (Minnesota Statutes Chapter 13). THE GIS DATA ARE PROVIDED TO YOU AS IS AND WITHOUT ANY WARRANTY AS TO THEIR PERFORMANCE, MERCHANTABILITY, OR FITNESS FOR ANY PARTICULAR PURPOSE. The GIS Data were developed by the Metropolitan Council for its own internal business purposes. The Metropolitan Council does not represent or warrant that the GIS Data or the data documentation are error-free, complete, current, or accurate. You are responsible for any consequences resulting from your use of the GIS Data or your reliance on the GIS Data. You should consult the data documentation for this particular GIS Data to determine the limitations of the GIS Data and the precision with which the GIS Data may depict distance, direction, location, or other geographic features. If you transmit or provide the GIS Data (or any portion of it) to another user, it is recommended that the GIS Data include a copy of this disclaimer and this metadata.</distliab><stdorder><digform><digtinfo><formname>ArcView Shape File</formname><formvern>ArcGIS 9x</formvern><transize>0.1 Meg. for zip file.</transize></digtinfo></digform><ordering>See Online Linkage Below</ordering></stdorder><distrib><cntinfo><cntperp><cntorg>Metropolitan Council - Metro Transit</cntorg><cntper>Jenny Ackerson</cntper></cntperp><cntpos>Planner - NR</cntpos><cntaddr><addrtype>mailing and physical</addrtype><address>560 6th Ave N</address><city>St. Paul</city><state>MN</state><postal>55106</postal></cntaddr><cntvoice>612.349.7366</cntvoice><cntemail>jenny.ackerson@metrotransit.org</cntemail></cntinfo></distrib></distinfo><metainfo><metd>20250306</metd><metstdn>Minnesota Geographic Metadata Guidelines</metstdn><metstdv>1.2</metstdv><metextns><onlink>http://www.mngeo.state.mn.us/committee/standards/mgmg/metadata.htm</onlink></metextns><metc><cntinfo><cntperp><cntorg>Metropolitan Council - Metro Transit</cntorg><cntper>Jenny Ackerson</cntper></cntperp><cntpos>Planner - NR</cntpos><cntaddr><addrtype>mailing and physical</addrtype><address>560 6th Ave N</address><city>St. Paul</city><state>MN</state><postal>55106</postal></cntaddr><cntvoice>612.349.7366</cntvoice><cntemail>jenny.ackerson@metrotransit.org</cntemail></cntinfo></metc></metainfo><Esri><ModDate>20110721</ModDate><ModTime>14581600</ModTime></Esri><mdDateSt Sync="TRUE">20110721</mdDateSt><spref><horizsys><planar><gridsys><gridsysn>Universal Transverse Mercator</gridsysn><utm><utmzone>15</utmzone></utm></gridsys><planci><plandu>meters</plandu></planci></planar><geodetic><horizdn>NAD83</horizdn><ellips>GRS80</ellips></geodetic></horizsys></spref></metadata>

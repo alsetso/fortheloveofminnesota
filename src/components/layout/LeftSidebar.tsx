@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -17,7 +17,11 @@ import {
   TicketIcon,
   MagnifyingGlassIcon,
   UserPlusIcon,
+  UserIcon,
+  EnvelopeIcon,
+  PhoneIcon,
 } from '@heroicons/react/24/outline';
+import type { PeopleSearchRow } from '@/app/api/people/search/recent/route';
 import {
   UserCircleIcon as UserCircleIconSolid,
   HeartIcon as HeartIconSolid,
@@ -70,11 +74,57 @@ interface LeftSidebarProps {
  * Left Sidebar - Sticky, scrollable
  * Shows navigation, shortcuts with colorful icons, and footer links
  */
+const SEARCH_HISTORY_VISIBLE = 5;
+
+function searchRowLabel(row: PeopleSearchRow): string {
+  const q = row.query as Record<string, unknown>;
+  switch (row.search_type) {
+    case 'name': {
+      const first = (q.firstName ?? q.first_name) as string | undefined;
+      const last = (q.lastName ?? q.last_name) as string | undefined;
+      return ([first, last].filter(Boolean).join(' ').trim() || (q.name as string)) ?? 'Name search';
+    }
+    case 'email':
+      return (q.email as string) ?? 'Email search';
+    case 'phone':
+      return (q.phone as string) ?? 'Phone search';
+    default:
+      return 'Search';
+  }
+}
+
+function searchRowIcon(row: PeopleSearchRow) {
+  switch (row.search_type) {
+    case 'name': return UserIcon;
+    case 'email': return EnvelopeIcon;
+    case 'phone': return PhoneIcon;
+    default: return MagnifyingGlassIcon;
+  }
+}
+
 export default function LeftSidebar({ children }: LeftSidebarProps) {
   const pathname = usePathname();
   const { account } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const queryClient = useQueryClient();
+  const [searchHistoryExpanded, setSearchHistoryExpanded] = useState(false);
+
+  const { data: recentSearchData } = useQuery(
+    account?.id
+      ? {
+          queryKey: ['people', 'search', 'recent', account.id],
+          queryFn: async () => {
+            const res = await fetch('/api/people/search/recent', { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch recent searches');
+            return res.json() as Promise<{ searches: PeopleSearchRow[] }>;
+          },
+          staleTime: 60 * 1000,
+        }
+      : { queryKey: ['skip'], queryFn: () => null, enabled: false }
+  );
+  const recentSearches = recentSearchData?.searches ?? [];
+  const searchHistoryShow = searchHistoryExpanded ? recentSearches : recentSearches.slice(0, SEARCH_HISTORY_VISIBLE);
+  const searchHistoryHasMore = recentSearches.length > SEARCH_HISTORY_VISIBLE;
 
   const { data: edgesData, isLoading: edgesLoading } = useQuery(
     account?.id ? socialGraphQueries.edges(account.id) : { queryKey: ['skip'], queryFn: () => null, enabled: false }
@@ -190,6 +240,45 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
           );
         })}
       </div>
+
+      {/* CONNECTIONS — Search history (up to 5, then +View all to expand) */}
+      {account && (
+        <div className="p-3 border-t border-border-muted dark:border-white/10">
+          <h3 className="text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-2">Connections</h3>
+          {recentSearches.length === 0 ? (
+            <p className="text-xs text-foreground-muted mb-1">No recent people searches</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {searchHistoryShow.map((row) => {
+                const Icon = searchRowIcon(row);
+                return (
+                  <li key={row.id}>
+                    <Link
+                      href={`/people/search/${row.id}`}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-accent transition-colors text-left"
+                    >
+                      <Icon className="w-3.5 h-3.5 text-foreground-muted flex-shrink-0" />
+                      <span className="text-xs text-foreground truncate flex-1">{searchRowLabel(row)}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {searchHistoryHasMore && (
+            <button
+              type="button"
+              onClick={() => setSearchHistoryExpanded((v) => !v)}
+              className="mt-1 text-xs text-lake-blue hover:underline"
+            >
+              {searchHistoryExpanded ? 'Show less' : '+View all'}
+            </button>
+          )}
+          <Link href="/people" className="mt-1.5 block text-xs text-foreground-muted hover:text-foreground">
+            Find anyone
+          </Link>
+        </div>
+      )}
 
       {/* Following Section or Custom Content */}
       {children ? (

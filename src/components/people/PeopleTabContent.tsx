@@ -28,7 +28,7 @@ export default function PeopleTabContent({ tab }: PeopleTabContentProps) {
   const router = useRouter();
 
   const handleBackToSearch = () => {
-    router.push('/people');
+    router.push('/people/users');
   };
 
   const getTabTitle = () => {

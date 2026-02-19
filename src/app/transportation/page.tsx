@@ -29,9 +29,9 @@ const SECTIONS = [
     icon: ArrowsRightLeftIcon,
   },
   {
-    label: 'GTFS Live Map',
+    label: 'Metro (•Live)',
     description: 'Real-time vehicle positions on a live map',
-    href: '/transportation/gtfs',
+    href: '/transportation/metro',
     icon: SignalSlashIcon,
   },
   {

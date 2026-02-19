@@ -354,6 +354,8 @@ export async function middleware(req: NextRequest) {
     if (pathname === '/news' || pathname.startsWith('/news/')) return true;
     // Explore (civic dashboard, counties, cities, etc.) is public
     if (pathname === '/explore' || pathname.startsWith('/explore/')) return true;
+    // Transportation (metro, nexrip, trip-planner, flights, etc.) is public
+    if (pathname === '/transportation' || pathname.startsWith('/transportation/')) return true;
     
     // Mention detail pages are allowed
     if (pathname.startsWith('/mention/')) {

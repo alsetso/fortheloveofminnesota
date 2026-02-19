@@ -224,7 +224,7 @@ export default function GTFSMap() {
 
       const map = new mapboxgl.Map({
         container: containerRef.current,
-        style: MAP_CONFIG.STRATEGIC_STYLES.light,
+        style: MAP_CONFIG.STRATEGIC_STYLES.satellite,
         center: [-93.27, 44.97],
         zoom: 11,
         minZoom: 8,

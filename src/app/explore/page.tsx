@@ -1,8 +1,5 @@
 import { Suspense } from 'react';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import ExploreLeftSidebar from '@/components/explore/ExploreLeftSidebar';
-import ExploreRightSidebar from '@/components/explore/ExploreRightSidebar';
-import ExploreContent from '@/components/explore/ExploreContent';
+import ExplorePageClient from '@/components/explore/ExplorePageClient';
 import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 /**
@@ -15,12 +12,7 @@ export default function ExplorePage() {
     <>
       <PageViewTracker />
       <Suspense>
-        <NewPageWrapper
-          leftSidebar={<ExploreLeftSidebar />}
-          rightSidebar={<ExploreRightSidebar />}
-        >
-          <ExploreContent />
-        </NewPageWrapper>
+        <ExplorePageClient />
       </Suspense>
     </>
   );

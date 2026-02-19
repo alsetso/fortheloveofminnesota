@@ -1,7 +1,7 @@
 'use client';
 
 import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
+import HeaderSearch from '@/components/layout/HeaderSearch';
 import SearchResults from '@/components/layout/SearchResults';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
@@ -15,7 +15,7 @@ interface StandardPageClientProps {
  * Standard page client wrapper with default PageWrapper configuration.
  * 
  * Provides consistent PageWrapper setup with:
- * - Search component (MapSearchInput)
+ * - Search component (HeaderSearch)
  * - Account dropdown with welcome modal
  * - Search results component
  * 
@@ -30,7 +30,7 @@ export default function StandardPageClient({
   return (
     <PageWrapper
       headerContent={null}
-      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
+      searchComponent={<HeaderSearch />}
       accountDropdownProps={{
         onAccountClick: () => {},
         onSignInClick: openWelcome,

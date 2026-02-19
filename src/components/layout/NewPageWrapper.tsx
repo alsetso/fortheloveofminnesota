@@ -12,9 +12,11 @@ import {
   ChartBarIcon,
   EllipsisHorizontalIcon,
   BuildingOfficeIcon,
-  BuildingStorefrontIcon,
   NewspaperIcon,
   XMarkIcon,
+  Bars3Icon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   SunIcon,
   MoonIcon,
 } from '@heroicons/react/24/outline';
@@ -39,7 +41,7 @@ const KNOWN_APP_ROUTES = new Set([
   'messages', 'search', 'collections', 'saved', 'memories', 'friends',
   'stories', 'billing', 'plans', 'onboarding', 'signup', 'login',
   'terms', 'post', 'marketplace', 'ad_center', 'contact', 'download',
-  'privacy', 'not-found', 'school',
+  'privacy', 'not-found', 'school', 'schools',
 ]);
 
 /** Routes where the right sidebar should be suppressed in the main content area. */
@@ -60,12 +62,13 @@ interface NewPageWrapperProps {
   headerContent?: ReactNode;
   /** When true, main content area does not scroll (e.g. profile map). Root uses h-screen; main uses overflow-hidden and flex so a single full-height child fills the area. */
   mainNoScroll?: boolean;
-  /** When set, left sidebar can be shown as a mobile overlay when viewport is narrow. Gov page uses this. */
-  mobileLeftSidebarOpen?: boolean;
-  onMobileLeftSidebarOpenChange?: (open: boolean) => void;
-  /** When set, right sidebar can be shown as a mobile overlay when viewport is narrow. Gov page uses this. */
-  mobileRightSidebarOpen?: boolean;
-  onMobileRightSidebarOpenChange?: (open: boolean) => void;
+  /** Route-specific sub-sidebar content rendered between the left sidebar and main content. */
+  subSidebar?: ReactNode;
+  /** Label for the sub-sidebar tab in the mobile overlay (e.g. "Explore", "Government"). */
+  subSidebarLabel?: string;
+  /** Controls whether the sub-sidebar is expanded (inline or overlay depending on viewport). */
+  subSidebarOpen?: boolean;
+  onSubSidebarOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -81,10 +84,10 @@ export default function NewPageWrapper({
   rightSidebar,
   headerContent,
   mainNoScroll = false,
-  mobileLeftSidebarOpen,
-  onMobileLeftSidebarOpenChange,
-  mobileRightSidebarOpen,
-  onMobileRightSidebarOpenChange,
+  subSidebar,
+  subSidebarLabel,
+  subSidebarOpen,
+  onSubSidebarOpenChange,
 }: NewPageWrapperProps) {
   const pathname = usePathname();
   const hideRightSidebar = useMemo(() => shouldHideRightSidebar(pathname), [pathname]);
@@ -95,10 +98,21 @@ export default function NewPageWrapper({
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(1024);
 
+  // Consolidated mobile overlay state: only one panel open at a time
+  type MobilePanel = 'left' | 'right' | null;
+  const [activeMobilePanel, setActiveMobilePanel] = useState<MobilePanel>(null);
+  const [leftPanelTab, setLeftPanelTab] = useState<'menu' | 'sub'>('menu');
+
+  const closeMobilePanel = () => {
+    setActiveMobilePanel(null);
+    setLeftPanelTab('menu');
+  };
+
   // Layout constants - extracted for maintainability
   const LAYOUT_CONSTANTS = {
     LEFT_SIDEBAR_WIDTH: 256,
     RIGHT_SIDEBAR_WIDTH: 320,
+    SUB_SIDEBAR_WIDTH: 240,
     MIN_CENTER_WIDTH: 400,
     RESIZE_THROTTLE_MS: 150,
   } as const;
@@ -135,14 +149,22 @@ export default function NewPageWrapper({
   // Calculate which sidebars can fit
   const minWidthForLeftOnly = LAYOUT_CONSTANTS.MIN_CENTER_WIDTH + LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH; // 656px
   const minWidthForBoth = LAYOUT_CONSTANTS.MIN_CENTER_WIDTH + LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH + LAYOUT_CONSTANTS.RIGHT_SIDEBAR_WIDTH; // 976px
+  const minWidthForLeftSubCenter = LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH + LAYOUT_CONSTANTS.SUB_SIDEBAR_WIDTH + LAYOUT_CONSTANTS.MIN_CENTER_WIDTH; // 896px
+  const minWidthForAllFour = minWidthForLeftSubCenter + LAYOUT_CONSTANTS.RIGHT_SIDEBAR_WIDTH; // 1216px
 
   // Determine what can fit (header: viewport-only; main content: viewport + !hideRightSidebar)
   const effectiveCanShowLeftSidebar = leftSidebar && viewportWidth >= minWidthForLeftOnly;
   const headerCanShowRightSidebar = rightSidebar && viewportWidth >= minWidthForBoth;
-  const effectiveCanShowRightSidebar = headerCanShowRightSidebar && !hideRightSidebar;
+
+  // Sub-sidebar: shows inline when open, left sidebar visible, and viewport wide enough
+  const subSidebarIsActive = !!(subSidebar && subSidebarOpen);
+  const canShowSubSidebarInline = subSidebarIsActive && !!effectiveCanShowLeftSidebar && viewportWidth >= minWidthForLeftSubCenter;
+  const rightSidebarSuppressedBySub = canShowSubSidebarInline && viewportWidth < minWidthForAllFour;
+
+  const effectiveCanShowRightSidebar = headerCanShowRightSidebar && !hideRightSidebar && !rightSidebarSuppressedBySub;
 
   // Use constants for consistency
-  const { LEFT_SIDEBAR_WIDTH, RIGHT_SIDEBAR_WIDTH, MIN_CENTER_WIDTH } = LAYOUT_CONSTANTS;
+  const { LEFT_SIDEBAR_WIDTH, RIGHT_SIDEBAR_WIDTH, SUB_SIDEBAR_WIDTH, MIN_CENTER_WIDTH } = LAYOUT_CONSTANTS;
 
   // Navigation items
   const navItems: Array<{
@@ -202,6 +224,20 @@ export default function NewPageWrapper({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isMoreMenuOpen]);
+
+  // Close mobile overlay on route navigation
+  useEffect(() => {
+    setActiveMobilePanel(null);
+    setLeftPanelTab('menu');
+  }, [pathname]);
+
+  // Auto-close mobile overlay when viewport grows past mobile breakpoint
+  useEffect(() => {
+    if (effectiveCanShowLeftSidebar) {
+      setActiveMobilePanel(null);
+      setLeftPanelTab('menu');
+    }
+  }, [effectiveCanShowLeftSidebar]);
 
   return (
     <div
@@ -443,6 +479,43 @@ export default function NewPageWrapper({
           </aside>
         )}
 
+        {/* Sub-Sidebar - Inline between left sidebar and main when viewport is wide enough */}
+        {canShowSubSidebarInline && subSidebar && (
+          <aside
+            className="sticky top-14 flex-shrink-0 w-60 h-[calc(100vh-3.5rem)] overflow-y-auto scrollbar-hide border-l border-r border-border-muted dark:border-white/10 flex flex-col"
+            aria-label="Sub navigation"
+            role="complementary"
+          >
+            <div className="flex-shrink-0 flex items-center justify-end px-2 pt-2">
+              <button
+                type="button"
+                onClick={() => onSubSidebarOpenChange?.(false)}
+                className="w-6 h-6 rounded-md hover:bg-surface-accent flex items-center justify-center transition-colors text-foreground-muted hover:text-foreground"
+                aria-label="Collapse sub navigation"
+              >
+                <ChevronLeftIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
+              {subSidebar}
+            </div>
+          </aside>
+        )}
+
+        {/* Sub-Sidebar collapsed: inline expand button when desktop has room but user closed it */}
+        {subSidebar && !subSidebarOpen && onSubSidebarOpenChange && !!effectiveCanShowLeftSidebar && viewportWidth >= minWidthForLeftSubCenter && (
+          <div className="sticky top-14 flex-shrink-0 h-[calc(100vh-3.5rem)] border-r border-border-muted dark:border-white/10 flex items-start">
+            <button
+              type="button"
+              onClick={() => onSubSidebarOpenChange(true)}
+              className="mt-2 mx-1 w-6 h-6 rounded-md hover:bg-surface-accent flex items-center justify-center transition-colors text-foreground-muted hover:text-foreground"
+              aria-label="Expand sub navigation"
+            >
+              <ChevronRightIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
         {/* Center: single scroll container when !mainNoScroll. Content should flow naturally (no nested overflow-y-auto). */}
         <main 
           className={`flex-1 min-w-0 min-h-0 transition-all duration-200 ease-out ${mainNoScroll ? 'overflow-hidden flex flex-col bg-surface-muted' : 'overflow-y-auto bg-surface-muted scrollbar-hide'}`}
@@ -452,6 +525,35 @@ export default function NewPageWrapper({
           }}
           role="main"
         >
+          {/* Mobile top strip: sidebar toggle icons, only on mobile when sidebars exist */}
+          {!effectiveCanShowLeftSidebar && (leftSidebar || (rightSidebar && !hideRightSidebar)) && (
+            <div className="sticky top-0 z-10 flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-border-muted dark:border-white/10 bg-surface">
+              <div>
+                {leftSidebar && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMobilePanel('left')}
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-accent transition-colors"
+                    aria-label="Open menu"
+                  >
+                    <Bars3Icon className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              <div>
+                {rightSidebar && !hideRightSidebar && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveMobilePanel('right')}
+                    className="w-8 h-8 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-accent transition-colors"
+                    aria-label="Open details"
+                  >
+                    <ChevronRightIcon className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           {children}
         </main>
 
@@ -472,42 +574,58 @@ export default function NewPageWrapper({
         )}
       </div>
 
-      {/* Fixed floating triggers: visible when sidebar is hidden and overlay callbacks are provided */}
-      {leftSidebar && !effectiveCanShowLeftSidebar && !mobileLeftSidebarOpen && onMobileLeftSidebarOpenChange && (
-        <button
-          type="button"
-          onClick={() => onMobileLeftSidebarOpenChange(true)}
-          className="fixed left-3 top-[4.25rem] z-40 w-8 h-8 rounded-md border border-gray-200 dark:border-white/10 bg-surface flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm"
-          aria-label="Open organizations"
+      {/* Unified mobile overlay: one panel at a time, controlled by activeMobilePanel */}
+      {activeMobilePanel && !effectiveCanShowLeftSidebar && (
+        <div
+          className={`fixed inset-0 z-[60] flex ${activeMobilePanel === 'right' ? 'justify-end' : ''}`}
+          role="dialog"
+          aria-label={activeMobilePanel === 'right' ? 'Details' : 'Menu'}
         >
-          <BuildingOfficeIcon className="w-4 h-4" />
-        </button>
-      )}
-      {rightSidebar && !effectiveCanShowRightSidebar && !mobileRightSidebarOpen && onMobileRightSidebarOpenChange && (
-        <button
-          type="button"
-          onClick={() => onMobileRightSidebarOpenChange(true)}
-          className="fixed right-3 top-[4.25rem] z-40 w-8 h-8 rounded-md border border-gray-200 dark:border-white/10 bg-surface flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors shadow-sm"
-          aria-label="Open buildings"
-        >
-          <BuildingStorefrontIcon className="w-4 h-4" />
-        </button>
-      )}
-
-      {/* Mobile overlay: left sidebar (e.g. /gov organizations) */}
-      {leftSidebar && !effectiveCanShowLeftSidebar && mobileLeftSidebarOpen && onMobileLeftSidebarOpenChange && (
-        <div className="fixed inset-0 z-[60] flex" role="dialog" aria-label="Organizations">
           <button
             type="button"
             className="absolute inset-0 bg-black/50 transition-opacity"
-            onClick={() => onMobileLeftSidebarOpenChange(false)}
+            onClick={closeMobilePanel}
             aria-label="Close"
           />
-          <div className="relative w-64 max-w-[85vw] h-full bg-surface border-r border-border-muted dark:border-white/10 flex flex-col overflow-hidden">
-            <div className="flex-shrink-0 flex justify-end p-2 border-b border-border-muted dark:border-white/10">
+          <div
+            className={`relative h-full bg-surface flex flex-col overflow-hidden w-80 max-w-[85vw] ${
+              activeMobilePanel === 'right'
+                ? 'border-l border-border-muted dark:border-white/10'
+                : 'border-r border-border-muted dark:border-white/10'
+            }`}
+          >
+            <div className="flex-shrink-0 flex items-center justify-between p-2 border-b border-border-muted dark:border-white/10">
+              {activeMobilePanel === 'left' && subSidebar ? (
+                <div className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setLeftPanelTab('menu')}
+                    className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                      leftPanelTab === 'menu'
+                        ? 'bg-surface-accent text-foreground font-medium'
+                        : 'text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    Menu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLeftPanelTab('sub')}
+                    className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                      leftPanelTab === 'sub'
+                        ? 'bg-surface-accent text-foreground font-medium'
+                        : 'text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    {subSidebarLabel || 'Navigation'}
+                  </button>
+                </div>
+              ) : (
+                <div />
+              )}
               <button
                 type="button"
-                onClick={() => onMobileLeftSidebarOpenChange(false)}
+                onClick={closeMobilePanel}
                 className="w-8 h-8 rounded-md hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
                 aria-label="Close"
               >
@@ -515,34 +633,10 @@ export default function NewPageWrapper({
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-              {leftSidebar}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile overlay: right sidebar (e.g. /gov buildings) */}
-      {rightSidebar && !effectiveCanShowRightSidebar && mobileRightSidebarOpen && onMobileRightSidebarOpenChange && (
-        <div className="fixed inset-0 z-[60] flex justify-end" role="dialog" aria-label="Buildings">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/50 transition-opacity"
-            onClick={() => onMobileRightSidebarOpenChange(false)}
-            aria-label="Close"
-          />
-          <div className="relative w-80 max-w-[85vw] h-full bg-surface border-l border-border-muted dark:border-white/10 flex flex-col overflow-hidden">
-            <div className="flex-shrink-0 flex justify-end p-2 border-b border-border-muted dark:border-white/10">
-              <button
-                type="button"
-                onClick={() => onMobileRightSidebarOpenChange(false)}
-                className="w-8 h-8 rounded-md hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
-                aria-label="Close"
-              >
-                <XMarkIcon className="w-4 h-4 text-foreground-muted" />
-              </button>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-              {rightSidebar}
+              {activeMobilePanel === 'left' && (
+                leftPanelTab === 'sub' && subSidebar ? subSidebar : leftSidebar
+              )}
+              {activeMobilePanel === 'right' && rightSidebar}
             </div>
           </div>
         </div>

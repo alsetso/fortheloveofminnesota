@@ -9,6 +9,7 @@ import {
   NewspaperIcon,
   HeartIcon,
   MapIcon,
+  AcademicCapIcon,
   MagnifyingGlassIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
@@ -18,6 +19,7 @@ import {
   BuildingOfficeIcon as BuildingOfficeIconSolid,
   NewspaperIcon as NewspaperIconSolid,
   MapIcon as MapIconSolid,
+  AcademicCapIcon as AcademicCapIconSolid,
 } from '@heroicons/react/24/solid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStateSafe } from '@/features/auth';
@@ -109,6 +111,7 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
     { label: 'Documentation', icon: UserCircleIcon, iconSolid: UserCircleIconSolid, href: '/docs' },
     { label: 'Love of Minnesota', icon: HeartIcon, iconSolid: HeartIconSolid, href: '/' },
     { label: 'Explore', icon: MapIcon, iconSolid: MapIconSolid, href: '/explore' },
+    { label: 'Schools', icon: AcademicCapIcon, iconSolid: AcademicCapIconSolid, href: '/schools' },
     { label: 'Government', icon: BuildingOfficeIcon, iconSolid: BuildingOfficeIconSolid, href: '/gov' },
     { label: 'News', icon: NewspaperIcon, iconSolid: NewspaperIconSolid, href: '/news' },
   ];
@@ -179,7 +182,7 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
           {children}
         </div>
       ) : (
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 border-t border-border-muted dark:border-white/10">
+      <div className="p-3 border-t border-border-muted dark:border-white/10">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-semibold text-foreground">Following</h3>
           {account && (
@@ -228,7 +231,7 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
           </div>
         ) : (
           <div className="space-y-1">
-            {following.map((acc) => {
+            {following.slice(0, 3).map((acc) => {
               const displayName =
                 acc.first_name && acc.last_name
                   ? `${acc.first_name} ${acc.last_name}`
@@ -254,6 +257,14 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
                 </Link>
               );
             })}
+            {following.length > 3 && (
+              <Link
+                href="/people"
+                className="block w-full mt-1 py-1.5 text-center text-xs text-foreground-muted hover:text-foreground hover:bg-surface-accent rounded-md transition-colors"
+              >
+                View all ({following.length})
+              </Link>
+            )}
           </div>
         )}
       </div>

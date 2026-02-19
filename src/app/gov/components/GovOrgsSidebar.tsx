@@ -72,7 +72,7 @@ export default function GovOrgsSidebar() {
   }, [orgs, typeFilter, searchQuery]);
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto scrollbar-hide bg-surface border-r border-border-muted dark:border-white/10">
+    <div className="flex flex-col border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface">
       <div className="p-2 border-b border-border-muted dark:border-white/10 flex flex-col gap-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <BuildingOfficeIcon className="w-4 h-4 text-foreground-muted flex-shrink-0" />
@@ -120,7 +120,7 @@ export default function GovOrgsSidebar() {
           </div>
         )}
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto p-2 bg-surface-muted scrollbar-theme">
+      <div className="max-h-[400px] overflow-y-auto p-2 scrollbar-theme">
         {loading && (
           <p className="text-xs text-foreground-muted py-4">Loading…</p>
         )}

@@ -186,7 +186,7 @@ export default function GovDashboard({ leaderSearchQuery = '' }: GovDashboardPro
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface">
       <GovPageViewTracker />
       <div className="p-2 border-b border-border-muted dark:border-white/10 flex flex-col gap-2 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ export default function GovDashboard({ leaderSearchQuery = '' }: GovDashboardPro
           ))}
         </select>
       </div>
-      <div className="overflow-y-auto flex-1 p-2 space-y-3">
+      <div className="max-h-[500px] overflow-y-auto p-2 space-y-3">
         {sections.map(({ key, title, people: sectionPeople, labelClass }) => (
           <div key={key} className="flex flex-col gap-1.5">
             <h3 className={`text-xs font-semibold ${labelClass}`}>{title}</h3>

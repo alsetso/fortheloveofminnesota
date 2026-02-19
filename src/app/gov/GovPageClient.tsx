@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import LeftSidebar from '@/components/layout/LeftSidebar';
+import GovSubNav from '@/components/sub-nav/GovSubNav';
 import GovOrgsSidebar from './components/GovOrgsSidebar';
 import GovBuildingsSidebar from './components/GovBuildingsSidebar';
 import GovDashboard from './components/GovDashboard';
@@ -13,28 +15,25 @@ interface GovPageClientProps {
   isAuthenticated: boolean;
 }
 
-/**
- * /gov – Minnesota Civic dashboard. Gov-specific sidebars replace app sidebars:
- * Left = Organizations, Center = People & roles, Right = Buildings.
- */
 export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
   const [leaderSearchQuery, setLeaderSearchQuery] = useState('');
-  const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
-  const [mobileRightOpen, setMobileRightOpen] = useState(false);
+  const [subSidebarOpen, setSubSidebarOpen] = useState(
+    () => typeof window !== 'undefined' ? window.innerWidth >= 896 : true
+  );
 
   return (
     <GovToastProvider>
       <GovToast />
       <NewPageWrapper
-        leftSidebar={<GovOrgsSidebar />}
+        leftSidebar={<LeftSidebar />}
+        subSidebar={<GovSubNav />}
+        subSidebarLabel="Government"
+        subSidebarOpen={subSidebarOpen}
+        onSubSidebarOpenChange={setSubSidebarOpen}
         rightSidebar={<GovBuildingsSidebar />}
-        mobileLeftSidebarOpen={mobileLeftOpen}
-        onMobileLeftSidebarOpenChange={setMobileLeftOpen}
-        mobileRightSidebarOpen={mobileRightOpen}
-        onMobileRightSidebarOpenChange={setMobileRightOpen}
       >
-      <div className="flex flex-col h-full min-h-0">
-        <div className="flex-shrink-0 py-10 px-4 border-b border-border-muted dark:border-white/10 bg-surface text-center">
+      <div className="max-w-7xl mx-auto w-full px-[10px] py-3 space-y-3">
+        <div className="flex-shrink-0 py-10 px-4 border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface text-center">
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">
             Minnesota Civic
           </h1>
@@ -53,9 +52,10 @@ export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
             />
           </div>
         </div>
-        <div className="flex-1 min-h-0 px-2 py-2">
-          <GovDashboard leaderSearchQuery={leaderSearchQuery} />
-        </div>
+
+        <GovDashboard leaderSearchQuery={leaderSearchQuery} />
+
+        <GovOrgsSidebar />
       </div>
     </NewPageWrapper>
     </GovToastProvider>

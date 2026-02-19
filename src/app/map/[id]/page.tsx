@@ -29,6 +29,7 @@ import MapActionUpgradePrompt from '@/components/maps/MapActionUpgradePrompt';
 import LocationSelectPopup from '@/components/layout/LocationSelectPopup';
 import ViewAsSelector from './components/ViewAsSelector';
 import type { MapData } from '@/types/map';
+import PageViewTracker from '@/components/analytics/PageViewTracker';
 
 export interface MapPageLocationSelect {
   lat: number;
@@ -787,6 +788,7 @@ export default function MapPage({ params, skipPageWrapper = false, onLocationSel
 
   return (
     <>
+      {!skipPageWrapper && <PageViewTracker />}
       <Toaster
         position="top-right"
         toastOptions={{

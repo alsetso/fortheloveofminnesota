@@ -1,6 +1,1 @@
-export { default as AppSearch } from './components/AppSearch';
-
-
-
-
-
+export { default as HeaderSearch } from '@/components/layout/HeaderSearch';

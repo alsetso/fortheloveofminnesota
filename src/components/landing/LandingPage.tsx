@@ -10,7 +10,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { PencilIcon, XMarkIcon, PlusIcon, EyeIcon, EyeSlashIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import PageWrapper from '@/components/layout/PageWrapper';
-import MapSearchInput from '@/components/layout/MapSearchInput';
+import HeaderSearch from '@/components/layout/HeaderSearch';
 import SearchResults from '@/components/layout/SearchResults';
 
 interface LandingPageProps {
@@ -598,7 +598,7 @@ export default function LandingPage({ embedInNewPageWrapper = false }: LandingPa
   return (
     <PageWrapper
       headerContent={null}
-      searchComponent={<MapSearchInput onLocationSelect={() => {}} />}
+      searchComponent={<HeaderSearch />}
       accountDropdownProps={{
         onAccountClick: () => {
           if (account?.username) {

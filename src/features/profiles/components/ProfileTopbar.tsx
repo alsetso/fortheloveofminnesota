@@ -11,11 +11,11 @@ import {
   EnvelopeIcon,
   Bars3Icon,
 } from '@heroicons/react/24/outline';
-import AppSearch from '@/features/search/components/AppSearch';
+import HeaderSearch from '@/components/layout/HeaderSearch';
 import BaseNav from '@/components/shared/BaseNav';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
-import type { MapboxMetadata } from '@/types/mapbox';
+
 
 interface ProfileTopbarProps {
   profileUsername: string | null;
@@ -195,45 +195,7 @@ export default function ProfileTopbar({ profileUsername, isSidebarOpen = true, o
   // Compact search for logged-in users
   const searchSection = user && account ? (
     <div className="w-48 sm:w-56 lg:w-64 hidden md:block">
-      <div className="compact-search-wrapper">
-        <AppSearch 
-          placeholder="Search" 
-          onLocationSelect={(coordinates: { lat: number; lng: number }, placeName: string, mapboxMetadata?: MapboxMetadata) => {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('mapLocationSelect', {
-                detail: { coordinates, placeName, mapboxMetadata }
-              }));
-            }
-          }}
-        />
-      </div>
-      <style jsx global>{`
-        .compact-search-wrapper form { width: 100%; }
-        .compact-search-wrapper input {
-          height: 2rem !important;
-          font-size: 0.875rem !important;
-          padding-left: 2rem !important;
-          padding-right: 0.75rem !important;
-          background-color: #f3f2ef !important;
-          border: 1px solid transparent !important;
-          color: #1f2937 !important;
-          border-radius: 0.25rem !important;
-        }
-        .compact-search-wrapper input::placeholder { color: #6b7280 !important; }
-        .compact-search-wrapper input:focus {
-          background-color: white !important;
-          border-color: #c2b289 !important;
-          outline: none !important;
-          box-shadow: 0 0 0 1px #c2b289 !important;
-        }
-        .compact-search-wrapper .absolute.inset-y-0.left-0 { padding-left: 0.5rem !important; }
-        .compact-search-wrapper .absolute.inset-y-0.left-0 svg {
-          width: 1rem !important;
-          height: 1rem !important;
-          color: #6b7280 !important;
-        }
-        .compact-search-wrapper .absolute.top-full { margin-top: 0.5rem !important; }
-      `}</style>
+      <HeaderSearch />
     </div>
   ) : null;
 

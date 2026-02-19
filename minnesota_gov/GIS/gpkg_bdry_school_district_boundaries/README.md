@@ -1,0 +1,9 @@
+# School District Boundaries, Minnesota, SY2025-26
+
+This file represents a statewide compilation of the boundaries of all independent, common, and special school districts in the state of Minnesota. Minnesota school districts are asked to report any changes to their district boundaries annually. With the exception of consolidations, dissolutions, or other financial cooperation agreements, the reporting is not mandatory. As independent special purpose government organizations, school districts determine their own district & attendance boundaries, working with neighboring districts and county auditors to ensure proper taxation. The Minnesota Department of Education (MDE) plays no role in determining the actual boundaries.
+
+Since 2008, district boundaries have also been reviewed against the school district coding provided in county parcels, where it exists. (Parcel data are supplied by counties to MnGeo, who in turn share that with MDE.) The results are overall increased accuracy, but also increased complexity. Conversations with county GIS coordinators and auditors are ongoing with respect to the complex situations reflected within county parcel data, and whether or not these are accurate representations of school district boundaries. Since school year 2021, many "islands" or other unusual situations have been eliminated or simplified as a result of those conversations.
+
+This file is not intended to represent the "true" boundaries with respect to taxation, but as generalized boundaries focused on ensuring accurate representation in residential areas. As a result, starting in 2021, boundaries have been simplified by removing complex situations in non-residential areas, such as transportation Right-of-Way (ROW), publicly-owned land, tax exempt land, or water. This simplification work is expected to continue each year.
+
+This data is now also available in CSV format. OBJECTID and Shape columns have been removed from that format.

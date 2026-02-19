@@ -4,7 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useHeaderTheme } from '@/contexts/HeaderThemeContext';
 import { useSearchState } from '@/contexts/SearchStateContext';
 import AccountDropdown from '@/features/auth/components/AccountDropdown';
-import MapSearchInput from './MapSearchInput';
+import HeaderSearch from './HeaderSearch';
 
 interface AppHeaderProps {
   /** When set, account image click opens this (e.g. AppMenu) instead of the account dropdown */
@@ -26,17 +26,12 @@ interface AppHeaderProps {
  */
 export default function AppHeader({ onAccountImageClick, onUniversalClose, showCloseIcon, currentFooterState, map, onLocationSelect }: AppHeaderProps) {
   const { isSearchActive } = useHeaderTheme();
-  const { deactivateSearch, clearSearch } = useSearchState();
-  
-  // Determine if search input should show active styling
-  const isSearchInputActive = isSearchActive || currentFooterState === 'tall';
+  const { clearSearch } = useSearchState();
 
   const handleClose = () => {
-    // Close search if active
     if (isSearchActive) {
       clearSearch();
     }
-    // Call universal close handler (clears selections, collapses footer)
     onUniversalClose?.();
   };
 
@@ -47,11 +42,7 @@ export default function AppHeader({ onAccountImageClick, onUniversalClose, showC
       aria-label="App header"
     >
       <div className="flex-1 min-w-0">
-        <MapSearchInput 
-          map={map}
-          onLocationSelect={onLocationSelect}
-          isActive={isSearchInputActive} 
-        />
+        <HeaderSearch />
       </div>
       <div className="flex-shrink-0">
         <AccountDropdown onTriggerClick={onAccountImageClick} />

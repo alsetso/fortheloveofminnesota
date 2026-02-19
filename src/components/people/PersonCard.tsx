@@ -180,7 +180,7 @@ export default function PersonCard({ person, edges: providedEdges }: PersonCardP
       <div className="flex items-start gap-4">
         {/* Avatar */}
         <Link href={profileUrl} className="flex-shrink-0">
-          <ProfilePhoto account={person} size="md" editable={false} />
+          <ProfilePhoto account={person as unknown as import('@/features/auth').Account} size="md" editable={false} />
         </Link>
 
         {/* Content */}

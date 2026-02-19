@@ -264,4 +264,38 @@ export type Database = {
       [key: string]: string
     }
   }
+  people: {
+    Tables: {
+      search: {
+        Row: {
+          id: string
+          account_id: string
+          user_id: string | null
+          search_type: string
+          query: Record<string, unknown>
+          account_results: unknown
+          public_record_results: unknown
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+      pull_requests: {
+        Row: {
+          id: string
+          search_id: string
+          user_id: string
+          account_id: string
+          person_id: string | null
+          pulled_data: unknown
+          created_at: string
+        }
+        Insert: Record<string, unknown>
+        Update: Record<string, unknown>
+      }
+    }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, string>
+  }
 }

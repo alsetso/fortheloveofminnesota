@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { XMarkIcon, UserIcon } from '@heroicons/react/24/outline';
 
 const SECTION_LABEL = 'text-[10px] font-medium text-foreground-muted uppercase tracking-wide mb-0.5';
@@ -37,19 +38,25 @@ export interface PersonDataModalProps {
   record: Record<string, unknown> | null;
   /** When present, sent to details API so pull is linked to people.search */
   searchId?: string | null;
+  /** When true, Pull Data button is disabled and limit message is shown */
+  pullRequestLimitReached?: boolean;
 }
 
-export default function PersonDataModal({ isOpen, onClose, record, searchId }: PersonDataModalProps) {
+export default function PersonDataModal({ isOpen, onClose, record, searchId, pullRequestLimitReached = false }: PersonDataModalProps) {
+  const queryClient = useQueryClient();
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [detailsData, setDetailsData] = useState<Record<string, unknown> | null>(null);
+  const [limitReachedFromResponse, setLimitReachedFromResponse] = useState(false);
 
   const personId = getPersonId(record);
   const canPullDetails = Boolean(personId);
+  const limitReached = pullRequestLimitReached || limitReachedFromResponse;
 
   useEffect(() => {
     setDetailsData(null);
     setDetailsError(null);
+    setLimitReachedFromResponse(false);
   }, [personId]);
 
   const handlePullPublicData = useCallback(async () => {
@@ -64,12 +71,17 @@ export default function PersonDataModal({ isOpen, onClose, record, searchId }: P
         `/api/people/public-records/details?${params.toString()}`,
         { credentials: 'include' }
       );
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({})) as Record<string, unknown> & { pull_limit_reached?: boolean };
       if (!res.ok) {
         setDetailsError((data as { error?: string }).error ?? 'Failed to load details');
         return;
       }
-      setDetailsData(data as Record<string, unknown>);
+      const { pull_limit_reached, ...rest } = data;
+      setDetailsData(rest);
+      if (pull_limit_reached) {
+        setLimitReachedFromResponse(true);
+        queryClient.invalidateQueries({ queryKey: ['people', 'search', 'recent'] });
+      }
       setShowMorePrevAddr(false);
       setShowMoreRelatives(false);
       setShowMoreAssociates(false);
@@ -78,7 +90,7 @@ export default function PersonDataModal({ isOpen, onClose, record, searchId }: P
     } finally {
       setDetailsLoading(false);
     }
-  }, [personId, searchId]);
+  }, [personId, searchId, queryClient]);
 
   const [showMorePrevAddr, setShowMorePrevAddr] = useState(false);
   const [showMoreRelatives, setShowMoreRelatives] = useState(false);
@@ -164,9 +176,14 @@ export default function PersonDataModal({ isOpen, onClose, record, searchId }: P
           )}
 
           <div className="pt-2 space-y-2">
+            {limitReached && (
+              <p className="text-xs text-foreground-muted">
+                People Search Temporary Limit Met
+              </p>
+            )}
             <button
               type="button"
-              disabled={!canPullDetails || detailsLoading}
+              disabled={!canPullDetails || detailsLoading || limitReached}
               onClick={handlePullPublicData}
               className="w-full py-3 px-4 rounded-xl bg-lake-blue text-white text-sm font-medium hover:bg-lake-blue/90 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none transition-all"
             >

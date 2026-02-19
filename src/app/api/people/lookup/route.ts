@@ -62,7 +62,9 @@ async function saveSearch(
     account_results: payload.accountResults,
   }).select('id').single();
   if (error || !data?.id) return null;
-  return data.id as string;
+  const newId = data.id as string;
+  await supabase.schema('people').from('search').delete().eq('account_id', payload.accountId).neq('id', newId);
+  return newId;
 }
 
 export async function POST(request: NextRequest) {
@@ -154,7 +156,8 @@ export async function POST(request: NextRequest) {
         }
 
         type Row = { phone: string | null } & Record<string, unknown>;
-        const withMatch = (rows ?? [] as Row[])
+        const rowsList: Row[] = (rows ?? []) as Row[];
+        const withMatch = rowsList
           .map((r) => {
             const n = normalizeDigits(r.phone);
             if (n.length < 4) return null;

@@ -219,6 +219,7 @@ export default function PeopleSearchByIdPage() {
         onClose={() => setPersonModalRecord(null)}
         record={personModalRecord}
         searchId={id}
+        pullRequestLimitReached={(data?.pull_requests?.length ?? 0) >= 1}
       />
       <PublicPullRecordModal
         isOpen={savedPullModal !== null}

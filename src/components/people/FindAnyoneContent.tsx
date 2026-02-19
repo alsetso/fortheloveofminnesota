@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   MagnifyingGlassIcon,
   UserCircleIcon,
@@ -12,6 +12,8 @@ import {
   PhoneIcon,
   CheckIcon,
 } from '@heroicons/react/24/outline';
+import { useAuthStateSafe } from '@/features/auth';
+import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import PersonDataModal from './PersonDataModal';
 import ProfileDisplayModal from './ProfileDisplayModal';
 
@@ -147,8 +149,25 @@ async function fetchPublicRecords(lastSearch: SearchState, searchId?: string | n
 }
 
 export default function FindAnyoneContent() {
+  const { account } = useAuthStateSafe();
+  const { openWelcome } = useAppModalContextSafe();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SearchTab>('name');
+  const { data: recentData } = useQuery(
+    account?.id
+      ? {
+          queryKey: ['people', 'search', 'recent', account.id],
+          queryFn: async () => {
+            const res = await fetch('/api/people/search/recent', { credentials: 'include' });
+            if (!res.ok) throw new Error('Failed to fetch');
+            return res.json() as Promise<{ searches: { id: string }[]; search_count: number; pull_request_count: number }>;
+          },
+          staleTime: 60 * 1000,
+        }
+      : { queryKey: ['skip'], queryFn: () => null, enabled: false }
+  );
+  const searchLimitMet = (recentData?.search_count ?? 0) >= 1;
+  const savedSearchId = recentData?.searches?.[0]?.id;
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -282,6 +301,27 @@ export default function FindAnyoneContent() {
     { id: 'phone', label: 'By phone', icon: PhoneIcon },
   ];
 
+  if (!account) {
+    return (
+      <div className="w-full max-w-2xl mx-auto py-6 px-4 space-y-3">
+        <section className="border border-border-muted dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px]">
+          <h1 className="text-sm font-semibold text-foreground mb-1">We help you find anyone</h1>
+          <p className="text-xs text-foreground-muted mb-3">
+            Sign in to search by name, email, or phone. We check accounts and can connect you with skip tracing.
+          </p>
+          <button
+            type="button"
+            onClick={openWelcome}
+            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-white bg-lake-blue hover:bg-lake-blue/90 rounded-md transition-colors"
+          >
+            <UserCircleIcon className="w-3.5 h-3.5" />
+            Sign in to search
+          </button>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto py-6 px-4 space-y-3">
       {/* Hero - theme dynamic */}
@@ -296,7 +336,23 @@ export default function FindAnyoneContent() {
       </section>
 
       {/* Tabs + Form - theme dynamic */}
-      <div className="border border-border-muted dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px] space-y-3">
+      <div className="relative border border-border-muted dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px] space-y-3">
+        {searchLimitMet && (
+          <div
+            className="absolute inset-0 z-10 rounded-md bg-white/90 dark:bg-surface/90 flex flex-col items-center justify-center gap-2 p-4"
+            aria-live="polite"
+          >
+            <p className="text-sm font-semibold text-foreground text-center">People Search Temporary Limit Met</p>
+            {savedSearchId && (
+              <Link
+                href={`/people/search/${savedSearchId}`}
+                className="text-xs text-lake-blue hover:underline"
+              >
+                View saved search
+              </Link>
+            )}
+          </div>
+        )}
         <div className="flex gap-1 p-0.5 rounded-md bg-surface-accent dark:bg-white/10">
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
@@ -543,6 +599,7 @@ export default function FindAnyoneContent() {
         onClose={() => setPersonModalRecord(null)}
         record={personModalRecord}
         searchId={currentSearchId}
+        pullRequestLimitReached={(recentData?.pull_request_count ?? 0) >= 1}
       />
       <ProfileDisplayModal
         isOpen={profileModalAccountId !== null}

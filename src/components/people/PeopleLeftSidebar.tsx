@@ -51,7 +51,14 @@ export default function PeopleLeftSidebar() {
            e.status === 'accepted'
   ).length;
 
-  const navItems = [
+  const navItems: Array<{
+    label: string;
+    href: string;
+    icon: typeof UserPlusIcon;
+    iconSolid: typeof UserPlusIconSolid;
+    count: number;
+    badge?: string | number;
+  }> = [
     {
       label: 'Following',
       href: '/people?tab=following',

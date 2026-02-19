@@ -132,7 +132,7 @@ export default function PeopleRightSidebar() {
                   }
                   className="flex items-center gap-3 p-2 rounded-md hover:bg-surface-accent transition-colors"
                 >
-                  <ProfilePhoto account={friend} size="sm" editable={false} />
+                  <ProfilePhoto account={friend as unknown as import('@/features/auth').Account} size="sm" editable={false} />
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-medium text-foreground truncate">
                       {displayName}

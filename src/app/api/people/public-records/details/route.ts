@@ -62,18 +62,31 @@ export async function GET(request: NextRequest) {
         const raw = await response.json();
         const normalized = normalizeToCamelCase(raw) as Record<string, unknown>;
 
+        let pullLimitReached = false;
         if (search_id && userId && accountId) {
           const supabase = await createServerClientWithAuth(cookies());
-          await supabase.schema('people').from('pull_requests').insert({
-            search_id,
-            user_id: userId,
-            account_id: accountId,
-            person_id: peo_id,
-            pulled_data: normalized,
-          });
+          const { data: searchRow, error: fetchErr } = await supabase.schema('people').from('search').select('account_id').eq('id', search_id).single();
+          if (fetchErr || !searchRow) {
+            return NextResponse.json({ error: 'Search not found' }, { status: 404 });
+          }
+          if ((searchRow as { account_id: string }).account_id !== accountId) {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+          }
+          const { count, error: countErr } = await supabase.schema('people').from('pull_requests').select('*', { count: 'exact', head: true }).eq('account_id', accountId);
+          if (!countErr && (count ?? 0) >= 1) {
+            pullLimitReached = true;
+          } else if (!countErr) {
+            await supabase.schema('people').from('pull_requests').insert({
+              search_id,
+              user_id: userId,
+              account_id: accountId,
+              person_id: peo_id,
+              pulled_data: normalized,
+            });
+          }
         }
 
-        return NextResponse.json(normalized);
+        return NextResponse.json(pullLimitReached ? { ...normalized, pull_limit_reached: true } : normalized);
       } catch (e) {
         if (process.env.NODE_ENV === 'development') {
           console.error('GET /api/people/public-records/details:', e);

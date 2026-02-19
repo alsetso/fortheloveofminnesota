@@ -41,7 +41,7 @@ const KNOWN_APP_ROUTES = new Set([
   'messages', 'search', 'collections', 'saved', 'memories', 'friends',
   'stories', 'billing', 'plans', 'onboarding', 'signup', 'login',
   'terms', 'post', 'marketplace', 'ad_center', 'contact', 'download',
-  'privacy', 'not-found', 'school', 'schools',
+  'privacy', 'not-found', 'school', 'schools', 'transportation', 'weather',
 ]);
 
 /** Routes where the right sidebar should be suppressed in the main content area. */
@@ -466,10 +466,10 @@ export default function NewPageWrapper({
         {/* Left Sidebar - Sticky, scrollable, shows when space allows */}
         {leftSidebar && (
           <aside 
-            className={`sticky top-14 flex-shrink-0 h-[calc(100vh-3.5rem)] overflow-y-auto scrollbar-hide transition-all duration-200 ease-out ${
+            className={`sticky top-14 flex-shrink-0 h-[calc(100vh-3.5rem)] overflow-y-auto scrollbar-hide transition-all duration-200 ease-out border-r border-border-muted dark:border-white/10 ${
               effectiveCanShowLeftSidebar 
                 ? 'w-64 opacity-100' 
-                : 'w-0 opacity-0 pointer-events-none overflow-hidden'
+                : 'w-0 opacity-0 pointer-events-none overflow-hidden border-r-0'
             }`}
             aria-hidden={!effectiveCanShowLeftSidebar}
             aria-label="Left sidebar navigation"
@@ -482,11 +482,11 @@ export default function NewPageWrapper({
         {/* Sub-Sidebar - Inline between left sidebar and main when viewport is wide enough */}
         {canShowSubSidebarInline && subSidebar && (
           <aside
-            className="sticky top-14 flex-shrink-0 w-60 h-[calc(100vh-3.5rem)] overflow-y-auto scrollbar-hide border-l border-r border-border-muted dark:border-white/10 flex flex-col"
+            className="sticky top-14 flex-shrink-0 w-60 h-[calc(100vh-3.5rem)] overflow-y-auto scrollbar-hide border-r border-border-muted dark:border-white/10 flex flex-col"
             aria-label="Sub navigation"
             role="complementary"
           >
-            <div className="flex-shrink-0 flex items-center justify-end px-2 pt-2">
+            <div className="flex-shrink-0 flex items-center justify-end px-2 pt-2 bg-white dark:bg-surface">
               <button
                 type="button"
                 onClick={() => onSubSidebarOpenChange?.(false)}

@@ -33,7 +33,7 @@ export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
         rightSidebar={<GovBuildingsSidebar />}
       >
       <div className="max-w-7xl mx-auto w-full px-[10px] py-3 space-y-3">
-        <div className="flex-shrink-0 py-10 px-4 border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface text-center">
+        <div className="flex-shrink-0 pt-6 pb-3 text-center">
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">
             Minnesota Civic
           </h1>

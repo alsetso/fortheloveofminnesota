@@ -10,6 +10,8 @@ import {
   HeartIcon,
   MapIcon,
   AcademicCapIcon,
+  TruckIcon,
+  CloudIcon,
   MagnifyingGlassIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
@@ -20,6 +22,8 @@ import {
   NewspaperIcon as NewspaperIconSolid,
   MapIcon as MapIconSolid,
   AcademicCapIcon as AcademicCapIconSolid,
+  TruckIcon as TruckIconSolid,
+  CloudIcon as CloudIconSolid,
 } from '@heroicons/react/24/solid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStateSafe } from '@/features/auth';
@@ -112,7 +116,9 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
     { label: 'Love of Minnesota', icon: HeartIcon, iconSolid: HeartIconSolid, href: '/' },
     { label: 'Explore', icon: MapIcon, iconSolid: MapIconSolid, href: '/explore' },
     { label: 'Schools', icon: AcademicCapIcon, iconSolid: AcademicCapIconSolid, href: '/schools' },
+    { label: 'Transportation', icon: TruckIcon, iconSolid: TruckIconSolid, href: '/transportation' },
     { label: 'Government', icon: BuildingOfficeIcon, iconSolid: BuildingOfficeIconSolid, href: '/gov' },
+    { label: 'Weather', icon: CloudIcon, iconSolid: CloudIconSolid, href: '/weather' },
     { label: 'News', icon: NewspaperIcon, iconSolid: NewspaperIconSolid, href: '/news' },
   ];
 
@@ -122,7 +128,7 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
   };
 
   return (
-    <div className="h-full flex flex-col overflow-y-auto scrollbar-hide">
+    <div className="h-full flex flex-col overflow-y-auto scrollbar-hide bg-white dark:bg-header">
       {/* Profile Card */}
       <div className="p-3 border-b border-border-muted dark:border-white/10">
         {account ? (

@@ -183,7 +183,7 @@ export async function middleware(req: NextRequest) {
     "img-src 'self' data: https: blob:", // Allow blob URLs for camera previews and Facebook tracking pixel
     "media-src 'self' blob: https:", // Allow blob URLs for video previews and https for Supabase videos
     "font-src 'self' data: https://fonts.gstatic.com", // Google Fonts fonts
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com https://api.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net", // Stripe API + Google Analytics + Facebook Pixel
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.mapbox.com https://api.mapbox.com https://api.stripe.com https://www.google-analytics.com https://www.googletagmanager.com https://www.facebook.com https://connect.facebook.net https://svc.metrotransit.org https://api.weather.gov", // Stripe API + Google Analytics + Facebook Pixel
     "frame-src 'self' https://js.stripe.com https://hooks.stripe.com", // Stripe Checkout and webhooks
     "frame-ancestors 'none'",
   ].join('; ');
@@ -348,8 +348,9 @@ export async function middleware(req: NextRequest) {
     // Maps page (shows live map) is allowed for all users
     if (pathname === '/maps') return true;
     
-    // Gov and news are public
+    // Gov, weather, and news are public
     if (pathname === '/gov' || pathname.startsWith('/gov/')) return true;
+    if (pathname === '/weather' || pathname.startsWith('/weather/')) return true;
     if (pathname === '/news' || pathname.startsWith('/news/')) return true;
     // Explore (civic dashboard, counties, cities, etc.) is public
     if (pathname === '/explore' || pathname.startsWith('/explore/')) return true;

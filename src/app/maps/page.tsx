@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { SearchStateProvider } from '@/contexts/SearchStateContext';
 import NewPageWrapper from '@/components/layout/NewPageWrapper';
@@ -205,6 +205,7 @@ function MapsPageContent() {
   // Finish-pin modal state
   const [finishPin, setFinishPin] = useState<ProfilePin | null>(null);
   const [finishPinAddress, setFinishPinAddress] = useState<string | null>(null);
+  const hasShownDropPinToastRef = useRef(false);
 
   const handlePinCreated = useCallback((pin: ProfilePin) => {
     handleClearSelection();
@@ -234,6 +235,12 @@ function MapsPageContent() {
     setFinishPinAddress(null);
   }, []);
 
+  const handleMapLoad = useCallback(() => {
+    if (hasShownDropPinToastRef.current) return;
+    hasShownDropPinToastRef.current = true;
+    addToast(createToast('info', 'Click on the map to drop a pin', { duration: 2000 }));
+  }, [addToast]);
+
   if (loading || !liveData?.pins) {
     return (
       <div className="flex items-center justify-center w-full h-[calc(100vh-3.5rem)] bg-gray-50 dark:bg-surface-muted">
@@ -258,6 +265,7 @@ function MapsPageContent() {
             onPinSelect={handlePinSelect}
             onPinDeselect={handleClearSelection}
             onLocationSelect={handleLocationSelect}
+            onMapLoad={handleMapLoad}
             onViewRecorded={handleViewRecorded}
           />
           {hasLocationSelection && atCoords && !finishPin && (

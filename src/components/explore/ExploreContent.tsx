@@ -4,10 +4,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
-  NewspaperIcon,
   BuildingOfficeIcon,
   GlobeAltIcon,
-  ArrowTopRightOnSquareIcon,
   ChevronRightIcon,
   TableCellsIcon,
   MagnifyingGlassIcon,
@@ -16,15 +14,6 @@ import {
 } from '@heroicons/react/24/outline';
 
 /* ───── types ───── */
-
-interface NewsArticle {
-  id: string;
-  title: string;
-  link: string;
-  snippet: string | null;
-  source_name: string | null;
-  published_at: string;
-}
 
 interface City {
   id: string;
@@ -113,17 +102,6 @@ function SearchResultGroup({ label, results }: { label: string; results: SearchR
 
 /* ───── helpers ───── */
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(ms / 3_600_000);
-  if (h < 1) return 'Just now';
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d === 1) return '1d ago';
-  if (d < 30) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 function StatBlock({ label, value, href, loading }: { label: string; value: string; href?: string; loading?: boolean }) {
   if (loading) {
     return (
@@ -162,9 +140,7 @@ export default function ExploreContent() {
 
   const [layerCounts, setLayerCounts] = useState<Record<string, number> | null>(null);
   const [atlasCounts, setAtlasCounts] = useState<Record<string, number> | null>(null);
-  const [news, setNews] = useState<NewsArticle[]>([]);
   const [cities, setCities] = useState<City[]>([]);
-  const [loadingNews, setLoadingNews] = useState(true);
   const [loadingCities, setLoadingCities] = useState(true);
 
   /* ── search state ── */
@@ -236,16 +212,6 @@ export default function ExploreContent() {
       .then((r) => (r.ok ? r.json() : {}))
       .then(setAtlasCounts)
       .catch(() => setAtlasCounts({}));
-  }, []);
-
-  /* news (once — not county‑scoped, API doesn't support it) */
-  useEffect(() => {
-    setLoadingNews(true);
-    fetch('/api/news?limit=8')
-      .then((r) => (r.ok ? r.json() : { articles: [] }))
-      .then((d) => setNews(d.articles || []))
-      .catch(() => setNews([]))
-      .finally(() => setLoadingNews(false));
   }, []);
 
   /* cities — re‑fetches when county changes */
@@ -409,7 +375,8 @@ export default function ExploreContent() {
             { label: 'Roads', key: 'roads', slug: 'roads' },
             { label: 'Radio & News', key: 'radio_and_news', slug: 'radio-and-news' },
             { label: 'Lakes', key: 'lakes', slug: 'lakes' },
-          ].map((item) => {
+          ].filter((item) => atlasCounts === null || (atlasCounts[item.key] ?? 0) > 2)
+          .map((item) => {
             const isLoading = atlasCounts === null;
             const count = atlasCounts?.[item.key];
             return (
@@ -430,54 +397,6 @@ export default function ExploreContent() {
             );
           })}
         </div>
-      </section>}
-
-      {/* ── right now — news ── */}
-      {!showSearchResults && <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-            <NewspaperIcon className="w-4 h-4 text-foreground-muted" />
-            Right Now
-          </h2>
-          <Link href="/news" className="text-[10px] text-lake-blue hover:underline">
-            All News →
-          </Link>
-        </div>
-
-        {loadingNews ? (
-          <Skeleton rows={4} />
-        ) : news.length === 0 ? (
-          <Empty>No recent news</Empty>
-        ) : (
-          <div className="border border-border rounded-md divide-y divide-border">
-            {news.map((a) => (
-              <a
-                key={a.id}
-                href={a.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-3 p-2.5 hover:bg-surface-accent transition-colors group"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground group-hover:text-lake-blue transition-colors line-clamp-2">
-                    {a.title}
-                  </p>
-                  {a.snippet && (
-                    <p className="text-[10px] text-foreground-muted mt-0.5 line-clamp-1">
-                      {a.snippet}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-foreground-subtle">
-                    {a.source_name && <span>{a.source_name}</span>}
-                    {a.source_name && <span aria-hidden>·</span>}
-                    <span>{timeAgo(a.published_at)}</span>
-                  </div>
-                </div>
-                <ArrowTopRightOnSquareIcon className="w-3 h-3 text-foreground-subtle flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-            ))}
-          </div>
-        )}
       </section>}
 
       {/* ── largest cities ── */}

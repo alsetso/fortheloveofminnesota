@@ -30,7 +30,7 @@ function buildRapidApiUrl(data: z.infer<typeof bodySchema>): string {
 /**
  * POST /api/people/public-records
  * Body: { type, name?|email?|phone?, search_id? (uuid) }
- * Calls RapidAPI skip-tracing; normalizes and returns. If search_id provided, verifies row belongs to context account then updates people.search.public_record_results.
+ * Calls public-records API; normalizes and returns. If search_id provided, verifies row belongs to context account then updates people.search.public_record_results.
  */
 export async function POST(request: NextRequest) {
   return withSecurity(

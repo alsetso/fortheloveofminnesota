@@ -3,7 +3,7 @@
  * Used by API routes (server) and client so DB never stores raw RapidAPI shapes.
  */
 
-/** Flexible extraction for skip-tracing API response. Handles PeopleDetails, Records, records, data, results. */
+/** Flexible extraction for public-records API response. Handles PeopleDetails, Records, records, data, results. */
 export function extractPublicRecords(
   data: Record<string, unknown> | null
 ): { records: Record<string, unknown>[]; count: number } {

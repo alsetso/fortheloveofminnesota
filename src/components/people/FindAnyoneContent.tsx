@@ -43,7 +43,7 @@ export interface LookupAccount {
   match_type?: 'full' | 'partial';
 }
 
-/** Flexible extraction for skip-tracing API response. Handles PeopleDetails, Records, records, data, results. */
+/** Flexible extraction for public-records API response. Handles PeopleDetails, Records, records, data, results. */
 function extractPublicRecords(data: Record<string, unknown> | null): { records: Record<string, unknown>[]; count: number } {
   if (!data || 'error' in data) return { records: [], count: 0 };
   const arr =
@@ -307,7 +307,7 @@ export default function FindAnyoneContent() {
         <section className="border border-border-muted dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px]">
           <h1 className="text-sm font-semibold text-foreground mb-1">We help you find anyone</h1>
           <p className="text-xs text-foreground-muted mb-3">
-            Sign in to search by name, email, or phone. We check accounts and can connect you with skip tracing.
+            Sign in to search by name, email, or phone. We check accounts on this platform and can look up public data when you need more.
           </p>
           <button
             type="button"
@@ -331,7 +331,7 @@ export default function FindAnyoneContent() {
           Give us their name, email, or phone number. We&apos;ll try to help you find that Minnesotan.
         </p>
         <p className="text-xs text-foreground-muted">
-          We&apos;ll check whether they have an account on the platform, and we can connect you with skip tracing when you need more.
+          We&apos;ll check whether they have an account on this platform, and we can look up public data resources when you need more.
         </p>
       </section>
 
@@ -448,14 +448,14 @@ export default function FindAnyoneContent() {
           <div className="flex gap-2 items-start">
             <DocumentMagnifyingGlassIcon className="w-4 h-4 text-foreground-muted flex-shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-medium text-foreground">Skip tracing</p>
-              <p className="text-xs text-foreground-muted">Need more than an account? Our skip tracing service can help locate and verify contact details.</p>
+              <p className="text-xs font-medium text-foreground">Public data lookup</p>
+              <p className="text-xs text-foreground-muted">Need more than an account? We can look up public data to help locate and verify contact details.</p>
             </div>
           </div>
         </div>
         <ol className="mt-2 space-y-1 text-xs text-foreground-muted list-decimal list-inside">
           <li>See if they have an account on the platform.</li>
-          <li>Connect you with skip tracing when you need deeper lookup.</li>
+          <li>Look up public data when you need deeper lookup.</li>
         </ol>
       </section>
 
@@ -531,7 +531,7 @@ export default function FindAnyoneContent() {
        * extractPublicRecords() normalizes API response to:
        * { records: Record<string, unknown>[]; count: number }
        * Each record may contain: Name/name, Address/address, Phone/phone, Email/email, Age/age,
-       * FirstName/LastName, etc. (varies by RapidAPI skip-tracing response; curl test 401 without auth)
+       * FirstName/LastName, etc. (varies by public-records API response; curl test 401 without auth)
        */}
       {/* Public data found - card always renders; matches Accounts found list style */}
       {publicRecordsResult && !('error' in publicRecordsResult) && (

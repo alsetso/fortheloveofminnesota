@@ -51,7 +51,7 @@ export async function createSupabaseClient(options: SupabaseClientOptions = {}):
     if (!supabaseServiceKey) {
       throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY');
     }
-    return createClient<Database>(supabaseUrl, supabaseServiceKey, {
+    return createClient<Database>(supabaseUrl!, supabaseServiceKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -65,7 +65,7 @@ export async function createSupabaseClient(options: SupabaseClientOptions = {}):
     if (!supabaseAnonKey) {
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
     }
-    return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    return createClient<Database>(supabaseUrl!, supabaseAnonKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -91,7 +91,7 @@ export async function createSupabaseClient(options: SupabaseClientOptions = {}):
     cookieStoreToUse = await cookies();
   }
 
-  return createSSRClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createSSRClient<Database>(supabaseUrl!, supabaseAnonKey!, {
     cookies: {
       getAll() {
         return cookieStoreToUse.getAll();
@@ -100,7 +100,16 @@ export async function createSupabaseClient(options: SupabaseClientOptions = {}):
         // Server components can't set cookies
       },
     },
-  });
+  }) as unknown as SupabaseClient<Database>;
+}
+
+/**
+ * Civic schema client — queries civic.* directly, bypassing public views.
+ * Use this in all civic service functions instead of createServerClient().
+ */
+export async function createCivicServerClient() {
+  const client = await createSupabaseClient({ auth: false });
+  return (client as any).schema('civic') as typeof client;
 }
 
 /**

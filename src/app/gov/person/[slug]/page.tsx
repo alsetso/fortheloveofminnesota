@@ -81,161 +81,155 @@ export default async function PersonPage({ params }: Props) {
     notFound();
   }
 
-  const { person, roles } = data;
-  const partyColor = person.party === 'DFL' ? 'text-blue-600' : 
-                     person.party === 'Republican' ? 'text-red-600' : 
+  const { person, roles, building } = data;
+
+  const partyColor = person.party === 'DFL' ? 'text-blue-600' :
+                     person.party === 'R' || person.party === 'Republican' ? 'text-red-600' :
                      person.party ? 'text-gray-600' : '';
 
-  // Group roles by org
+  // Primary role for display below name
+  const primaryRole = roles[0];
+  const primaryOrg = primaryRole?.org;
+
+  // Group roles by org for the roles section
   const rolesByOrg = new Map<string, typeof roles>();
   roles.forEach(role => {
     if (role.org) {
-      if (!rolesByOrg.has(role.org.id)) {
-        rolesByOrg.set(role.org.id, []);
-      }
+      if (!rolesByOrg.has(role.org.id)) rolesByOrg.set(role.org.id, []);
       rolesByOrg.get(role.org.id)!.push(role);
     }
   });
 
+  const hasContact = !!(person.phone || person.email || person.address);
+
   return (
     <NewPageWrapper>
       <div className="max-w-4xl mx-auto px-[10px] py-3">
-        {/* Breadcrumb Navigation */}
         <Breadcrumbs items={[
           { label: 'Minnesota', href: '/' },
           { label: 'Government', href: '/gov' },
+          ...(primaryOrg ? [{ label: primaryOrg.name, href: `/gov/org/${primaryOrg.slug}` }] : []),
           { label: person.name, href: null },
         ]} />
 
-        {/* Header */}
-        <div className="mb-3 space-y-1.5">
-          <div className="flex items-center gap-2 flex-wrap justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              <PersonAvatar 
-                name={person.name} 
-                photoUrl={person.photo_url}
-                size="lg"
-              />
-              <h1 className="text-sm font-semibold text-gray-900">
-                {person.name}
-              </h1>
-              {person.party && (
-                <span className={`text-xs font-medium ${partyColor}`}>
-                  {person.party}
-                </span>
-              )}
+        {/* Hero */}
+        <div className="mt-2 border border-gray-200 rounded-md p-4">
+          <div className="flex items-center gap-4 justify-between">
+            <div className="flex items-center gap-3">
+              <PersonAvatar name={person.name} photoUrl={person.photo_url} size="lg" />
+              <div>
+                <h1 className="text-sm font-semibold text-gray-900">{person.name}</h1>
+                {primaryRole && (
+                  <p className="text-xs text-gray-600 mt-0.5">{primaryRole.title}</p>
+                )}
+                {primaryOrg && (
+                  <Link href={`/gov/org/${primaryOrg.slug}`} className="text-[10px] text-blue-600 hover:underline mt-0.5 block">
+                    {primaryOrg.name}
+                  </Link>
+                )}
+                {person.party && (
+                  <span className={`text-[10px] font-medium mt-1 inline-block ${partyColor}`}>
+                    {person.party}
+                  </span>
+                )}
+              </div>
             </div>
             <PersonPageClient person={person} isAdmin={isAdmin} />
           </div>
-          
-          {isAdmin && <LastEditedIndicator tableName="people" recordId={person.id} />}
-          
-          {/* Contact Information */}
-          <div className="bg-white rounded-md border border-gray-200 p-[10px] space-y-1.5">
-            {person.phone && (
-              <div className="text-xs text-gray-600">
-                <span className="font-medium text-gray-700">Phone:</span> {person.phone}
-              </div>
-            )}
-            {!person.phone && (
-              <div className="text-xs text-gray-400">
-                <span className="font-medium text-gray-500">Phone:</span> <span className="italic">Not available</span>
-              </div>
-            )}
-            
-            {person.email && (
-              <div className="text-xs text-gray-600">
-                <span className="font-medium text-gray-700">Email:</span>{' '}
-                <a href={`mailto:${person.email}`} className="hover:underline text-blue-600">
-                  {person.email}
-                </a>
-              </div>
-            )}
-            {!person.email && (
-              <div className="text-xs text-gray-400">
-                <span className="font-medium text-gray-500">Email:</span> <span className="italic">Not available</span>
-              </div>
-            )}
-            
-            {person.address && (
-              <div className="text-xs text-gray-600">
-                <span className="font-medium text-gray-700">Address:</span> {person.address}
-              </div>
-            )}
-            {!person.address && (
-              <div className="text-xs text-gray-400">
-                <span className="font-medium text-gray-500">Address:</span> <span className="italic">Not available</span>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Roles by Organization */}
-        {rolesByOrg.size > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-xs font-semibold text-gray-900">Current Roles</h2>
-            {Array.from(rolesByOrg.entries()).map(([orgId, orgRoles]) => {
-              const org = orgRoles[0]?.org;
-              if (!org) return null;
+        {isAdmin && (
+          <div className="mt-1">
+            <LastEditedIndicator tableName="people" recordId={person.id} />
+          </div>
+        )}
 
-              // Group roles by title (in case person has multiple roles with same title)
-              const rolesByTitle = new Map<string, typeof orgRoles>();
-              orgRoles.forEach(role => {
-                if (!rolesByTitle.has(role.title)) {
-                  rolesByTitle.set(role.title, []);
-                }
-                rolesByTitle.get(role.title)!.push(role);
-              });
+        {/* Contact block — only render if at least one field exists */}
+        {hasContact && (
+          <div className="mt-3">
+            <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Contact</h2>
+            <div className="border border-gray-200 rounded-md p-3 space-y-1.5">
+              {person.email && (
+                <div className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Email:</span>{' '}
+                  <a href={`mailto:${person.email}`} className="text-blue-600 hover:underline">
+                    {person.email}
+                  </a>
+                </div>
+              )}
+              {person.phone && (
+                <div className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Phone:</span>{' '}
+                  <a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`} className="hover:underline">
+                    {person.phone}
+                  </a>
+                </div>
+              )}
+              {person.address && (
+                <div className="text-xs text-gray-600">
+                  <span className="font-medium text-gray-700">Address:</span> {person.address}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-              return (
-                <div key={orgId} className="bg-white rounded-md border border-gray-200 p-[10px]">
-                  <div className="space-y-1.5">
-                    <Link
-                      href={`/gov/org/${org.slug}`}
-                      className="text-xs font-semibold text-gray-900 hover:underline"
-                    >
+        {/* Building block */}
+        {building && (
+          <div className="mt-3">
+            <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Location</h2>
+            <div className="border border-gray-200 rounded-md p-3">
+              <Link href={`/gov/building/${building.slug ?? building.id}`} className="text-xs font-medium text-blue-600 hover:underline">
+                {building.name}
+              </Link>
+              {building.full_address && (
+                <p className="text-[10px] text-gray-500 mt-0.5">{building.full_address}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Roles section */}
+        <div className="mt-3">
+          <h2 className="text-xs font-semibold text-gray-900 mb-1.5">
+            {rolesByOrg.size <= 1 ? 'Current Role' : 'Roles'}
+          </h2>
+          {rolesByOrg.size > 0 ? (
+            <div className="space-y-2">
+              {Array.from(rolesByOrg.entries()).map(([orgId, orgRoles]) => {
+                const org = orgRoles[0]?.org;
+                if (!org) return null;
+                return (
+                  <div key={orgId} className="border border-gray-200 rounded-md p-3">
+                    <Link href={`/gov/org/${org.slug}`} className="text-xs font-semibold text-gray-900 hover:underline block mb-1">
                       {org.name}
                     </Link>
                     <div className="space-y-0.5">
-                      {Array.from(rolesByTitle.entries()).map(([title, titleRoles]) => (
-                        <div key={title} className="text-xs text-gray-600">
-                          {title}
-                          {titleRoles.length > 1 && (
-                            <span className="text-[10px] text-gray-500 ml-1">
-                              ({titleRoles.length} positions)
-                            </span>
-                          )}
-                          {titleRoles[0].start_date && (
-                            <span className="text-[10px] text-gray-500 ml-1">
-                              (since {new Date(titleRoles[0].start_date).getFullYear()})
+                      {orgRoles.map((role, idx) => (
+                        <div key={idx} className="text-xs text-gray-600 flex items-center gap-1.5">
+                          <span>{role.title}</span>
+                          {role.start_date && (
+                            <span className="text-[10px] text-gray-400">
+                              since {new Date(role.start_date).getFullYear()}
                             </span>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          ) : (
+            <div className="border border-gray-200 rounded-md p-3">
+              <p className="text-xs text-gray-400">No current roles on record.</p>
+            </div>
+          )}
+        </div>
 
-        {roles.length === 0 && (
-          <div className="bg-white rounded-md border border-gray-200 p-[10px]">
-            <p className="text-xs text-gray-600">No current roles.</p>
-          </div>
-        )}
-
-        {/* Page Break */}
         {isAdmin && (
           <div className="mt-6 pt-6 border-t border-gray-300">
-            {/* Edit History */}
-            <EntityEditHistory 
-              tableName="people" 
-              recordId={person.id} 
-              recordName={person.name}
-              showHeader={true}
-            />
+            <EntityEditHistory tableName="people" recordId={person.id} recordName={person.name} showHeader={true} />
           </div>
         )}
       </div>

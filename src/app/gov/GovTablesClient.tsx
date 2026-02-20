@@ -155,8 +155,12 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
 
     setLoading(true);
     try {
+      const civic = typeof (supabase as any).schema === 'function'
+        ? (supabase as any).schema('civic')
+        : supabase;
+
       if (activeTab === 'orgs') {
-        const { data: orgsData, error } = await supabase
+        const { data: orgsData, error } = await civic
           .from('orgs')
           .select('*')
           .order('name');
@@ -186,13 +190,13 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
 
         setOrgs(orgsWithParents);
       } else if (activeTab === 'people') {
-        const { data: peopleData, error: peopleError } = await supabase
+        const { data: peopleData, error: peopleError } = await civic
           .from('people')
           .select('id, name, slug, party, photo_url, district, email, phone, address, created_at');
         if (peopleError) throw peopleError;
 
         // Fetch all roles
-        const { data: rolesData, error: rolesError } = await supabase
+        const { data: rolesData, error: rolesError } = await civic
           .from('roles')
           .select('person_id, title')
           .order('title');
@@ -233,7 +237,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
 
         setPeople(sortedPeople);
       } else if (activeTab === 'roles') {
-        const { data: rolesData, error: rolesError } = await supabase
+        const { data: rolesData, error: rolesError } = await civic
           .from('roles')
           .select('*')
           .order('created_at', { ascending: false });
@@ -241,8 +245,8 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
 
         // Fetch all people and orgs to join with roles
         const [peopleResult, orgsResult] = await Promise.all([
-          supabase.from('people').select('id, name, photo_url, slug'),
-          supabase.from('orgs').select('id, name, slug'),
+          civic.from('people').select('id, name, photo_url, slug'),
+          civic.from('orgs').select('id, name, slug'),
         ]);
         
         if (peopleResult.error) {

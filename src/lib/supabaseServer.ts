@@ -8,6 +8,7 @@
 export { 
   createSupabaseClient,
   createServerClient,
+  createCivicServerClient,
   createServerClientWithAuth,
   createServiceClient
 } from './supabase/unified';

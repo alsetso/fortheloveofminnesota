@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabaseServer';
+import { createCivicServerClient } from '@/lib/supabaseServer';
 import type { CivicOrg } from '../services/civicService';
 
 export interface BreadcrumbItem {
@@ -17,7 +17,7 @@ export async function buildOrgBreadcrumbs(org: { id: string; parent_id: string |
   ];
 
   // Build parent chain
-  const supabase = createServerClient();
+  const supabase = await createCivicServerClient();
   const { data: allOrgs } = await supabase
     .from('orgs')
     .select('id, parent_id, name, slug, org_type')

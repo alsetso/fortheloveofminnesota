@@ -7,7 +7,6 @@ import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import BuildingPageClient from './BuildingPageClient';
 import CopyButton from './CopyButton';
 import { getDisplayRole } from '@/features/civic/utils/roleFromTitle';
@@ -67,8 +66,7 @@ export default async function BuildingPage({ params }: Props) {
   const heroImage = building.cover_images?.[0];
 
   return (
-    <NewPageWrapper>
-      <div className="max-w-4xl mx-auto px-[10px] py-3">
+    <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs items={[
           { label: 'Minnesota', href: '/' },
           { label: 'Government', href: '/gov' },
@@ -225,7 +223,6 @@ export default async function BuildingPage({ params }: Props) {
             />
           </div>
         )}
-      </div>
-    </NewPageWrapper>
+    </div>
   );
 }

@@ -1,10 +1,6 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import LeftSidebar from '@/components/layout/LeftSidebar';
-import GovSubNav from '@/components/sub-nav/GovSubNav';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import type { CivicPerson } from '@/features/civic/services/civicService';
@@ -17,17 +13,8 @@ interface Props {
 }
 
 export default function OfficerPageClient({ orgName, person, roleTitle }: Props) {
-  const [subSidebarOpen, setSubSidebarOpen] = useState(true);
-
   return (
-    <NewPageWrapper
-      leftSidebar={<LeftSidebar />}
-      subSidebar={<GovSubNav />}
-      subSidebarLabel="Government"
-      subSidebarOpen={subSidebarOpen}
-      onSubSidebarOpenChange={setSubSidebarOpen}
-    >
-      <div className="max-w-4xl mx-auto px-[10px] py-3">
+    <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs
           items={[
             { label: 'Minnesota', href: '/' },
@@ -96,7 +83,6 @@ export default function OfficerPageClient({ orgName, person, roleTitle }: Props)
             ← Back to Executive Branch
           </Link>
         </div>
-      </div>
-    </NewPageWrapper>
+    </div>
   );
 }

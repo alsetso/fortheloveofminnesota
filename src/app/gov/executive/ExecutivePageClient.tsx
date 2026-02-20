@@ -1,10 +1,6 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import LeftSidebar from '@/components/layout/LeftSidebar';
-import GovSubNav from '@/components/sub-nav/GovSubNav';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import type { CivicPerson, CivicRole, CivicOrg } from '@/features/civic/services/civicService';
@@ -37,20 +33,11 @@ function OrgCard({ org, basePath }: { org: CivicOrg & { gov_type?: string | null
 }
 
 export default function ExecutivePageClient({ officers, departments, agencies, boards }: Props) {
-  const [subSidebarOpen, setSubSidebarOpen] = useState(true);
-
   const governor = officers[0];
   const otherOfficers = officers.slice(1);
 
   return (
-    <NewPageWrapper
-      leftSidebar={<LeftSidebar />}
-      subSidebar={<GovSubNav />}
-      subSidebarLabel="Government"
-      subSidebarOpen={subSidebarOpen}
-      onSubSidebarOpenChange={setSubSidebarOpen}
-    >
-      <div className="max-w-4xl mx-auto px-[10px] py-3">
+    <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs
           items={[
             { label: 'Minnesota', href: '/' },
@@ -165,7 +152,6 @@ export default function ExecutivePageClient({ officers, departments, agencies, b
             </div>
           </div>
         )}
-      </div>
-    </NewPageWrapper>
+    </div>
   );
 }

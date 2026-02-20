@@ -1,7 +1,6 @@
 import { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import GovTablesClient from '../../GovTablesClient';
 import { GovTabProvider } from '../../contexts/GovTabContext';
 import GovPageViewTracker from '../../components/GovPageViewTracker';
@@ -30,32 +29,25 @@ export default async function PeopleAdminPage() {
   }
 
   return (
-    <NewPageWrapper>
-      <div className="max-w-7xl mx-auto px-[10px] py-3">
-        <GovPageViewTracker />
-        
-        {/* Breadcrumb Navigation */}
-        <Breadcrumbs items={[
-          { label: 'Government', href: '/gov' },
-          { label: 'People', href: '/gov/people' },
-          { label: 'Admin', href: null },
-        ]} />
+    <div className="max-w-7xl mx-auto px-[10px] py-3">
+      <GovPageViewTracker />
 
-        {/* Header */}
-        <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            People Admin
-          </h1>
-          <p className="text-xs text-gray-600">
-            Admin interface for managing Minnesota government officials and elected representatives
-          </p>
-        </div>
+      <Breadcrumbs items={[
+        { label: 'Government', href: '/gov' },
+        { label: 'People', href: '/gov/people' },
+        { label: 'Admin', href: null },
+      ]} />
 
-        {/* Table */}
-        <GovTabProvider initialTab="people">
-          <GovTablesClient showTablesOnly={true} />
-        </GovTabProvider>
+      <div className="mb-3 space-y-1.5">
+        <h1 className="text-sm font-semibold text-gray-900">People Admin</h1>
+        <p className="text-xs text-gray-600">
+          Admin interface for managing Minnesota government officials and elected representatives
+        </p>
       </div>
-    </NewPageWrapper>
+
+      <GovTabProvider initialTab="people">
+        <GovTablesClient showTablesOnly={true} />
+      </GovTabProvider>
+    </div>
   );
 }

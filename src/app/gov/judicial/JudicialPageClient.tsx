@@ -1,10 +1,6 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import LeftSidebar from '@/components/layout/LeftSidebar';
-import GovSubNav from '@/components/sub-nav/GovSubNav';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import type { CivicOrg, JudicialLeader, JudicialDistrict } from '@/features/civic/services/civicService';
@@ -22,8 +18,6 @@ const COURT_ORDER: Record<string, number> = {
 };
 
 export default function JudicialPageClient({ courts, leaders, districts }: Props) {
-  const [subSidebarOpen, setSubSidebarOpen] = useState(true);
-
   const sortedCourts = [...courts].sort(
     (a, b) => (COURT_ORDER[a.slug] ?? 9) - (COURT_ORDER[b.slug] ?? 9)
   );
@@ -44,14 +38,7 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
   const appealsLeaders = leadersByCourtSlug['mn-court-appeals'] ?? [];
 
   return (
-    <NewPageWrapper
-      leftSidebar={<LeftSidebar />}
-      subSidebar={<GovSubNav />}
-      subSidebarLabel="Government"
-      subSidebarOpen={subSidebarOpen}
-      onSubSidebarOpenChange={setSubSidebarOpen}
-    >
-      <div className="max-w-4xl mx-auto px-[10px] py-3">
+    <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs
           items={[
             { label: 'Minnesota', href: '/' },
@@ -195,7 +182,6 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
             Minnesota has 87 county district courts across 10 judicial districts. Individual court data coming soon.
           </p>
         </div>
-      </div>
-    </NewPageWrapper>
+    </div>
   );
 }

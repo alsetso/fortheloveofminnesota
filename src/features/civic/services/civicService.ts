@@ -677,8 +677,8 @@ export interface DepartmentBudgetRow {
 }
 
 /**
- * Get budget data for an executive department by org slug.
- * Looks up the checkbook agency name via org_agency_map, then returns
+ * Get budget data for an org by slug.
+ * Reads checkbook_agency_name directly from civic.orgs, then returns
  * all available fiscal years from checkbook.budgets, newest first.
  */
 export async function getDepartmentBudget(
@@ -686,22 +686,22 @@ export async function getDepartmentBudget(
 ): Promise<DepartmentBudgetRow[] | null> {
   const supabase = await createSupabaseClient({ auth: false });
 
-  // Resolve org slug → checkbook agency name
-  const { data: mapping } = await (supabase as any)
-    .schema('checkbook')
-    .from('org_agency_map')
-    .select('agency_name')
-    .eq('org_slug', orgSlug)
+  // Resolve org slug → checkbook agency name via civic.orgs
+  const { data: org } = await supabase
+    .schema('civic')
+    .from('orgs')
+    .select('checkbook_agency_name')
+    .eq('slug', orgSlug)
     .single();
 
-  if (!mapping?.agency_name) return null;
+  if (!org?.checkbook_agency_name) return null;
 
   // Fetch all budget rows for that agency across all fiscal years
   const { data, error } = await (supabase as any)
     .schema('checkbook')
     .from('budgets')
     .select('budget_period, agency, budget_amount, spend_amount, remaining_amount, obligated_amount')
-    .eq('agency', mapping.agency_name)
+    .eq('agency', org.checkbook_agency_name)
     .order('budget_period', { ascending: false });
 
   if (error) {
@@ -712,3 +712,46 @@ export async function getDepartmentBudget(
   return (data ?? []) as DepartmentBudgetRow[];
 }
 
+export interface OrgContractRow {
+  payee: string;
+  contract_type: string;
+  total_contract_amount: number;
+  start_date: string;
+  end_date: string | null;
+  contract_id: string;
+}
+
+/**
+ * Get top contracts for an org by slug, ordered by total amount descending.
+ * Returns null if the org has no checkbook_agency_name set.
+ */
+export async function getOrgContracts(
+  orgSlug: string,
+  limit = 10
+): Promise<OrgContractRow[] | null> {
+  const supabase = await createSupabaseClient({ auth: false });
+
+  const { data: org } = await supabase
+    .schema('civic')
+    .from('orgs')
+    .select('checkbook_agency_name')
+    .eq('slug', orgSlug)
+    .single();
+
+  if (!org?.checkbook_agency_name) return null;
+
+  const { data, error } = await (supabase as any)
+    .schema('checkbook')
+    .from('contracts')
+    .select('payee, contract_type, total_contract_amount, start_date, end_date, contract_id')
+    .eq('agency', org.checkbook_agency_name)
+    .order('total_contract_amount', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('[civicService] getOrgContracts error:', error);
+    return null;
+  }
+
+  return (data ?? []) as OrgContractRow[];
+}

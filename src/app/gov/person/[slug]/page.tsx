@@ -8,7 +8,7 @@ import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import GovSidebarBroadcaster from '@/components/gov/GovSidebarBroadcaster';
 
 export const revalidate = 3600;
 
@@ -103,7 +103,20 @@ export default async function PersonPage({ params }: Props) {
   const hasContact = !!(person.phone || person.email || person.address);
 
   return (
-    <NewPageWrapper>
+    <>
+      <GovSidebarBroadcaster
+        data={{
+          personName: person.name,
+          personSlug: person.slug ?? undefined,
+          roleTitle: primaryRole?.title ?? null,
+          primaryOrg: primaryOrg ? { name: primaryOrg.name, slug: primaryOrg.slug } : null,
+          contact: {
+            email: person.email ?? null,
+            phone: person.phone ?? null,
+          },
+          personBuilding: building ? { name: building.name, slug: building.slug ?? null } : null,
+        }}
+      />
       <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs items={[
           { label: 'Minnesota', href: '/' },
@@ -233,7 +246,7 @@ export default async function PersonPage({ params }: Props) {
           </div>
         )}
       </div>
-    </NewPageWrapper>
+    </>
   );
 }
 

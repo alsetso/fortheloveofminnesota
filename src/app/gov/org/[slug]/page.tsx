@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import OrgChart from '@/features/civic/components/OrgChart';
-import { getCivicOrgBySlug, getCivicOrgWithBuilding, getDepartmentBudget, type DepartmentBudgetRow } from '@/features/civic/services/civicService';
+import { getCivicOrgBySlug, getCivicOrgWithBuilding, getDepartmentBudget, getOrgContracts, type DepartmentBudgetRow, type OrgContractRow } from '@/features/civic/services/civicService';
 import { buildOrgBreadcrumbs } from '@/features/civic/utils/breadcrumbs';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import { BuildingOfficeIcon, ScaleIcon } from '@heroicons/react/24/outline';
@@ -10,7 +10,7 @@ import OrgPageClient from './OrgPageClient';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
+import GovSidebarBroadcaster from '@/components/gov/GovSidebarBroadcaster';
 
 export const revalidate = 3600;
 
@@ -97,6 +97,20 @@ function formatPercent(part: number, total: number): string {
   return `${((part / total) * 100).toFixed(1)}%`;
 }
 
+function formatContractAmount(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
+function formatContractDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+}
+
 // Aggregate budget rows for a single fiscal year into totals
 function aggregateBudget(rows: DepartmentBudgetRow[], year: number) {
   const yr = rows.filter(r => r.budget_period === year);
@@ -142,7 +156,10 @@ export default async function OrgPage({ params }: Props) {
 
   // Budget — only fetch for executive departments
   const isDepartment = org.gov_type === 'department' && org.branch === 'executive';
-  const budgetRows = isDepartment ? await getDepartmentBudget(slug) : null;
+  const [budgetRows, contractRows] = await Promise.all([
+    isDepartment ? getDepartmentBudget(slug) : Promise.resolve(null),
+    getOrgContracts(slug, 10),
+  ]);
   const isTransitionDept = TRANSITION_DEPTS.has(slug);
 
   // Find most recent year with non-zero budget data as the hero
@@ -154,7 +171,24 @@ export default async function OrgPage({ params }: Props) {
   const budgetDisplay = heroYear !== null ? aggregateBudget(budgetRows!, heroYear) : null;
 
   return (
-    <NewPageWrapper>
+    <>
+      <GovSidebarBroadcaster
+        data={{
+          orgName: org.name,
+          orgSlug: org.slug,
+          parentOrg: parentOrg ? { name: parentOrg.name, slug: parentOrg.slug } : null,
+          leaders: leaders.map(r => ({
+            name: r.person!.name,
+            slug: r.person!.slug ?? null,
+            title: r.title,
+            photoUrl: r.person!.photo_url ?? null,
+          })),
+          building: building ? { name: building.name, slug: building.slug ?? null } : null,
+          budgetAmount: budgetDisplay?.budget_amount ?? null,
+          budgetYear: heroYear ?? null,
+          website: org.website ?? null,
+        }}
+      />
       <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs items={breadcrumbs} />
 
@@ -374,6 +408,45 @@ export default async function OrgPage({ params }: Props) {
           </div>
         )}
 
+        {/* Top Contracts block — only when data exists */}
+        {contractRows && contractRows.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <h2 className="text-xs font-semibold text-gray-900">Top Contracts</h2>
+              <span className="text-[10px] text-gray-400">Minnesota OpenCheckbook</span>
+            </div>
+            <div className="border border-gray-200 rounded-md overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50">
+                      <th className="text-left text-gray-500 font-medium px-3 py-1.5">Payee</th>
+                      <th className="text-left text-gray-500 font-medium px-3 py-1.5 hidden sm:table-cell">Type</th>
+                      <th className="text-right text-gray-500 font-medium px-3 py-1.5">Amount</th>
+                      <th className="text-right text-gray-500 font-medium px-3 py-1.5 hidden sm:table-cell">Start</th>
+                      <th className="text-right text-gray-500 font-medium px-3 py-1.5 hidden sm:table-cell">End</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contractRows.map((row: OrgContractRow) => (
+                      <tr key={row.contract_id} className="border-b border-gray-50 last:border-0">
+                        <td className="px-3 py-1.5 text-gray-700 max-w-[160px] truncate">{row.payee}</td>
+                        <td className="px-3 py-1.5 text-gray-500 hidden sm:table-cell">{row.contract_type}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-700 tabular-nums font-medium">{formatContractAmount(row.total_contract_amount)}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-500 hidden sm:table-cell">{formatContractDate(row.start_date)}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-500 hidden sm:table-cell">{formatContractDate(row.end_date)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-3 py-1.5 border-t border-gray-100">
+                <span className="text-[10px] text-gray-400">View all contracts →</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Org chart (children) */}
         {(org.children?.length ?? 0) > 0 && (
           <div className="mb-3">
@@ -394,7 +467,7 @@ export default async function OrgPage({ params }: Props) {
           </div>
         )}
       </div>
-    </NewPageWrapper>
+    </>
   );
 }
 

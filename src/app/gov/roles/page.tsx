@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import GovTablesClient from '../GovTablesClient';
 import { GovTabProvider } from '../contexts/GovTabContext';
 import GovPageViewTracker from '../components/GovPageViewTracker';
@@ -30,31 +29,24 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RolesPage() {
   return (
-    <NewPageWrapper>
-      <div className="max-w-7xl mx-auto px-[10px] py-3">
-        <GovPageViewTracker />
-        
-        {/* Breadcrumb Navigation */}
-        <Breadcrumbs items={[
-          { label: 'Government', href: '/gov' },
-          { label: 'Roles', href: null },
-        ]} />
+    <div className="max-w-7xl mx-auto px-[10px] py-3">
+      <GovPageViewTracker />
 
-        {/* Header */}
-        <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            Roles
-          </h1>
-          <p className="text-xs text-gray-600">
-            All roles linking people to organizations in Minnesota government
-          </p>
-        </div>
+      <Breadcrumbs items={[
+        { label: 'Government', href: '/gov' },
+        { label: 'Roles', href: null },
+      ]} />
 
-        {/* Table */}
-        <GovTabProvider initialTab="roles">
-          <GovTablesClient showTablesOnly={true} />
-        </GovTabProvider>
+      <div className="mb-3 space-y-1.5">
+        <h1 className="text-sm font-semibold text-gray-900">Roles</h1>
+        <p className="text-xs text-gray-600">
+          All roles linking people to organizations in Minnesota government
+        </p>
       </div>
-    </NewPageWrapper>
+
+      <GovTabProvider initialTab="roles">
+        <GovTablesClient showTablesOnly={true} />
+      </GovTabProvider>
+    </div>
   );
 }

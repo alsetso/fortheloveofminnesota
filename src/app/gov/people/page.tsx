@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import GovPageViewTracker from '../components/GovPageViewTracker';
 import PeoplePageClient from './PeoplePageClient';
 
@@ -29,29 +28,22 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function PeoplePage() {
   return (
-    <NewPageWrapper>
-      <div className="max-w-7xl mx-auto px-[10px] py-3">
-        <GovPageViewTracker />
-        
-        {/* Breadcrumb Navigation */}
-        <Breadcrumbs items={[
-          { label: 'Government', href: '/gov' },
-          { label: 'People', href: null },
-        ]} />
+    <div className="max-w-7xl mx-auto px-[10px] py-3">
+      <GovPageViewTracker />
 
-        {/* Header */}
-        <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            People
-          </h1>
-          <p className="text-xs text-gray-600">
-            All Minnesota government officials and elected representatives
-          </p>
-        </div>
+      <Breadcrumbs items={[
+        { label: 'Government', href: '/gov' },
+        { label: 'People', href: null },
+      ]} />
 
-        {/* Two-column layout with governor at top */}
-        <PeoplePageClient />
+      <div className="mb-3 space-y-1.5">
+        <h1 className="text-sm font-semibold text-gray-900">People</h1>
+        <p className="text-xs text-gray-600">
+          All Minnesota government officials and elected representatives
+        </p>
       </div>
-    </NewPageWrapper>
+
+      <PeoplePageClient />
+    </div>
   );
 }

@@ -2,9 +2,6 @@
 
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import LeftSidebar from '@/components/layout/LeftSidebar';
-import GovSubNav from '@/components/sub-nav/GovSubNav';
 import GovOrgsSidebar from './components/GovOrgsSidebar';
 import GovBuildingsSidebar from './components/GovBuildingsSidebar';
 import GovDashboard from './components/GovDashboard';
@@ -20,23 +17,12 @@ interface GovPageClientProps {
 
 export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
   const [leaderSearchQuery, setLeaderSearchQuery] = useState('');
-  const [subSidebarOpen, setSubSidebarOpen] = useState(
-    () => typeof window !== 'undefined' ? window.innerWidth >= 896 : true
-  );
   const [view, setView] = useState<'list' | 'map'>('list');
 
   return (
     <GovToastProvider>
       <GovToast />
-      <NewPageWrapper
-        leftSidebar={<LeftSidebar />}
-        subSidebar={<GovSubNav />}
-        subSidebarLabel="Government"
-        subSidebarOpen={subSidebarOpen}
-        onSubSidebarOpenChange={setSubSidebarOpen}
-        rightSidebar={<GovBuildingsSidebar />}
-        mainNoScroll={view === 'map'}
-      >
+      <>
         {view === 'map' ? (
           <div className="flex flex-1 min-h-0 w-full flex-col overflow-hidden p-[10px]">
             <div className="flex-1 min-h-0 w-full relative rounded-md overflow-hidden">
@@ -90,7 +76,7 @@ export default function GovPageClient({ isAuthenticated }: GovPageClientProps) {
             <GovOrgsSidebar />
           </div>
         )}
-      </NewPageWrapper>
+      </>
     </GovToastProvider>
   );
 }

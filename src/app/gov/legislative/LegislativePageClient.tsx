@@ -2,9 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
-import LeftSidebar from '@/components/layout/LeftSidebar';
-import GovSubNav from '@/components/sub-nav/GovSubNav';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import type { LegislativeMember } from '@/features/civic/services/civicService';
 
@@ -109,7 +106,6 @@ function MemberTable({
 }
 
 export default function LegislativePageClient({ senators, houseMembers }: Props) {
-  const [subSidebarOpen, setSubSidebarOpen] = useState(true);
   const [chamber, setChamber] = useState<Chamber>('senate');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
@@ -127,14 +123,7 @@ export default function LegislativePageClient({ senators, houseMembers }: Props)
   const activeMembrs = chamber === 'senate' ? senators : houseMembers;
 
   return (
-    <NewPageWrapper
-      leftSidebar={<LeftSidebar />}
-      subSidebar={<GovSubNav />}
-      subSidebarLabel="Government"
-      subSidebarOpen={subSidebarOpen}
-      onSubSidebarOpenChange={setSubSidebarOpen}
-    >
-      <div className="max-w-4xl mx-auto px-[10px] py-3">
+    <div className="max-w-4xl mx-auto px-[10px] py-3">
         <Breadcrumbs
           items={[
             { label: 'Minnesota', href: '/' },
@@ -189,7 +178,6 @@ export default function LegislativePageClient({ senators, houseMembers }: Props)
           sortDir={sortDir}
           onSort={handleSort}
         />
-      </div>
-    </NewPageWrapper>
+    </div>
   );
 }

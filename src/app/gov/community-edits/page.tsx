@@ -1,5 +1,4 @@
 import { Metadata } from 'next';
-import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import { getServerAuth } from '@/lib/authServer';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import { getAccountIdForUser } from '@/lib/server/getAccountId';
@@ -50,28 +49,22 @@ export default async function CommunityEditsPage() {
   }
 
   return (
-    <NewPageWrapper>
-      <div className="max-w-4xl mx-auto px-[10px] py-3">
-        {/* Breadcrumb Navigation */}
-        <Breadcrumbs items={[
-          { label: 'Minnesota', href: '/' },
-          { label: 'Government', href: '/gov' },
-          { label: 'Community Edits', href: null },
-        ]} />
+    <div className="max-w-4xl mx-auto px-[10px] py-3">
+      <Breadcrumbs items={[
+        { label: 'Minnesota', href: '/' },
+        { label: 'Government', href: '/gov' },
+        { label: 'Community Edits', href: null },
+      ]} />
 
-        {/* Header */}
-        <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
-            Community Edits
-          </h1>
-          <p className="text-xs text-gray-600">
-            All community edits to the Minnesota government directory.
-          </p>
-        </div>
-
-        <CommunityEditsClient accountId={accountId} />
+      <div className="mb-3 space-y-1.5">
+        <h1 className="text-sm font-semibold text-gray-900">Community Edits</h1>
+        <p className="text-xs text-gray-600">
+          All community edits to the Minnesota government directory.
+        </p>
       </div>
-    </NewPageWrapper>
+
+      <CommunityEditsClient accountId={accountId} />
+    </div>
   );
 }
 

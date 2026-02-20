@@ -2,9 +2,12 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import OrgChart from '@/features/civic/components/OrgChart';
-import { getCivicOrgBySlug, getCivicOrgWithBuilding, getDepartmentBudget, getOrgContracts, type DepartmentBudgetRow, type OrgContractRow } from '@/features/civic/services/civicService';
+import PersonAvatar from '@/features/civic/components/PersonAvatar';
+import { getCivicOrgBySlug, getCivicOrgWithBuilding, getDepartmentBudget, getOrgContracts, getOrgJurisdictions, type DepartmentBudgetRow, type OrgContractRow, type OrgJurisdiction } from '@/features/civic/services/civicService';
 import { buildOrgBreadcrumbs } from '@/features/civic/utils/breadcrumbs';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import GovBadge from '@/components/gov/GovBadge';
+import PartyBadge from '@/components/gov/PartyBadge';
 import { BuildingOfficeIcon, ScaleIcon } from '@heroicons/react/24/outline';
 import OrgPageClient from './OrgPageClient';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
@@ -67,11 +70,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 function getIconForOrgType(orgType: string) {
   switch (orgType) {
     case 'branch':
-      return <BuildingOfficeIcon className="w-4 h-4 text-gray-500" />;
+      return <BuildingOfficeIcon className="w-4 h-4 text-foreground-muted" />;
     case 'court':
-      return <ScaleIcon className="w-4 h-4 text-gray-500" />;
+      return <ScaleIcon className="w-4 h-4 text-foreground-muted" />;
     default:
-      return <BuildingOfficeIcon className="w-4 h-4 text-gray-500" />;
+      return <BuildingOfficeIcon className="w-4 h-4 text-foreground-muted" />;
   }
 }
 
@@ -154,11 +157,12 @@ export default async function OrgPage({ params }: Props) {
   // Leadership — people with roles at this org
   const leaders = org.roles?.filter(r => r.is_current && r.person) ?? [];
 
-  // Budget — only fetch for executive departments
-  const isDepartment = org.gov_type === 'department' && org.branch === 'executive';
-  const [budgetRows, contractRows] = await Promise.all([
-    isDepartment ? getDepartmentBudget(slug) : Promise.resolve(null),
+  // Budget — fetch for any org that has a checkbook_agency_name (not just executive departments)
+  const needsJurisdictions = org.branch === 'judicial' || org.branch === 'legislative';
+  const [budgetRows, contractRows, jurisdictions] = await Promise.all([
+    getDepartmentBudget(slug),
     getOrgContracts(slug, 10),
+    needsJurisdictions ? getOrgJurisdictions(org.id) : Promise.resolve([] as OrgJurisdiction[]),
   ]);
   const isTransitionDept = TRANSITION_DEPTS.has(slug);
 
@@ -197,33 +201,25 @@ export default async function OrgPage({ params }: Props) {
           <div className="flex items-center gap-2 justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               {icon}
-              <h1 className="text-sm font-semibold text-gray-900">{org.name}</h1>
-              {org.gov_type && (
-                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border bg-green-50 text-green-700 border-green-200">
-                  {org.gov_type}
-                </span>
-              )}
-              {org.branch && (
-                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border bg-blue-50 text-blue-700 border-blue-200">
-                  {org.branch}
-                </span>
-              )}
+              <h1 className="text-sm font-semibold text-foreground">{org.name}</h1>
+              {org.gov_type && <GovBadge label={org.gov_type} />}
+              {org.branch && <GovBadge label={org.branch} />}
             </div>
             <OrgPageClient org={org} isAdmin={isAdmin} />
           </div>
 
           {/* Parent breadcrumb */}
           {parentOrg && (
-            <p className="text-[10px] text-gray-500">
+            <p className="text-[10px] text-foreground-muted">
               Part of{' '}
-              <Link href={`/gov/org/${parentOrg.slug}`} className="text-blue-600 hover:underline">
+              <Link href={`/gov/org/${parentOrg.slug}`} className="text-accent hover:underline">
                 {parentOrg.name}
               </Link>
             </p>
           )}
 
           {org.description && (
-            <p className="text-xs text-gray-600">{org.description}</p>
+            <p className="text-xs text-foreground-muted">{org.description}</p>
           )}
 
           <div className="flex items-center gap-3 flex-wrap">
@@ -232,7 +228,7 @@ export default async function OrgPage({ params }: Props) {
                 href={org.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs text-accent hover:underline"
               >
                 Official Website →
               </a>
@@ -244,13 +240,13 @@ export default async function OrgPage({ params }: Props) {
         {/* Building block */}
         {building && (
           <div className="mb-3">
-            <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Location</h2>
-            <div className="border border-gray-200 rounded-md p-3">
-              <Link href={`/gov/building/${building.slug ?? building.id}`} className="text-xs font-medium text-blue-600 hover:underline">
+            <h2 className="text-xs font-semibold text-foreground mb-1.5">Location</h2>
+            <div className="border border-border rounded-md p-3 bg-surface">
+              <Link href={`/gov/building/${building.slug ?? building.id}`} className="text-xs font-medium text-accent hover:underline">
                 {building.name}
               </Link>
               {building.full_address && (
-                <p className="text-[10px] text-gray-500 mt-0.5">{building.full_address}</p>
+                <p className="text-[10px] text-foreground-muted mt-0.5">{building.full_address}</p>
               )}
             </div>
           </div>
@@ -258,83 +254,69 @@ export default async function OrgPage({ params }: Props) {
 
         {/* Leadership section */}
         <div className="mb-3">
-          <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Leadership</h2>
+          <h2 className="text-xs font-semibold text-foreground mb-1.5">Leadership</h2>
           {leaders.length > 0 ? (
             <div className="space-y-2">
               {leaders.map((role, idx) => {
                 const person = role.person!;
-                const partyColor = person.party === 'DFL' ? 'text-blue-600' :
-                                   person.party === 'R' || person.party === 'Republican' ? 'text-red-600' :
-                                   person.party ? 'text-gray-600' : '';
                 return (
-                  <div key={idx} className="border border-gray-200 rounded-md p-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 border border-gray-300 flex-shrink-0 flex items-center justify-center overflow-hidden">
-                      {person.photo_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={person.photo_url} alt={person.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[10px] font-medium text-gray-600">
-                          {person.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                        </span>
-                      )}
-                    </div>
+                  <div key={idx} className="border border-border rounded-md p-3 flex items-center gap-3 bg-surface">
+                    <PersonAvatar name={person.name} photoUrl={person.photo_url} size="sm" />
                     <div>
-                      <Link href={`/gov/person/${person.slug ?? person.id}`} className="text-xs font-medium text-gray-900 hover:underline">
+                      <Link href={`/gov/person/${person.slug ?? person.id}`} className="text-xs font-medium text-foreground hover:underline">
                         {person.name}
                       </Link>
-                      <p className="text-[10px] text-gray-500">{role.title}</p>
-                      {person.party && (
-                        <span className={`text-[10px] font-medium ${partyColor}`}>{person.party}</span>
-                      )}
+                      <p className="text-[10px] text-foreground-muted">{role.title}</p>
+                      <PartyBadge party={person.party} />
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="border border-gray-200 rounded-md p-3">
-              <p className="text-[10px] text-gray-400">Leadership data coming soon.</p>
+            <div className="border border-border rounded-md p-3 bg-surface">
+              <p className="text-[10px] text-foreground-muted">Leadership data coming soon.</p>
             </div>
           )}
         </div>
 
-        {/* Budget block — executive departments only */}
-        {isDepartment && (
+        {/* Budget block — any org with a checkbook_agency_name mapping */}
+        {(budgetRows !== null || isTransitionDept) && (
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1.5">
-              <h2 className="text-xs font-semibold text-gray-900">
+              <h2 className="text-xs font-semibold text-foreground">
                 Budget{heroYear ? ` (FY${heroYear})` : ''}
               </h2>
-              <span className="text-[10px] text-gray-400">Minnesota State Budget</span>
+              <span className="text-[10px] text-foreground-muted">Minnesota State Budget</span>
             </div>
 
             {budgetDisplay ? (
-              <div className="border border-gray-200 rounded-md p-3 space-y-3">
+              <div className="border border-border rounded-md p-3 space-y-3 bg-surface">
                 {/* Hero figures — most recent year with data */}
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Total Budget</p>
-                    <p className="text-sm font-semibold text-gray-900">{formatBudget(budgetDisplay.budget_amount)}</p>
+                    <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Total Budget</p>
+                    <p className="text-sm font-semibold text-foreground">{formatBudget(budgetDisplay.budget_amount)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Spent</p>
-                    <p className="text-sm font-semibold text-gray-900">{formatBudget(budgetDisplay.spend_amount)}</p>
-                    <p className="text-[10px] text-gray-400">{formatPercent(budgetDisplay.spend_amount, budgetDisplay.budget_amount)} of budget</p>
+                    <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Spent</p>
+                    <p className="text-sm font-semibold text-foreground">{formatBudget(budgetDisplay.spend_amount)}</p>
+                    <p className="text-[10px] text-foreground-muted">{formatPercent(budgetDisplay.spend_amount, budgetDisplay.budget_amount)} of budget</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Obligated</p>
-                    <p className="text-sm font-semibold text-gray-900">{formatBudget(budgetDisplay.obligated_amount)}</p>
+                    <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Obligated</p>
+                    <p className="text-sm font-semibold text-foreground">{formatBudget(budgetDisplay.obligated_amount)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wide font-medium">Remaining</p>
-                    <p className="text-sm font-semibold text-gray-900">{formatBudget(budgetDisplay.remaining_amount)}</p>
+                    <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Remaining</p>
+                    <p className="text-sm font-semibold text-foreground">{formatBudget(budgetDisplay.remaining_amount)}</p>
                   </div>
                 </div>
 
                 {/* Spend bar */}
                 {budgetDisplay.budget_amount > 0 && (
                   <div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-surface-muted rounded-full h-1.5 overflow-hidden">
                       <div
                         className="bg-blue-500 h-1.5 rounded-full"
                         style={{ width: `${Math.min((budgetDisplay.spend_amount / budgetDisplay.budget_amount) * 100, 100)}%` }}
@@ -344,7 +326,7 @@ export default async function OrgPage({ params }: Props) {
                 )}
 
                 {isTransitionDept && (
-                  <p className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  <p className="text-[10px] text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded px-2 py-1">
                     Budget data reflects agency transition — full figures available in FY2026.
                   </p>
                 )}
@@ -352,15 +334,15 @@ export default async function OrgPage({ params }: Props) {
                 {/* Year-over-year history table */}
                 {budgetYears.length > 1 && (
                   <div>
-                    <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wide mb-1">Year-over-Year History</p>
+                    <p className="text-[10px] text-foreground-muted font-medium uppercase tracking-wide mb-1">Year-over-Year History</p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[10px]">
                         <thead>
-                          <tr className="border-b border-gray-100">
-                            <th className="text-left text-gray-500 font-medium pb-1 pr-3">Fiscal Year</th>
-                            <th className="text-right text-gray-500 font-medium pb-1 pr-3">Budget</th>
-                            <th className="text-right text-gray-500 font-medium pb-1 pr-3">Spent</th>
-                            <th className="text-right text-gray-500 font-medium pb-1">Remaining</th>
+                          <tr className="border-b border-border">
+                            <th className="text-left text-foreground-muted font-medium pb-1 pr-3">Fiscal Year</th>
+                            <th className="text-right text-foreground-muted font-medium pb-1 pr-3">Budget</th>
+                            <th className="text-right text-foreground-muted font-medium pb-1 pr-3">Spent</th>
+                            <th className="text-right text-foreground-muted font-medium pb-1">Remaining</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -370,21 +352,21 @@ export default async function OrgPage({ params }: Props) {
                             if (!agg) return null;
                             if (agg.budget_amount === 0) {
                               return (
-                                <tr key={yr} className="border-b border-gray-50">
-                                  <td className="py-1 pr-3 text-gray-500 font-medium">FY{yr}</td>
+                                <tr key={yr} className="border-b border-border">
+                                  <td className="py-1 pr-3 text-foreground-muted font-medium">FY{yr}</td>
                                   <td colSpan={3} className="py-1 text-amber-600 italic">Agency established mid-cycle</td>
                                 </tr>
                               );
                             }
                             return (
-                              <tr key={yr} className={`border-b border-gray-50 ${isHero ? 'font-semibold' : ''}`}>
-                                <td className="py-1 pr-3 text-gray-700">
+                              <tr key={yr} className={`border-b border-border ${isHero ? 'font-semibold' : ''}`}>
+                                <td className="py-1 pr-3 text-foreground">
                                   FY{yr}
                                   {isHero && <span className="ml-1 text-[9px] text-blue-500 font-normal">(current)</span>}
                                 </td>
-                                <td className="py-1 pr-3 text-right text-gray-700 tabular-nums">{formatBudgetFull(agg.budget_amount)}</td>
-                                <td className="py-1 pr-3 text-right text-gray-700 tabular-nums">{formatBudgetFull(agg.spend_amount)}</td>
-                                <td className="py-1 text-right text-gray-700 tabular-nums">{formatBudgetFull(agg.remaining_amount)}</td>
+                                <td className="py-1 pr-3 text-right text-foreground tabular-nums">{formatBudgetFull(agg.budget_amount)}</td>
+                                <td className="py-1 pr-3 text-right text-foreground tabular-nums">{formatBudgetFull(agg.spend_amount)}</td>
+                                <td className="py-1 text-right text-foreground tabular-nums">{formatBudgetFull(agg.remaining_amount)}</td>
                               </tr>
                             );
                           })}
@@ -395,13 +377,13 @@ export default async function OrgPage({ params }: Props) {
                 )}
               </div>
             ) : (
-              <div className="border border-gray-200 rounded-md p-3">
+              <div className="border border-border rounded-md p-3 bg-surface">
                 {isTransitionDept ? (
                   <p className="text-[10px] text-amber-600">
                     Budget data reflects agency transition — full figures available in FY2026.
                   </p>
                 ) : (
-                  <p className="text-[10px] text-gray-400">Budget data not available.</p>
+                  <p className="text-[10px] text-foreground-muted">Budget data not available.</p>
                 )}
               </div>
             )}
@@ -412,36 +394,45 @@ export default async function OrgPage({ params }: Props) {
         {contractRows && contractRows.length > 0 && (
           <div className="mb-3">
             <div className="flex items-center justify-between mb-1.5">
-              <h2 className="text-xs font-semibold text-gray-900">Top Contracts</h2>
-              <span className="text-[10px] text-gray-400">Minnesota OpenCheckbook</span>
+              <h2 className="text-xs font-semibold text-foreground">Top Contracts</h2>
+              <span className="text-[10px] text-foreground-muted">Minnesota OpenCheckbook</span>
             </div>
-            <div className="border border-gray-200 rounded-md overflow-hidden">
+            <div className="border border-border rounded-md overflow-hidden bg-surface">
               <div className="overflow-x-auto">
                 <table className="w-full text-[10px]">
                   <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="text-left text-gray-500 font-medium px-3 py-1.5">Payee</th>
-                      <th className="text-left text-gray-500 font-medium px-3 py-1.5 hidden sm:table-cell">Type</th>
-                      <th className="text-right text-gray-500 font-medium px-3 py-1.5">Amount</th>
-                      <th className="text-right text-gray-500 font-medium px-3 py-1.5 hidden sm:table-cell">Start</th>
-                      <th className="text-right text-gray-500 font-medium px-3 py-1.5 hidden sm:table-cell">End</th>
+                    <tr className="border-b border-border bg-surface-muted">
+                      <th className="text-left text-foreground-muted font-medium px-3 py-1.5">Payee</th>
+                      <th className="text-left text-foreground-muted font-medium px-3 py-1.5 hidden sm:table-cell">Type</th>
+                      <th className="text-right text-foreground-muted font-medium px-3 py-1.5">Amount</th>
+                      <th className="text-right text-foreground-muted font-medium px-3 py-1.5 hidden sm:table-cell">Start</th>
+                      <th className="text-right text-foreground-muted font-medium px-3 py-1.5 hidden sm:table-cell">End</th>
                     </tr>
                   </thead>
                   <tbody>
                     {contractRows.map((row: OrgContractRow) => (
-                      <tr key={row.contract_id} className="border-b border-gray-50 last:border-0">
-                        <td className="px-3 py-1.5 text-gray-700 max-w-[160px] truncate">{row.payee}</td>
-                        <td className="px-3 py-1.5 text-gray-500 hidden sm:table-cell">{row.contract_type}</td>
-                        <td className="px-3 py-1.5 text-right text-gray-700 tabular-nums font-medium">{formatContractAmount(row.total_contract_amount)}</td>
-                        <td className="px-3 py-1.5 text-right text-gray-500 hidden sm:table-cell">{formatContractDate(row.start_date)}</td>
-                        <td className="px-3 py-1.5 text-right text-gray-500 hidden sm:table-cell">{formatContractDate(row.end_date)}</td>
+                      <tr key={row.contract_id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-1.5 text-foreground max-w-[160px] truncate">{row.payee}</td>
+                        <td className="px-3 py-1.5 text-foreground-muted hidden sm:table-cell">{row.contract_type}</td>
+                        <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-medium">{formatContractAmount(row.total_contract_amount)}</td>
+                        <td className="px-3 py-1.5 text-right text-foreground-muted hidden sm:table-cell">{formatContractDate(row.start_date)}</td>
+                        <td className="px-3 py-1.5 text-right text-foreground-muted hidden sm:table-cell">{formatContractDate(row.end_date)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <div className="px-3 py-1.5 border-t border-gray-100">
-                <span className="text-[10px] text-gray-400">View all contracts →</span>
+              <div className="px-3 py-1.5 border-t border-border">
+                <Link
+                  href={
+                    (org as any).checkbook_agency_name
+                      ? `/gov/checkbook/contracts?agency=${encodeURIComponent((org as any).checkbook_agency_name)}`
+                      : '/gov/checkbook/contracts'
+                  }
+                  className="text-[10px] text-accent hover:underline"
+                >
+                  View all contracts →
+                </Link>
               </div>
             </div>
           </div>
@@ -450,7 +441,7 @@ export default async function OrgPage({ params }: Props) {
         {/* Org chart (children) */}
         {(org.children?.length ?? 0) > 0 && (
           <div className="mb-3">
-            <h2 className="text-xs font-semibold text-gray-900 mb-1.5">
+            <h2 className="text-xs font-semibold text-foreground mb-1.5">
               Sub-organizations ({org.children!.length})
             </h2>
             <OrgChart org={{ ...org, roles: [] }} icon={icon} />
@@ -461,8 +452,40 @@ export default async function OrgPage({ params }: Props) {
           <OrgChart org={org} icon={icon} />
         )}
 
+        {/* Jurisdictions block — for judicial/legislative orgs */}
+        {jurisdictions.length > 0 && (
+          <div className="mb-3">
+            <h2 className="text-xs font-semibold text-foreground mb-1.5">
+              Districts ({jurisdictions.length})
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {jurisdictions.map((j) => (
+                <Link
+                  key={j.slug}
+                  href={j.slug ? `/gov/jurisdictions/${j.slug}` : `/gov/${org.branch ?? 'gov'}`}
+                  className="block border border-border rounded-md p-3 bg-surface hover:bg-surface-muted transition-colors"
+                >
+                  <div className="flex items-baseline gap-2">
+                    {j.district_number != null && (
+                      <span className="text-xs font-semibold text-foreground font-mono w-5 shrink-0">
+                        {j.district_number}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-foreground">{j.name}</span>
+                  </div>
+                  {j.description && (
+                    <p className="text-[10px] text-foreground-muted mt-1 leading-relaxed pl-7 line-clamp-2">
+                      {j.description}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {isAdmin && (
-          <div className="mt-6 pt-6 border-t border-gray-300">
+          <div className="mt-6 pt-6 border-t border-border">
             <EntityEditHistory tableName="orgs" recordId={org.id} recordName={org.name} showHeader={true} />
           </div>
         )}

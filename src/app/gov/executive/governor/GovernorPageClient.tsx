@@ -3,127 +3,115 @@
 import Link from 'next/link';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
-import type { CivicPerson, CivicOrg } from '@/features/civic/services/civicService';
+import OrgCard from '@/components/gov/OrgCard';
+import PartyBadge from '@/components/gov/PartyBadge';
+import type { CivicPerson, OrgWithBudget } from '@/features/civic/services/civicService';
 
 interface Props {
   person: CivicPerson | null;
   roleTitle: string;
-  departments: (CivicOrg & { gov_type?: string | null })[];
-  agencies: (CivicOrg & { gov_type?: string | null })[];
-  boards: (CivicOrg & { gov_type?: string | null })[];
-}
-
-function OrgCard({
-  org,
-  href,
-}: {
-  org: CivicOrg & { gov_type?: string | null };
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="block border border-gray-200 rounded-md p-3 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-    >
-      <div className="text-xs font-medium text-gray-900 leading-snug">{org.name}</div>
-      {org.description && (
-        <p className="text-[10px] text-gray-500 mt-1 line-clamp-2">{org.description}</p>
-      )}
-    </Link>
-  );
+  departments: OrgWithBudget[];
+  agencies: OrgWithBudget[];
+  boards: OrgWithBudget[];
 }
 
 export default function GovernorPageClient({ person, roleTitle, departments, agencies, boards }: Props) {
   return (
     <div className="max-w-4xl mx-auto px-[10px] py-3">
-        <Breadcrumbs
-          items={[
-            { label: 'Minnesota', href: '/' },
-            { label: 'Government', href: '/gov' },
-            { label: 'Executive Branch', href: '/gov/executive' },
-            { label: 'Governor', href: null },
-          ]}
-        />
+      <Breadcrumbs
+        items={[
+          { label: 'Minnesota', href: '/' },
+          { label: 'Government', href: '/gov' },
+          { label: 'Executive Branch', href: '/gov/executive' },
+          { label: 'Governor', href: null },
+        ]}
+      />
 
-        {/* Section 1 — Governor Profile */}
-        <div className="mt-2 border border-gray-200 rounded-md p-4">
-          {person ? (
-            <div className="flex items-center gap-4">
-              <PersonAvatar
-                name={person.name}
-                photoUrl={person.photo_url}
-                size="lg"
-              />
-              <div>
-                <h1 className="text-sm font-semibold text-gray-900">{person.name}</h1>
-                <p className="text-xs text-gray-600 mt-0.5">{roleTitle}</p>
-                {person.party && (
-                  <span className={`text-[10px] font-medium mt-1 inline-block ${
-                    person.party === 'DFL' ? 'text-blue-600' : 'text-red-600'
-                  }`}>
-                    {person.party}
-                  </span>
-                )}
-                {person.slug && (
-                  <div className="mt-2">
-                    <Link
-                      href={`/gov/person/${person.slug}`}
-                      className="text-[10px] text-blue-600 hover:underline"
-                    >
-                      View full profile →
-                    </Link>
-                  </div>
-                )}
-              </div>
+      {/* Section 1 — Governor Profile */}
+      <div className="mt-2 border border-border rounded-md p-4 bg-surface">
+        {person ? (
+          <div className="flex items-center gap-4">
+            <PersonAvatar name={person.name} photoUrl={person.photo_url} size="lg" />
+            <div>
+              <h1 className="text-sm font-semibold text-foreground">{person.name}</h1>
+              <p className="text-xs text-foreground-muted mt-0.5">{roleTitle}</p>
+              <PartyBadge party={person.party} className="mt-1 inline-block" />
+              {person.slug && (
+                <div className="mt-2">
+                  <Link href={`/gov/person/${person.slug}`} className="text-[10px] text-accent hover:underline">
+                    View full profile →
+                  </Link>
+                </div>
+              )}
             </div>
-          ) : (
-            <p className="text-xs text-gray-400">Governor profile not available.</p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="text-xs text-foreground-muted">Governor profile not available.</p>
+        )}
+      </div>
 
-        {/* Section 2 — Departments */}
+      {/* Section 2 — Departments */}
+      <div className="mt-6">
+        <h2 className="text-xs font-semibold text-foreground mb-2">
+          Departments ({departments.length})
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {departments.map((dept) => (
+            <OrgCard
+              key={dept.id}
+              name={dept.name}
+              slug={dept.slug}
+              href={`/gov/executive/departments/${dept.slug}`}
+              description={dept.description}
+              govType={dept.gov_type}
+              budgetAmount={dept.budget_amount}
+              budgetYear={dept.budget_year}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Section 3 — Agencies */}
+      {agencies.length > 0 && (
         <div className="mt-6">
-          <h2 className="text-xs font-semibold text-gray-900 mb-2">
-            Departments ({departments.length})
+          <h2 className="text-xs font-semibold text-foreground mb-2">
+            Agencies ({agencies.length})
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {departments.map((dept) => (
+            {agencies.map((org) => (
               <OrgCard
-                key={dept.id}
-                org={dept}
-                href={`/gov/executive/departments/${dept.slug}`}
+                key={org.id}
+                name={org.name}
+                slug={org.slug}
+                href={`/gov/org/${org.slug}`}
+                description={org.description}
+                govType={org.gov_type}
               />
             ))}
           </div>
         </div>
+      )}
 
-        {/* Section 3 — Agencies */}
-        {agencies.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-xs font-semibold text-gray-900 mb-2">
-              Agencies ({agencies.length})
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {agencies.map((org) => (
-                <OrgCard key={org.id} org={org} href={`/gov/org/${org.slug}`} />
-              ))}
-            </div>
+      {/* Section 4 — Boards, Commissions & Councils */}
+      {boards.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-xs font-semibold text-foreground mb-2">
+            Boards, Commissions &amp; Councils ({boards.length})
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {boards.map((org) => (
+              <OrgCard
+                key={org.id}
+                name={org.name}
+                slug={org.slug}
+                href={`/gov/org/${org.slug}`}
+                description={org.description}
+                govType={org.gov_type}
+              />
+            ))}
           </div>
-        )}
-
-        {/* Section 3 — Boards, Commissions & Councils */}
-        {boards.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-xs font-semibold text-gray-900 mb-2">
-              Boards, Commissions &amp; Councils ({boards.length})
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {boards.map((org) => (
-                <OrgCard key={org.id} org={org} href={`/gov/org/${org.slug}`} />
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }

@@ -36,10 +36,10 @@ export default async function CheckbookPage() {
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
+          <h1 className="text-sm font-semibold text-foreground">
             State Checkbook
           </h1>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-foreground-muted">
             Government financial data and transparency information
           </p>
         </div>
@@ -48,22 +48,22 @@ export default async function CheckbookPage() {
         <div className="space-y-2">
           <Link
             href="/gov/checkbook/contracts"
-            className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
+            className="group bg-surface rounded-md border border-border p-[10px] hover:bg-surface-muted transition-colors block"
           >
             <div className="flex items-start gap-2">
-              <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
-                <DocumentTextIcon className="w-4 h-4 text-gray-700" />
+              <div className="p-[10px] bg-surface-muted rounded-md group-hover:bg-surface-accent transition-colors flex-shrink-0">
+                <DocumentTextIcon className="w-4 h-4 text-foreground-muted" />
               </div>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                  <h2 className="text-xs font-semibold text-foreground transition-colors">
                     Contracts
                   </h2>
-                  <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 text-foreground-muted transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground-muted">
                   View all government contracts and payments. Filter by agency, payee, year, and amount. Data from Transparency Minnesota.
                 </p>
               </div>
@@ -72,22 +72,22 @@ export default async function CheckbookPage() {
 
           <Link
             href="/gov/checkbook/payroll"
-            className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
+            className="group bg-surface rounded-md border border-border p-[10px] hover:bg-surface-muted transition-colors block"
           >
             <div className="flex items-start gap-2">
-              <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
-                <CurrencyDollarIcon className="w-4 h-4 text-gray-700" />
+              <div className="p-[10px] bg-surface-muted rounded-md group-hover:bg-surface-accent transition-colors flex-shrink-0">
+                <CurrencyDollarIcon className="w-4 h-4 text-foreground-muted" />
               </div>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                  <h2 className="text-xs font-semibold text-foreground transition-colors">
                     Payroll
                   </h2>
-                  <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 text-foreground-muted transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground-muted">
                   Government payroll data and employee compensation information.
                 </p>
               </div>
@@ -96,22 +96,22 @@ export default async function CheckbookPage() {
 
           <Link
             href="/gov/checkbook/payments"
-            className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
+            className="group bg-surface rounded-md border border-border p-[10px] hover:bg-surface-muted transition-colors block"
           >
             <div className="flex items-start gap-2">
-              <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
-                <BanknotesIcon className="w-4 h-4 text-gray-700" />
+              <div className="p-[10px] bg-surface-muted rounded-md group-hover:bg-surface-accent transition-colors flex-shrink-0">
+                <BanknotesIcon className="w-4 h-4 text-foreground-muted" />
               </div>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                  <h2 className="text-xs font-semibold text-foreground transition-colors">
                     Payments
                   </h2>
-                  <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 text-foreground-muted transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground-muted">
                   Government payment transactions and disbursements.
                 </p>
               </div>
@@ -120,22 +120,22 @@ export default async function CheckbookPage() {
 
           <Link
             href="/gov/checkbook/budget"
-            className="group bg-white rounded-md border border-gray-200 p-[10px] hover:bg-gray-50 transition-colors block"
+            className="group bg-surface rounded-md border border-border p-[10px] hover:bg-surface-muted transition-colors block"
           >
             <div className="flex items-start gap-2">
-              <div className="p-[10px] bg-gray-100 rounded-md group-hover:bg-gray-200 transition-colors flex-shrink-0">
-                <ChartBarIcon className="w-4 h-4 text-gray-700" />
+              <div className="p-[10px] bg-surface-muted rounded-md group-hover:bg-surface-accent transition-colors flex-shrink-0">
+                <ChartBarIcon className="w-4 h-4 text-foreground-muted" />
               </div>
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="text-xs font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
+                  <h2 className="text-xs font-semibold text-foreground transition-colors">
                     Budget
                   </h2>
-                  <svg className="w-3 h-3 text-gray-400 group-hover:text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 text-foreground-muted transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </div>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-foreground-muted">
                   Government budget information and financial planning data.
                 </p>
               </div>

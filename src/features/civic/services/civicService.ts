@@ -11,6 +11,7 @@ export interface CivicOrg {
   description: string | null;
   website: string | null;
   building_id: string | null;
+  checkbook_agency_name: string | null;
   created_at: string;
 }
 
@@ -34,6 +35,7 @@ export interface CivicRole {
   person_id: string;
   org_id: string;
   title: string;
+  role_type: string | null;
   start_date: string | null;
   end_date: string | null;
   is_current: boolean;
@@ -425,15 +427,23 @@ export async function getExecutiveOfficers(): Promise<{
   return results;
 }
 
+export interface OrgWithBudget extends CivicOrg {
+  gov_type?: string | null;
+  /** Most recent available FY budget total in dollars */
+  budget_amount?: number | null;
+  budget_year?: number | null;
+}
+
 /**
- * Get departments and agencies under the Governor
+ * Get departments and agencies under the Governor, with FY2026 budget totals merged in.
  */
 export async function getGovernorSubOrgs(): Promise<{
-  departments: (CivicOrg & { gov_type?: string | null })[];
-  agencies: (CivicOrg & { gov_type?: string | null })[];
-  boards: (CivicOrg & { gov_type?: string | null })[];
+  departments: OrgWithBudget[];
+  agencies: OrgWithBudget[];
+  boards: OrgWithBudget[];
 }> {
   const supabase = await createCivicServerClient();
+  const checkbookClient = await createSupabaseClient({ auth: false });
 
   const { data: govOrg } = await supabase
     .from('orgs')
@@ -451,12 +461,65 @@ export async function getGovernorSubOrgs(): Promise<{
 
   if (!children) return { departments: [], agencies: [], boards: [] };
 
-  const typed = children as (CivicOrg & { gov_type?: string | null })[];
+  const typed = children as OrgWithBudget[];
+
+  // Collect agency names that have a checkbook mapping
+  const agencyNames = typed
+    .map(o => o.checkbook_agency_name)
+    .filter((n): n is string => !!n);
+
+  // Fetch most recent budget totals per agency in one query (try FY2026 first, fallback handled below)
+  let budgetMap = new Map<string, { amount: number; year: number }>();
+  if (agencyNames.length > 0) {
+    // Fetch FY2025 + FY2026 rows so we always have at least one year
+    const { data: budgetRows } = await (checkbookClient as any)
+      .schema('checkbook')
+      .from('budgets')
+      .select('agency, budget_amount, budget_period')
+      .in('agency', agencyNames)
+      .in('budget_period', [2025, 2026]);
+
+    if (budgetRows) {
+      // Group by agency, pick the latest year with non-zero amount
+      for (const row of budgetRows as { agency: string; budget_amount: number; budget_period: number }[]) {
+        const existing = budgetMap.get(row.agency);
+        const amount = Number(row.budget_amount);
+        if (amount > 0 && (!existing || row.budget_period > existing.year)) {
+          budgetMap.set(row.agency, { amount, year: row.budget_period });
+        }
+      }
+      // Aggregate rows for the same agency+year (budget rows may be multi-fund)
+      const aggregated = new Map<string, { amount: number; year: number }>();
+      for (const row of budgetRows as { agency: string; budget_amount: number; budget_period: number }[]) {
+        const amount = Number(row.budget_amount);
+        if (amount <= 0) continue;
+        const existing = aggregated.get(row.agency);
+        if (!existing) {
+          aggregated.set(row.agency, { amount, year: row.budget_period });
+        } else if (row.budget_period > existing.year) {
+          aggregated.set(row.agency, { amount, year: row.budget_period });
+        } else if (row.budget_period === existing.year) {
+          aggregated.set(row.agency, { amount: existing.amount + amount, year: existing.year });
+        }
+      }
+      budgetMap = aggregated;
+    }
+  }
+
+  // Merge budget data onto each org
+  const withBudget = typed.map(o => {
+    const b = o.checkbook_agency_name ? budgetMap.get(o.checkbook_agency_name) : undefined;
+    return {
+      ...o,
+      budget_amount: b?.amount ?? null,
+      budget_year: b?.year ?? null,
+    };
+  });
 
   return {
-    departments: typed.filter(o => o.gov_type === 'department'),
-    agencies: typed.filter(o => o.gov_type === 'agency'),
-    boards: typed.filter(o => o.gov_type === 'board_commission_council'),
+    departments: withBudget.filter(o => o.gov_type === 'department'),
+    agencies: withBudget.filter(o => o.gov_type === 'agency'),
+    boards: withBudget.filter(o => o.gov_type === 'board_commission_council'),
   };
 }
 
@@ -710,6 +773,35 @@ export async function getDepartmentBudget(
   }
 
   return (data ?? []) as DepartmentBudgetRow[];
+}
+
+export interface OrgJurisdiction {
+  district_number: number | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  jurisdiction_type: string | null;
+}
+
+/**
+ * Fetch jurisdictions linked to an org via civic_org_id (for legislative/judicial orgs).
+ */
+export async function getOrgJurisdictions(orgId: string): Promise<OrgJurisdiction[]> {
+  const supabase = await createSupabaseClient({ auth: false });
+
+  const { data, error } = await (supabase as any)
+    .schema('layers')
+    .from('jurisdictions')
+    .select('district_number, name, slug, description, jurisdiction_type')
+    .eq('civic_org_id', orgId)
+    .order('district_number', { ascending: true });
+
+  if (error) {
+    console.error('[civicService] getOrgJurisdictions error:', error);
+    return [];
+  }
+
+  return (data ?? []) as OrgJurisdiction[];
 }
 
 export interface OrgContractRow {

@@ -38,8 +38,8 @@ export default async function OrgsPage() {
       ]} />
 
       <div className="mb-3 space-y-1.5">
-        <h1 className="text-sm font-semibold text-gray-900">Organizations</h1>
-        <p className="text-xs text-gray-600">All Minnesota government organizations</p>
+        <h1 className="text-sm font-semibold text-foreground">Organizations</h1>
+        <p className="text-xs text-foreground-muted">All Minnesota government organizations</p>
       </div>
 
       <GovTabProvider initialTab="orgs">

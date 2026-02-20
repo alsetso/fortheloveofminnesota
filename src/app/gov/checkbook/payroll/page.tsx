@@ -37,10 +37,10 @@ export default async function PayrollPage() {
         <div className="mb-3 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h1 className="text-sm font-semibold text-gray-900">
+              <h1 className="text-sm font-semibold text-foreground">
                 Payroll
               </h1>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-foreground-muted">
                 Government employee payroll and compensation data in Minnesota
               </p>
             </div>
@@ -48,11 +48,11 @@ export default async function PayrollPage() {
         </div>
 
         {/* Coming Soon */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <h2 className="text-xs font-semibold text-gray-900">
+        <div className="bg-surface border border-border rounded-md p-[10px] space-y-1.5">
+          <h2 className="text-xs font-semibold text-foreground">
             Coming Soon
           </h2>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-foreground-muted">
             Payroll data will be available here soon. This section will include government employee compensation, salary information, and related payroll records.
           </p>
         </div>

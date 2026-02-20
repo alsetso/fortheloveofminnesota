@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import { partyColorClass } from '@/components/gov/PartyBadge';
+import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import type { LegislativeMember } from '@/features/civic/services/civicService';
 
 type SortField = 'name' | 'district' | 'party';
@@ -12,12 +14,6 @@ type Chamber = 'senate' | 'house';
 interface Props {
   senators: LegislativeMember[];
   houseMembers: LegislativeMember[];
-}
-
-function partyColor(party: string | null) {
-  if (party === 'DFL') return 'text-blue-600';
-  if (party === 'R') return 'text-red-600';
-  return 'text-gray-500';
 }
 
 function partyLabel(party: string | null) {
@@ -30,6 +26,15 @@ function districtNum(d: string | null): number {
   if (!d) return 9999;
   const m = d.match(/\d+/);
   return m ? parseInt(m[0], 10) : 9999;
+}
+
+function partySeatCounts(members: LegislativeMember[]) {
+  const counts: Record<string, number> = {};
+  for (const m of members) {
+    const p = m.party ?? 'Other';
+    counts[p] = (counts[p] ?? 0) + 1;
+  }
+  return counts;
 }
 
 function MemberTable({
@@ -71,35 +76,48 @@ function MemberTable({
   const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
     <button
       onClick={() => onSort(field)}
-      className="flex items-center gap-0.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-900 transition-colors"
+      className="flex items-center gap-0.5 text-[10px] font-semibold text-foreground-muted uppercase tracking-wide hover:text-foreground transition-colors"
     >
       {label}
       {sortField === field && (
-        <span className="text-gray-400">{sortDir === 'asc' ? '↑' : '↓'}</span>
+        <span className="text-foreground-muted">{sortDir === 'asc' ? '↑' : '↓'}</span>
       )}
     </button>
   );
 
   return (
-    <div className="border border-gray-200 rounded-md overflow-hidden">
-      <div className="grid grid-cols-[1fr_80px_50px] gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-200">
+    <div className="border border-border rounded-md overflow-hidden">
+      <div className="grid grid-cols-[20px_1fr_72px_46px] gap-2 px-3 py-1.5 bg-surface-muted border-b border-border">
+        <div />
         <SortHeader field="name" label="Name" />
         <SortHeader field="district" label="District" />
         <SortHeader field="party" label="Party" />
       </div>
       {filtered.length === 0 && (
-        <div className="px-3 py-4 text-xs text-gray-400 text-center">No members match your search.</div>
+        <div className="px-3 py-4 text-xs text-foreground-muted text-center">
+          No members match your search.
+        </div>
       )}
       {filtered.map((m) => (
-        <Link
+        <div
           key={m.person_id}
-          href={`/gov/person/${m.slug ?? m.person_id}`}
-          className="grid grid-cols-[1fr_80px_50px] gap-2 px-3 py-1.5 text-xs border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+          className="grid grid-cols-[20px_1fr_72px_46px] gap-2 px-3 py-1.5 text-xs border-b border-border last:border-b-0 hover:bg-surface-muted transition-colors items-center"
         >
-          <span className="text-gray-900 truncate">{m.name}</span>
-          <span className="text-gray-500 font-mono text-[11px]">{m.district ?? '—'}</span>
-          <span className={`font-medium ${partyColor(m.party)}`}>{partyLabel(m.party)}</span>
-        </Link>
+          <PersonAvatar name={m.name} photoUrl={m.photo_url} size="xs" />
+          <Link
+            href={`/gov/person/${m.slug ?? m.person_id}`}
+            className="text-foreground truncate hover:underline"
+          >
+            {m.name}
+          </Link>
+          <Link
+            href={`/gov/person/${m.slug ?? m.person_id}`}
+            className="text-foreground-muted font-mono text-[11px] hover:underline truncate"
+          >
+            {m.district ?? '—'}
+          </Link>
+          <span className={`font-medium ${partyColorClass(m.party)}`}>{partyLabel(m.party)}</span>
+        </div>
       ))}
     </div>
   );
@@ -120,64 +138,81 @@ export default function LegislativePageClient({ senators, houseMembers }: Props)
     }
   };
 
-  const activeMembrs = chamber === 'senate' ? senators : houseMembers;
+  const activeMembers = chamber === 'senate' ? senators : houseMembers;
+  const seatCounts = partySeatCounts(activeMembers);
 
   return (
     <div className="max-w-4xl mx-auto px-[10px] py-3">
-        <Breadcrumbs
-          items={[
-            { label: 'Minnesota', href: '/' },
-            { label: 'Government', href: '/gov' },
-            { label: 'Legislative Branch', href: null },
-          ]}
-        />
+      <Breadcrumbs
+        items={[
+          { label: 'Minnesota', href: '/' },
+          { label: 'Government', href: '/gov' },
+          { label: 'Legislative Branch', href: null },
+        ]}
+      />
 
-        <h1 className="text-sm font-semibold text-gray-900 mt-2">Minnesota Legislature</h1>
-        <p className="text-xs text-gray-600 mt-1">
-          The Minnesota Legislature consists of the Senate and House of Representatives.
-        </p>
+      <h1 className="text-sm font-semibold text-foreground mt-2">Minnesota Legislature</h1>
+      <p className="text-xs text-foreground-muted mt-1">
+        The Minnesota Legislature consists of the Senate and House of Representatives.
+      </p>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mt-3 mb-2">
-          <button
-            onClick={() => { setChamber('senate'); setSearch(''); }}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              chamber === 'senate'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            Senate ({senators.length})
-          </button>
-          <button
-            onClick={() => { setChamber('house'); setSearch(''); }}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              chamber === 'house'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            House ({houseMembers.length})
-          </button>
+      {/* Tabs */}
+      <div className="flex gap-1 mt-3 mb-2">
+        <button
+          onClick={() => { setChamber('senate'); setSearch(''); }}
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            chamber === 'senate'
+              ? 'bg-foreground text-background dark:bg-foreground dark:text-background'
+              : 'bg-surface-muted text-foreground-muted hover:bg-surface-accent'
+          }`}
+        >
+          Senate ({senators.length})
+        </button>
+        <button
+          onClick={() => { setChamber('house'); setSearch(''); }}
+          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            chamber === 'house'
+              ? 'bg-foreground text-background dark:bg-foreground dark:text-background'
+              : 'bg-surface-muted text-foreground-muted hover:bg-surface-accent'
+          }`}
+        >
+          House ({houseMembers.length})
+        </button>
+      </div>
+
+      {/* Seat count summary */}
+      {Object.keys(seatCounts).length > 0 && (
+        <div className="flex items-center gap-1.5 mb-2 text-[10px] text-foreground-muted">
+          {Object.entries(seatCounts)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([party, count], i, arr) => (
+              <span key={party} className="flex items-center gap-1.5">
+                <span className={`font-semibold ${partyColorClass(party)}`}>
+                  {count} {party}
+                </span>
+                {i < arr.length - 1 && <span className="text-foreground-muted">·</span>}
+              </span>
+            ))}
         </div>
+      )}
 
-        {/* Search */}
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={`Search ${chamber === 'senate' ? 'senators' : 'representatives'}…`}
-          aria-label={`Search ${chamber === 'senate' ? 'senators' : 'representatives'}`}
-          className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-xs placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-300 mb-2"
-        />
+      {/* Search */}
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={`Search ${chamber === 'senate' ? 'senators' : 'representatives'}…`}
+        aria-label={`Search ${chamber === 'senate' ? 'senators' : 'representatives'}`}
+        className="w-full border border-border rounded-md px-3 py-1.5 text-xs placeholder:text-foreground-muted bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-border mb-2"
+      />
 
-        <MemberTable
-          members={activeMembrs}
-          search={search}
-          sortField={sortField}
-          sortDir={sortDir}
-          onSort={handleSort}
-        />
+      <MemberTable
+        members={activeMembers}
+        search={search}
+        sortField={sortField}
+        sortDir={sortDir}
+        onSort={handleSort}
+      />
     </div>
   );
 }

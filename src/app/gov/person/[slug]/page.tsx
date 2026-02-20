@@ -5,6 +5,8 @@ import { getCivicPersonBySlug } from '@/features/civic/services/civicService';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonPageClient from './PersonPageClient';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
+import PartyBadge from '@/components/gov/PartyBadge';
+import GovBadge from '@/components/gov/GovBadge';
 import LastEditedIndicator from '@/features/civic/components/LastEditedIndicator';
 import EntityEditHistory from '@/features/civic/components/EntityEditHistory';
 import { getServerAuth } from '@/lib/authServer';
@@ -83,10 +85,6 @@ export default async function PersonPage({ params }: Props) {
 
   const { person, roles, building } = data;
 
-  const partyColor = person.party === 'DFL' ? 'text-blue-600' :
-                     person.party === 'R' || person.party === 'Republican' ? 'text-red-600' :
-                     person.party ? 'text-gray-600' : '';
-
   // Primary role for display below name
   const primaryRole = roles[0];
   const primaryOrg = primaryRole?.org;
@@ -126,25 +124,29 @@ export default async function PersonPage({ params }: Props) {
         ]} />
 
         {/* Hero */}
-        <div className="mt-2 border border-gray-200 rounded-md p-4">
+        <div className="mt-2 border border-border rounded-md p-4 bg-surface">
           <div className="flex items-center gap-4 justify-between">
             <div className="flex items-center gap-3">
               <PersonAvatar name={person.name} photoUrl={person.photo_url} size="lg" />
               <div>
-                <h1 className="text-sm font-semibold text-gray-900">{person.name}</h1>
+                <h1 className="text-sm font-semibold text-foreground">{person.name}</h1>
                 {primaryRole && (
-                  <p className="text-xs text-gray-600 mt-0.5">{primaryRole.title}</p>
+                  <p className="text-xs text-foreground-muted mt-0.5">{primaryRole.title}</p>
                 )}
                 {primaryOrg && (
-                  <Link href={`/gov/org/${primaryOrg.slug}`} className="text-[10px] text-blue-600 hover:underline mt-0.5 block">
+                  <Link href={`/gov/org/${primaryOrg.slug}`} className="text-[10px] text-accent hover:underline mt-0.5 block">
                     {primaryOrg.name}
                   </Link>
                 )}
-                {person.party && (
-                  <span className={`text-[10px] font-medium mt-1 inline-block ${partyColor}`}>
-                    {person.party}
-                  </span>
+                {person.district && (
+                  <p className="text-[10px] text-foreground-muted mt-0.5">
+                    <span className="font-medium">District:</span> {person.district}
+                  </p>
                 )}
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                  <PartyBadge party={person.party} />
+                  {primaryRole?.role_type && <GovBadge label={primaryRole.role_type} variant="gray" />}
+                </div>
               </div>
             </div>
             <PersonPageClient person={person} isAdmin={isAdmin} />
@@ -160,27 +162,27 @@ export default async function PersonPage({ params }: Props) {
         {/* Contact block — only render if at least one field exists */}
         {hasContact && (
           <div className="mt-3">
-            <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Contact</h2>
-            <div className="border border-gray-200 rounded-md p-3 space-y-1.5">
+            <h2 className="text-xs font-semibold text-foreground mb-1.5">Contact</h2>
+            <div className="border border-border rounded-md p-3 space-y-1.5 bg-surface">
               {person.email && (
-                <div className="text-xs text-gray-600">
-                  <span className="font-medium text-gray-700">Email:</span>{' '}
-                  <a href={`mailto:${person.email}`} className="text-blue-600 hover:underline">
+                <div className="text-xs text-foreground-muted">
+                  <span className="font-medium text-foreground">Email:</span>{' '}
+                  <a href={`mailto:${person.email}`} className="text-accent hover:underline">
                     {person.email}
                   </a>
                 </div>
               )}
               {person.phone && (
-                <div className="text-xs text-gray-600">
-                  <span className="font-medium text-gray-700">Phone:</span>{' '}
+                <div className="text-xs text-foreground-muted">
+                  <span className="font-medium text-foreground">Phone:</span>{' '}
                   <a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`} className="hover:underline">
                     {person.phone}
                   </a>
                 </div>
               )}
               {person.address && (
-                <div className="text-xs text-gray-600">
-                  <span className="font-medium text-gray-700">Address:</span> {person.address}
+                <div className="text-xs text-foreground-muted">
+                  <span className="font-medium text-foreground">Address:</span> {person.address}
                 </div>
               )}
             </div>
@@ -190,13 +192,13 @@ export default async function PersonPage({ params }: Props) {
         {/* Building block */}
         {building && (
           <div className="mt-3">
-            <h2 className="text-xs font-semibold text-gray-900 mb-1.5">Location</h2>
-            <div className="border border-gray-200 rounded-md p-3">
-              <Link href={`/gov/building/${building.slug ?? building.id}`} className="text-xs font-medium text-blue-600 hover:underline">
+            <h2 className="text-xs font-semibold text-foreground mb-1.5">Location</h2>
+            <div className="border border-border rounded-md p-3 bg-surface">
+              <Link href={`/gov/building/${building.slug ?? building.id}`} className="text-xs font-medium text-accent hover:underline">
                 {building.name}
               </Link>
               {building.full_address && (
-                <p className="text-[10px] text-gray-500 mt-0.5">{building.full_address}</p>
+                <p className="text-[10px] text-foreground-muted mt-0.5">{building.full_address}</p>
               )}
             </div>
           </div>
@@ -204,7 +206,7 @@ export default async function PersonPage({ params }: Props) {
 
         {/* Roles section */}
         <div className="mt-3">
-          <h2 className="text-xs font-semibold text-gray-900 mb-1.5">
+          <h2 className="text-xs font-semibold text-foreground mb-1.5">
             {rolesByOrg.size <= 1 ? 'Current Role' : 'Roles'}
           </h2>
           {rolesByOrg.size > 0 ? (
@@ -213,16 +215,22 @@ export default async function PersonPage({ params }: Props) {
                 const org = orgRoles[0]?.org;
                 if (!org) return null;
                 return (
-                  <div key={orgId} className="border border-gray-200 rounded-md p-3">
-                    <Link href={`/gov/org/${org.slug}`} className="text-xs font-semibold text-gray-900 hover:underline block mb-1">
-                      {org.name}
-                    </Link>
+                  <div key={orgId} className="border border-border rounded-md p-3 bg-surface">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <Link href={`/gov/org/${org.slug}`} className="text-xs font-semibold text-foreground hover:underline">
+                        {org.name}
+                      </Link>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {org.branch && <GovBadge label={org.branch} />}
+                      </div>
+                    </div>
                     <div className="space-y-0.5">
                       {orgRoles.map((role, idx) => (
-                        <div key={idx} className="text-xs text-gray-600 flex items-center gap-1.5">
+                        <div key={idx} className="text-xs text-foreground-muted flex items-center gap-1.5 flex-wrap">
                           <span>{role.title}</span>
+                          {role.role_type && <GovBadge label={role.role_type} variant="gray" />}
                           {role.start_date && (
-                            <span className="text-[10px] text-gray-400">
+                            <span className="text-[10px] text-foreground-muted">
                               since {new Date(role.start_date).getFullYear()}
                             </span>
                           )}
@@ -234,14 +242,14 @@ export default async function PersonPage({ params }: Props) {
               })}
             </div>
           ) : (
-            <div className="border border-gray-200 rounded-md p-3">
-              <p className="text-xs text-gray-400">No current roles on record.</p>
+            <div className="border border-border rounded-md p-3 bg-surface">
+              <p className="text-xs text-foreground-muted">No current roles on record.</p>
             </div>
           )}
         </div>
 
         {isAdmin && (
-          <div className="mt-6 pt-6 border-t border-gray-300">
+          <div className="mt-6 pt-6 border-t border-border">
             <EntityEditHistory tableName="people" recordId={person.id} recordName={person.name} showHeader={true} />
           </div>
         )}

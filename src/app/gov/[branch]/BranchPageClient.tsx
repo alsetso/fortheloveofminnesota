@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
+import GovBadge from '@/components/gov/GovBadge';
 import type { CivicOrg } from '@/features/civic/services/civicService';
 
 const BRANCHES = ['executive', 'legislative', 'judicial'] as const;
@@ -13,33 +14,27 @@ interface BranchPageClientProps {
 }
 
 export default function BranchPageClient({ branch, orgs }: BranchPageClientProps) {
+  const branchLabel = branch.charAt(0).toUpperCase() + branch.slice(1);
   return (
     <div className="max-w-4xl mx-auto px-[10px] py-3">
       <Breadcrumbs
         items={[
           { label: 'Minnesota', href: '/' },
           { label: 'Government', href: '/gov' },
-          { label: `${branch.charAt(0).toUpperCase() + branch.slice(1)} Branch`, href: null },
+          { label: `${branchLabel} Branch`, href: null },
         ]}
       />
-      <h1 className="text-sm font-semibold text-gray-900 mt-2">
-        {branch.charAt(0).toUpperCase() + branch.slice(1)} Branch
-      </h1>
-      <p className="text-xs text-gray-600 mt-1">
+      <h1 className="text-sm font-semibold text-foreground mt-2">{branchLabel} Branch</h1>
+      <p className="text-xs text-foreground-muted mt-1">
         Organizations in the Minnesota state {branch} branch.
       </p>
-      <ul className="mt-3 space-y-1">
+      <ul className="mt-3 space-y-1.5">
         {orgs.map((org) => (
-          <li key={org.id}>
-            <Link
-              href={`/gov/org/${org.slug}`}
-              className="text-xs text-blue-600 hover:underline"
-            >
+          <li key={org.id} className="flex items-center gap-2">
+            <Link href={`/gov/org/${org.slug}`} className="text-xs text-accent hover:underline">
               {org.name}
             </Link>
-            {org.gov_type && (
-              <span className="text-[10px] text-gray-500 ml-1.5">({org.gov_type})</span>
-            )}
+            {org.gov_type && <GovBadge label={org.gov_type} />}
           </li>
         ))}
       </ul>

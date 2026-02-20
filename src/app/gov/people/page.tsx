@@ -37,8 +37,8 @@ export default async function PeoplePage() {
       ]} />
 
       <div className="mb-3 space-y-1.5">
-        <h1 className="text-sm font-semibold text-gray-900">People</h1>
-        <p className="text-xs text-gray-600">
+        <h1 className="text-sm font-semibold text-foreground">People</h1>
+        <p className="text-xs text-foreground-muted">
           All Minnesota government officials and elected representatives
         </p>
       </div>

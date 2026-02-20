@@ -35,20 +35,20 @@ export default async function PaymentsPage() {
 
         {/* Header */}
         <div className="mb-3 space-y-1.5">
-          <h1 className="text-sm font-semibold text-gray-900">
+          <h1 className="text-sm font-semibold text-foreground">
             Payments
           </h1>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-foreground-muted">
             Government payment transactions in Minnesota
           </p>
         </div>
 
         {/* Coming Soon */}
-        <div className="bg-white border border-gray-200 rounded-md p-[10px] space-y-1.5">
-          <h2 className="text-xs font-semibold text-gray-900">
+        <div className="bg-surface border border-border rounded-md p-[10px] space-y-1.5">
+          <h2 className="text-xs font-semibold text-foreground">
             Coming Soon
           </h2>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-foreground-muted">
             Payment transaction data will be available here soon. This section will include government payment disbursements, transaction details, and related financial records.
           </p>
         </div>

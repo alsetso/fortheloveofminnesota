@@ -38,8 +38,8 @@ export default async function RolesPage() {
       ]} />
 
       <div className="mb-3 space-y-1.5">
-        <h1 className="text-sm font-semibold text-gray-900">Roles</h1>
-        <p className="text-xs text-gray-600">
+        <h1 className="text-sm font-semibold text-foreground">Roles</h1>
+        <p className="text-xs text-foreground-muted">
           All roles linking people to organizations in Minnesota government
         </p>
       </div>

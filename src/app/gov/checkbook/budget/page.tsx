@@ -39,10 +39,10 @@ export default async function BudgetPage() {
         <div className="mb-3 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h1 className="text-sm font-semibold text-gray-900">
+              <h1 className="text-sm font-semibold text-foreground">
                 Budget
               </h1>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-foreground-muted">
                 Government budget allocations and spending in Minnesota
               </p>
             </div>

@@ -38,22 +38,22 @@ export default async function ContractsPage() {
         <div className="mb-3 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h1 className="text-sm font-semibold text-gray-900">
+              <h1 className="text-sm font-semibold text-foreground">
                 Contracts
               </h1>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-foreground-muted">
                 All government contracts and payments in Minnesota
               </p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-foreground-muted">
                 Data Uploaded Dec 30 2:52
               </p>
               <a
                 href="https://mn.gov/mmb/transparency-mn/contracts-grants.jsp"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-gray-500 hover:text-gray-700 underline"
+                className="text-xs text-foreground-muted hover:text-foreground underline"
               >
                 Source →
               </a>

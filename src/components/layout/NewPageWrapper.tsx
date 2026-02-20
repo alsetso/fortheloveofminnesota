@@ -42,6 +42,7 @@ const KNOWN_APP_ROUTES = new Set([
   'stories', 'billing', 'plans', 'onboarding', 'signup', 'login',
   'terms', 'post', 'marketplace', 'ad_center', 'contact', 'download',
   'privacy', 'not-found', 'school', 'schools', 'transportation', 'weather',
+  'realestate', 'work',
 ]);
 
 /** Routes where the right sidebar should be suppressed in the main content area. */

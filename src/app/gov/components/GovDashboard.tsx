@@ -6,6 +6,7 @@ import { useAuthStateSafe } from '@/features/auth';
 import { UserIcon, PlusIcon } from '@heroicons/react/24/outline';
 import GovPageViewTracker from './GovPageViewTracker';
 import GovPeopleModal, { type GovPeopleRecord } from './GovPeopleModal';
+import { getDisplayRole } from '@/features/civic/utils/roleFromTitle';
 
 interface PersonRecord {
   id: string;
@@ -127,11 +128,17 @@ export default function GovDashboard({ leaderSearchQuery = '' }: GovDashboardPro
     load();
   }, [load]);
 
-  const TITLE_FILTER_OPTIONS = [
-    { value: '', label: 'All' },
-    { value: 'House of Representatives', label: 'House of Representatives' },
-    { value: 'Senate', label: 'Senate' },
-  ] as const;
+  const titleFilterOptions = useMemo(() => {
+    const titles = new Set<string>();
+    people.forEach((p) => {
+      if (p.title) titles.add(p.title);
+      (p.roles ?? []).forEach((r) => titles.add(r));
+    });
+    return [
+      { value: '', label: 'All' },
+      ...Array.from(titles).sort().map((t) => ({ value: t, label: t })),
+    ];
+  }, [people]);
 
   const filteredPeople = useMemo(() => {
     let list = people;
@@ -210,9 +217,9 @@ export default function GovDashboard({ leaderSearchQuery = '' }: GovDashboardPro
           value={titleFilter}
           onChange={(e) => setTitleFilter(e.target.value)}
           className="w-full max-w-[220px] text-xs px-2 py-1.5 rounded-md border border-border-muted dark:border-white/10 bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-foreground-muted"
-          aria-label="Filter by title (chamber)"
+          aria-label="Filter by title or role"
         >
-          {TITLE_FILTER_OPTIONS.map((opt) => (
+          {titleFilterOptions.map((opt) => (
             <option key={opt.value || 'all'} value={opt.value}>
               {opt.label}
             </option>
@@ -258,7 +265,8 @@ export default function GovDashboard({ leaderSearchQuery = '' }: GovDashboardPro
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium text-foreground truncate leading-tight">{person.name}</p>
                     <p className="text-[10px] text-foreground-muted leading-tight">
-                      {person.district ?? '—'}
+                      {getDisplayRole(person.title, person.roles ?? []) || '—'}
+                      {person.district ? ` · ${person.district}` : ''}
                     </p>
                   </div>
                 </button>

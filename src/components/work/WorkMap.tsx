@@ -1,0 +1,97 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { loadMapboxGL } from '@/features/map/utils/mapboxLoader';
+import { MAP_CONFIG } from '@/features/map/config';
+
+/**
+ * Standalone map for the Work page.
+ * No pins, no layers, no shared /maps logic — independent lifecycle.
+ */
+export default function WorkMap() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<import('mapbox-gl').default | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!containerRef.current || !MAP_CONFIG.MAPBOX_TOKEN) return;
+
+    let mounted = true;
+
+    const init = async () => {
+      const container = containerRef.current;
+      if (!container || !mounted) return;
+
+      const width = container.offsetWidth;
+      const height = container.offsetHeight;
+      if (width <= 0 || height <= 0) {
+        requestAnimationFrame(init);
+        return;
+      }
+
+      try {
+        await import('mapbox-gl/dist/mapbox-gl.css');
+        const mapbox = await loadMapboxGL();
+        mapbox.accessToken = MAP_CONFIG.MAPBOX_TOKEN;
+
+        if (!containerRef.current || !mounted) return;
+
+        const map = new mapbox.Map({
+          container: containerRef.current,
+          style: MAP_CONFIG.STRATEGIC_STYLES.streets,
+          center: MAP_CONFIG.DEFAULT_CENTER,
+          zoom: MAP_CONFIG.DEFAULT_ZOOM,
+          pitch: 0,
+          bearing: 0,
+        });
+
+        mapRef.current = map;
+
+        map.on('load', () => {
+          if (!mounted || !mapRef.current) return;
+          map.addControl(new mapbox.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (mounted && mapRef.current && !(mapRef.current as any).removed) {
+                mapRef.current.resize();
+              }
+              setReady(true);
+            });
+          });
+        });
+
+        map.on('error', () => {
+          if (mounted) setReady(true);
+        });
+      } catch (err) {
+        console.error('[WorkMap] init failed', err);
+        if (mounted) setReady(true);
+      }
+    };
+
+    const t = setTimeout(init, 50);
+
+    return () => {
+      mounted = false;
+      clearTimeout(t);
+      if (mapRef.current) {
+        try {
+          const m = mapRef.current;
+          if (!(m as any).removed) m.remove();
+        } catch {
+          // ignore
+        }
+        mapRef.current = null;
+      }
+      setReady(false);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full min-h-[300px] bg-gray-100 dark:bg-surface-muted"
+      aria-label="Work map"
+    />
+  );
+}

@@ -48,7 +48,7 @@ export interface OrgWithRoles extends CivicOrg {
  * Fetch all organizations with their roles and people
  */
 export async function getCivicOrgs(): Promise<CivicOrg[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   const { data, error } = await supabase
     .from('orgs')
@@ -67,7 +67,7 @@ export async function getCivicOrgs(): Promise<CivicOrg[]> {
  * Fetch all people
  */
 export async function getCivicPeople(): Promise<CivicPerson[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   const { data, error } = await supabase
     .from('people')
@@ -86,7 +86,7 @@ export async function getCivicPeople(): Promise<CivicPerson[]> {
  * Fetch all roles with person and org data
  */
 export async function getCivicRoles(): Promise<CivicRole[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   const [rolesResult, peopleResult, orgsResult] = await Promise.all([
     supabase.from('roles').select('*').eq('is_current', true).order('title'),
@@ -178,7 +178,7 @@ export async function getCivicOrgsByType(type: 'branch' | 'agency' | 'department
  * Get a single person by slug or ID with all their roles
  */
 export async function getCivicPersonBySlug(slug: string): Promise<{ person: CivicPerson; roles: (CivicRole & { org?: CivicOrg })[] } | null> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   // Check if slug is a UUID (person ID) or a slug
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
@@ -230,7 +230,7 @@ export async function getCivicPersonBySlug(slug: string): Promise<{ person: Civi
  * Fetch people by building_id
  */
 export async function getCivicPeopleByBuildingId(buildingId: string): Promise<CivicPerson[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   const { data, error } = await supabase
     .from('people')
@@ -246,11 +246,66 @@ export async function getCivicPeopleByBuildingId(buildingId: string): Promise<Ci
   return (data || []) as CivicPerson[];
 }
 
+export interface CivicBuilding {
+  id: string;
+  type: string | null;
+  name: string | null;
+  description: string | null;
+  full_address: string | null;
+  lat: number | null;
+  lng: number | null;
+  website: string | null;
+  cover_images: string[] | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+/**
+ * Get organizations for a branch (executive | legislative | judicial)
+ */
+export async function getBranchOrgs(
+  branch: 'executive' | 'legislative' | 'judicial'
+): Promise<(CivicOrg & { gov_type?: string | null })[]> {
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('orgs')
+    .select('*')
+    .eq('branch', branch)
+    .order('name');
+  if (error) return [];
+  return (data ?? []) as (CivicOrg & { gov_type?: string | null })[];
+}
+
+/**
+ * Get a single building by id, with linked people, orgs, and roles
+ */
+export async function getCivicBuildingById(id: string): Promise<{
+  building: CivicBuilding;
+  people: CivicPerson[];
+  orgs: CivicOrg[];
+} | null> {
+  const supabase = await createServerClient();
+
+  const [buildingResult, peopleResult, orgsResult] = await Promise.all([
+    supabase.from('buildings').select('*').eq('id', id).single(),
+    supabase.from('people').select('*').eq('building_id', id).order('name'),
+    supabase.from('orgs').select('*').eq('building_id', id).order('name'),
+  ]);
+
+  if (buildingResult.error || !buildingResult.data) return null;
+
+  return {
+    building: buildingResult.data as CivicBuilding,
+    people: (peopleResult.data ?? []) as CivicPerson[],
+    orgs: (orgsResult.data ?? []) as CivicOrg[],
+  };
+}
+
 /**
  * Get a single organization with its roles
  */
 export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | null> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   
   const { data: org, error: orgError } = await supabase
     .from('orgs')

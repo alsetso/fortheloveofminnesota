@@ -11,6 +11,7 @@ import {
   DocumentTextIcon,
   ClipboardDocumentListIcon,
   ChatBubbleLeftRightIcon,
+  ScaleIcon,
 } from '@heroicons/react/24/outline';
 
 const GOV_NAV_SECTIONS = [
@@ -21,10 +22,18 @@ const GOV_NAV_SECTIONS = [
     ],
   },
   {
+    label: 'Branches',
+    items: [
+      { label: 'Executive', href: '/gov/executive', icon: BuildingOfficeIcon },
+      { label: 'Legislative', href: '/gov/legislative', icon: DocumentTextIcon },
+      { label: 'Judicial', href: '/gov/judicial', icon: ScaleIcon },
+    ],
+  },
+  {
     label: 'Directory',
     items: [
-      { label: 'Organizations', href: '/gov/orgs', icon: BuildingOfficeIcon },
       { label: 'People', href: '/gov/people', icon: UserGroupIcon },
+      { label: 'Organizations', href: '/gov/orgs', icon: BuildingOfficeIcon },
       { label: 'Roles', href: '/gov/roles', icon: BriefcaseIcon },
     ],
   },
@@ -32,10 +41,10 @@ const GOV_NAV_SECTIONS = [
     label: 'Checkbook',
     items: [
       { label: 'Overview', href: '/gov/checkbook', icon: BanknotesIcon, exact: true },
-      { label: 'Payments', href: '/gov/checkbook/payments', icon: CreditCardIcon },
-      { label: 'Payroll', href: '/gov/checkbook/payroll', icon: DocumentTextIcon },
-      { label: 'Contracts', href: '/gov/checkbook/contracts', icon: ClipboardDocumentListIcon },
-      { label: 'Budget', href: '/gov/checkbook/budget', icon: BanknotesIcon },
+      { label: 'Payments', href: '/gov/checkbook/payments', icon: CreditCardIcon, comingSoon: true },
+      { label: 'Payroll', href: '/gov/checkbook/payroll', icon: DocumentTextIcon, comingSoon: true },
+      { label: 'Contracts', href: '/gov/checkbook/contracts', icon: ClipboardDocumentListIcon, comingSoon: true },
+      { label: 'Budget', href: '/gov/checkbook/budget', icon: BanknotesIcon, comingSoon: true },
     ],
   },
   {
@@ -71,6 +80,19 @@ export default function GovSubNav() {
               {section.items.map((item) => {
                 const active = isActive(item.href, item.exact);
                 const Icon = item.icon;
+                const comingSoon = 'comingSoon' in item && item.comingSoon;
+                if (comingSoon) {
+                  return (
+                    <div
+                      key={item.href}
+                      className="flex items-center gap-2 px-2 py-1.5 text-xs rounded-md text-foreground-muted"
+                    >
+                      <Icon className="w-3.5 h-3.5 flex-shrink-0 opacity-60" />
+                      <span>{item.label}</span>
+                      <span className="text-[10px] text-foreground-muted/80 ml-auto">Coming soon</span>
+                    </div>
+                  );
+                }
                 return (
                   <Link
                     key={item.href}

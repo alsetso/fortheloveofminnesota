@@ -76,10 +76,11 @@ export const API_KEYS = {
   },
   
   // RapidAPI (should be server-only)
+  // One key for all RapidAPI APIs; each API has its own host (e.g. skip-tracing-working-api.p.rapidapi.com).
   RAPIDAPI: {
     envVar: 'RAPIDAPI_KEY', // Changed from NEXT_PUBLIC_RAPIDAPI_KEY
     required: true,
-    description: 'RapidAPI key for skip trace, Zillow, and news APIs',
+    description: 'RapidAPI key for skip trace (people), Zillow, news, etc.',
   },
   
   // Stripe (server-only)

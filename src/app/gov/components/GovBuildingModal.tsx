@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { XMarkIcon, PencilSquareIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { useSupabaseClient } from '@/hooks/useSupabaseClient';
 import { useFormState } from '@/hooks/useFormState';
@@ -60,6 +61,7 @@ export default function GovBuildingModal({ record, onClose, onSave, isAdmin = fa
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adminPreview, setAdminPreview] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     if (record) {
@@ -159,7 +161,7 @@ export default function GovBuildingModal({ record, onClose, onSave, isAdmin = fa
       >
         <div className="flex items-center justify-between gap-2 p-3 border-b border-border flex-shrink-0">
           <h2 className="text-sm font-semibold text-foreground">
-            {isCreate ? 'New building' : 'Building'}
+            {isCreate ? 'New building' : (record?.name ?? record?.type ?? 'Building')}
           </h2>
           <div className="flex items-center gap-1">
             {canEdit && (
@@ -192,13 +194,20 @@ export default function GovBuildingModal({ record, onClose, onSave, isAdmin = fa
         {!showForm && displayRecord?.cover_images && displayRecord.cover_images.length > 0 && (
           <div className="flex-shrink-0">
             <div className="w-full aspect-video bg-surface-accent overflow-hidden">
-              <img src={displayRecord.cover_images[0]} alt="" className="w-full h-full object-cover" />
+              <img src={displayRecord.cover_images[activeImageIndex] ?? displayRecord.cover_images[0]} alt="" className="w-full h-full object-cover" />
             </div>
             {displayRecord.cover_images.length > 1 && (
               <ul className="flex gap-1 p-2 overflow-x-auto border-b border-border">
                 {displayRecord.cover_images.map((url, i) => (
-                  <li key={i} className="w-12 h-12 flex-shrink-0 rounded overflow-hidden border border-border">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  <li key={i} className="flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActiveImageIndex(i)}
+                      className={`w-12 h-12 rounded overflow-hidden border-2 transition-colors ${i === activeImageIndex ? 'border-foreground' : 'border-border hover:border-foreground-muted'}`}
+                      aria-label={`View image ${i + 1}`}
+                    >
+                      <img src={url} alt="" className="w-full h-full object-cover" />
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -261,26 +270,38 @@ export default function GovBuildingModal({ record, onClose, onSave, isAdmin = fa
             </form>
           ) : (record || (canEdit && adminPreview)) ? (
             <>
-              <div>
-                <p className="text-xs font-medium text-foreground-muted mb-0.5">Name</p>
-                <p className="text-sm text-foreground">{displayRecord.name || displayName}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-base font-semibold text-foreground">{displayRecord.name || displayName}</p>
+                {displayRecord.type && (
+                  <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded border border-border text-foreground-muted uppercase tracking-wide">
+                    {displayRecord.type}
+                  </span>
+                )}
               </div>
-              {displayRecord.type && displayRecord.name && (
-                <div>
-                  <p className="text-xs font-medium text-foreground-muted mb-0.5">Type</p>
-                  <p className="text-sm text-foreground">{displayRecord.type}</p>
+              {displayRecord.full_address && (
+                <div className="flex items-start gap-1.5">
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(displayRecord.full_address)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline break-all flex-1"
+                  >
+                    {displayRecord.full_address}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(displayRecord.full_address!)}
+                    className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-border text-foreground-muted hover:text-foreground hover:bg-surface-accent transition-colors mt-0.5"
+                    aria-label="Copy address"
+                  >
+                    Copy
+                  </button>
                 </div>
               )}
               {displayRecord.description && (
                 <div>
                   <p className="text-xs font-medium text-foreground-muted mb-0.5">Description</p>
                   <p className="text-sm text-foreground whitespace-pre-wrap">{displayRecord.description}</p>
-                </div>
-              )}
-              {displayRecord.full_address && (
-                <div>
-                  <p className="text-xs font-medium text-foreground-muted mb-0.5">Address</p>
-                  <p className="text-sm text-foreground">{displayRecord.full_address}</p>
                 </div>
               )}
               {displayRecord.lat != null && displayRecord.lng != null && (
@@ -298,11 +319,19 @@ export default function GovBuildingModal({ record, onClose, onSave, isAdmin = fa
                     href={displayRecord.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-foreground hover:underline break-all"
+                    className="text-sm text-blue-600 hover:underline break-all"
                   >
                     {displayRecord.website}
                   </a>
                 </div>
+              )}
+              {!isCreate && record?.id && (
+                <Link
+                  href={`/gov/building/${record.id}`}
+                  className="block w-full text-center text-sm font-semibold px-4 py-2.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors mt-2"
+                >
+                  More Details
+                </Link>
               )}
             </>
           ) : null}

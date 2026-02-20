@@ -1,0 +1,13 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+node_modules/
+.next/
+dist/
+build/
+out/
+.git/
+coverage/
+*.lock
+*.log
+*.map
+public/
+.env*

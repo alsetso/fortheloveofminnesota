@@ -85,86 +85,86 @@ function ExecutivePanel() {
   return (
     <div className="p-2 space-y-3">
       <SidebarSection label="Constitutional Officers">
-        <SidebarLink href="/gov/executive/governor">Governor</SidebarLink>
-        <SidebarLink href="/gov/executive/lieutenant-governor">Lt. Governor</SidebarLink>
-        <SidebarLink href="/gov/executive/attorney-general">Attorney General</SidebarLink>
-        <SidebarLink href="/gov/executive/secretary-of-state">Secretary of State</SidebarLink>
-        <SidebarLink href="/gov/executive/state-auditor">State Auditor</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/governor">Governor</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/lieutenant-governor">Lt. Governor</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/attorney-general">Attorney General</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/secretary-of-state">Secretary of State</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/state-auditor">State Auditor</SidebarLink>
       </SidebarSection>
       <Divider />
       <SidebarSection label="Agencies">
         <CollapsibleSection label="Departments" defaultOpen={false}>
-          <SidebarLink href="/gov/org/dept-administration">Administration</SidebarLink>
-          <SidebarLink href="/gov/org/dept-agriculture">Agriculture</SidebarLink>
-          <SidebarLink href="/gov/org/dept-commerce">Commerce</SidebarLink>
-          <SidebarLink href="/gov/org/dept-corrections">Corrections</SidebarLink>
-          <SidebarLink href="/gov/org/dept-education">Education</SidebarLink>
-          <SidebarLink href="/gov/org/dept-employment-economic-development">Employment &amp; Economic Dev.</SidebarLink>
-          <SidebarLink href="/gov/org/dept-health">Health</SidebarLink>
-          <SidebarLink href="/gov/org/dept-human-rights">Human Rights</SidebarLink>
-          <SidebarLink href="/gov/org/dept-human-services">Human Services</SidebarLink>
-          <SidebarLink href="/gov/org/dept-labor-industry">Labor &amp; Industry</SidebarLink>
-          <SidebarLink href="/gov/org/dept-management-budget">Management &amp; Budget</SidebarLink>
-          <SidebarLink href="/gov/org/dept-military-affairs">Military Affairs</SidebarLink>
-          <SidebarLink href="/gov/org/dept-natural-resources">Natural Resources</SidebarLink>
-          <SidebarLink href="/gov/org/dept-public-safety">Public Safety</SidebarLink>
-          <SidebarLink href="/gov/org/dept-revenue">Revenue</SidebarLink>
-          <SidebarLink href="/gov/org/dept-transportation">Transportation</SidebarLink>
-          <SidebarLink href="/gov/org/dept-veterans-affairs">Veterans Affairs</SidebarLink>
-          <SidebarLink href="/gov/org/office-mnit">MN.IT Services</SidebarLink>
-          <SidebarLink href="/gov/org/dept-children-youth-families">Children, Youth &amp; Families</SidebarLink>
-          <SidebarLink href="/gov/org/dept-direct-care-treatment">Direct Care &amp; Treatment</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-administration">Administration</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-agriculture">Agriculture</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-commerce">Commerce</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-corrections">Corrections</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-education">Education</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-employment-economic-development">Employment &amp; Economic Dev.</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-health">Health</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-human-rights">Human Rights</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-human-services">Human Services</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-labor-industry">Labor &amp; Industry</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-management-budget">Management &amp; Budget</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-military-affairs">Military Affairs</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-natural-resources">Natural Resources</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-public-safety">Public Safety</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-revenue">Revenue</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-transportation">Transportation</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-veterans-affairs">Veterans Affairs</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/office-mnit">MN.IT Services</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-children-youth-families">Children, Youth &amp; Families</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-direct-care-treatment">Direct Care &amp; Treatment</SidebarLink>
         </CollapsibleSection>
         <CollapsibleSection label="Agencies &amp; Boards">
-          <SidebarLink href="/gov/orgs">View all →</SidebarLink>
+          <SidebarLink href="/gov/directory">View all →</SidebarLink>
         </CollapsibleSection>
       </SidebarSection>
     </div>
   );
 }
 
-/** /gov/executive/governor */
+/** /gov/executive/agency/governor */
 function GovernorPanel() {
   return (
     <div className="p-2 space-y-3">
       <SidebarSection label="Office">
-        <SidebarLink href="/gov/person/tim-walz">Tim Walz</SidebarLink>
-        <SidebarLink href="/gov/executive/governor">Governor&apos;s Office</SidebarLink>
+        <SidebarLink href="/gov/executive/person/tim-walz">Tim Walz</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/governor">Governor&apos;s Office</SidebarLink>
       </SidebarSection>
       <Divider />
       <SidebarSection label="Departments">
         <CollapsibleSection label="All Departments (20)" defaultOpen={true}>
-          <SidebarLink href="/gov/org/dept-administration">Administration</SidebarLink>
-          <SidebarLink href="/gov/org/dept-agriculture">Agriculture</SidebarLink>
-          <SidebarLink href="/gov/org/dept-commerce">Commerce</SidebarLink>
-          <SidebarLink href="/gov/org/dept-corrections">Corrections</SidebarLink>
-          <SidebarLink href="/gov/org/dept-education">Education</SidebarLink>
-          <SidebarLink href="/gov/org/dept-employment-economic-development">Employment &amp; Econ. Dev.</SidebarLink>
-          <SidebarLink href="/gov/org/dept-health">Health</SidebarLink>
-          <SidebarLink href="/gov/org/dept-human-rights">Human Rights</SidebarLink>
-          <SidebarLink href="/gov/org/dept-human-services">Human Services</SidebarLink>
-          <SidebarLink href="/gov/org/dept-labor-industry">Labor &amp; Industry</SidebarLink>
-          <SidebarLink href="/gov/org/dept-management-budget">Management &amp; Budget</SidebarLink>
-          <SidebarLink href="/gov/org/dept-military-affairs">Military Affairs</SidebarLink>
-          <SidebarLink href="/gov/org/dept-natural-resources">Natural Resources</SidebarLink>
-          <SidebarLink href="/gov/org/dept-public-safety">Public Safety</SidebarLink>
-          <SidebarLink href="/gov/org/dept-revenue">Revenue</SidebarLink>
-          <SidebarLink href="/gov/org/dept-transportation">Transportation</SidebarLink>
-          <SidebarLink href="/gov/org/dept-veterans-affairs">Veterans Affairs</SidebarLink>
-          <SidebarLink href="/gov/org/office-mnit">MN.IT Services</SidebarLink>
-          <SidebarLink href="/gov/org/dept-children-youth-families">Children, Youth &amp; Families</SidebarLink>
-          <SidebarLink href="/gov/org/dept-direct-care-treatment">Direct Care &amp; Treatment</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-administration">Administration</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-agriculture">Agriculture</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-commerce">Commerce</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-corrections">Corrections</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-education">Education</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-employment-economic-development">Employment &amp; Econ. Dev.</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-health">Health</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-human-rights">Human Rights</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-human-services">Human Services</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-labor-industry">Labor &amp; Industry</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-management-budget">Management &amp; Budget</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-military-affairs">Military Affairs</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-natural-resources">Natural Resources</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-public-safety">Public Safety</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-revenue">Revenue</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-transportation">Transportation</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-veterans-affairs">Veterans Affairs</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/office-mnit">MN.IT Services</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-children-youth-families">Children, Youth &amp; Families</SidebarLink>
+          <SidebarLink href="/gov/executive/agency/dept-direct-care-treatment">Direct Care &amp; Treatment</SidebarLink>
         </CollapsibleSection>
       </SidebarSection>
       <Divider />
       <SidebarSection label="More">
-        <SidebarLink href="/gov/orgs">All Agencies &amp; Boards</SidebarLink>
+        <SidebarLink href="/gov/directory">All Agencies &amp; Boards</SidebarLink>
       </SidebarSection>
     </div>
   );
 }
 
-/** /gov/executive/:slug (non-governor officer pages) */
+/** /gov/executive/agency/:slug (constitutional officer agency pages) */
 function OfficerPanel({ slug }: { slug: string }) {
   const officerLabels: Record<string, string> = {
     'lieutenant-governor': 'Lt. Governor',
@@ -176,16 +176,16 @@ function OfficerPanel({ slug }: { slug: string }) {
   return (
     <div className="p-2 space-y-3">
       <SidebarSection label="This Office">
-        <SidebarLink href={`/gov/executive/${slug}`}>{label}</SidebarLink>
+        <SidebarLink href={`/gov/executive/agency/${slug}`}>{label}</SidebarLink>
       </SidebarSection>
       <Divider />
       <SidebarSection label="Executive Branch">
         <SidebarLink href="/gov/executive">← All Officers</SidebarLink>
-        <SidebarLink href="/gov/executive/governor">Governor</SidebarLink>
-        <SidebarLink href="/gov/executive/lieutenant-governor">Lt. Governor</SidebarLink>
-        <SidebarLink href="/gov/executive/attorney-general">Attorney General</SidebarLink>
-        <SidebarLink href="/gov/executive/secretary-of-state">Secretary of State</SidebarLink>
-        <SidebarLink href="/gov/executive/state-auditor">State Auditor</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/governor">Governor</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/lieutenant-governor">Lt. Governor</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/attorney-general">Attorney General</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/secretary-of-state">Secretary of State</SidebarLink>
+        <SidebarLink href="/gov/executive/agency/state-auditor">State Auditor</SidebarLink>
       </SidebarSection>
     </div>
   );
@@ -196,32 +196,33 @@ function JudicialPanel() {
   return (
     <div className="p-2 space-y-3">
       <SidebarSection label="Courts">
-        <SidebarLink href="/gov/org/mn-supreme-court">Supreme Court</SidebarLink>
-        <SidebarLink href="/gov/org/mn-court-appeals">Court of Appeals</SidebarLink>
-        <SidebarLink href="/gov/org/mn-district-court">District Court</SidebarLink>
+        <SidebarLink href="/gov/judicial/agency/mn-supreme-court">Supreme Court</SidebarLink>
+        <SidebarLink href="/gov/judicial/agency/mn-court-appeals">Court of Appeals</SidebarLink>
+        <SidebarLink href="/gov/judicial/agency/mn-district-court">District Court</SidebarLink>
       </SidebarSection>
       <Divider />
       <SidebarSection label="Judicial Districts">
         <CollapsibleSection label="10 Districts" defaultOpen={false}>
-          <SidebarLink href="/gov/org/judicial-district-1">District 1</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-2">District 2</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-3">District 3</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-4">District 4</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-5">District 5</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-6">District 6</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-7">District 7</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-8">District 8</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-9">District 9</SidebarLink>
-          <SidebarLink href="/gov/org/judicial-district-10">District 10</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-1">District 1</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-2">District 2</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-3">District 3</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-4">District 4</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-5">District 5</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-6">District 6</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-7">District 7</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-8">District 8</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-9">District 9</SidebarLink>
+          <SidebarLink href="/gov/judicial/agency/judicial-district-10">District 10</SidebarLink>
         </CollapsibleSection>
       </SidebarSection>
     </div>
   );
 }
 
-/** /gov/org/:slug */
+/** /gov/[branch]/agency/:slug */
 function OrgPanel() {
   const { data } = useGovSidebar();
+  const branch = data.branch ?? 'executive';
   const {
     orgName,
     orgSlug,
@@ -249,7 +250,7 @@ function OrgPanel() {
       <div className="px-2 pt-1">
         {parentOrg && (
           <Link
-            href={`/gov/org/${parentOrg.slug}`}
+            href={`/gov/${branch}/agency/${parentOrg.slug}`}
             className="text-[10px] text-foreground-muted hover:text-foreground hover:underline block mb-1"
           >
             ← {parentOrg.name ?? 'Parent'}
@@ -257,10 +258,10 @@ function OrgPanel() {
         )}
         {!parentOrg && (
           <Link
-            href="/gov/executive"
+            href={`/gov/${branch}`}
             className="text-[10px] text-foreground-muted hover:text-foreground hover:underline block mb-1"
           >
-            ← Executive Branch
+            ← {branch === 'executive' ? 'Executive' : branch === 'legislative' ? 'Legislative' : 'Judicial'} Branch
           </Link>
         )}
         {orgName && (
@@ -274,7 +275,7 @@ function OrgPanel() {
       {leaders && leaders.length > 0 && (
         <SidebarSection label="Leadership">
           {leaders.map((l) => (
-            <SidebarLink key={l.slug ?? l.name} href={l.slug ? `/gov/person/${l.slug}` : '#'}>
+            <SidebarLink key={l.slug ?? l.name} href={l.slug ? `/gov/${branch}/person/${l.slug}` : '#'}>
               <span className="truncate">{l.name}</span>
               <span className="text-[10px] text-foreground-muted/70 ml-auto truncate">{l.title}</span>
             </SidebarLink>
@@ -285,7 +286,7 @@ function OrgPanel() {
       {/* Building */}
       {building && (
         <SidebarSection label="Location">
-          <SidebarLink href={`/gov/building/${building.slug ?? ''}`}>
+          <SidebarLink href={`/gov/${branch}/building/${building.slug ?? ''}`}>
             {building.name ?? 'Building'}
           </SidebarLink>
         </SidebarSection>
@@ -317,9 +318,10 @@ function OrgPanel() {
   );
 }
 
-/** /gov/person/:slug */
+/** /gov/[branch]/person/:slug */
 function PersonPanel() {
   const { data } = useGovSidebar();
+  const branch = data.branch ?? 'executive';
   const { personName, primaryOrg, roleTitle, contact, personBuilding } = data;
 
   if (!personName) return null;
@@ -329,7 +331,7 @@ function PersonPanel() {
       <div className="px-2 pt-1">
         {primaryOrg && (
           <Link
-            href={`/gov/org/${primaryOrg.slug}`}
+            href={`/gov/${branch}/agency/${primaryOrg.slug}`}
             className="text-[10px] text-foreground-muted hover:text-foreground hover:underline block mb-1"
           >
             ← {primaryOrg.name ?? 'Organization'}
@@ -368,7 +370,7 @@ function PersonPanel() {
       {/* Building */}
       {personBuilding && (
         <SidebarSection label="Location">
-          <SidebarLink href={`/gov/building/${personBuilding.slug ?? ''}`}>
+          <SidebarLink href={`/gov/${branch}/building/${personBuilding.slug ?? ''}`}>
             {personBuilding.name ?? 'Building'}
           </SidebarLink>
         </SidebarSection>
@@ -377,7 +379,7 @@ function PersonPanel() {
       {/* Org link */}
       {primaryOrg && (
         <SidebarSection label="Organization">
-          <SidebarLink href={`/gov/org/${primaryOrg.slug}`}>
+          <SidebarLink href={`/gov/${branch}/agency/${primaryOrg.slug}`}>
             {primaryOrg.name ?? 'Organization'}
           </SidebarLink>
         </SidebarSection>
@@ -396,11 +398,10 @@ function PersonPanel() {
 export default function GovContextSidebar() {
   const pathname = usePathname();
 
-  // Exact /gov — no contextual panel (GovSubNav is sufficient)
   if (pathname === '/gov') return null;
 
-  // /gov/executive/governor
-  if (pathname === '/gov/executive/governor') {
+  // /gov/executive/agency/governor
+  if (pathname === '/gov/executive/agency/governor') {
     return (
       <>
         <Divider />
@@ -409,15 +410,18 @@ export default function GovContextSidebar() {
     );
   }
 
-  // /gov/executive/:slug (constitutional officer pages)
-  const officerMatch = pathname.match(/^\/gov\/executive\/([^/]+)$/);
-  if (officerMatch && officerMatch[1] !== 'governor') {
-    return (
-      <>
-        <Divider />
-        <OfficerPanel slug={officerMatch[1]} />
-      </>
-    );
+  // /gov/executive/agency/:slug (constitutional officer agency pages)
+  const execAgencyMatch = pathname.match(/^\/gov\/executive\/agency\/([^/]+)$/);
+  if (execAgencyMatch) {
+    const slug = execAgencyMatch[1];
+    if (['lieutenant-governor', 'attorney-general', 'secretary-of-state', 'state-auditor'].includes(slug)) {
+      return (
+        <>
+          <Divider />
+          <OfficerPanel slug={slug} />
+        </>
+      );
+    }
   }
 
   // /gov/executive (index)
@@ -440,8 +444,8 @@ export default function GovContextSidebar() {
     );
   }
 
-  // /gov/org/:slug
-  if (pathname.startsWith('/gov/org/')) {
+  // /gov/[branch]/agency/:slug
+  if (/^\/gov\/(executive|legislative|judicial)\/agency\//.test(pathname)) {
     return (
       <>
         <Divider />
@@ -450,8 +454,8 @@ export default function GovContextSidebar() {
     );
   }
 
-  // /gov/person/:slug
-  if (pathname.startsWith('/gov/person/')) {
+  // /gov/[branch]/person/:slug
+  if (/^\/gov\/(executive|legislative|judicial)\/person\//.test(pathname)) {
     return (
       <>
         <Divider />

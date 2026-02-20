@@ -43,7 +43,7 @@ export default function OfficerPageClient({ orgName, person, roleTitle }: Props)
               )}
               {person.slug && (
                 <div className="mt-1.5">
-                  <Link href={`/gov/person/${person.slug}`} className="text-[10px] text-accent hover:underline">
+                  <Link href={`/gov/executive/person/${person.slug}`} className="text-[10px] text-accent hover:underline">
                     View full profile →
                   </Link>
                 </div>

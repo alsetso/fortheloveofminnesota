@@ -126,6 +126,6 @@ export async function createServerClientWithAuth(
   return createSupabaseClient({ auth: true, cookieStore });
 }
 
-export function createServiceClient() {
+export async function createServiceClient() {
   return createSupabaseClient({ service: true });
 }

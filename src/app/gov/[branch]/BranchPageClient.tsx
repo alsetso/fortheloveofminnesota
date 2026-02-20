@@ -31,7 +31,7 @@ export default function BranchPageClient({ branch, orgs }: BranchPageClientProps
       <ul className="mt-3 space-y-1.5">
         {orgs.map((org) => (
           <li key={org.id} className="flex items-center gap-2">
-            <Link href={`/gov/org/${org.slug}`} className="text-xs text-accent hover:underline">
+            <Link href={`/gov/${branch}/agency/${org.slug}`} className="text-xs text-accent hover:underline">
               {org.name}
             </Link>
             {org.gov_type && <GovBadge label={org.gov_type} />}

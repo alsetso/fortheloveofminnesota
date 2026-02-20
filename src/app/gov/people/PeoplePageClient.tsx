@@ -166,7 +166,7 @@ export default function PeoplePageClient() {
   // PersonCard component (moved outside render for performance)
   const PersonCard = ({ person }: { person: PersonRecord }) => (
     <Link
-      href={person.slug ? `/gov/person/${person.slug}` : '#'}
+      href={person.slug ? `/gov/executive/person/${person.slug}` : '#'}
       className="block border border-gray-200 rounded-md bg-white p-[10px] hover:bg-gray-50 transition-colors"
     >
       <div className="flex items-start gap-2">

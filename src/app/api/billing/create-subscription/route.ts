@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
               // Log successful payment to stripe_events table
               // This ensures we have a record even if webhook doesn't fire
               try {
-                const serviceSupabase = createServiceClient();
+                const serviceSupabase = await createServiceClient();
                 
                 // Create a synthetic event ID for direct API payments (not from webhook)
                 const eventId = `api_subscription_${subscription.id}_${Date.now()}`;

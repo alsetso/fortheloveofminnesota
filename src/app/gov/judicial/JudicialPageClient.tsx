@@ -57,7 +57,7 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
 
         {supremeCourt && (
           <Link
-            href={`/gov/org/${supremeCourt.slug}`}
+            href={`/gov/judicial/agency/${supremeCourt.slug}`}
             className="block border border-border rounded-md p-4 hover:bg-surface-muted transition-colors mb-2 bg-surface"
           >
             <div className="text-sm font-semibold text-foreground">{supremeCourt.name}</div>
@@ -69,7 +69,7 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
           {otherCourts.map(court => (
             <Link
               key={court.id}
-              href={`/gov/org/${court.slug}`}
+              href={`/gov/judicial/agency/${court.slug}`}
               className="block border border-border rounded-md p-3 hover:bg-surface-muted transition-colors bg-surface"
             >
               <div className="text-xs font-medium text-foreground">{court.name}</div>
@@ -96,7 +96,7 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
                 name={chiefJustice.name}
                 photoUrl={chiefJustice.photo_url}
                 title={chiefJustice.title}
-                href={`/gov/person/${chiefJustice.slug ?? ''}`}
+                href={`/gov/judicial/person/${chiefJustice.slug ?? ''}`}
                 avatarSize="md"
                 className="mb-2"
               />
@@ -109,7 +109,7 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
                   name={j.name}
                   photoUrl={j.photo_url}
                   title="Associate Justice"
-                  href={`/gov/person/${j.slug ?? ''}`}
+                  href={`/gov/judicial/person/${j.slug ?? ''}`}
                   avatarSize="xs"
                 />
               ))}
@@ -129,7 +129,7 @@ export default function JudicialPageClient({ courts, leaders, districts }: Props
                   name={j.name}
                   photoUrl={j.photo_url}
                   title={j.title}
-                  href={`/gov/person/${j.slug ?? ''}`}
+                  href={`/gov/judicial/person/${j.slug ?? ''}`}
                   avatarSize="xs"
                 />
               ))}

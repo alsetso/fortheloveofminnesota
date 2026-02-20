@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         const auth = await getServerAuth();
         const supabase = auth 
           ? await createServerClientWithAuth(cookies())
-          : createServerClient();
+          : await createServerClient();
 
         // Validate query parameters
         const url = new URL(req.url);

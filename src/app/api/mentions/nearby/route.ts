@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createServerClient();
     const auth = await getServerAuth();
+    const supabase = await createServerClient();
     let accountId: string | null = null;
     
     if (auth) {

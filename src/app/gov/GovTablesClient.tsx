@@ -62,6 +62,7 @@ interface OrgRecord {
   website: string | null;
   created_at: string;
   parent_name?: string | null;
+  branch?: string;
 }
 
 interface PersonRecord {
@@ -76,13 +77,14 @@ interface PersonRecord {
   address: string | null;
   created_at: string;
   roles?: string[];
+  branch?: string;
 }
 
 interface RoleRecord {
   id: string;
   title: string;
   person_id: string;
-  org_id: string;
+  agency_id: string;
   start_date: string | null;
   end_date: string | null;
   is_current: boolean;
@@ -92,6 +94,7 @@ interface RoleRecord {
   person_slug?: string | null;
   org_name?: string;
   org_slug?: string;
+  org_branch?: string;
 }
 
 interface GovTablesClientProps {
@@ -161,7 +164,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
 
       if (activeTab === 'orgs') {
         const { data: orgsData, error } = await civic
-          .from('orgs')
+          .from('agencies')
           .select('*')
           .order('name');
         if (error) throw error;
@@ -195,31 +198,37 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           .select('id, name, slug, party, photo_url, district, email, phone, address, created_at');
         if (peopleError) throw peopleError;
 
-        // Fetch all roles
+        // Fetch all roles (person_id, title, agency_id) and agencies (id, branch) for branch
         const { data: rolesData, error: rolesError } = await civic
           .from('roles')
-          .select('person_id, title')
+          .select('person_id, title, agency_id')
           .order('title');
-        
-        if (rolesError) {
-          console.error('Error fetching roles:', rolesError);
-        }
+        if (rolesError) console.error('Error fetching roles:', rolesError);
 
-        // Group roles by person_id
+        const agencyIdsFromRoles = new Set((rolesData || []).map((r: { agency_id?: string }) => r.agency_id).filter(Boolean));
+        const { data: agenciesBranchData } = agencyIdsFromRoles.size > 0
+          ? await civic.from('agencies').select('id, branch').in('id', Array.from(agencyIdsFromRoles))
+          : { data: [] as { id: string; branch?: string }[] };
+        const agencyBranchMap = new Map<string, string>((agenciesBranchData || []).map((a: { id: string; branch?: string }) => [a.id, a.branch || 'executive']));
+
         const rolesByPerson = new Map<string, string[]>();
-        (rolesData || []).forEach((role: { person_id: string; title: string }) => {
+        const personIdToBranch = new Map<string, string>();
+        (rolesData || []).forEach((role: { person_id: string; title: string; agency_id?: string }) => {
           if (role.person_id) {
             if (!rolesByPerson.has(role.person_id)) {
               rolesByPerson.set(role.person_id, []);
             }
             rolesByPerson.get(role.person_id)!.push(role.title);
+            if (!personIdToBranch.has(role.person_id) && role.agency_id) {
+              personIdToBranch.set(role.person_id, agencyBranchMap.get(role.agency_id) || 'executive');
+            }
           }
         });
 
-        // Add roles to people
         const peopleWithRoles = (peopleData || []).map((person: PersonRecord) => ({
           ...person,
           roles: rolesByPerson.get(person.id) || [],
+          branch: personIdToBranch.get(person.id) || 'executive',
         }));
 
         // Sort by district number (ascending), then by suffix, then by name
@@ -243,20 +252,13 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           .order('created_at', { ascending: false });
         if (rolesError) throw rolesError;
 
-        // Fetch all people and orgs to join with roles
-        const [peopleResult, orgsResult] = await Promise.all([
+        const [peopleResult, agenciesResult] = await Promise.all([
           civic.from('people').select('id, name, photo_url, slug'),
-          civic.from('orgs').select('id, name, slug'),
+          civic.from('agencies').select('id, name, slug, branch'),
         ]);
-        
-        if (peopleResult.error) {
-          console.error('Error fetching people:', peopleResult.error);
-        }
-        if (orgsResult.error) {
-          console.error('Error fetching orgs:', orgsResult.error);
-        }
+        if (peopleResult.error) console.error('Error fetching people:', peopleResult.error);
+        if (agenciesResult.error) console.error('Error fetching agencies:', agenciesResult.error);
 
-        // Create maps for lookups
         const peopleMap = new Map<string, { name: string; photo_url: string | null; slug: string | null }>();
         (peopleResult.data || []).forEach((person: { id: string; name: string; photo_url: string | null; slug: string | null }) => {
           peopleMap.set(person.id, {
@@ -266,18 +268,14 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
           });
         });
 
-        const orgsMap = new Map<string, { name: string; slug: string }>();
-        (orgsResult.data || []).forEach((org: { id: string; name: string; slug: string }) => {
-          orgsMap.set(org.id, {
-            name: org.name,
-            slug: org.slug,
-          });
+        const agenciesMap = new Map<string, { name: string; slug: string; branch?: string }>();
+        (agenciesResult.data || []).forEach((a: { id: string; name: string; slug: string; branch?: string }) => {
+          agenciesMap.set(a.id, { name: a.name, slug: a.slug, branch: a.branch || 'executive' });
         });
 
-        // Join roles with people and orgs data
         const rolesWithPeople = (rolesData || []).map((role: RoleRecord) => {
           const person = peopleMap.get(role.person_id);
-          const org = orgsMap.get(role.org_id);
+          const org = agenciesMap.get(role.agency_id);
           return {
             ...role,
             person_name: person?.name,
@@ -285,6 +283,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
             person_slug: person?.slug,
             org_name: org?.name,
             org_slug: org?.slug,
+            org_branch: org?.branch || 'executive',
           };
         });
 
@@ -504,7 +503,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <tr key={org.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="p-1.5 border-r border-gray-100">
                       <Link
-                        href={`/gov/org/${org.slug}`}
+                        href={`/gov/${org.branch ?? 'executive'}/agency/${org.slug}`}
                         className="text-gray-900 hover:text-gray-700 hover:underline font-medium"
                       >
                         {org.name}
@@ -513,7 +512,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     <td className="p-1.5 border-r border-gray-100">
                       {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
-                          table="orgs"
+                          table="agencies"
                           recordId={org.id}
                           field="description"
                           value={org.description}
@@ -529,7 +528,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
                       <Link
-                        href={`/gov/org/${org.slug}`}
+                        href={`/gov/${org.branch ?? 'executive'}/agency/${org.slug}`}
                         className="text-gray-600 hover:text-gray-900 hover:underline"
                       >
                         {org.slug}
@@ -542,7 +541,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     <td className="p-1.5">
                       {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
-                          table="orgs"
+                          table="agencies"
                           recordId={org.id}
                           field="website"
                           value={org.website}
@@ -693,7 +692,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     <td className="p-1.5 border-r border-gray-100">
                       {person.slug ? (
                         <Link
-                          href={`/gov/person/${person.slug}`}
+                          href={`/gov/${person.branch ?? 'executive'}/person/${person.slug}`}
                           className="text-gray-900 hover:text-gray-700 hover:underline font-medium"
                         >
                           {person.name}
@@ -903,7 +902,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                           )}
                           {role.person_slug ? (
                             <Link
-                              href={`/gov/person/${role.person_slug}`}
+                              href={`/gov/${role.org_branch ?? 'executive'}/person/${role.person_slug}`}
                               className="text-gray-900 hover:text-gray-700 hover:underline"
                             >
                               {role.person_name}
@@ -922,7 +921,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       {role.org_name ? (
                         role.org_slug ? (
                           <Link
-                            href={`/gov/org/${role.org_slug}`}
+                            href={`/gov/${role.org_branch ?? 'executive'}/agency/${role.org_slug}`}
                             className="text-gray-900 hover:text-gray-700 hover:underline"
                           >
                             {role.org_name}
@@ -932,7 +931,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                         )
                       ) : (
                         <span className="text-gray-500 font-mono text-[10px]">
-                          {role.org_id ? `${role.org_id.slice(0, 8)}...` : '-'}
+                          {role.agency_id ? `${role.agency_id.slice(0, 8)}...` : '-'}
                         </span>
                       )}
                     </td>
@@ -1126,7 +1125,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                   <tr key={org.id} className="border-b border-gray-200 hover:bg-gray-50">
                     <td className="p-1.5 border-r border-gray-100">
                       <Link
-                        href={`/gov/org/${org.slug}`}
+                        href={`/gov/${org.branch ?? 'executive'}/agency/${org.slug}`}
                         className="text-gray-900 hover:text-gray-700 hover:underline font-medium"
                       >
                         {org.name}
@@ -1135,7 +1134,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     <td className="p-1.5 border-r border-gray-100">
                       {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
-                          table="orgs"
+                          table="agencies"
                           recordId={org.id}
                           field="description"
                           value={org.description}
@@ -1151,7 +1150,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     </td>
                     <td className="p-1.5 border-r border-gray-100">
                       <Link
-                        href={`/gov/org/${org.slug}`}
+                        href={`/gov/${org.branch ?? 'executive'}/agency/${org.slug}`}
                         className="text-gray-600 hover:text-gray-900 hover:underline"
                       >
                         {org.slug}
@@ -1164,7 +1163,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     <td className="p-1.5">
                       {isAuthenticated && account?.id && hasContributorAccess ? (
                         <InlineEditField
-                          table="orgs"
+                          table="agencies"
                           recordId={org.id}
                           field="website"
                           value={org.website}
@@ -1299,7 +1298,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                     <td className="p-1.5 border-r border-gray-100">
                       {person.slug ? (
                         <Link
-                          href={`/gov/person/${person.slug}`}
+                          href={`/gov/${person.branch ?? 'executive'}/person/${person.slug}`}
                           className="text-gray-900 hover:text-gray-700 hover:underline font-medium"
                         >
                           {person.name}
@@ -1508,7 +1507,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                           )}
                           {role.person_slug ? (
                             <Link
-                              href={`/gov/person/${role.person_slug}`}
+                              href={`/gov/${role.org_branch ?? 'executive'}/person/${role.person_slug}`}
                               className="text-gray-900 hover:text-gray-700 hover:underline"
                             >
                               {role.person_name}
@@ -1527,7 +1526,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                       {role.org_name ? (
                         role.org_slug ? (
                           <Link
-                            href={`/gov/org/${role.org_slug}`}
+                            href={`/gov/${role.org_branch ?? 'executive'}/agency/${role.org_slug}`}
                             className="text-gray-900 hover:text-gray-700 hover:underline"
                           >
                             {role.org_name}
@@ -1537,7 +1536,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
                         )
                       ) : (
                         <span className="text-gray-500 font-mono text-[10px]">
-                          {role.org_id ? `${role.org_id.slice(0, 8)}...` : '-'}
+                          {role.agency_id ? `${role.agency_id.slice(0, 8)}...` : '-'}
                         </span>
                       )}
                     </td>

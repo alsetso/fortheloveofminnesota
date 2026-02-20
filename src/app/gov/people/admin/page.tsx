@@ -25,7 +25,7 @@ export default async function PeopleAdminPage() {
   const auth = await getServerAuth();
   
   if (!auth || auth.role !== 'admin') {
-    redirect('/gov/people');
+    redirect('/gov/directory');
   }
 
   return (
@@ -34,8 +34,8 @@ export default async function PeopleAdminPage() {
 
       <Breadcrumbs items={[
         { label: 'Government', href: '/gov' },
-        { label: 'People', href: '/gov/people' },
-        { label: 'Admin', href: null },
+        { label: 'Directory', href: '/gov/directory' },
+        { label: 'People Admin', href: null },
       ]} />
 
       <div className="mb-3 space-y-1.5">

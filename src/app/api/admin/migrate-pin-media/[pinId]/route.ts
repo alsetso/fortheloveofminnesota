@@ -21,7 +21,7 @@ export async function POST(
         const { pinId } = await params;
         const supabase = await createServerClientWithAuth(cookies());
         // Use service client for storage operations (bypasses RLS)
-        const serviceSupabase = createServiceClient();
+        const serviceSupabase = await createServiceClient();
 
         // Query maps.pins using RPC function - fetch in batches until we find the pin
         let pin: any = null;
@@ -91,7 +91,7 @@ export async function POST(
             // Fallback: try to use account_id as user_id (in case they're the same)
             userId = pin.author_account_id;
           } else {
-            userId = account.user_id;
+            userId = (account as { user_id: string | null }).user_id;
           }
         }
 
@@ -103,7 +103,7 @@ export async function POST(
         }
 
         let migratedFiles = 0;
-        const updates: Record<string, string> = {};
+        const updates: Record<string, string | null> = {};
 
         // Helper to detect content type from file extension
         const detectContentType = (filename: string): string => {
@@ -226,12 +226,12 @@ export async function POST(
         // Update pin with new URLs if any were migrated
         if (Object.keys(updates).length > 0) {
           // Use RPC function to update maps.pins (works across schemas)
-          const { error: updateError } = await serviceSupabase.rpc('update_pin_media', {
+          const { error: updateError } = await (serviceSupabase as any).rpc('update_pin_media', {
             p_pin_id: pinId,
-            p_image_url: updates.image_url || null,
-            p_video_url: updates.video_url || null,
-            p_icon_url: updates.icon_url || null,
-          });
+            p_image_url: updates.image_url ?? '',
+            p_video_url: updates.video_url ?? '',
+            p_icon_url: updates.icon_url ?? '',
+          } as any);
 
           if (updateError) {
             console.error('[Migrate Pin Media] Update failed:', updateError);

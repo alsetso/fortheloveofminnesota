@@ -100,7 +100,7 @@ export default function GovOrgModal({ record, onClose, onSave, isAdmin = false }
     try {
       const civic = getCivic();
       if (isCreate) {
-        const { error: insertError } = await civic.from('orgs').insert({
+        const { error: insertError } = await civic.from('agencies').insert({
           name: formData.name.trim(),
           slug: formData.slug.trim(),
           org_type: formData.org_type || null,
@@ -111,7 +111,7 @@ export default function GovOrgModal({ record, onClose, onSave, isAdmin = false }
         if (insertError) throw insertError;
       } else if (record) {
         const { error: updateError } = await civic
-          .from('orgs')
+          .from('agencies')
           .update({
             name: formData.name.trim(),
             slug: formData.slug.trim(),

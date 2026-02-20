@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 export interface GovSidebarData {
+  /** Branch for branch-scoped links (executive | legislative | judicial) */
+  branch?: string;
   /** Org page: org name displayed as header */
   orgName?: string;
   /** Org page: org slug for links */

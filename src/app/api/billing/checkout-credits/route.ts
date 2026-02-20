@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
 
         // Log checkout session creation to stripe_events table
         try {
-          const serviceSupabase = createServiceClient();
+          const serviceSupabase = await createServiceClient();
           
           const eventId = `checkout_credits_${session.id}`;
           

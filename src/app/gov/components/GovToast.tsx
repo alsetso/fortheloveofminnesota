@@ -17,6 +17,7 @@ export default function GovToast() {
       return () => clearTimeout(t);
     }
     setVisible(false);
+    return undefined;
   }, [toast]);
 
   if (!toast) return null;

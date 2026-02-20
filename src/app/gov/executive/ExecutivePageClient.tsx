@@ -3,7 +3,7 @@
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
 import PersonCard from '@/components/gov/PersonCard';
 import OrgCard from '@/components/gov/OrgCard';
-import type { CivicPerson, CivicRole, OrgWithBudget } from '@/features/civic/services/civicService';
+import type { CivicPerson, CivicRole, OrgWithBudget, CivicOrg } from '@/features/civic/services/civicService';
 
 interface Officer {
   person: CivicPerson;
@@ -83,7 +83,7 @@ export default function ExecutivePageClient({ officers, departments, agencies, b
                 key={dept.id}
                 name={dept.name}
                 slug={dept.slug}
-                href={`/gov/executive/departments/${dept.slug}`}
+                href={`/gov/executive/agency/${dept.slug}`}
                 description={dept.description}
                 govType={dept.gov_type}
                 budgetAmount={dept.budget_amount}
@@ -105,7 +105,7 @@ export default function ExecutivePageClient({ officers, departments, agencies, b
                 key={org.id}
                 name={org.name}
                 slug={org.slug}
-                href={`/gov/org/${org.slug}`}
+                href={`/gov/executive/agency/${org.slug}`}
                 description={org.description}
                 govType={org.gov_type}
               />
@@ -126,7 +126,7 @@ export default function ExecutivePageClient({ officers, departments, agencies, b
                 key={org.id}
                 name={org.name}
                 slug={org.slug}
-                href={`/gov/org/${org.slug}`}
+                href={`/gov/executive/agency/${org.slug}`}
                 description={org.description}
                 govType={org.gov_type}
               />

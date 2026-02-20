@@ -11,6 +11,7 @@ interface OrgNode {
   title: string;
   subtitle?: string;
   href?: string;
+  branch?: string;
   icon?: ReactNode;
   children?: OrgNode[];
   party?: string;
@@ -148,7 +149,7 @@ function OrgCard({ node, level = 0 }: { node: OrgNode; level?: number }) {
                               />
                               {(role.person.slug || role.person.id) ? (
                                 <Link 
-                                  href={`/gov/person/${role.person.slug || role.person.id}`} 
+                                  href={`/gov/${node.branch ?? 'executive'}/person/${role.person.slug || role.person.id}`} 
                                   onClick={handleLinkClick} 
                                   className="text-[10px] text-gray-900 hover:underline flex items-center gap-1"
                                 >
@@ -194,11 +195,12 @@ function OrgCard({ node, level = 0 }: { node: OrgNode; level?: number }) {
 function convertOrgToNode(org: OrgWithRoles, icon?: ReactNode): OrgNode {
   const roles = org.roles || [];
   const currentRoles = roles.filter(r => r.is_current);
-  
+  const branch = (org as { branch?: string | null }).branch ?? 'executive';
   return {
     id: org.id,
     title: org.name,
-    href: org.slug ? `/gov/org/${org.slug}` : undefined,
+    href: org.slug ? `/gov/${branch}/agency/${org.slug}` : undefined,
+    branch,
     icon,
     orgType: org.org_type,
     party: currentRoles[0]?.person?.party || undefined,

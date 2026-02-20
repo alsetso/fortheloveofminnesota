@@ -105,13 +105,13 @@ function MemberTable({
         >
           <PersonAvatar name={m.name} photoUrl={m.photo_url} size="xs" />
           <Link
-            href={`/gov/person/${m.slug ?? m.person_id}`}
+            href={`/gov/legislative/person/${m.slug ?? m.person_id}`}
             className="text-foreground truncate hover:underline"
           >
             {m.name}
           </Link>
           <Link
-            href={`/gov/person/${m.slug ?? m.person_id}`}
+            href={`/gov/legislative/person/${m.slug ?? m.person_id}`}
             className="text-foreground-muted font-mono text-[11px] hover:underline truncate"
           >
             {m.district ?? '—'}

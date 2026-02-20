@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createServerClientWithAuth, createServerClient } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
 import { withSecurity } from '@/lib/security/middleware';
-import { getServerAuth } from '@/lib/auth/getServerAuth';
+import { getServerAuth } from '@/lib/authServer';
 
 const REQUEST_SIZE_LIMITS = {
   json: 1024 * 1024, // 1MB
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
           return new Response(
             JSON.stringify({ 
               error: 'Validation failed',
-              details: validation.error.errors 
+              details: validation.error.issues 
             }),
             { status: 400, headers: { 'Content-Type': 'application/json' } }
           );
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
             counter++;
             if (counter > 100) {
               // Fallback: use UUID if too many collisions
-              finalSlug = null;
+              finalSlug = `${slug}-${Date.now()}`;
               break;
             }
           }

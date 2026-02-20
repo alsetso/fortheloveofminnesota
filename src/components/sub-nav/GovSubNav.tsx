@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import {
   BuildingOfficeIcon,
   UserGroupIcon,
-  BriefcaseIcon,
   BanknotesIcon,
   CreditCardIcon,
   DocumentTextIcon,
@@ -19,6 +18,7 @@ const GOV_NAV_SECTIONS = [
     label: 'Overview',
     items: [
       { label: 'Dashboard', href: '/gov', icon: BuildingOfficeIcon, exact: true },
+      { label: 'Directory', href: '/gov/directory', icon: UserGroupIcon },
     ],
   },
   {
@@ -27,14 +27,6 @@ const GOV_NAV_SECTIONS = [
       { label: 'Executive', href: '/gov/executive', icon: BuildingOfficeIcon },
       { label: 'Legislative', href: '/gov/legislative', icon: DocumentTextIcon },
       { label: 'Judicial', href: '/gov/judicial', icon: ScaleIcon },
-    ],
-  },
-  {
-    label: 'Directory',
-    items: [
-      { label: 'People', href: '/gov/people', icon: UserGroupIcon },
-      { label: 'Organizations', href: '/gov/orgs', icon: BuildingOfficeIcon },
-      { label: 'Roles', href: '/gov/roles', icon: BriefcaseIcon },
     ],
   },
   {

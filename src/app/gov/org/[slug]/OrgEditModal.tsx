@@ -46,7 +46,7 @@ export default function OrgEditModal({ isOpen, org, onClose, onSave, isAdmin = f
       if (isAdmin) {
         // Admin can edit all fields - direct update
         const { error: updateError } = await (supabase
-          .from('orgs') as any)
+          .from('agencies') as any)
           .update({
             name: formData.name,
             slug: formData.slug,
@@ -65,7 +65,7 @@ export default function OrgEditModal({ isOpen, org, onClose, onSave, isAdmin = f
         };
 
         const { error: updateError } = await updateCivicFieldsWithLogging(
-          'orgs',
+          'agencies',
           org.id,
           updates,
           account.id,

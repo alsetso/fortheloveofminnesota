@@ -32,7 +32,7 @@ const BROWSABLE_TABLES = [
   'ctu_boundaries',
   'map_pins',
   'mention_types',
-  'orgs',
+  'agencies',
   'payments',
   'payroll',
   'people',

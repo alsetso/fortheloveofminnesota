@@ -252,7 +252,7 @@ const KNOWN_TABLES = [
   'geometry_columns',
   'map_pins',
   'mention_types',
-  'orgs',
+  'agencies',
   'payments',
   'payroll',
   'people',

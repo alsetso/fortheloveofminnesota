@@ -8,7 +8,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { formatDistanceToNow } from 'date-fns';
 
-export type CivicTable = 'orgs' | 'people' | 'roles';
+export type CivicTable = 'agencies' | 'people' | 'roles' | 'buildings';
 
 export interface CivicEditOptions {
   table: CivicTable;
@@ -252,9 +252,11 @@ export async function revertCivicEdit(
       return { error: eventError || new Error('Event not found') };
     }
 
-    // Get current value to use as old_value in the revert log
+    // Legacy events may have table_name 'orgs' (now 'agencies')
+    const tableName = (event.table_name === 'orgs' ? 'agencies' : event.table_name) as CivicTable;
+
     const { data: current, error: fetchError } = await supabase
-      .from(event.table_name as CivicTable)
+      .from(tableName)
       .select(event.field_name)
       .eq('id', event.record_id)
       .single();
@@ -265,19 +267,16 @@ export async function revertCivicEdit(
 
     const currentValue = current?.[event.field_name] ?? null;
 
-    // Revert to the old_value from the event
     const revertValue = event.old_value;
 
-    // Get account info from the event (civic_events view includes account fields)
     const eventWithAccount = event as any;
     const originalEditor = eventWithAccount.account_username || 
       (eventWithAccount.account_first_name || eventWithAccount.account_last_name
         ? [eventWithAccount.account_first_name, eventWithAccount.account_last_name].filter(Boolean).join(' ')
         : 'user');
 
-    // Use the update function to revert and log
     const result = await updateCivicFieldWithLogging({
-      table: event.table_name as CivicTable,
+      table: tableName,
       recordId: event.record_id,
       field: event.field_name,
       newValue: revertValue,

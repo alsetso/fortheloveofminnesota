@@ -50,7 +50,7 @@ export async function GET(
         const auth = await getServerAuth();
         const supabase = auth 
           ? await createServerClientWithAuth(cookies())
-          : createServerClient();
+          : await createServerClient();
 
         // Resolve identifier to map_id (handle both UUID and slug)
         let mapId: string;

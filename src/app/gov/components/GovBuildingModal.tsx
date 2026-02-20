@@ -30,6 +30,8 @@ interface GovBuildingModalProps {
   onClose: () => void;
   onSave?: () => void;
   isAdmin?: boolean;
+  /** Branch for "More Details" link (default: executive) */
+  branch?: string;
 }
 
 const BUILDING_TYPES = [
@@ -42,7 +44,7 @@ const BUILDING_TYPES = [
 /**
  * Modal for building details. Rendered via portal. Admin can create/edit inline.
  */
-export default function GovBuildingModal({ record, onClose, onSave, isAdmin = false }: GovBuildingModalProps) {
+export default function GovBuildingModal({ record, onClose, onSave, isAdmin = false, branch = 'executive' }: GovBuildingModalProps) {
   const supabase = useSupabaseClient();
   const { showPending, showSuccess, showError } = useGovToast();
   const isCreate = record === null;
@@ -327,7 +329,7 @@ export default function GovBuildingModal({ record, onClose, onSave, isAdmin = fa
               )}
               {!isCreate && record?.id && (
                 <Link
-                  href={`/gov/building/${record.id}`}
+                  href={`/gov/${branch}/building/${record.id}`}
                   className="block w-full text-center text-sm font-semibold px-4 py-2.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors mt-2"
                 >
                   More Details

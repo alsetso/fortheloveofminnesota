@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
         // Log checkout session creation to stripe_events table
         // Use service client to bypass RLS (similar to webhook handler)
         try {
-          const serviceSupabase = createServiceClient();
+          const serviceSupabase = await createServiceClient();
           
           // Use checkout session ID as event identifier (prefixed to distinguish from webhook events)
           const eventId = `checkout_${session.id}`;

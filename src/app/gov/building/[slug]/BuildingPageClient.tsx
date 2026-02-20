@@ -10,9 +10,11 @@ import type { CivicBuilding } from '@/features/civic/services/civicService';
 interface BuildingPageClientProps {
   building: CivicBuilding;
   isAdmin: boolean;
+  /** Branch for building link (default: executive) */
+  branch?: string;
 }
 
-export default function BuildingPageClient({ building, isAdmin }: BuildingPageClientProps) {
+export default function BuildingPageClient({ building, isAdmin, branch = 'executive' }: BuildingPageClientProps) {
   const [editOpen, setEditOpen] = useState(false);
 
   if (!isAdmin) return null;
@@ -40,6 +42,7 @@ export default function BuildingPageClient({ building, isAdmin }: BuildingPageCl
             window.location.reload();
           }}
           isAdmin
+          branch={branch}
         />
       )}
     </GovToastProvider>

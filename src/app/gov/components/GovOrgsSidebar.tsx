@@ -44,8 +44,8 @@ export default function GovOrgsSidebar() {
     try {
       const civic = typeof (supabase as any).schema === 'function' ? (supabase as any).schema('civic') : supabase;
       const { data, error: e } = await civic
-.from('orgs')
-          .select('id, name, slug, org_type, parent_id, description, website')
+        .from('agencies')
+        .select('id, name, slug, org_type, parent_id, description, website')
         .order('name');
       if (e) throw e;
       setOrgs((data ?? []) as OrgRecord[]);

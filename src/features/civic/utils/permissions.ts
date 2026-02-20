@@ -4,24 +4,26 @@
  * Determines which fields can be edited by community users vs admin-only
  */
 
-export type CivicTable = 'orgs' | 'people' | 'roles';
+export type CivicTable = 'agencies' | 'people' | 'roles' | 'buildings';
 
 /**
  * Fields that community users can edit (wiki-style)
  */
 const COMMUNITY_EDITABLE_FIELDS: Record<CivicTable, string[]> = {
-  orgs: ['description', 'website'],
+  agencies: ['description', 'website'],
   people: ['photo_url', 'party', 'district', 'email', 'phone', 'address'],
   roles: ['title', 'start_date', 'end_date', 'is_current'],
+  buildings: [],
 };
 
 /**
  * Fields that are admin-only (core structure fields)
  */
 const ADMIN_ONLY_FIELDS: Record<CivicTable, string[]> = {
-  orgs: ['id', 'name', 'slug', 'org_type', 'parent_id'],
+  agencies: ['id', 'name', 'slug', 'org_type', 'parent_id'],
   people: ['id', 'name', 'slug'],
-  roles: ['id', 'person_id', 'org_id'],
+  roles: ['id', 'person_id', 'agency_id'],
+  buildings: ['id', 'name', 'slug'],
 };
 
 /**

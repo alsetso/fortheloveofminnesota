@@ -107,7 +107,7 @@ export default function GovPeopleModal({ record, onClose, onSave, isAdmin = fals
       .select('name, type, full_address')
       .eq('id', buildingIdToFetch)
       .single()
-      .then(({ data, error: e }) => {
+      .then(({ data, error: e }: { data: { name?: string | null; type?: string | null; full_address?: string | null } | null; error: unknown }) => {
         if (!cancelled && !e && data) {
           setBuilding({
             name: data.name ?? null,
@@ -184,7 +184,7 @@ export default function GovPeopleModal({ record, onClose, onSave, isAdmin = fals
     address: formData.address,
     photo_url: formData.photo_url,
     building_id: formData.building_id,
-    roles: record?.roles,
+    roles: (record as { roles?: string[] } | null)?.roles,
   };
 
   const modal = (
@@ -327,7 +327,7 @@ export default function GovPeopleModal({ record, onClose, onSave, isAdmin = fals
                   <p className="text-sm text-foreground">{displayRecord.district}</p>
                 </div>
               )}
-              {record.roles && record.roles.length > 0 && (
+              {record?.roles && record.roles.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-foreground-muted mb-0.5">Roles</p>
                   <p className="text-sm text-foreground">{record.roles.join(', ')}</p>

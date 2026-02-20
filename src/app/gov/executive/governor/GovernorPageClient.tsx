@@ -38,7 +38,7 @@ export default function GovernorPageClient({ person, roleTitle, departments, age
               <PartyBadge party={person.party} className="mt-1 inline-block" />
               {person.slug && (
                 <div className="mt-2">
-                  <Link href={`/gov/person/${person.slug}`} className="text-[10px] text-accent hover:underline">
+                  <Link href={`/gov/executive/person/${person.slug}`} className="text-[10px] text-accent hover:underline">
                     View full profile →
                   </Link>
                 </div>
@@ -61,7 +61,7 @@ export default function GovernorPageClient({ person, roleTitle, departments, age
               key={dept.id}
               name={dept.name}
               slug={dept.slug}
-              href={`/gov/executive/departments/${dept.slug}`}
+              href={`/gov/executive/agency/${dept.slug}`}
               description={dept.description}
               govType={dept.gov_type}
               budgetAmount={dept.budget_amount}
@@ -83,7 +83,7 @@ export default function GovernorPageClient({ person, roleTitle, departments, age
                 key={org.id}
                 name={org.name}
                 slug={org.slug}
-                href={`/gov/org/${org.slug}`}
+                href={`/gov/executive/agency/${org.slug}`}
                 description={org.description}
                 govType={org.gov_type}
               />
@@ -104,7 +104,7 @@ export default function GovernorPageClient({ person, roleTitle, departments, age
                 key={org.id}
                 name={org.name}
                 slug={org.slug}
-                href={`/gov/org/${org.slug}`}
+                href={`/gov/executive/agency/${org.slug}`}
                 description={org.description}
                 govType={org.gov_type}
               />

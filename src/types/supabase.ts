@@ -10,6 +10,14 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+/** Loose schema definition for schemas without full generated types */
+type SchemaDef = {
+  Tables: Record<string, { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }>
+  Views: Record<string, { Row: Record<string, unknown> }>
+  Functions: Record<string, { Args: Record<string, unknown>; Returns: unknown }>
+  Enums: Record<string, string>
+}
+
 export type Database = {
   public: {
     Tables: {
@@ -298,4 +306,14 @@ export type Database = {
     Functions: Record<string, never>
     Enums: Record<string, string>
   }
+  // Additional schemas (admin, maps, ads, notifications, content, civic, social_graph, checkbook)
+  // Use loose types so .schema('x') is accepted without full generated types per schema
+  admin: SchemaDef
+  maps: SchemaDef
+  ads: SchemaDef
+  notifications: SchemaDef
+  content: SchemaDef
+  civic: SchemaDef
+  social_graph: SchemaDef
+  checkbook: SchemaDef
 }

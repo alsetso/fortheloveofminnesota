@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getCivicPersonBySlug } from '@/features/civic/services/civicService';
 import Breadcrumbs from '@/components/civic/Breadcrumbs';
-import PersonPageClient from './PersonPageClient';
+import PersonPageClient from '@/app/gov/person/[slug]/PersonPageClient';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import PartyBadge from '@/components/gov/PartyBadge';
 import GovBadge from '@/components/gov/GovBadge';
@@ -14,96 +14,85 @@ import GovSidebarBroadcaster from '@/components/gov/GovSidebarBroadcaster';
 
 export const revalidate = 3600;
 
-type Props = {
-  params: Promise<{ slug: string }>;
-};
+const BRANCHES = ['executive', 'legislative', 'judicial'] as const;
+type BranchSlug = (typeof BRANCHES)[number];
+
+type Props = { params: Promise<{ branch: string; slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
+  const { branch, slug } = await params;
+  if (!BRANCHES.includes(branch as BranchSlug)) return { title: 'Not Found' };
   const data = await getCivicPersonBySlug(slug);
-
   if (!data) {
-    return {
-      title: 'Person Not Found',
-      robots: {
-        index: false,
-        follow: false,
-      },
-    };
+    return { title: 'Person Not Found', robots: { index: false, follow: false } };
   }
-
   const { person, roles } = data;
+  const primaryOrg = roles[0]?.org;
+  if (primaryOrg?.branch !== branch) {
+    return { title: 'Not Found', robots: { index: false, follow: false } };
+  }
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fortheloveofminnesota.com';
-  const url = `${baseUrl}/gov/person/${slug}`;
+  const url = `${baseUrl}/gov/${branch}/person/${slug}`;
   const title = `${person.name} | Minnesota Government`;
-  const roleTitles = roles.map(r => r.title).join(', ');
+  const roleTitles = roles.map((r) => r.title).join(', ');
   const description = `${person.name}${person.party ? ` (${person.party})` : ''} - ${roleTitles || 'Minnesota government official'}.`;
-
   return {
     title,
     description,
-    keywords: [person.name, 'Minnesota government', person.party || '', 'Minnesota official'],
     openGraph: {
       title,
       description,
       url,
       siteName: 'For the Love of Minnesota',
-      images: person.photo_url ? [
-        {
-          url: person.photo_url,
-          width: 1200,
-          height: 630,
-          alt: person.name,
-        },
-      ] : [
-        {
-          url: '/seo_share_public_image.png',
-          width: 1200,
-          height: 630,
-          type: 'image/png',
-          alt: person.name,
-        },
-      ],
+      images: person.photo_url
+        ? [{ url: person.photo_url, width: 1200, height: 630, alt: person.name }]
+        : [{ url: '/seo_share_public_image.png', width: 1200, height: 630, type: 'image/png', alt: person.name }],
       locale: 'en_US',
       type: 'website',
     },
-    alternates: {
-      canonical: url,
-    },
+    alternates: { canonical: url },
   };
 }
 
-export default async function PersonPage({ params }: Props) {
-  const { slug } = await params;
+export default async function BranchPersonPage({ params }: Props) {
+  const { branch, slug } = await params;
+  if (!BRANCHES.includes(branch as BranchSlug)) notFound();
+
   const data = await getCivicPersonBySlug(slug);
   const auth = await getServerAuth();
   const isAdmin = auth?.role === 'admin';
 
-  if (!data) {
-    notFound();
-  }
+  if (!data) notFound();
 
   const { person, roles, building } = data;
-
-  // Primary role for display below name
   const primaryRole = roles[0];
   const primaryOrg = primaryRole?.org;
+  const personBranch = primaryOrg?.branch ?? null;
+  if (personBranch !== branch) notFound();
 
-  // Group roles by org for the roles section
+  const branchLabel =
+    branch === 'executive' ? 'Executive' : branch === 'legislative' ? 'Legislative' : 'Judicial';
+  const breadcrumbItems = [
+    { label: 'Government', href: '/gov' },
+    { label: `${branchLabel} Branch`, href: `/gov/${branch}` },
+    ...(primaryOrg ? [{ label: primaryOrg.name, href: `/gov/${branch}/agency/${primaryOrg.slug}` }] : []),
+    { label: person.name, href: null },
+  ];
+
   const rolesByOrg = new Map<string, typeof roles>();
-  roles.forEach(role => {
+  roles.forEach((role) => {
     if (role.org) {
       if (!rolesByOrg.has(role.org.id)) rolesByOrg.set(role.org.id, []);
       rolesByOrg.get(role.org.id)!.push(role);
     }
   });
-
   const hasContact = !!(person.phone || person.email || person.address);
 
   return (
     <>
       <GovSidebarBroadcaster
         data={{
+          branch,
           personName: person.name,
           personSlug: person.slug ?? undefined,
           roleTitle: primaryRole?.title ?? null,
@@ -116,14 +105,8 @@ export default async function PersonPage({ params }: Props) {
         }}
       />
       <div className="max-w-4xl mx-auto px-[10px] py-3">
-        <Breadcrumbs items={[
-          { label: 'Minnesota', href: '/' },
-          { label: 'Government', href: '/gov' },
-          ...(primaryOrg ? [{ label: primaryOrg.name, href: `/gov/org/${primaryOrg.slug}` }] : []),
-          { label: person.name, href: null },
-        ]} />
+        <Breadcrumbs items={breadcrumbItems} />
 
-        {/* Hero */}
         <div className="mt-2 border border-border rounded-md p-4 bg-surface">
           <div className="flex items-center gap-4 justify-between">
             <div className="flex items-center gap-3">
@@ -134,7 +117,10 @@ export default async function PersonPage({ params }: Props) {
                   <p className="text-xs text-foreground-muted mt-0.5">{primaryRole.title}</p>
                 )}
                 {primaryOrg && (
-                  <Link href={`/gov/org/${primaryOrg.slug}`} className="text-[10px] text-accent hover:underline mt-0.5 block">
+                  <Link
+                    href={`/gov/${branch}/agency/${primaryOrg.slug}`}
+                    className="text-[10px] text-accent hover:underline mt-0.5 block"
+                  >
                     {primaryOrg.name}
                   </Link>
                 )}
@@ -145,7 +131,9 @@ export default async function PersonPage({ params }: Props) {
                 )}
                 <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <PartyBadge party={person.party} />
-                  {primaryRole?.role_type && <GovBadge label={primaryRole.role_type} variant="gray" />}
+                  {primaryRole?.role_type && (
+                    <GovBadge label={primaryRole.role_type} variant="gray" />
+                  )}
                 </div>
               </div>
             </div>
@@ -159,7 +147,6 @@ export default async function PersonPage({ params }: Props) {
           </div>
         )}
 
-        {/* Contact block — only render if at least one field exists */}
         {hasContact && (
           <div className="mt-3">
             <h2 className="text-xs font-semibold text-foreground mb-1.5">Contact</h2>
@@ -175,7 +162,10 @@ export default async function PersonPage({ params }: Props) {
               {person.phone && (
                 <div className="text-xs text-foreground-muted">
                   <span className="font-medium text-foreground">Phone:</span>{' '}
-                  <a href={`tel:${person.phone.replace(/[^+\d]/g, '')}`} className="hover:underline">
+                  <a
+                    href={`tel:${person.phone.replace(/[^+\d]/g, '')}`}
+                    className="hover:underline"
+                  >
                     {person.phone}
                   </a>
                 </div>
@@ -189,12 +179,14 @@ export default async function PersonPage({ params }: Props) {
           </div>
         )}
 
-        {/* Building block */}
         {building && (
           <div className="mt-3">
             <h2 className="text-xs font-semibold text-foreground mb-1.5">Location</h2>
             <div className="border border-border rounded-md p-3 bg-surface">
-              <Link href={`/gov/building/${building.slug ?? building.id}`} className="text-xs font-medium text-accent hover:underline">
+              <Link
+                href={`/gov/${branch}/building/${building.slug ?? building.id}`}
+                className="text-xs font-medium text-accent hover:underline"
+              >
                 {building.name}
               </Link>
               {building.full_address && (
@@ -204,7 +196,6 @@ export default async function PersonPage({ params }: Props) {
           </div>
         )}
 
-        {/* Roles section */}
         <div className="mt-3">
           <h2 className="text-xs font-semibold text-foreground mb-1.5">
             {rolesByOrg.size <= 1 ? 'Current Role' : 'Roles'}
@@ -217,7 +208,10 @@ export default async function PersonPage({ params }: Props) {
                 return (
                   <div key={orgId} className="border border-border rounded-md p-3 bg-surface">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <Link href={`/gov/org/${org.slug}`} className="text-xs font-semibold text-foreground hover:underline">
+                      <Link
+                        href={`/gov/${branch}/agency/${org.slug}`}
+                        className="text-xs font-semibold text-foreground hover:underline"
+                      >
                         {org.name}
                       </Link>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -226,9 +220,14 @@ export default async function PersonPage({ params }: Props) {
                     </div>
                     <div className="space-y-0.5">
                       {orgRoles.map((role, idx) => (
-                        <div key={idx} className="text-xs text-foreground-muted flex items-center gap-1.5 flex-wrap">
+                        <div
+                          key={idx}
+                          className="text-xs text-foreground-muted flex items-center gap-1.5 flex-wrap"
+                        >
                           <span>{role.title}</span>
-                          {role.role_type && <GovBadge label={role.role_type} variant="gray" />}
+                          {role.role_type && (
+                            <GovBadge label={role.role_type} variant="gray" />
+                          )}
                           {role.start_date && (
                             <span className="text-[10px] text-foreground-muted">
                               since {new Date(role.start_date).getFullYear()}
@@ -250,11 +249,15 @@ export default async function PersonPage({ params }: Props) {
 
         {isAdmin && (
           <div className="mt-6 pt-6 border-t border-border">
-            <EntityEditHistory tableName="people" recordId={person.id} recordName={person.name} showHeader={true} />
+            <EntityEditHistory
+              tableName="people"
+              recordId={person.id}
+              recordName={person.name}
+              showHeader={true}
+            />
           </div>
         )}
       </div>
     </>
   );
 }
-

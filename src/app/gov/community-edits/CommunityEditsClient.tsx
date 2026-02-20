@@ -29,6 +29,7 @@ interface EditEvent {
 interface EditEventWithSlug extends EditEvent {
   entity_slug?: string | null;
   entity_name?: string | null;
+  entity_branch?: string;
   account_image_url?: string | null;
 }
 
@@ -71,7 +72,7 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
 
         editEvents.forEach((event: any) => {
           const eventTyped = event as { table_name: string; record_id: string; account_id?: string };
-          if (eventTyped.table_name === 'orgs') {
+          if (eventTyped.table_name === 'orgs' || eventTyped.table_name === 'agencies') {
             orgIds.add(eventTyped.record_id);
           } else if (eventTyped.table_name === 'people') {
             personIds.add(eventTyped.record_id);
@@ -81,12 +82,12 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
           }
         });
 
-        // Fetch orgs, people, and accounts to get slugs, names, and image_urls
-        const [orgsResult, peopleResult, accountsResult] = await Promise.all([
+        // Fetch orgs (agencies) with branch, people, accounts; for people get branch via roles
+        const [orgsResult, peopleResult, accountsResult, rolesForPeopleResult] = await Promise.all([
           orgIds.size > 0
             ? supabase
-                .from('orgs')
-                .select('id, slug, name')
+                .from('agencies')
+                .select('id, slug, name, branch')
                 .in('id', Array.from(orgIds))
             : Promise.resolve({ data: [], error: null }),
           personIds.size > 0
@@ -101,11 +102,33 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
                 .select('id, image_url')
                 .in('id', Array.from(accountIds))
             : Promise.resolve({ data: [], error: null }),
+          personIds.size > 0
+            ? supabase
+                .from('roles')
+                .select('person_id, agency_id')
+                .in('person_id', Array.from(personIds))
+                .eq('is_current', true)
+            : Promise.resolve({ data: [], error: null }),
         ]);
 
         const orgsMap = new Map(
-          (orgsResult.data || []).map((org: any) => [(org as { id: string; slug: string; name: string }).id, { slug: (org as { id: string; slug: string; name: string }).slug, name: (org as { id: string; slug: string; name: string }).name }])
+          (orgsResult.data || []).map((org: any) => {
+            const o = org as { id: string; slug: string; name: string; branch?: string };
+            return [o.id, { slug: o.slug, name: o.name, branch: o.branch || 'executive' }];
+          })
         );
+        const agencyIdsFromRoles = new Set((rolesForPeopleResult?.data || []).map((r: any) => (r as { agency_id: string }).agency_id));
+        const { data: agenciesBranchData } = agencyIdsFromRoles.size > 0
+          ? await supabase.from('agencies').select('id, branch').in('id', Array.from(agencyIdsFromRoles))
+          : { data: [] as { id: string; branch?: string }[] };
+        const agencyBranchMap = new Map((agenciesBranchData || []).map((a: any) => [a.id, (a as { branch?: string }).branch || 'executive']));
+        const personIdToBranch = new Map<string, string>();
+        (rolesForPeopleResult?.data || []).forEach((r: any) => {
+          const rr = r as { person_id: string; agency_id: string };
+          if (!personIdToBranch.has(rr.person_id)) {
+            personIdToBranch.set(rr.person_id, agencyBranchMap.get(rr.agency_id) || 'executive');
+          }
+        });
         const peopleMap = new Map(
           (peopleResult.data || []).map((person: any) => [
             (person as { id: string; slug: string; name: string }).id,
@@ -128,12 +151,13 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
             account_image_url: account?.image_url || null,
           };
 
-          if (eventTyped.table_name === 'orgs') {
+          if (eventTyped.table_name === 'orgs' || eventTyped.table_name === 'agencies') {
             const org = orgsMap.get(eventTyped.record_id);
             return {
               ...baseEvent,
               entity_slug: org?.slug || null,
               entity_name: org?.name || null,
+              entity_branch: org?.branch || 'executive',
             };
           } else if (eventTyped.table_name === 'people') {
             const person = peopleMap.get(eventTyped.record_id);
@@ -141,6 +165,7 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
               ...baseEvent,
               entity_slug: person?.slug || null,
               entity_name: person?.name || null,
+              entity_branch: personIdToBranch.get(eventTyped.record_id) || 'executive',
             };
           }
           return baseEvent;
@@ -280,13 +305,13 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
   }
 
   const getEntityLink = (event: EditEventWithSlug): string => {
-    if (event.table_name === 'orgs') {
-      return event.entity_slug ? `/gov/org/${event.entity_slug}` : `/gov/org/${event.record_id}`;
+    const branch = event.entity_branch || 'executive';
+    if ((event.table_name === 'orgs' || event.table_name === 'agencies')) {
+      const slug = event.entity_slug || event.record_id;
+      return `/gov/${branch}/agency/${slug}`;
     } else if (event.table_name === 'people') {
-      // getCivicPersonBySlug accepts UUIDs, so we can use record_id directly
-      return event.entity_slug
-        ? `/gov/person/${event.entity_slug}`
-        : `/gov/person/${event.record_id}`;
+      const slug = event.entity_slug || event.record_id;
+      return `/gov/${branch}/person/${slug}`;
     }
     return '/gov';
   };
@@ -301,6 +326,7 @@ export default function CommunityEditsClient({ accountId }: CommunityEditsClient
   const getTableLabel = (tableName: string): string => {
     switch (tableName) {
       case 'orgs':
+      case 'agencies':
         return 'organization';
       case 'people':
         return 'person';

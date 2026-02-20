@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           return new Response(
             JSON.stringify({ 
               error: 'Validation failed',
-              details: validation.error.errors 
+              details: validation.error.issues 
             }),
             { status: 400, headers: { 'Content-Type': 'application/json' } }
           );

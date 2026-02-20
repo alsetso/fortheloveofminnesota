@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         // If payment succeeded, log to stripe_events
         if (paymentIntent.status === 'succeeded') {
           try {
-            const serviceSupabase = createServiceClient();
+            const serviceSupabase = await createServiceClient();
             
             // Create synthetic event for one-time payment
             const eventId = `api_payment_${paymentIntent.id}_${Date.now()}`;

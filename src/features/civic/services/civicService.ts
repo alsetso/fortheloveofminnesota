@@ -1,6 +1,6 @@
 import { createCivicServerClient, createServerClient, createSupabaseClient } from '@/lib/supabaseServer';
 
-export interface CivicOrg {
+export interface CivicAgency {
   id: string;
   parent_id: string | null;
   name: string;
@@ -33,7 +33,7 @@ export interface CivicPerson {
 export interface CivicRole {
   id: string;
   person_id: string;
-  org_id: string;
+  agency_id: string;
   title: string;
   role_type: string | null;
   start_date: string | null;
@@ -41,31 +41,31 @@ export interface CivicRole {
   is_current: boolean;
   created_at: string;
   person?: CivicPerson;
-  org?: CivicOrg;
+  org?: CivicAgency;
 }
 
-export interface OrgWithRoles extends CivicOrg {
+export interface AgencyWithRoles extends CivicAgency {
   roles?: (CivicRole & { person?: CivicPerson })[];
-  children?: OrgWithRoles[];
+  children?: AgencyWithRoles[];
 }
 
 /**
- * Fetch all organizations with their roles and people
+ * Fetch all agencies with their roles and people
  */
-export async function getCivicOrgs(): Promise<CivicOrg[]> {
+export async function getCivicAgencies(): Promise<CivicAgency[]> {
   const supabase = await createCivicServerClient();
   
   const { data, error } = await supabase
-    .from('orgs')
+    .from('agencies')
     .select('*')
     .order('name');
 
   if (error) {
-    console.error('[civicService] Error fetching orgs:', error);
+    console.error('[civicService] Error fetching agencies:', error);
     return [];
   }
 
-  return (data || []) as CivicOrg[];
+  return (data || []) as CivicAgency[];
 }
 
 /**
@@ -93,10 +93,10 @@ export async function getCivicPeople(): Promise<CivicPerson[]> {
 export async function getCivicRoles(): Promise<CivicRole[]> {
   const supabase = await createCivicServerClient();
   
-  const [rolesResult, peopleResult, orgsResult] = await Promise.all([
+  const [rolesResult, peopleResult, agenciesResult] = await Promise.all([
     supabase.from('roles').select('*').eq('is_current', true).order('title'),
     supabase.from('people').select('*'),
-    supabase.from('orgs').select('*'),
+    supabase.from('agencies').select('*'),
   ]);
 
   if (rolesResult.error) {
@@ -106,77 +106,70 @@ export async function getCivicRoles(): Promise<CivicRole[]> {
 
   const roles = (rolesResult.data || []) as any[];
   const people = new Map(((peopleResult.data || []) as CivicPerson[]).map(p => [p.id, p]));
-  const orgs = new Map(((orgsResult.data || []) as CivicOrg[]).map(o => [o.id, o]));
+  const agencies = new Map(((agenciesResult.data || []) as CivicAgency[]).map(o => [o.id, o]));
 
   return roles.map(role => ({
     ...role,
     person: people.get(role.person_id) || undefined,
-    org: orgs.get(role.org_id) || undefined,
+    org: agencies.get(role.agency_id) || undefined,
   })) as CivicRole[];
 }
 
 /**
- * Build organizational tree from orgs
+ * Build organizational tree from agencies
  */
-export async function getCivicOrgTree(): Promise<OrgWithRoles[]> {
-  const [orgs, roles] = await Promise.all([
-    getCivicOrgs(),
+export async function getCivicAgencyTree(): Promise<AgencyWithRoles[]> {
+  const [agencies, roles] = await Promise.all([
+    getCivicAgencies(),
     getCivicRoles(),
   ]);
 
-  // Create a map of org_id to roles
-  const rolesByOrgId = new Map<string, (CivicRole & { person?: CivicPerson })[]>();
+  const rolesByAgencyId = new Map<string, (CivicRole & { person?: CivicPerson })[]>();
   roles.forEach(role => {
-    if (!rolesByOrgId.has(role.org_id)) {
-      rolesByOrgId.set(role.org_id, []);
+    if (!rolesByAgencyId.has(role.agency_id)) {
+      rolesByAgencyId.set(role.agency_id, []);
     }
-    rolesByOrgId.get(role.org_id)!.push(role);
+    rolesByAgencyId.get(role.agency_id)!.push(role);
   });
 
-  // Create a map of orgs by id
-  const orgsById = new Map<string, OrgWithRoles>();
-  orgs.forEach(org => {
-    orgsById.set(org.id, {
-      ...org,
-      roles: rolesByOrgId.get(org.id) || [],
+  const agenciesById = new Map<string, AgencyWithRoles>();
+  agencies.forEach(agency => {
+    agenciesById.set(agency.id, {
+      ...agency,
+      roles: rolesByAgencyId.get(agency.id) || [],
       children: [],
     });
   });
 
-  // Build tree structure
-  const roots: OrgWithRoles[] = [];
-  orgsById.forEach(org => {
-    if (org.parent_id && orgsById.has(org.parent_id)) {
-      const parent = orgsById.get(org.parent_id)!;
+  const roots: AgencyWithRoles[] = [];
+  agenciesById.forEach(agency => {
+    if (agency.parent_id && agenciesById.has(agency.parent_id)) {
+      const parent = agenciesById.get(agency.parent_id)!;
       if (!parent.children) {
         parent.children = [];
       }
-      parent.children.push(org);
+      parent.children.push(agency);
     } else {
-      roots.push(org);
+      roots.push(agency);
     }
   });
 
-  // Sort children
-  const sortOrgs = (orgs: OrgWithRoles[]) => {
-    orgs.sort((a, b) => a.name.localeCompare(b.name));
-    orgs.forEach(org => {
-      if (org.children) {
-        sortOrgs(org.children);
-      }
+  const sortAgencies = (list: AgencyWithRoles[]) => {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+    list.forEach(a => {
+      if (a.children?.length) sortAgencies(a.children);
     });
   };
-
-  sortOrgs(roots);
+  sortAgencies(roots);
   return roots;
 }
 
 /**
- * Get organizations by type
+ * Get agencies by type
  */
-export async function getCivicOrgsByType(type: 'branch' | 'agency' | 'department' | 'court'): Promise<OrgWithRoles[]> {
-  const tree = await getCivicOrgTree();
-  return tree.filter(org => org.org_type === type);
+export async function getCivicAgenciesByType(type: 'branch' | 'agency' | 'department' | 'court'): Promise<AgencyWithRoles[]> {
+  const tree = await getCivicAgencyTree();
+  return tree.filter(agency => agency.org_type === type);
 }
 
 /**
@@ -184,7 +177,7 @@ export async function getCivicOrgsByType(type: 'branch' | 'agency' | 'department
  */
 export async function getCivicPersonBySlug(slug: string): Promise<{
   person: CivicPerson;
-  roles: (CivicRole & { org?: CivicOrg })[];
+  roles: (CivicRole & { org?: CivicAgency })[];
   building: CivicBuilding | null;
 } | null> {
   const supabase = await createCivicServerClient();
@@ -221,59 +214,58 @@ export async function getCivicPersonBySlug(slug: string): Promise<{
     console.error('[civicService] Error fetching roles for person:', rolesResult.error);
   }
 
-  // Get orgs for these roles
   const typedRoles = (rolesResult.data || []) as CivicRole[];
-  const orgIds = [...new Set(typedRoles.map(r => r.org_id))];
-  const { data: orgs } = orgIds.length
-    ? await supabase.from('orgs').select('*').in('id', orgIds)
+  const agencyIds = [...new Set(typedRoles.map(r => r.agency_id))];
+  const { data: agencies } = agencyIds.length
+    ? await supabase.from('agencies').select('*').in('id', agencyIds)
     : { data: [] };
 
-  const orgsMap = new Map(((orgs || []) as CivicOrg[]).map(o => [o.id, o]));
+  const agenciesMap = new Map(((agencies || []) as CivicAgency[]).map(o => [o.id, o]));
 
   return {
     person: typedPerson,
     roles: typedRoles.map(role => ({
       ...role,
-      org: orgsMap.get(role.org_id) || undefined,
-    })) as (CivicRole & { org?: CivicOrg })[],
+      org: agenciesMap.get(role.agency_id) || undefined,
+    })) as (CivicRole & { org?: CivicAgency })[],
     building: (buildingResult.data as CivicBuilding | null) ?? null,
   };
 }
 
 /**
- * Get a single org with building and parent org info
+ * Get a single agency with building and parent agency info
  */
-export async function getCivicOrgWithBuilding(slug: string): Promise<(CivicOrg & {
+export async function getCivicAgencyWithBuilding(slug: string): Promise<(CivicAgency & {
   gov_type?: string | null;
   branch?: string | null;
   building: CivicBuilding | null;
-  parent: CivicOrg | null;
+  parent: CivicAgency | null;
 }) | null> {
   const supabase = await createCivicServerClient();
 
-  const { data: org, error } = await supabase
-    .from('orgs')
+  const { data: agency, error } = await supabase
+    .from('agencies')
     .select('*')
     .eq('slug', slug)
     .single();
 
-  if (error || !org) return null;
+  if (error || !agency) return null;
 
-  const typedOrg = org as CivicOrg & { gov_type?: string | null; branch?: string | null; building_id?: string | null; parent_id?: string | null };
+  const typed = agency as CivicAgency & { gov_type?: string | null; branch?: string | null; building_id?: string | null; parent_id?: string | null };
 
   const [buildingResult, parentResult] = await Promise.all([
-    typedOrg.building_id
-      ? supabase.from('buildings').select('*').eq('id', typedOrg.building_id).single()
+    typed.building_id
+      ? supabase.from('buildings').select('*').eq('id', typed.building_id).single()
       : Promise.resolve({ data: null }),
-    typedOrg.parent_id
-      ? supabase.from('orgs').select('*').eq('id', typedOrg.parent_id).single()
+    typed.parent_id
+      ? supabase.from('agencies').select('*').eq('id', typed.parent_id).single()
       : Promise.resolve({ data: null }),
   ]);
 
   return {
-    ...typedOrg,
+    ...typed,
     building: (buildingResult.data as CivicBuilding | null) ?? null,
-    parent: (parentResult.data as CivicOrg | null) ?? null,
+    parent: (parentResult.data as CivicAgency | null) ?? null,
   };
 }
 
@@ -330,18 +322,18 @@ export interface LegislativeMember {
 export async function getLegislativeMembers(orgSlug: string): Promise<LegislativeMember[]> {
   const supabase = await createCivicServerClient();
 
-  const { data: org } = await supabase
-    .from('orgs')
+  const { data: agency } = await supabase
+    .from('agencies')
     .select('id')
     .eq('slug', orgSlug)
     .single();
 
-  if (!org) return [];
+  if (!agency) return [];
 
   const { data: roles, error: rolesError } = await supabase
     .from('roles')
     .select('person_id, title')
-    .eq('org_id', (org as any).id)
+    .eq('agency_id', (agency as any).id)
     .eq('is_current', true);
 
   if (rolesError || !roles?.length) return [];
@@ -377,26 +369,26 @@ export async function getLegislativeMembers(orgSlug: string): Promise<Legislativ
 export async function getExecutiveOfficers(): Promise<{
   person: CivicPerson;
   role: CivicRole;
-  org: CivicOrg & { gov_type?: string | null };
+  org: CivicAgency & { gov_type?: string | null };
 }[]> {
   const supabase = await createCivicServerClient();
 
   const slugOrder = ['governor', 'lieutenant-governor', 'attorney-general', 'secretary-of-state', 'state-auditor'];
 
-  const { data: orgs } = await supabase
-    .from('orgs')
+  const { data: agencies } = await supabase
+    .from('agencies')
     .select('*')
     .eq('branch', 'executive')
     .eq('gov_type', 'elected_office');
 
-  if (!orgs?.length) return [];
+  if (!agencies?.length) return [];
 
-  const orgIds = orgs.map((o: any) => o.id);
+  const agencyIds = agencies.map((o: any) => o.id);
 
   const { data: roles } = await supabase
     .from('roles')
     .select('*')
-    .in('org_id', orgIds)
+    .in('agency_id', agencyIds)
     .eq('is_current', true);
 
   if (!roles?.length) return [];
@@ -410,12 +402,12 @@ export async function getExecutiveOfficers(): Promise<{
   if (!people?.length) return [];
 
   const peopleMap = new Map((people as CivicPerson[]).map(p => [p.id, p]));
-  const orgsMap = new Map((orgs as any[]).map(o => [o.id, o]));
+  const agenciesMap = new Map((agencies as any[]).map(o => [o.id, o]));
 
   const results = (roles as CivicRole[]).map(role => ({
     person: peopleMap.get(role.person_id)!,
     role,
-    org: orgsMap.get(role.org_id)!,
+    org: agenciesMap.get(role.agency_id)!,
   })).filter(r => r.person && r.org);
 
   results.sort((a, b) => {
@@ -427,7 +419,7 @@ export async function getExecutiveOfficers(): Promise<{
   return results;
 }
 
-export interface OrgWithBudget extends CivicOrg {
+export interface AgencyWithBudget extends CivicAgency {
   gov_type?: string | null;
   /** Most recent available FY budget total in dollars */
   budget_amount?: number | null;
@@ -437,31 +429,31 @@ export interface OrgWithBudget extends CivicOrg {
 /**
  * Get departments and agencies under the Governor, with FY2026 budget totals merged in.
  */
-export async function getGovernorSubOrgs(): Promise<{
-  departments: OrgWithBudget[];
-  agencies: OrgWithBudget[];
-  boards: OrgWithBudget[];
+export async function getGovernorSubAgencies(): Promise<{
+  departments: AgencyWithBudget[];
+  agencies: AgencyWithBudget[];
+  boards: AgencyWithBudget[];
 }> {
   const supabase = await createCivicServerClient();
   const checkbookClient = await createSupabaseClient({ auth: false });
 
-  const { data: govOrg } = await supabase
-    .from('orgs')
+  const { data: govAgency } = await supabase
+    .from('agencies')
     .select('id')
     .eq('slug', 'governor')
     .single();
 
-  if (!govOrg) return { departments: [], agencies: [], boards: [] };
+  if (!govAgency) return { departments: [], agencies: [], boards: [] };
 
   const { data: children } = await supabase
-    .from('orgs')
+    .from('agencies')
     .select('*')
-    .eq('parent_id', (govOrg as any).id)
+    .eq('parent_id', (govAgency as any).id)
     .order('name');
 
   if (!children) return { departments: [], agencies: [], boards: [] };
 
-  const typed = children as OrgWithBudget[];
+  const typed = children as AgencyWithBudget[];
 
   // Collect agency names that have a checkbook mapping
   const agencyNames = typed
@@ -518,8 +510,8 @@ export async function getGovernorSubOrgs(): Promise<{
 
   return {
     departments: withBudget.filter(o => o.gov_type === 'department'),
-    agencies: withBudget.filter(o => o.gov_type === 'agency'),
-    boards: withBudget.filter(o => o.gov_type === 'board_commission_council'),
+    agencies: withBudget.filter(o => o.gov_type === 'authority' || o.gov_type === 'office'),
+    boards: withBudget.filter(o => o.gov_type === 'board' || o.gov_type === 'commission' || o.gov_type === 'council'),
   };
 }
 
@@ -543,24 +535,23 @@ export interface JudicialDistrict {
  * Get judicial branch data: court orgs, leadership, and districts
  */
 export async function getJudicialData(): Promise<{
-  courts: (CivicOrg & { gov_type?: string | null })[];
+  courts: (CivicAgency & { gov_type?: string | null })[];
   leaders: JudicialLeader[];
   districts: JudicialDistrict[];
 }> {
   const supabase = await createCivicServerClient();
-  // layers schema client for jurisdictions (different schema from civic)
   const layersClient = await createServerClient();
 
   const [courtsResult, rolesResult, districtsResult] = await Promise.all([
     supabase
-      .from('orgs')
+      .from('agencies')
       .select('*')
       .eq('branch', 'judicial')
       .eq('org_type', 'court')
       .order('name'),
     supabase
       .from('roles')
-      .select('title, person_id, org_id')
+      .select('title, person_id, agency_id')
       .eq('is_current', true),
     (layersClient as any)
       .schema('layers')
@@ -570,11 +561,10 @@ export async function getJudicialData(): Promise<{
       .order('district_number'),
   ]);
 
-  const courts = (courtsResult.data ?? []) as (CivicOrg & { gov_type?: string | null })[];
+  const courts = (courtsResult.data ?? []) as (CivicAgency & { gov_type?: string | null })[];
 
-  // Build judicial court id set
   const courtIds = new Set(courts.map(c => c.id));
-  const judicialRoles = (rolesResult.data ?? []).filter((r: any) => courtIds.has(r.org_id));
+  const judicialRoles = (rolesResult.data ?? []).filter((r: any) => courtIds.has(r.agency_id));
 
   let leaders: JudicialLeader[] = [];
   if (judicialRoles.length > 0) {
@@ -590,7 +580,7 @@ export async function getJudicialData(): Promise<{
     leaders = judicialRoles
       .map((r: any) => {
         const person = peopleMap.get(r.person_id);
-        const court = courtsMap.get(r.org_id);
+        const court = courtsMap.get(r.agency_id);
         if (!person || !court) return null;
         return {
           name: person.name,
@@ -623,35 +613,35 @@ export async function getJudicialData(): Promise<{
 }
 
 /**
- * Get organizations for a branch (executive | legislative | judicial)
+ * Get agencies for a branch (executive | legislative | judicial)
  */
-export async function getBranchOrgs(
+export async function getBranchAgencies(
   branch: 'executive' | 'legislative' | 'judicial'
-): Promise<(CivicOrg & { gov_type?: string | null })[]> {
+): Promise<(CivicAgency & { gov_type?: string | null })[]> {
   const supabase = await createCivicServerClient();
   const { data, error } = await supabase
-    .from('orgs')
+    .from('agencies')
     .select('*')
     .eq('branch', branch)
     .order('name');
   if (error) return [];
-  return (data ?? []) as (CivicOrg & { gov_type?: string | null })[];
+  return (data ?? []) as (CivicAgency & { gov_type?: string | null })[];
 }
 
 /**
- * Get a single building by id, with linked people, orgs, and roles
+ * Get a single building by id, with linked people, agencies, and roles
  */
 export async function getCivicBuildingById(id: string): Promise<{
   building: CivicBuilding;
   people: CivicPerson[];
-  orgs: CivicOrg[];
+  agencies: CivicAgency[];
 } | null> {
   const supabase = await createCivicServerClient();
 
-  const [buildingResult, peopleResult, orgsResult] = await Promise.all([
+  const [buildingResult, peopleResult, agenciesResult] = await Promise.all([
     supabase.from('buildings').select('*').eq('id', id).single(),
     supabase.from('people').select('*').eq('building_id', id).order('name'),
-    supabase.from('orgs').select('*').eq('building_id', id).order('name'),
+    supabase.from('agencies').select('*').eq('building_id', id).order('name'),
   ]);
 
   if (buildingResult.error || !(buildingResult as any).data) return null;
@@ -659,40 +649,39 @@ export async function getCivicBuildingById(id: string): Promise<{
   return {
     building: (buildingResult as any).data as CivicBuilding,
     people: ((peopleResult as any).data ?? []) as CivicPerson[],
-    orgs: ((orgsResult as any).data ?? []) as CivicOrg[],
+    agencies: ((agenciesResult as any).data ?? []) as CivicAgency[],
   };
 }
 
 /**
- * Get a single organization with its roles
+ * Get a single agency with its roles
  */
-export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | null> {
+export async function getCivicAgencyBySlug(slug: string): Promise<AgencyWithRoles | null> {
   const supabase = await createCivicServerClient();
   
-  const { data: org, error: orgError } = await supabase
-    .from('orgs')
+  const { data: agency, error: agencyError } = await supabase
+    .from('agencies')
     .select('*')
     .eq('slug', slug)
     .single();
 
-  if (orgError || !org) {
+  if (agencyError || !agency) {
     return null;
   }
 
-  const typedOrg = org as CivicOrg;
+  const typed = agency as CivicAgency;
 
-  // Get roles and people for this org
   const [rolesResult, peopleResult, childrenResult] = await Promise.all([
-    supabase.from('roles').select('*').eq('org_id', typedOrg.id).eq('is_current', true).order('title'),
+    supabase.from('roles').select('*').eq('agency_id', typed.id).eq('is_current', true).order('title'),
     supabase.from('people').select('*'),
-    supabase.from('orgs').select('*').eq('parent_id', typedOrg.id).order('name'),
+    supabase.from('agencies').select('*').eq('parent_id', typed.id).order('name'),
   ]);
 
   if (rolesResult.error) {
-    console.error('[civicService] Error fetching roles for org:', rolesResult.error);
+    console.error('[civicService] Error fetching roles for agency:', rolesResult.error);
   }
   if (childrenResult.error) {
-    console.error('[civicService] Error fetching child orgs:', childrenResult.error);
+    console.error('[civicService] Error fetching child agencies:', childrenResult.error);
   }
 
   const roles = (rolesResult.data || []) as CivicRole[];
@@ -702,13 +691,12 @@ export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | nu
     person: people.get(role.person_id) || undefined,
   })) as (CivicRole & { person?: CivicPerson })[];
 
-  // Recursively get roles for children
-  const childrenWithRoles: OrgWithRoles[] = await Promise.all(
-    ((childrenResult.data || []) as CivicOrg[]).map(async (child) => {
+  const childrenWithRoles: AgencyWithRoles[] = await Promise.all(
+    ((childrenResult.data || []) as CivicAgency[]).map(async (child) => {
       const { data: childRoles } = await supabase
         .from('roles')
         .select('*')
-        .eq('org_id', child.id)
+        .eq('agency_id', child.id)
         .eq('is_current', true);
 
       const childPeople = new Map(((peopleResult.data || []) as CivicPerson[]).map(p => [p.id, p]));
@@ -724,7 +712,7 @@ export async function getCivicOrgBySlug(slug: string): Promise<OrgWithRoles | nu
   );
 
   return {
-    ...typedOrg,
+    ...typed,
     roles: rolesWithPeople,
     children: childrenWithRoles,
   };
@@ -741,30 +729,29 @@ export interface DepartmentBudgetRow {
 
 /**
  * Get budget data for an org by slug.
- * Reads checkbook_agency_name directly from civic.orgs, then returns
+ * Reads checkbook_agency_name directly from civic.agencies, then returns
  * all available fiscal years from checkbook.budgets, newest first.
  */
 export async function getDepartmentBudget(
-  orgSlug: string
+  agencySlug: string
 ): Promise<DepartmentBudgetRow[] | null> {
   const supabase = await createSupabaseClient({ auth: false });
 
-  // Resolve org slug → checkbook agency name via civic.orgs
-  const { data: org } = await supabase
+  const { data: agency } = await supabase
     .schema('civic')
-    .from('orgs')
+    .from('agencies')
     .select('checkbook_agency_name')
-    .eq('slug', orgSlug)
+    .eq('slug', agencySlug)
     .single();
 
-  if (!org?.checkbook_agency_name) return null;
+  if (!agency?.checkbook_agency_name) return null;
 
   // Fetch all budget rows for that agency across all fiscal years
   const { data, error } = await (supabase as any)
     .schema('checkbook')
     .from('budgets')
     .select('budget_period, agency, budget_amount, spend_amount, remaining_amount, obligated_amount')
-    .eq('agency', org.checkbook_agency_name)
+    .eq('agency', agency.checkbook_agency_name)
     .order('budget_period', { ascending: false });
 
   if (error) {
@@ -818,25 +805,25 @@ export interface OrgContractRow {
  * Returns null if the org has no checkbook_agency_name set.
  */
 export async function getOrgContracts(
-  orgSlug: string,
+  agencySlug: string,
   limit = 10
 ): Promise<OrgContractRow[] | null> {
   const supabase = await createSupabaseClient({ auth: false });
 
-  const { data: org } = await supabase
+  const { data: agency } = await supabase
     .schema('civic')
-    .from('orgs')
+    .from('agencies')
     .select('checkbook_agency_name')
-    .eq('slug', orgSlug)
+    .eq('slug', agencySlug)
     .single();
 
-  if (!org?.checkbook_agency_name) return null;
+  if (!agency?.checkbook_agency_name) return null;
 
   const { data, error } = await (supabase as any)
     .schema('checkbook')
     .from('contracts')
     .select('payee, contract_type, total_contract_amount, start_date, end_date, contract_id')
-    .eq('agency', org.checkbook_agency_name)
+    .eq('agency', agency.checkbook_agency_name)
     .order('total_contract_amount', { ascending: false })
     .limit(limit);
 
@@ -847,3 +834,282 @@ export async function getOrgContracts(
 
   return (data ?? []) as OrgContractRow[];
 }
+
+/** Escape value for use in ilike pattern (allow % and _ as literals) */
+function escapeIlike(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+export interface DirectorySearchAgency {
+  id: string;
+  name: string;
+  slug: string;
+  branch: string | null;
+  gov_type: string | null;
+  description: string | null;
+}
+
+export interface DirectorySearchPerson {
+  id: string;
+  name: string;
+  slug: string | null;
+  party: string | null;
+  district: string | null;
+  title?: string | null;
+  roles?: Array<{ title: string; agencies: { branch: string; name: string; slug: string } | null }>;
+}
+
+export interface DirectorySearchRole {
+  id: string;
+  title: string;
+  person_id: string;
+  agency_id: string;
+  people: { id: string; name: string; slug: string | null; party: string | null } | null;
+  agencies: { id: string; name: string; slug: string; branch: string | null } | null;
+}
+
+export interface DirectorySearchResult {
+  agencies: DirectorySearchAgency[];
+  people: DirectorySearchPerson[];
+  roles: DirectorySearchRole[];
+}
+
+/**
+ * Search directory across agencies (name, description), people (name, district), and roles (title).
+ */
+export async function searchDirectory(query: string): Promise<DirectorySearchResult> {
+  const supabase = await createCivicServerClient();
+  const q = query.trim();
+  if (!q) {
+    return { agencies: [], people: [], roles: [] };
+  }
+  const pattern = `%${escapeIlike(q)}%`;
+
+  const [agenciesRes, peopleRes, rolesRes] = await Promise.all([
+    supabase
+      .from('agencies')
+      .select('id, name, slug, branch, gov_type, description')
+      .or(`name.ilike.${pattern},description.ilike.${pattern}`)
+      .limit(5),
+    supabase
+      .from('people')
+      .select('id, name, slug, party, district, title')
+      .or(`name.ilike.${pattern},district.ilike.${pattern},title.ilike.${pattern}`)
+      .limit(5),
+    supabase
+      .from('roles')
+      .select('id, title, person_id, agency_id, people(id, name, slug, party), agencies(id, name, slug, branch)')
+      .eq('is_current', true)
+      .ilike('title', pattern)
+      .limit(5),
+  ]);
+
+  const peopleData = (peopleRes.data ?? []) as Array<{
+    id: string;
+    name: string;
+    slug: string | null;
+    party: string | null;
+    district: string | null;
+    title: string | null;
+  }>;
+  const personIds = peopleData.map((p) => p.id);
+
+  // Attach current roles (with agency) for people so client can show title/org and branch
+  let peopleWithRoles: DirectorySearchPerson[] = peopleData.map((p) => ({
+    ...p,
+    roles: undefined,
+  }));
+  if (personIds.length > 0) {
+    const { data: rolesData } = await supabase
+      .from('roles')
+      .select('person_id, title, agencies(branch, name, slug)')
+      .in('person_id', personIds)
+      .eq('is_current', true);
+    const rolesByPerson = new Map<string, Array<{ title: string; agencies: { branch: string; name: string; slug: string } | null }>>();
+    (rolesData ?? []).forEach((r: any) => {
+      const list = rolesByPerson.get(r.person_id) ?? [];
+      list.push({
+        title: r.title,
+        agencies: r.agencies ?? null,
+      });
+      rolesByPerson.set(r.person_id, list);
+    });
+    peopleWithRoles = peopleData.map((p) => ({
+      ...p,
+      roles: rolesByPerson.get(p.id) ?? [],
+    }));
+  }
+
+  return {
+    agencies: (agenciesRes.data ?? []) as DirectorySearchAgency[],
+    people: peopleWithRoles,
+    roles: (rolesRes.data ?? []) as DirectorySearchRole[],
+  };
+}
+
+export interface DirectoryOverviewCounts {
+  agencyCount: number;
+  peopleCount: number;
+  roleCount: number;
+  buildingCount: number;
+}
+
+export interface DirectoryBranchSummary {
+  agencyCount: number;
+  peopleCount: number;
+  /** Executive: e.g. "$171B+ budget" */
+  budgetLabel?: string | null;
+  /** Legislative: senate member count */
+  senateCount?: number;
+  /** Legislative: house member count */
+  houseCount?: number;
+  /** Judicial: court count (e.g. 3) */
+  courtCount?: number;
+  /** Judicial: district count (e.g. 10) */
+  districtCount?: number;
+}
+
+export interface DirectoryOverview {
+  counts: DirectoryOverviewCounts;
+  branchSummaries: {
+    executive: DirectoryBranchSummary;
+    legislative: DirectoryBranchSummary;
+    judicial: DirectoryBranchSummary;
+  };
+}
+
+/**
+ * Fetch directory overview: total counts and per-branch summaries for the dashboard.
+ */
+export async function getDirectoryOverview(): Promise<DirectoryOverview> {
+  const supabase = await createCivicServerClient();
+
+  const [
+    agenciesRes,
+    peopleRes,
+    rolesRes,
+    buildingsRes,
+    agenciesByBranchRes,
+    rolesWithAgencyRes,
+  ] = await Promise.all([
+    supabase.from('agencies').select('id', { count: 'exact', head: true }),
+    supabase.from('people').select('id', { count: 'exact', head: true }),
+    supabase.from('roles').select('id', { count: 'exact', head: true }),
+    supabase.from('buildings').select('id', { count: 'exact', head: true }),
+    supabase.from('agencies').select('id, branch, slug, org_type'),
+    supabase.from('roles').select('person_id, agency_id').eq('is_current', true),
+  ]);
+
+  const agencyCount = agenciesRes.count ?? 0;
+  const peopleCount = peopleRes.count ?? 0;
+  const roleCount = rolesRes.count ?? 0;
+  const buildingCount = buildingsRes.count ?? 0;
+
+  const agencies = (agenciesByBranchRes.data ?? []) as Array<{
+    id: string;
+    branch: string | null;
+    slug: string | null;
+    org_type: string | null;
+  }>;
+  const rolesWithAgency = (rolesWithAgencyRes.data ?? []) as Array<{
+    person_id: string;
+    agency_id: string;
+  }>;
+
+  const agencyById = new Map(agencies.map((a) => [a.id, a]));
+  const execAgencyIds = new Set(agencies.filter((a) => a.branch === 'executive').map((a) => a.id));
+  const legAgencyIds = new Set(agencies.filter((a) => a.branch === 'legislative').map((a) => a.id));
+  const judAgencyIds = new Set(agencies.filter((a) => a.branch === 'judicial').map((a) => a.id));
+
+  const execPersonIds = new Set(
+    rolesWithAgency
+      .filter((r) => execAgencyIds.has(r.agency_id))
+      .map((r) => r.person_id)
+  );
+  const legPersonIds = new Set(
+    rolesWithAgency
+      .filter((r) => legAgencyIds.has(r.agency_id))
+      .map((r) => r.person_id)
+  );
+  const judPersonIds = new Set(
+    rolesWithAgency
+      .filter((r) => judAgencyIds.has(r.agency_id))
+      .map((r) => r.person_id)
+  );
+
+  const execAgencies = agencies.filter((a) => a.branch === 'executive');
+  const legAgencies = agencies.filter((a) => a.branch === 'legislative');
+  const judAgencies = agencies.filter((a) => a.branch === 'judicial');
+
+  const senateSlug = legAgencies.find((a) => (a.slug ?? '').includes('senate'))?.id;
+  const houseSlug = legAgencies.find((a) => (a.slug ?? '').includes('house'))?.id;
+  const senateCount = senateSlug
+    ? rolesWithAgency.filter((r) => r.agency_id === senateSlug).length
+    : 0;
+  const houseCount = houseSlug
+    ? rolesWithAgency.filter((r) => r.agency_id === houseSlug).length
+    : 0;
+
+  const courtCount = judAgencies.filter(
+    (a) =>
+      (a.slug ?? '').startsWith('mn-') &&
+      ((a.org_type ?? '') === 'court' || (a.slug ?? '').includes('court'))
+  ).length || 3;
+  const districtCount = judAgencies.filter((a) =>
+    (a.slug ?? '').includes('judicial-district')
+  ).length || 10;
+
+  let budgetLabel: string | null = null;
+  try {
+    const checkbookClient = await createSupabaseClient({ auth: false });
+    const { data: budgetRows } = await (checkbookClient as any)
+      .schema('checkbook')
+      .from('budgets')
+      .select('budget_amount')
+      .limit(5000);
+    if (Array.isArray(budgetRows) && budgetRows.length > 0) {
+      const total = (budgetRows as { budget_amount?: number }[]).reduce(
+        (sum, r) => sum + (Number(r.budget_amount) || 0),
+        0
+      );
+      if (total > 0) {
+        const billions = total / 1e9;
+        budgetLabel = billions >= 1 ? `$${billions.toFixed(0)}B+ budget` : `$${(total / 1e6).toFixed(0)}M+ budget`;
+      }
+    }
+  } catch {
+    budgetLabel = '$171B+ budget';
+  }
+
+  return {
+    counts: { agencyCount, peopleCount, roleCount, buildingCount },
+    branchSummaries: {
+      executive: {
+        agencyCount: execAgencies.length,
+        peopleCount: execPersonIds.size,
+        budgetLabel: budgetLabel ?? '$171B+ budget',
+      },
+      legislative: {
+        agencyCount: legAgencies.length,
+        peopleCount: legPersonIds.size,
+        senateCount: senateCount || 67,
+        houseCount: houseCount || 134,
+      },
+      judicial: {
+        agencyCount: judAgencies.length,
+        peopleCount: judPersonIds.size,
+        courtCount: courtCount,
+        districtCount: districtCount,
+      },
+    },
+  };
+}
+
+// Backward-compat aliases (prefer CivicAgency / getCivicAgencyBySlug / getBranchAgencies / getGovernorSubAgencies)
+export type CivicOrg = CivicAgency;
+export type OrgWithRoles = AgencyWithRoles;
+export type OrgWithBudget = AgencyWithBudget;
+export const getCivicOrgBySlug = getCivicAgencyBySlug;
+export const getCivicOrgWithBuilding = getCivicAgencyWithBuilding;
+export const getBranchOrgs = getBranchAgencies;
+export const getGovernorSubOrgs = getGovernorSubAgencies;

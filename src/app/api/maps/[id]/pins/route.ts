@@ -284,7 +284,7 @@ export async function POST(
         }
 
         // Create pin using RPC function to insert into maps.pins
-        const { data: pinResult, error: pinError } = await supabase.rpc('insert_pin_to_maps_pins', {
+        const { data: pinResult, error: pinError } = await (supabase as any).rpc('insert_pin_to_maps_pins', {
           p_map_id: (map as any).id,
           p_author_account_id: accountId,
           p_lat: body.lat,
@@ -313,17 +313,17 @@ export async function POST(
           return createErrorResponse('Failed to create pin', 500);
         }
 
-        if (!pinResult || pinResult.length === 0) {
+        if (!pinResult || (pinResult as unknown[]).length === 0) {
           return createErrorResponse('Failed to create pin: No data returned', 500);
         }
 
-        const pin = pinResult[0];
+        const pin = (pinResult as unknown[])[0] as Record<string, unknown>;
         
         // Transform maps.pins format to expected API response format
         // Use original lat/lng values since we know them
         const responsePin = {
-          id: pin.id,
-          map_id: pin.map_id,
+          id: pin.id as string,
+          map_id: pin.map_id as string,
           lat: body.lat,
           lng: body.lng,
           emoji: pin.emoji,

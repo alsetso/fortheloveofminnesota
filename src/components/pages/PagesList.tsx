@@ -218,7 +218,7 @@ export default function PagesList() {
                   <div className="flex items-center justify-between pt-3 border-t border-white/10">
                     <div className="flex items-center gap-2 min-w-0">
                       {page.owner.image_url ? (
-                        <ProfilePhoto account={page.owner} size="xs" editable={false} />
+                        <ProfilePhoto account={page.owner as unknown as import('@/features/auth').Account} size="xs" editable={false} />
                       ) : (
                         <div className="w-6 h-6 rounded-full bg-surface-accent flex items-center justify-center flex-shrink-0">
                           <UserCircleIcon className="w-4 h-4 text-white/60" />

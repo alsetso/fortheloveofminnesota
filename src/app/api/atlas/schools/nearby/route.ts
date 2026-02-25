@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         const { createSupabaseClient } = await import('@/lib/supabase/unified');
         const supabase = await createSupabaseClient();
 
-        const { data, error } = await supabase.rpc('get_nearby_schools', {
+        const { data, error } = await (supabase as any).rpc('get_nearby_schools', {
           p_school_id: school_id,
           p_radius_miles: radius,
           p_limit: limit,

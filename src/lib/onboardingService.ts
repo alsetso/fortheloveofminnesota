@@ -1,7 +1,17 @@
 import type { Account } from '@/features/auth';
 
-/** MVP: 3 steps only. Extended steps (location, name, bio, etc.) deferred. */
-export type OnboardingStep = 'welcome' | 'username' | 'profile_photo';
+/** All onboarding steps (MVP + extended steps used in OnboardingClient). */
+export type OnboardingStep =
+  | 'welcome'
+  | 'username'
+  | 'profile_photo'
+  | 'name'
+  | 'bio'
+  | 'traits'
+  | 'owns_business'
+  | 'contact'
+  | 'location'
+  | 'review';
 
 export interface OnboardingState {
   currentStep: OnboardingStep;

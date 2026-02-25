@@ -59,7 +59,7 @@ export async function GET(
         const liveMapId = (liveMap as { id: string }).id;
 
         // Fetch pin from live map (no cross-schema join - accounts is in public)
-        const { data: pin, error } = await supabase
+        const { data: pin, error } = await (supabase as any)
           .schema('maps')
           .from('pins')
           .select(`
@@ -95,7 +95,7 @@ export async function GET(
           .eq('id', validatedPinId)
           .eq('map_id', liveMapId)
           .eq('is_active', true)
-          .single();
+          .single() as { data: Record<string, unknown> | null; error: unknown };
 
         if (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -143,7 +143,7 @@ export async function GET(
             .from('accounts')
             .select('id, username, first_name, last_name, image_url')
             .eq('id', pin.author_account_id)
-            .single();
+            .single() as { data: { id: string; username: string | null; first_name: string | null; last_name: string | null; image_url: string | null } | null };
           if (acc) account = acc;
         }
 
@@ -184,11 +184,11 @@ export async function GET(
             last_name: account.last_name,
             image_url: account.image_url,
           } : null,
-          mention_type: pin.mention_type ? {
-            id: pin.mention_type.id,
-            emoji: pin.mention_type.emoji,
-            name: pin.mention_type.name,
-          } : null,
+          mention_type: (() => {
+            const mt = pin.mention_type;
+            const obj = Array.isArray(mt) ? (mt as any[])[0] : mt;
+            return obj ? { id: obj.id, emoji: obj.emoji, name: obj.name } : null;
+          })(),
           tagged_accounts,
         };
 

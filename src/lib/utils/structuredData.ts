@@ -166,10 +166,10 @@ export function generateExploreStructuredData(
     hasPart: favoriteCounties
       .filter(c => c.slug !== null)
       .slice(0, 10)
-      .map((county) => ({
+        .map((county) => ({
         '@type': 'County',
         name: county.name,
-        url: `${BASE_URL}/explore/counties/${county.id || county.slug}`,
+        url: `${BASE_URL}/explore/counties/${(county as { id?: string }).id ?? county.slug}`,
         ...(county.website_url && { sameAs: county.website_url }),
       })),
   };

@@ -83,12 +83,12 @@ export async function fetchExploreRecord(
       const data = await getStateBoundary();
       const stateId = (data as { id?: string }).id ?? 'mn';
       if (stateId !== id && id !== 'mn') return null;
-      const geometry = extractGeometry(data) ?? (data as { geometry?: GeoJSON.Geometry }).geometry ?? null;
-      const geomForCentroid = geometry ?? (data as { geometry?: { coordinates?: unknown } }).geometry;
-      const coords = (geomForCentroid as { coordinates?: unknown[] })?.coordinates;
-      const ring = Array.isArray(coords?.[0]?.[0]) ? coords![0][0] : coords?.[0];
-      const pt = Array.isArray(ring?.[0]) ? ring[0] : null;
-      const centroid: [number, number] = pt && pt.length >= 2 ? [Number(pt[0]), Number(pt[1])] : [-93.265, 44.9778];
+      const geometry = extractGeometry(data) ?? (data as unknown as { geometry?: GeoJSON.Geometry }).geometry ?? null;
+      const geomForCentroid = geometry ?? (data as unknown as { geometry?: { coordinates?: unknown } }).geometry;
+      const coords = (geomForCentroid as { coordinates?: unknown[] })?.coordinates as number[][][] | number[][] | undefined;
+      const ring = Array.isArray(coords?.[0]?.[0]) ? (coords as number[][][])[0][0] : (coords as number[][])?.[0];
+      const pt = ring?.[0];
+      const centroid: [number, number] = Array.isArray(pt) && pt.length >= 2 ? [Number(pt[0]), Number(pt[1])] : [-93.265, 44.9778];
       const result: ExploreRecordResult = {
         record: { ...(data as object), geometry: undefined } as Record<string, unknown>,
         geometry,

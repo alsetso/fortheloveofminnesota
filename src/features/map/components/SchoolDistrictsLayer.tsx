@@ -175,7 +175,7 @@ export default function SchoolDistrictsLayer({
       );
     }
 
-    moveMentionsLayersToTop(mapboxMap);
+    moveMentionsLayersToTop(mapboxMap as unknown as { getLayer: (id: string) => unknown; moveLayer: (id: string, beforeId?: string) => void });
 
     const highlightSource = mapboxMap.getSource(HIGHLIGHT_SOURCE_ID) as { setData?: (d: GeoJSON.FeatureCollection) => void } | undefined;
     const selectedFeature = selectedId ? features.find((f) => (f.properties as { id?: string })?.id === selectedId) : null;

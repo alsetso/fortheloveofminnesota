@@ -104,9 +104,9 @@ export default async function MentionPage({ params }: Props) {
   const mentionData = mention as any;
 
   // Page view count (detail page only); map view count is mentionData.view_count
-  const { data: pageViewCount } = await supabase.rpc('get_mention_page_view_count', {
+  const { data: pageViewCount } = await (supabase as any).rpc('get_mention_page_view_count', {
     p_mention_id: id,
-  }) as { data: number | null; error: unknown };
+  });
   mentionData.pin_view_count = mentionData.view_count ?? 0;
   mentionData.page_view_count = typeof pageViewCount === 'number' ? pageViewCount : 0;
 

@@ -111,9 +111,9 @@ export default function StoriesList() {
               last_name: account.last_name,
               image_url: account.image_url,
             },
-            slide_count: slideCounts.get(story.id) || 0,
+            slide_count: (slideCounts.get(story.id) ?? 0) as number,
           }))
-          .filter((story: Story) => story.slide_count > 0); // Only show stories with slides
+          .filter((story: Story) => (story.slide_count ?? 0) > 0); // Only show stories with slides
 
         setStories(storiesWithAuthor);
       } catch (err: any) {
@@ -196,7 +196,7 @@ export default function StoriesList() {
                 {/* Cover Image */}
                 <div className="aspect-video bg-surface-accent flex items-center justify-center border-b border-white/10 relative">
                   <CameraIcon className="w-16 h-16 text-white/20 group-hover:text-white/30 transition-colors" />
-                  {story.slide_count > 0 && (
+                  {story.slide_count != null && story.slide_count > 0 && (
                     <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 rounded text-xs text-white">
                       {story.slide_count} {story.slide_count === 1 ? 'slide' : 'slides'}
                     </div>
@@ -209,7 +209,7 @@ export default function StoriesList() {
                   <div className="flex items-center justify-between pt-3">
                     <div className="flex items-center gap-2 min-w-0">
                       {story.author.image_url ? (
-                        <ProfilePhoto account={story.author} size="xs" editable={false} />
+                        <ProfilePhoto account={story.author as unknown as import('@/features/auth').Account} size="xs" editable={false} />
                       ) : (
                         <div className="w-6 h-6 rounded-full bg-surface-accent flex items-center justify-center flex-shrink-0">
                           <UserCircleIcon className="w-4 h-4 text-white/60" />

@@ -16,6 +16,7 @@ import MapPage from '@/app/map/[id]/page';
 import { generateUUID } from '@/lib/utils/uuid';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 import type { MapInstance } from '@/components/layout/types';
+import type { LiveMapFooterStatusState } from '@/components/layout/LiveMapFooterStatus';
 import { MentionService } from '@/features/mentions/services/mentionService';
 import MapControls from '@/components/layout/MapControls';
 import type { NearbyPin } from '@/components/layout/types';
@@ -40,7 +41,7 @@ export default function HomePageContent() {
   const [pinDisplayGrouping, setPinDisplayGrouping] = useState(false);
   const [showOnlyMyPins, setShowOnlyMyPins] = useState(false);
   const [timeFilter, setTimeFilter] = useState<'24h' | '7d' | null>(null);
-  const [liveStatus, setLiveStatus] = useState({
+  const [liveStatus, setLiveStatus] = useState<LiveMapFooterStatusState>({
     loadingData: true,
     mapLoaded: false,
     loadingPins: false,
@@ -625,7 +626,9 @@ export default function HomePageContent() {
     const showMentionTypeCard = Boolean(typeSlugFromUrl);
     return (
       <>
-        {showMentionTypeCard && !selectedLocation && <MentionTypeInfoCard typeSlug={typeSlugFromUrl} />}
+        {showMentionTypeCard && !selectedLocation && typeSlugFromUrl != null && (
+          <MentionTypeInfoCard typeSlug={typeSlugFromUrl} />
+        )}
         <MapInfo
           location={selectedLocation}
           zoom={liveStatus.currentZoom}

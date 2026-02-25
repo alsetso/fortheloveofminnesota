@@ -10,7 +10,7 @@ import { MAP_CONFIG } from '@/features/map/config';
  */
 export default function WorkMap() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<import('mapbox-gl').default | null>(null);
+  const mapRef = useRef<import('mapbox-gl').Map | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {

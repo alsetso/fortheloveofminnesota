@@ -93,8 +93,9 @@ export function canUserPerformMapAction(
   }
   
   // Normalize requiredPlan to valid PlanLevel (handle legacy professional/business/plus plans)
+  const planStr = String(requiredPlan);
   const normalizedRequiredPlan: PlanLevel = 
-    requiredPlan === 'professional' || requiredPlan === 'business' || requiredPlan === 'plus'
+    planStr === 'professional' || planStr === 'business' || planStr === 'plus'
       ? 'contributor'
       : (requiredPlan === 'hobby' || requiredPlan === 'contributor' ? requiredPlan : 'contributor');
   

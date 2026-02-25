@@ -11,7 +11,7 @@ import { MAP_CONFIG } from '@/features/map/config';
  */
 export default function RealEstateMap() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<import('mapbox-gl').default | null>(null);
+  const mapRef = useRef<import('mapbox-gl').Map | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function RealEstateMap() {
           map.addControl(new mapbox.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-              if (mounted && mapRef.current && !mapRef.current.removed) {
+              if (mounted && mapRef.current && !(mapRef.current as { _removed?: boolean })._removed) {
                 mapRef.current.resize();
               }
               setReady(true);
@@ -78,7 +78,7 @@ export default function RealEstateMap() {
       if (mapRef.current) {
         try {
           const m = mapRef.current;
-          if (!m.removed) m.remove();
+          if (!(m as { _removed?: boolean })._removed) m.remove();
         } catch {
           // ignore
         }

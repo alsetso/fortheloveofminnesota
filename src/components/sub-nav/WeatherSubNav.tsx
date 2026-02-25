@@ -64,7 +64,7 @@ export default function WeatherSubNav() {
               {section.label}
             </p>
             <div className="space-y-0.5">
-              {section.items.map((item) => {
+              {section.items.map((item: { label: string; href: string; icon: typeof CloudIcon; exact?: boolean }) => {
                 const active = isActive(item.href, item.exact);
                 const Icon = item.icon;
                 return (

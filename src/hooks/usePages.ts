@@ -24,7 +24,8 @@ export function usePages() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!account?.id) {
+    const accountId = account?.id;
+    if (!accountId) {
       setPages([]);
       setLoading(false);
       return;
@@ -35,13 +36,11 @@ export function usePages() {
         setLoading(true);
         setError(null);
 
-        // Type assertion needed: Supabase TypeScript types only support 'public' schema,
-        // but we need to query from 'pages' schema. The schema() method exists at runtime.
         const { data, error: fetchError } = await (supabase as any)
           .schema('pages')
           .from('pages')
           .select('id, title, icon, shortcut_color, slug')
-          .eq('owner_id', account.id)
+          .eq('owner_id', accountId)
           .order('created_at', { ascending: false });
 
         if (fetchError) {

@@ -20,7 +20,8 @@ export type AppModalType =
   | 'analytics'
   | 'atlas'
   | 'coming-soon'
-  | 'successPin';
+  | 'successPin'
+  | 'mission';
 
 // Modal state with context
 export interface AppModalState {
@@ -79,6 +80,7 @@ export interface UseAppModalsReturn {
   openComingSoon: (feature: string) => void;
   openSuccessPin: (pinData: { id?: string; lat: number; lng: number; description: string | null; media_url: string | null; status?: 'loading' | 'success' | 'error'; error?: string }) => void;
   updateSuccessPin: (updates: { id?: string; status?: 'loading' | 'success' | 'error'; error?: string; media_url?: string | null }) => void;
+  openMission: () => void;
   
   // Close
   closeModal: () => void;

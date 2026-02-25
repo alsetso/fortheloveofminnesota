@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { UserCircleIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { usePage } from '@/hooks/usePage';
+import type { Account } from '@/features/auth';
 
 interface PageDetailRightSidebarProps {
   pageId: string;
@@ -41,7 +42,7 @@ export default function PageDetailRightSidebar({ pageId }: PageDetailRightSideba
             className="flex items-center gap-3 p-2 bg-surface-accent rounded-md hover:bg-surface-accent/80 transition-colors"
           >
             {page.owner.image_url ? (
-              <ProfilePhoto account={page.owner} size="md" editable={false} />
+              <ProfilePhoto account={page.owner as unknown as Account} size="md" editable={false} />
             ) : (
               <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center border border-white/10">
                 <UserCircleIcon className="w-5 h-5 text-white/60" />

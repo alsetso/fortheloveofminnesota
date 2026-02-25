@@ -133,13 +133,20 @@ export default function OnboardingClient({ initialAccount, redirectTo, onComplet
   const locationMapInstanceRef = useRef<MapboxMapInstance | null>(null);
   const [locationMapLoaded, setLocationMapLoaded] = useState(false);
 
-  const totalSteps = 3;
-  const stepIndexMap: Record<OnboardingStep, number> = {
+  const totalSteps = 10;
+  const stepIndexMap: Partial<Record<OnboardingStep, number>> = {
     welcome: 0,
     username: 1,
     profile_photo: 2,
+    name: 3,
+    bio: 4,
+    traits: 5,
+    owns_business: 6,
+    contact: 7,
+    location: 8,
+    review: 9,
   };
-  const stepIndex = stepIndexMap[currentStep];
+  const stepIndex = stepIndexMap[currentStep] ?? 0;
 
   // Update stepper state when step changes
   useEffect(() => {

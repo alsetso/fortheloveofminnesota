@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createServerClientWithAuth(cookies());
         
         // Use RPC function to fetch pins from maps.pins
-        const { data: pinsResult, error } = await supabase.rpc('fetch_live_map_pins');
+        const { data: pinsResult, error } = await (supabase as any).rpc('fetch_live_map_pins');
         
         if (error) {
           console.error('[Admin Mentions API] Error fetching pins:', error);
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         }
         
         // Transform to match Mention format
-        const mentions = (pinsResult || []).map((pin: any) => ({
+        const mentions = ((pinsResult || []) as any[]).map((pin: any) => ({
           id: pin.id,
           map_id: pin.map_id,
           lat: pin.lat,

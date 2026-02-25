@@ -65,14 +65,16 @@ export function useExploreMapLayerInteraction({
 
     const mapboxMap = map as unknown as {
       queryRenderedFeatures: (point: unknown, opts?: { layers: string[] }) => MapboxFeature[];
-      on: (ev: string, fn: (e: { point: unknown; lngLat: { lng: number; lat: number } }) => void) => void;
-      off: (ev: string, fn: (e: unknown) => void) => void;
+      on: (ev: string, fn: (e: unknown) => void) => void;
+      off: (ev: string, fn?: (e: unknown) => void) => void;
       once: (ev: string, fn: () => void) => void;
-      getCanvas: () => { style: { cursor: string } };
+      getCanvas: () => { style: { cursor: string }; title?: string };
       isStyleLoaded?: () => boolean;
     };
 
-    const handleMouseMove = (e: mapboxgl.MapMouseEvent) => {
+type MapMouseEvent = { point: unknown; lngLat: { lng: number; lat: number } };
+
+    const handleMouseMove = (e: MapMouseEvent) => {
       const now = Date.now();
       if (now - lastMoveTimeRef.current < HOVER_THROTTLE_MS) {
         if (rafRef.current == null) {
@@ -97,7 +99,7 @@ export function useExploreMapLayerInteraction({
       return { layer: fc.layer, id, name };
     };
 
-    const processHover = (e: mapboxgl.MapMouseEvent) => {
+    const processHover = (e: MapMouseEvent) => {
       const features = mapboxMap.queryRenderedFeatures(e.point, { layers: fillLayerIds });
       const feature = features[0] as MapboxFeature | undefined;
 
@@ -136,7 +138,7 @@ export function useExploreMapLayerInteraction({
       onHoverRef.current?.(null);
     };
 
-    const handleClick = (e: mapboxgl.MapMouseEvent) => {
+    const handleClick = (e: MapMouseEvent) => {
       const features = mapboxMap.queryRenderedFeatures(e.point, { layers: fillLayerIds });
       const feature = features[0] as MapboxFeature | undefined;
       if (!feature) return;
@@ -149,9 +151,9 @@ export function useExploreMapLayerInteraction({
     };
 
     const attach = () => {
-      mapboxMap.on('mousemove', handleMouseMove);
+      mapboxMap.on('mousemove', handleMouseMove as (e: unknown) => void);
       mapboxMap.on('mouseout', handleMouseOut);
-      mapboxMap.on('click', handleClick);
+      mapboxMap.on('click', handleClick as (e: unknown) => void);
     };
 
     if (mapboxMap.isStyleLoaded?.()) {
@@ -162,9 +164,9 @@ export function useExploreMapLayerInteraction({
 
     return () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-      mapboxMap.off('mousemove', handleMouseMove);
+      mapboxMap.off('mousemove', handleMouseMove as (e: unknown) => void);
       mapboxMap.off('mouseout', handleMouseOut);
-      mapboxMap.off('click', handleClick);
+      mapboxMap.off('click', handleClick as (e: unknown) => void);
     };
   }, [map, mapLoaded, layerSlug, overlayLayerSlug, config, overlayConfig, fillLayerIds]);
 }

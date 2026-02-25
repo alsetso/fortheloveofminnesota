@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
             total: allRoutes.length,
           },
           uncoveredBySegment: Object.fromEntries(uncoveredBySegment),
-          uncoveredRoutes: uncoveredRoutes.map(r => r.route),
+          uncoveredRouteList: uncoveredRoutes.map(r => r.route),
           routeCoverage,
         });
       } catch (error) {

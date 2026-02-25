@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -18,7 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { usePage } from '@/hooks/usePage';
-import { useAuthStateSafe } from '@/features/auth';
+import { useAuthStateSafe, type Account } from '@/features/auth';
 
 interface PageDetailContentProps {
   pageId: string;
@@ -127,7 +127,7 @@ export default function PageDetailContent({ pageId }: PageDetailContentProps) {
   // Legacy markdown parser (for fallback)
   const parseContent = (content: string) => {
     const lines = content.split('\n');
-    const blocks: JSX.Element[] = [];
+    const blocks: ReactElement[] = [];
     let inList = false;
     let listItems: string[] = [];
     let inCodeBlock = false;
@@ -452,7 +452,7 @@ export default function PageDetailContent({ pageId }: PageDetailContentProps) {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             {page.owner.image_url ? (
-              <ProfilePhoto account={page.owner} size="md" editable={false} />
+              <ProfilePhoto account={page.owner as unknown as Account} size="md" editable={false} />
             ) : (
               <div className="w-10 h-10 rounded-full bg-surface-accent flex items-center justify-center border border-white/10">
                 <UserCircleIcon className="w-5 h-5 text-white/60" />

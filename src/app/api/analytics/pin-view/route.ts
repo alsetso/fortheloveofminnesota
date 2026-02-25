@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
           .from('map_pins')
           .select('view_count')
           .eq('id', pin_id)
-          .single();
+          .single() as { data: { view_count?: number } | null };
 
         const viewCount = pinRow?.view_count ?? 0;
 

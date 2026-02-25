@@ -122,5 +122,7 @@ export function extractPointFromGeometry(geom: GeoJSON.Geometry | null | undefin
   const ring = Array.isArray(coords[0]?.[0]) && typeof coords[0][0][0] === 'number' ? coords[0][0] : coords[0];
   const pt = ring?.[0];
   if (!Array.isArray(pt) || pt.length < 2) return null;
-  return [pt[0], pt[1]];
+  const a = pt[0];
+  const b = pt[1];
+  return typeof a === 'number' && typeof b === 'number' ? [a, b] : null;
 }

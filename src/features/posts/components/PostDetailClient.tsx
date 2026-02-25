@@ -12,6 +12,7 @@ import MentionCard from '@/components/feed/MentionCard';
 import { Account } from '@/features/auth';
 import { getMapUrl, getMapPostEditUrl } from '@/lib/maps/urls';
 import PostContent from '@/components/posts/PostContent';
+import type { Post } from '@/types/post';
 
 interface PostDetailClientProps {
   mapId?: string;
@@ -467,12 +468,12 @@ export default function PostDetailClient({ post, isOwner, mapId, mapSlug, useNew
           )}
 
           {/* Content */}
-          <div className={`text-sm mb-4 leading-relaxed ${post.background_color ? '-mx-4' : useNewWrapper ? 'text-white/90' : 'text-gray-900'}`}>
+          <div className={`text-sm mb-4 leading-relaxed ${(post as Post).background_color ? '-mx-4' : useNewWrapper ? 'text-white/90' : 'text-gray-900'}`}>
             <PostContent 
               content={post.content} 
               taggedAccounts={post.tagged_accounts}
               className="whitespace-pre-wrap"
-              backgroundColor={post.background_color || null}
+              backgroundColor={(post as Post).background_color || null}
             />
           </div>
 

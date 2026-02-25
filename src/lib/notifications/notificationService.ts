@@ -19,7 +19,7 @@ export async function createNotification(
 ): Promise<NotificationAlert> {
   const supabase = await createServiceClient();
 
-  const { data, error } = await supabase.rpc('create_alert', {
+  const { data, error } = await (supabase as any).rpc('create_alert', {
     p_account_id: params.account_id,
     p_event_type: params.event_type,
     p_title: params.title,

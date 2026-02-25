@@ -73,9 +73,11 @@ interface LivePinCardProps {
   pin?: LivePinData | null;
   /** Current viewer's account id (from auth). When equal to pin.account_id, the owner is viewing. */
   currentAccountId?: string | null;
+  /** Optional close callback (e.g. for overlay card). */
+  onClose?: () => void;
 }
 
-export default function LivePinCard({ pinId, pin: pinProp, currentAccountId }: LivePinCardProps) {
+export default function LivePinCard({ pinId, pin: pinProp, currentAccountId, onClose }: LivePinCardProps) {
   const { account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   const isAuthenticated = Boolean(account || activeAccountId);

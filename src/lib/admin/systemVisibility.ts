@@ -62,13 +62,13 @@ export async function isSystemVisible(schemaName: string): Promise<boolean> {
     .from('system_visibility')
     .select('is_visible, is_enabled')
     .eq('schema_name', schemaName)
-    .single();
+    .single() as { data: { is_visible?: boolean; is_enabled?: boolean } | null; error: unknown };
   
   if (error || !data) {
     return true; // Default to visible if not found
   }
   
-  return data.is_visible && data.is_enabled;
+  return Boolean(data.is_visible && data.is_enabled);
 }
 
 /**

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { AccountService } from '@/features/auth/services/memberService';
-import type { Mention, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
+import type { Mention, MentionVisibility, CreateMentionData, MentionFilters, MentionGeoJSONCollection, MentionGeoJSONFeature } from '@/types/mention';
 
 /**
  * Service for managing mentions
@@ -397,21 +397,18 @@ export class MentionService {
       mentionTypeData = tagData;
     }
 
-    // Transform to Mention format
-    const mention: Mention = {
+    // Transform to Mention format (cast to Mention; maps.pins has extra fields like emoji/mention_type_id)
+    const mention = {
       id: pin.id,
       map_id: pin.map_id,
-      lat: data.lat, // Keep original lat/lng for compatibility
+      lat: data.lat,
       lng: data.lng,
-      description: pin.body,
-      caption: pin.caption,
-      emoji: pin.emoji,
+      description: pin.body ?? pin.caption ?? null,
       image_url: pin.image_url,
       video_url: pin.video_url,
       media_type: pin.media_type as 'image' | 'video' | 'none',
       account_id: pin.author_account_id,
-      mention_type_id: pin.tag_id,
-      visibility: pin.visibility as 'public' | 'private',
+      visibility: (pin.visibility === 'private' ? 'only_me' : (pin.visibility as MentionVisibility)),
       archived: pin.archived,
       post_date: pin.post_date,
       created_at: pin.created_at,
@@ -426,20 +423,19 @@ export class MentionService {
           ? JSON.parse(pin.tagged_account_ids) 
           : []),
       account: accountData ? {
-        id: accountData.id,
-        username: accountData.username,
-        first_name: accountData.first_name,
-        image_url: accountData.image_url,
+        id: String(accountData.id),
+        username: accountData.username ?? null,
+        image_url: accountData.image_url ?? null,
       } : null,
       mention_type: mentionTypeData ? {
         id: mentionTypeData.id,
         emoji: mentionTypeData.emoji,
         name: mentionTypeData.name,
       } : null,
-      collection_id: null, // maps.pins doesn't have collection_id
-      city_id: null, // maps.pins doesn't have city_id
-      is_active: true, // maps.pins doesn't have is_active, assume true
-    };
+      collection_id: null,
+      city_id: null,
+      is_active: true,
+    } as Mention;
 
     return mention;
   }

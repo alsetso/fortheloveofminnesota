@@ -113,7 +113,7 @@ export default function NewPageWrapper({
   // Layout constants - extracted for maintainability
   const LAYOUT_CONSTANTS = {
     LEFT_SIDEBAR_WIDTH: 256,
-    RIGHT_SIDEBAR_WIDTH: 320,
+    RIGHT_SIDEBAR_WIDTH: 256,
     SUB_SIDEBAR_WIDTH: 240,
     MIN_CENTER_WIDTH: 400,
     RESIZE_THROTTLE_MS: 150,
@@ -362,7 +362,7 @@ export default function NewPageWrapper({
 
           {/* Right Column - w-80, aligns with right sidebar, shows when space allows (viewport only) */}
           {headerCanShowRightSidebar && (
-            <div className="flex items-center justify-end w-80 flex-shrink-0 px-4 border-l border-border-muted dark:border-white/10">
+            <div className="flex items-center justify-end w-64 flex-shrink-0 px-4 border-l border-border-muted dark:border-white/10">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -479,7 +479,7 @@ export default function NewPageWrapper({
             aria-label="Sub navigation"
             role="complementary"
           >
-            <div className="flex-shrink-0 flex items-center justify-end px-2 pt-2 bg-white dark:bg-surface">
+            <div className="flex-shrink-0 flex items-center justify-end px-2 pt-2 bg-surface">
               <button
                 type="button"
                 onClick={() => onSubSidebarOpenChange?.(false)}
@@ -555,7 +555,7 @@ export default function NewPageWrapper({
           <aside 
             className={`sticky top-14 flex-shrink-0 h-[calc(100vh-3.5rem)] overflow-y-auto transition-all duration-200 ease-out ${
               effectiveCanShowRightSidebar 
-                ? 'w-80 opacity-100' 
+                ? 'w-64 opacity-100' 
                 : 'w-0 opacity-0 pointer-events-none overflow-hidden'
             }`}
             aria-hidden={!effectiveCanShowRightSidebar}
@@ -619,7 +619,7 @@ export default function NewPageWrapper({
               <button
                 type="button"
                 onClick={closeMobilePanel}
-                className="w-8 h-8 rounded-md hover:bg-gray-50 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-md hover:bg-surface-accent flex items-center justify-center transition-colors"
                 aria-label="Close"
               >
                 <XMarkIcon className="w-4 h-4 text-foreground-muted" />

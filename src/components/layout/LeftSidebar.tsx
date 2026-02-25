@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -17,6 +17,8 @@ import {
   MagnifyingGlassIcon,
   UserPlusIcon,
   CurrencyDollarIcon,
+  ChevronDownIcon,
+  EllipsisHorizontalIcon,
 } from '@heroicons/react/24/outline';
 import {
   UserCircleIcon as UserCircleIconSolid,
@@ -123,6 +125,9 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
     { label: 'Schools', icon: AcademicCapIcon, iconSolid: AcademicCapIconSolid, href: '/schools' },
     { label: 'Transportation', icon: TruckIcon, iconSolid: TruckIconSolid, href: '/transportation' },
     { label: 'Government', icon: BuildingOfficeIcon, iconSolid: BuildingOfficeIconSolid, href: '/gov' },
+  ];
+
+  const seeMoreNav = [
     { label: 'Realestate', icon: HomeModernIcon, iconSolid: HomeModernIconSolid, href: '/realestate' },
     { label: 'Work', icon: BriefcaseIcon, iconSolid: BriefcaseIconSolid, href: '/work' },
     { label: 'Weather', icon: CloudIcon, iconSolid: CloudIconSolid, href: '/weather' },
@@ -135,6 +140,21 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
   };
 
   const showPricingLink = !account || account.plan !== 'contributor';
+
+  const [seeMoreOpen, setSeeMoreOpen] = useState(false);
+  const seeMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (seeMoreRef.current && !seeMoreRef.current.contains(event.target as Node)) {
+        setSeeMoreOpen(false);
+      }
+    };
+    if (seeMoreOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [seeMoreOpen]);
 
   return (
     <div className="h-full flex flex-col overflow-y-auto scrollbar-hide bg-white dark:bg-header">
@@ -202,6 +222,44 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
             <span>Pricing</span>
           </Link>
         )}
+        <div className="relative" ref={seeMoreRef}>
+          <button
+            type="button"
+            onClick={() => setSeeMoreOpen(!seeMoreOpen)}
+            className={`w-full flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
+              seeMoreOpen
+                ? 'bg-surface-accent text-foreground'
+                : 'text-foreground-muted hover:bg-surface-accent hover:text-foreground'
+            }`}
+          >
+            <EllipsisHorizontalIcon className="w-5 h-5" />
+            <span>See more</span>
+            <ChevronDownIcon className={`w-4 h-4 ml-auto transition-transform ${seeMoreOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {seeMoreOpen && (
+            <div className="absolute left-0 right-0 top-full mt-1 py-1 bg-white dark:bg-surface border border-border-muted dark:border-white/10 rounded-md shadow-lg z-10">
+              {seeMoreNav.map((item) => {
+                const isActive = isNavActive(item.href);
+                const Icon = isActive ? item.iconSolid : item.icon;
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    onClick={() => setSeeMoreOpen(false)}
+                    className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                      isActive
+                        ? 'bg-surface-accent text-foreground'
+                        : 'text-foreground-muted hover:bg-surface-accent hover:text-foreground'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Following Section or Custom Content */}

@@ -3,12 +3,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { ChartBarIcon, ChevronDownIcon, ChevronUpIcon, UserIcon, ClockIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, UserIcon, ClockIcon } from '@heroicons/react/24/outline';
 import NewPageWrapper from '@/components/layout/NewPageWrapper';
 import LeftSidebar from '@/components/layout/LeftSidebar';
 import RightSidebar from '@/components/layout/RightSidebar';
 import Image from 'next/image';
 import { isCardVisible, type AnalyticsCardId } from '@/lib/analytics/cardVisibility';
+import BillingFeatureGate from '@/components/billing/BillingFeatureGate';
 
 interface View {
   id: string;
@@ -29,7 +30,6 @@ interface View {
 
 type TimeFilter = '24h' | '7d' | '30d' | '90d' | 'all';
 type UrlVisitFilter = 'all' | 'profile' | 'mention' | 'post';
-type ProfilePinViewFilter = 'all' | 'profile' | 'mention' | 'pin_click';
 
 interface AnalyticsClientProps {
   profileViews: number;
@@ -67,14 +67,53 @@ export default function AnalyticsClient({
   const pathname = usePathname();
   const totalViews = profileViews + pinViews + mentionPageViews + postViews + mapViews;
   
-  // Separate filter states
+  // Filter and UI state
   const [urlVisitFilter, setUrlVisitFilter] = useState<UrlVisitFilter>('all');
-  const [profilePinViewFilter, setProfilePinViewFilter] = useState<ProfilePinViewFilter>('all');
   const [displayLimit, setDisplayLimit] = useState(50);
-  const [profilePinDisplayLimit, setProfilePinDisplayLimit] = useState(50);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(initialTimeFilter);
   const [isTimeFilterOpen, setIsTimeFilterOpen] = useState(false);
+  const [visitHistoryOpen, setVisitHistoryOpen] = useState(false);
+  const [expandedPinId, setExpandedPinId] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const transitioningTargetRef = useRef<TimeFilter | null>(null);
   const timeFilterRef = useRef<HTMLDivElement>(null);
+
+  // Extract pin ID from view URL (for grouping)
+  const getPinIdFromView = (view: View): string | null => {
+    const mentionMatch = view.url.match(/\/mention\/([a-f0-9-]{36})/i);
+    if (mentionMatch) return mentionMatch[1];
+    const pinMatch = view.url.match(/[?&](?:pin|pinId)=([a-f0-9-]{36})/i);
+    return pinMatch ? pinMatch[1] : null;
+  };
+
+  // Section 1: Profile view rows only (view_type === 'profile')
+  const profileViewRows = useMemo(
+    () => profileAndPinViewersList.filter((v) => v.view_type === 'profile'),
+    [profileAndPinViewersList]
+  );
+
+  // Section 2: Pin/mention view rows (view_type === 'mention' | 'pin_click')
+  const pinViewRows = useMemo(
+    () => profileAndPinViewersList.filter((v) => v.view_type === 'mention' || v.view_type === 'pin_click'),
+    [profileAndPinViewersList]
+  );
+
+  // Per-pin grouping: pinId -> { pinId, title, views }
+  const pinGroups = useMemo(() => {
+    const map = new Map<string, { pinId: string; title: string; views: View[] }>();
+    for (const view of pinViewRows) {
+      const pinId = getPinIdFromView(view);
+      if (!pinId) continue;
+      const existing = map.get(pinId);
+      const title = view.content_title || 'Pin';
+      if (existing) {
+        existing.views.push(view);
+      } else {
+        map.set(pinId, { pinId, title, views: [view] });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.views.length - a.views.length);
+  }, [pinViewRows]);
 
   // Close time filter when clicking outside
   useEffect(() => {
@@ -88,25 +127,6 @@ export default function AnalyticsClient({
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isTimeFilterOpen]);
-
-  // Filter profile/pin viewers by type
-  const filteredProfilePinViewers = useMemo(() => {
-    let list = profileAndPinViewersList;
-    if (profilePinViewFilter !== 'all') {
-      list = list.filter((v) => v.view_type === profilePinViewFilter);
-    }
-    return list.slice(0, profilePinDisplayLimit);
-  }, [profileAndPinViewersList, profilePinViewFilter, profilePinDisplayLimit]);
-
-  const profilePinViewCounts = useMemo(
-    () => ({
-      all: profileAndPinViewersList.length,
-      profile: profileAndPinViewersList.filter((v) => v.view_type === 'profile').length,
-      mention: profileAndPinViewersList.filter((v) => v.view_type === 'mention').length,
-      pin_click: profileAndPinViewersList.filter((v) => v.view_type === 'pin_click').length,
-    }),
-    [profileAndPinViewersList]
-  );
 
   // Filter URL visit history by type
   const filteredUrlVisitHistory = useMemo(() => {
@@ -241,18 +261,29 @@ export default function AnalyticsClient({
   }, [searchParams]);
 
   const handleTimeFilterChange = (newFilter: TimeFilter) => {
-    setTimeFilter(newFilter);
+    if (newFilter === timeFilter) return;
     setIsTimeFilterOpen(false);
+    setIsTransitioning(true);
+    transitioningTargetRef.current = newFilter;
+    setTimeFilter(newFilter);
     const params = new URLSearchParams(searchParams.toString());
-    
     if (newFilter === '24h') {
       params.delete('time');
     } else {
       params.set('time', newFilter);
     }
-    
     router.push(`${pathname}?${params.toString()}`);
   };
+
+  // Clear transitioning when URL (and thus server data) has updated
+  useEffect(() => {
+    if (!isTransitioning || !transitioningTargetRef.current) return;
+    const current = (searchParams.get('time') as TimeFilter | null) || '24h';
+    if (current === transitioningTargetRef.current) {
+      setIsTransitioning(false);
+      transitioningTargetRef.current = null;
+    }
+  }, [searchParams, isTransitioning]);
 
   const getTimeFilterLabel = (tf: TimeFilter) => {
     switch (tf) {
@@ -263,6 +294,28 @@ export default function AnalyticsClient({
       case 'all': return 'All time';
     }
   };
+
+  // Skeleton for transitioning state (time filter change)
+  const TransitionSkeleton = ({ className = '' }: { className?: string }) => (
+    <div
+      className={`rounded bg-surface-accent dark:bg-white/10 animate-pulse ${className}`}
+      aria-hidden
+    />
+  );
+  const ListSpinner = () => (
+    <div className="flex items-center justify-center py-12" aria-label="Loading">
+      <svg
+        className="w-8 h-8 text-foreground-muted animate-spin"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        aria-hidden
+      >
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
+    </div>
+  );
 
   // Analytics cards
   const allStats = [
@@ -475,6 +528,66 @@ export default function AnalyticsClient({
     >
       <div className="w-full py-6">
         <div className="max-w-4xl mx-auto px-4 space-y-6">
+          {isTransitioning ? (
+            <>
+              {/* Header — skeleton time selector */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ChartBarIcon className="w-4 h-4 text-foreground-muted" />
+                  <h1 className="text-sm font-semibold text-foreground">Analytics</h1>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-border-muted dark:border-white/10">
+                  <ClockIcon className="w-3 h-3 text-foreground-muted" />
+                  <TransitionSkeleton className="h-3.5 w-16" />
+                </div>
+              </div>
+              {/* Stat cards — skeleton values */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {stats.map((stat) => (
+                  <div key={stat.id} className={`border rounded-md p-[10px] ${getStatCardColor(stat.color)}`}>
+                    <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wide">{stat.label}</p>
+                    <TransitionSkeleton className="h-4 w-10 mt-0.5" />
+                    <TransitionSkeleton className="h-3 w-full mt-1.5" />
+                  </div>
+                ))}
+              </div>
+              {/* Section 1 — Profile Views: spinner */}
+              <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+                <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+                  <h2 className="text-sm font-semibold text-foreground">Profile Views</h2>
+                  <TransitionSkeleton className="h-3 w-48 mt-1.5" />
+                </div>
+                <ListSpinner />
+              </div>
+              {/* Section 2 — Pin Views: spinner */}
+              <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+                <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+                  <h2 className="text-sm font-semibold text-foreground">Pin Views</h2>
+                  <TransitionSkeleton className="h-3 w-40 mt-1.5" />
+                </div>
+                <ListSpinner />
+              </div>
+              {/* Section 3 — Visit History: collapsed skeleton */}
+              <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+                <div className="flex items-center gap-2 p-[10px]">
+                  <ChevronDownIcon className="w-4 h-4 text-foreground-muted flex-shrink-0" />
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Your Visit History</h2>
+                    <TransitionSkeleton className="h-3 w-56 mt-1.5" />
+                  </div>
+                </div>
+              </div>
+              {/* Map Views: spinner */}
+              <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+                <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+                  <h2 className="text-sm font-semibold text-foreground">Map views</h2>
+                  <TransitionSkeleton className="h-3 w-44 mt-1.5" />
+                </div>
+                <ListSpinner />
+              </div>
+            </>
+          ) : (
+            <>
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -532,70 +645,48 @@ export default function AnalyticsClient({
             ))}
           </div>
 
-          {/* Who Viewed Your Account & Pins */}
-          {profileAndPinViewersList.length > 0 && (
-            <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
-              <div className="p-[10px] border-b border-border-muted dark:border-white/10">
-                <h2 className="text-sm font-semibold text-foreground">Who viewed your account & pins</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  People who viewed your profile or pins
-                </p>
-                <div className="flex gap-1 mt-3">
-                  {(['all', 'profile', 'mention', 'pin_click'] as ProfilePinViewFilter[]).map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setProfilePinViewFilter(f)}
-                      className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${profilePinViewFilter === f ? 'border-border-muted dark:border-white/20 bg-surface-accent dark:bg-white/10 text-foreground' : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'}`}
-                    >
-                      {f === 'all' ? 'All' : f === 'profile' ? 'Profile' : f === 'mention' ? 'Mention' : 'Map Pin'} ({f === 'all' ? profilePinViewCounts.all : profilePinViewCounts[f]})
-                    </button>
-                  ))}
+          {/* Section 1 — Profile Views */}
+          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+            <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+              <h2 className="text-sm font-semibold text-foreground">Profile Views</h2>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                People who visited your profile
+              </p>
+            </div>
+            <BillingFeatureGate
+              featureSlug="visitor_identities"
+              upgradeHref="/pricing"
+              fallback={
+                <div className="p-4 space-y-2">
+                  <p className="text-sm text-foreground">
+                    Your profile was viewed {profileViews.toLocaleString()} times in the selected period.
+                  </p>
+                  <Link
+                    href="/pricing"
+                    className="text-xs font-medium text-lake-blue hover:underline inline-flex items-center gap-1"
+                  >
+                    Upgrade to Contributor to see who viewed your profile
+                  </Link>
                 </div>
-              </div>
+              }
+            >
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Type</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Content</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">When</th>
-                      {hasVisitorIdentitiesAccess && (
+                {profileViewRows.length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
                         <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Viewer</th>
-                      )}
-                      {isAdmin && (
-                        <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">Admin</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredProfilePinViewers.map((view) => {
-                      const contentLink = getContentLink(view);
-                      return (
+                        <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">When</th>
+                        {isAdmin && (
+                          <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">Admin</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profileViewRows.map((view, idx) => (
                         <tr key={view.id} className="border-b border-border-muted dark:border-white/10 hover:bg-surface-accent dark:hover:bg-white/5 transition-colors">
                           <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border inline-block ${getViewTypeColor(view.view_type)}`}>
-                              {getViewTypeLabel(view.view_type, view.url)}
-                            </span>
-                          </td>
-                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
-                            <div className="min-w-[180px]">
-                              {view.content_title && contentLink ? (
-                                <Link href={contentLink} className="text-xs font-semibold text-foreground hover:text-lake-blue hover:underline truncate block" title={view.content_title}>
-                                  {view.content_title}
-                                </Link>
-                              ) : view.content_title ? (
-                                <p className="text-xs font-semibold text-foreground truncate" title={view.content_title}>{view.content_title}</p>
-                              ) : (
-                                <p className="text-xs text-foreground-muted">—</p>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
-                            <time className="text-xs text-foreground-muted whitespace-nowrap">{formatDate(view.viewed_at)}</time>
-                          </td>
-                          {hasVisitorIdentitiesAccess && (
-                            <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+                            <div className="w-[150px]">
                               {view.viewer_username ? (
                                 <Link href={`/${view.viewer_username}`} className="flex items-center gap-1.5 min-w-0 hover:opacity-80">
                                   {view.viewer_image_url ? (
@@ -608,10 +699,16 @@ export default function AnalyticsClient({
                                   <span className="text-xs text-foreground truncate">@{view.viewer_username}</span>
                                 </Link>
                               ) : (
-                                <span className="text-xs text-foreground-muted">Anonymous</span>
+                                <span className="flex items-center gap-1.5 text-foreground-muted">
+                                  <UserIcon className="w-5 h-5 text-foreground-muted" aria-hidden />
+                                  <span className="text-xs">Anonymous</span>
+                                </span>
                               )}
-                            </td>
-                          )}
+                            </div>
+                          </td>
+                          <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+                            <time className="text-xs text-foreground-muted whitespace-nowrap">{formatDate(view.viewed_at)}</time>
+                          </td>
                           {isAdmin && (
                             <td className="p-[10px] align-middle">
                               {view.viewer_username ? (
@@ -625,84 +722,202 @@ export default function AnalyticsClient({
                             </td>
                           )}
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-6 text-center">
+                    <p className="text-xs text-foreground-muted">No profile views in this period</p>
+                  </div>
+                )}
               </div>
-              {filteredProfilePinViewers.length >= profilePinDisplayLimit && profileAndPinViewersList.length > profilePinDisplayLimit && (
-                <div className="p-[10px] border-t border-border-muted dark:border-white/10">
-                  <button type="button" onClick={() => setProfilePinDisplayLimit((l) => l + 50)} className="text-xs text-foreground-muted hover:text-foreground underline">
-                    Load more
-                  </button>
+            </BillingFeatureGate>
+          </div>
+
+          {/* Section 2 — Pin Views */}
+          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+            <div className="p-[10px] border-b border-border-muted dark:border-white/10">
+              <h2 className="text-sm font-semibold text-foreground">Pin Views</h2>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                Views across your pins
+              </p>
+            </div>
+            <div className="p-[10px] space-y-2">
+              {pinGroups.length > 0 ? (
+                <>
+                  {pinGroups.map((group) => (
+                    <div key={group.pinId} className="border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
+                      <div className="flex items-center justify-between gap-2 p-3 bg-surface-accent/30 dark:bg-white/5">
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            href={`/mention/${group.pinId}`}
+                            className="text-xs font-semibold text-foreground hover:text-lake-blue hover:underline truncate block"
+                            title={group.title}
+                          >
+                            {group.title}
+                          </Link>
+                          <p className="text-[10px] text-foreground-muted mt-0.5">
+                            {group.views.length} view{group.views.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        {hasVisitorIdentitiesAccess && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedPinId((id) => (id === group.pinId ? null : group.pinId))}
+                            className="flex items-center gap-1 text-xs font-medium text-foreground-muted hover:text-foreground shrink-0"
+                          >
+                            {expandedPinId === group.pinId ? (
+                              <ChevronUpIcon className="w-4 h-4" />
+                            ) : (
+                              <ChevronRightIcon className="w-4 h-4" />
+                            )}
+                            View viewers
+                          </button>
+                        )}
+                      </div>
+                      {hasVisitorIdentitiesAccess && expandedPinId === group.pinId && (
+                        <div className="border-t border-border-muted dark:border-white/10 bg-surface">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
+                                <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Viewer</th>
+                                <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">When</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.views.map((view) => (
+                                <tr key={view.id} className="border-b border-border-muted dark:border-white/10 last:border-b-0">
+                                  <td className="p-[10px] border-r border-border-muted dark:border-white/10 align-middle">
+                                    {view.viewer_username ? (
+                                      <Link href={`/${view.viewer_username}`} className="flex items-center gap-1.5 min-w-0 hover:opacity-80">
+                                        {view.viewer_image_url ? (
+                                          <Image src={view.viewer_image_url} alt={view.viewer_username} width={20} height={20} className="w-5 h-5 rounded-full object-cover flex-shrink-0" unoptimized={view.viewer_image_url.startsWith('data:') || view.viewer_image_url.includes('supabase.co')} />
+                                        ) : (
+                                          <div className="w-5 h-5 rounded-full bg-surface-accent dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                                            <UserIcon className="w-3 h-3 text-foreground-muted" />
+                                          </div>
+                                        )}
+                                        <span className="text-xs text-foreground truncate">@{view.viewer_username}</span>
+                                      </Link>
+                                    ) : (
+                                      <span className="flex items-center gap-1.5 text-foreground-muted">
+                                        <UserIcon className="w-5 h-5" aria-hidden />
+                                        <span className="text-xs">Anonymous</span>
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-[10px] align-middle">
+                                    <time className="text-xs text-foreground-muted whitespace-nowrap">{formatDate(view.viewed_at)}</time>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {!hasVisitorIdentitiesAccess && (
+                    <div className="pt-2">
+                      <Link
+                        href="/pricing"
+                        className="text-xs font-medium text-lake-blue hover:underline"
+                      >
+                        Upgrade to Contributor to see who viewed your pins
+                      </Link>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="py-4 text-center">
+                  <p className="text-xs text-foreground-muted">No pin views in this period</p>
+                  {!hasVisitorIdentitiesAccess && (
+                    <Link href="/pricing" className="text-xs font-medium text-lake-blue hover:underline mt-2 inline-block">
+                      Upgrade to Contributor to see who viewed your pins
+                    </Link>
+                  )}
                 </div>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Where You Visited */}
+          {/* Section 3 — Your Visit History (collapsed by default) */}
           <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md overflow-hidden">
-            <div className="p-[10px] border-b border-border-muted dark:border-white/10">
-              <div className="flex items-start gap-2">
-                <InformationCircleIcon className="w-4 h-4 text-foreground-muted flex-shrink-0 mt-0.5" />
+            <button
+              type="button"
+              onClick={() => setVisitHistoryOpen((o) => !o)}
+              className="w-full flex items-center justify-between gap-2 p-[10px] text-left hover:bg-surface-accent dark:hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {visitHistoryOpen ? (
+                  <ChevronUpIcon className="w-4 h-4 text-foreground-muted flex-shrink-0" />
+                ) : (
+                  <ChevronDownIcon className="w-4 h-4 text-foreground-muted flex-shrink-0" />
+                )}
                 <div>
-                  <h2 className="text-sm font-semibold text-foreground">Where you visited</h2>
+                  <h2 className="text-sm font-semibold text-foreground">Your Visit History</h2>
                   <p className="text-xs text-foreground-muted mt-0.5">
-                    Pages you viewed. Your visit may count toward others' analytics.
+                    {visitHistoryOpen ? 'Pages you viewed. Your visit may count toward others\' analytics.' : 'Pages you\'ve visited on Love of Minnesota'}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-1 mt-3">
-                {(['all', 'profile', 'mention', 'post'] as UrlVisitFilter[]).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => setUrlVisitFilter(f)}
-                    className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${urlVisitFilter === f ? 'border-border-muted dark:border-white/20 bg-surface-accent dark:bg-white/10 text-foreground' : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'}`}
-                  >
-                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({f === 'all' ? urlVisitCounts.all : urlVisitCounts[f]})
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              {filteredUrlVisitHistory.length > 0 ? (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Type</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Content</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">URL</th>
-                      <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">When</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUrlVisitHistory.map((view, idx) => (
-                      <TableRow
-                        key={view.id}
-                        view={view}
-                        isLastRow={idx === filteredUrlVisitHistory.length - 1}
-                        showViewerColumns={false}
-                      />
+            </button>
+            {visitHistoryOpen && (
+              <>
+                <div className="border-t border-border-muted dark:border-white/10 p-[10px]">
+                  <div className="flex gap-1 mb-3">
+                    {(['all', 'profile', 'mention', 'post'] as UrlVisitFilter[]).map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        onClick={() => setUrlVisitFilter(f)}
+                        className={`px-2 py-1 text-[10px] font-medium rounded border transition-colors ${urlVisitFilter === f ? 'border-border-muted dark:border-white/20 bg-surface-accent dark:bg-white/10 text-foreground' : 'border-border-muted dark:border-white/10 text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/5'}`}
+                      >
+                        {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({f === 'all' ? urlVisitCounts.all : urlVisitCounts[f]})
+                      </button>
                     ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-6 text-center">
-                  <p className="text-xs text-foreground-muted">No visits in this period</p>
+                  </div>
                 </div>
-              )}
-            </div>
-            {filteredUrlVisitHistory.length >= displayLimit && userVisitHistory.length > displayLimit && (
-              <div className="p-[10px] border-t border-border-muted dark:border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setDisplayLimit((l) => l + 50)}
-                  className="text-xs text-foreground-muted hover:text-foreground underline"
-                >
-                  Load more
-                </button>
-              </div>
+                <div className="overflow-x-auto border-t border-border-muted dark:border-white/10">
+                  {filteredUrlVisitHistory.length > 0 ? (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-surface-accent dark:bg-white/5 border-b border-border-muted dark:border-white/10">
+                          <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Type</th>
+                          <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">Content</th>
+                          <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide border-r border-border-muted dark:border-white/10">URL</th>
+                          <th className="p-[10px] text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">When</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredUrlVisitHistory.map((view, idx) => (
+                          <TableRow
+                            key={view.id}
+                            view={view}
+                            isLastRow={idx === filteredUrlVisitHistory.length - 1}
+                            showViewerColumns={false}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-6 text-center">
+                      <p className="text-xs text-foreground-muted">No visits in this period</p>
+                    </div>
+                  )}
+                </div>
+                {filteredUrlVisitHistory.length >= displayLimit && userVisitHistory.length > displayLimit && (
+                  <div className="p-[10px] border-t border-border-muted dark:border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setDisplayLimit((l) => l + 50)}
+                      className="text-xs text-foreground-muted hover:text-foreground underline"
+                    >
+                      Load more
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -799,6 +1014,8 @@ export default function AnalyticsClient({
                 </table>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

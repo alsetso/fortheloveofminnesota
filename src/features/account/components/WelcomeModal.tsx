@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, type ChangeEvent, type FormEvent, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type ChangeEvent, type FormEvent } from 'react';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -86,7 +86,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   
   // Refs for auto-focus
   const emailInputRef = useRef<HTMLInputElement>(null);
-  const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const codeInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state when modal opens/closes and load stored email
   useEffect(() => {
@@ -227,9 +227,9 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setAuthState('code-sent');
       setMessage('');
       setMessageType(null);
-      // Auto-focus first code input after a brief delay to ensure DOM is ready
+      // Auto-focus code input after a brief delay to ensure DOM is ready
       setTimeout(() => {
-        codeInputRefs.current[0]?.focus();
+        codeInputRef.current?.focus();
       }, 150);
     } catch (error: unknown) {
       console.error('OTP error:', error);
@@ -241,70 +241,16 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     }
   };
 
-  const handleCodeInput = (index: number, value: string) => {
-    // Only allow digits
-    const digit = value.replace(/\D/g, '').slice(0, 1);
-    if (!digit) return;
-
-    // Update OTP string
-    const newOtp = otp.split('');
-    newOtp[index] = digit;
-    const updatedOtp = newOtp.join('').slice(0, 6);
-    setOtp(updatedOtp);
+  const handleCodeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setOtp(digits);
     setMessage('');
     setMessageType(null);
 
-    // Auto-advance to next input
-    if (index < 5 && digit) {
-      codeInputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto-submit when 6 digits entered - use updatedOtp directly
-    if (updatedOtp.length === 6) {
+    if (digits.length === 6) {
       setTimeout(() => {
-        handleVerifyOtpWithCode(updatedOtp);
+        handleVerifyOtpWithCode(digits);
       }, 100);
-    }
-  };
-
-  const handleCodeKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    // Handle backspace
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      codeInputRefs.current[index - 1]?.focus();
-    }
-    
-    // Handle arrow keys
-    if (e.key === 'ArrowLeft' && index > 0) {
-      e.preventDefault();
-      codeInputRefs.current[index - 1]?.focus();
-    }
-    if (e.key === 'ArrowRight' && index < 5) {
-      e.preventDefault();
-      codeInputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleCodePaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    
-    if (pastedData.length > 0) {
-      // Set the OTP state - this will fill all individual inputs via controlled components
-      setOtp(pastedData);
-      setMessage('');
-      setMessageType(null);
-      
-      // Focus the last filled input or the last input if all 6 digits pasted
-      const focusIndex = Math.min(pastedData.length - 1, 5);
-      setTimeout(() => {
-        codeInputRefs.current[focusIndex]?.focus();
-        // Auto-submit if 6 digits - pass the code directly to avoid state timing issues
-        if (pastedData.length === 6) {
-          setTimeout(() => {
-            handleVerifyOtpWithCode(pastedData);
-          }, 100);
-        }
-      }, 0);
     }
   };
 
@@ -370,8 +316,8 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       setAuthState('code-sent');
       setMessage('');
       setMessageType(null);
-      // Auto-focus first code input
-      setTimeout(() => codeInputRefs.current[0]?.focus(), 100);
+      // Auto-focus code input
+      setTimeout(() => codeInputRef.current?.focus(), 100);
     } catch (error: unknown) {
       console.error('OTP error:', error);
       setAuthState('error');
@@ -714,42 +660,36 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                   )}
                 </div>
 
-                {/* Code Input - 6 Separate Inputs */}
+                {/* Code Input - Single Input */}
                 {otpSent && (
-                  <div className="space-y-3">
+                  <div className="space-y-3 mt-4">
                     <label className="block text-sm font-semibold text-gray-900 mb-3">
                       Verification Code
                     </label>
-                    <div className="flex items-center justify-center gap-2.5">
-                      {[0, 1, 2, 3, 4, 5].map((index) => (
-                        <input
-                          key={index}
-                          ref={(el) => {
-                            codeInputRefs.current[index] = el;
-                          }}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          required
-                          value={otp[index] || ''}
-                          onChange={(e) => handleCodeInput(index, e.target.value)}
-                          onKeyDown={(e) => handleCodeKeyDown(index, e)}
-                          onPaste={handleCodePaste}
-                          disabled={isVerifying || isSuccess}
-                          className={`w-12 h-14 px-0 border-2 rounded-xl text-center text-lg font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 transition-colors ${
-                            isSuccess
-                              ? 'border-green-400 bg-green-50'
-                              : messageType === 'error'
-                              ? 'border-red-400 focus:ring-red-500 focus:border-red-500'
-                              : otp.length === 6
-                              ? 'border-green-400 focus:ring-green-500 focus:border-green-500'
-                              : 'border-gray-300 focus:ring-gray-500 focus:border-gray-500'
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
-                          aria-label={`Code digit ${index + 1}`}
-                        />
-                      ))}
+                    <div className="relative">
+                      <input
+                        ref={codeInputRef}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        required
+                        value={otp}
+                        onChange={handleCodeChange}
+                        disabled={isVerifying || isSuccess}
+                        placeholder="000000"
+                        className={`w-full px-4 py-3.5 border-2 rounded-xl text-center text-2xl font-mono font-bold tracking-[0.5em] text-gray-900 focus:outline-none focus:ring-2 transition-colors ${
+                          isSuccess
+                            ? 'border-green-400 bg-green-50'
+                            : messageType === 'error'
+                            ? 'border-red-400 focus:ring-red-500 focus:border-red-500'
+                            : otp.length === 6
+                            ? 'border-green-400 focus:ring-green-500 focus:border-green-500'
+                            : 'border-gray-300 focus:ring-gray-500 focus:border-gray-500'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        aria-label="6-digit verification code"
+                      />
                       {isSuccess && otp.length === 6 && (
-                        <div className="flex-shrink-0 text-green-600 ml-2">
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600">
                           <CheckIcon className="w-6 h-6" />
                         </div>
                       )}

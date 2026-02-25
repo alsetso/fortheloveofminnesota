@@ -48,15 +48,15 @@ export default function SettingsClient({ initialAccount, userEmail }: SettingsCl
   };
 
   const handleManageBilling = () => {
-    router.push('/billing');
+    router.push('/settings/billing');
   };
 
   // Determine billing status
-  const isProUser = account.plan === 'contributor' || account.plan === 'plus';
+  const isProUser = account.plan === 'contributor';
   const isActive = account.subscription_status === 'active' || account.subscription_status === 'trialing';
   const isTrial = account.billing_mode === 'trial' || account.subscription_status === 'trialing';
-  const planDisplayName = account.plan === 'plus' ? 'Pro+' : account.plan === 'contributor' ? 'Contributor' : 'Hobby';
-  const planPrice = account.plan === 'plus' ? '$80/month' : account.plan === 'contributor' ? '$20/month' : 'Free';
+  const planDisplayName = account.plan === 'contributor' ? 'Contributor' : 'Hobby';
+  const planPrice = account.plan === 'contributor' ? '$20/month' : 'Free';
 
   // Get subscription status display
   const getStatusDisplay = () => {

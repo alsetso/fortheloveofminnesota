@@ -10,10 +10,9 @@ import type { Account } from '@/features/auth';
 import type { User } from '@supabase/supabase-js';
 import ProPaymentForm from './ProPaymentForm';
 import ComingSoonScreen from './ComingSoonScreen';
-import BusinessSetupForm from './BusinessSetupForm';
 import GovernmentSetupForm from './GovernmentSetupForm';
 
-type PlanTab = 'contributor' | 'business' | 'government';
+type PlanTab = 'contributor' | 'government';
 
 interface PaymentScreenProps {
   plan: PlanTab;
@@ -52,11 +51,7 @@ export default function PaymentScreen({ plan, account, user, onBack }: PaymentSc
   }, [plan]);
 
   const getPlanName = (plan: PlanTab) => {
-    switch (plan) {
-      case 'contributor': return 'Contributor';
-      case 'government': return 'Government';
-      default: return 'Plan';
-    }
+    return plan === 'contributor' ? 'Contributor' : 'Government';
   };
 
   const contributorFeatures = [
@@ -71,17 +66,10 @@ export default function PaymentScreen({ plan, account, user, onBack }: PaymentSc
 
   // If no price ID, show appropriate screen
   if (hasPriceId === false) {
-    if (plan === 'business') {
-      return <BusinessSetupForm onBack={onBack} />;
-    }
     if (plan === 'government') {
       return <GovernmentSetupForm onBack={onBack} />;
     }
-    // For contributor, if no price ID, show coming soon (shouldn't happen in production)
-    if (plan === 'contributor') {
-      return <ComingSoonScreen plan="business" onBack={onBack} />;
-    }
-    return <ComingSoonScreen plan={plan as 'business' | 'government'} onBack={onBack} />;
+    return <ComingSoonScreen plan="government" onBack={onBack} />;
   }
 
   // For Contributor, show payment form

@@ -372,7 +372,7 @@ export default function AccountSettingsForm({
           <div className="flex items-start gap-3">
             <div
               className={`relative w-20 h-20 -mt-14 rounded-full bg-white overflow-hidden group flex-shrink-0 ${
-                account.plan === 'contributor' || account.plan === 'plus'
+                account.plan === 'contributor'
                   ? 'p-[2px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                   : 'border-4 border-white'
               }`}

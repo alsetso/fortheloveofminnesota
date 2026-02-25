@@ -2,15 +2,13 @@
 
 import { ArrowLeftIcon, EnvelopeIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
-type PlanTab = 'business' | 'government';
-
 interface ComingSoonScreenProps {
-  plan: PlanTab;
+  plan: 'government';
   onBack: () => void;
 }
 
 export default function ComingSoonScreen({ plan, onBack }: ComingSoonScreenProps) {
-  const planName = plan === 'business' ? 'Business' : 'Government';
+  const planName = 'Government';
 
   const handleEmailContact = () => {
     const subject = `Apply for ${planName} Membership`;

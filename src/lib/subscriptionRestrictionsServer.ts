@@ -27,13 +27,9 @@ export async function hasContributorOrHigherAccess(): Promise<boolean> {
     return false;
   }
 
-  // Check if user has Contributor, Professional, or Business plan
+  // Check if user has Contributor plan (paid tier)
   const accountData = account as any;
-  const hasContributorAccess = 
-    accountData.plan === 'contributor' || 
-    accountData.plan === 'professional' || 
-    accountData.plan === 'business' ||
-    accountData.plan === 'plus'; // Legacy plus plan also has access
+  const hasContributorAccess = accountData.plan === 'contributor';
 
   // Check if subscription is active
   const isActive = 

@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         const { createSupabaseClient } = await import('@/lib/supabase/unified');
         const supabase = await createSupabaseClient();
 
-        const { data, error } = await supabase.rpc('search_atlas', {
+        const { data, error } = await (supabase as any).rpc('search_atlas', {
           query,
           result_limit: limit,
         });

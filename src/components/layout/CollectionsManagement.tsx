@@ -72,7 +72,7 @@ export default function CollectionsManagement() {
     if (!account) return;
     try {
       const plan = account.plan || 'hobby';
-      setMaxCollections((plan === 'contributor' || plan === 'plus') ? null : 3); // null means unlimited for Contributor
+      setMaxCollections(plan === 'contributor' ? null : 3); // null means unlimited for Contributor
     } catch (err) {
       console.error('Error loading account plan:', err);
     }

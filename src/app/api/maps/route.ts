@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
         let finalSlug: string | null = null;
         if (slug) {
           // Check if user can set custom slug (pro/plus or admin)
-          const canSetCustomSlug = isAdmin || accountData?.plan === 'pro' || accountData?.plan === 'plus';
+          const canSetCustomSlug = isAdmin || accountData?.plan === 'contributor';
           if (!canSetCustomSlug) {
             return createErrorResponse('Custom slugs are only available for pro/plus accounts or admins', 403);
           }

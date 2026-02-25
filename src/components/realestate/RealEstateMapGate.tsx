@@ -5,7 +5,7 @@ import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
 
 /** Plan slugs that can access Real Estate (contributor or higher). */
-export const REALESTATE_REQUIRED_PLANS = ['contributor', 'plus', 'gov'] as const;
+export const REALESTATE_REQUIRED_PLANS = ['contributor', 'gov'] as const;
 
 const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'trialing'];
 
@@ -61,8 +61,8 @@ export default function RealEstateMapGate({ children }: { children: React.ReactN
       role="button"
       tabIndex={0}
       className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-md bg-black/40 dark:bg-black/50 p-4 text-center focus:outline-none focus:ring-2 focus:ring-gray-300 cursor-pointer"
-      onClick={() => window.location.assign('/settings/plans')}
-      onKeyDown={(e) => e.key === 'Enter' && window.location.assign('/settings/plans')}
+      onClick={() => window.location.assign('/pricing')}
+      onKeyDown={(e) => e.key === 'Enter' && window.location.assign('/pricing')}
     >
       <div
         className="flex flex-col items-center justify-center gap-3 rounded-md border border-gray-200 dark:border-white/10 bg-white dark:bg-surface p-4 shadow-sm"
@@ -76,7 +76,7 @@ export default function RealEstateMapGate({ children }: { children: React.ReactN
         </p>
         <div className="flex items-center gap-2 flex-wrap justify-center">
           <Link
-            href="/settings/plans"
+            href="/pricing"
             className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md border border-gray-200 dark:border-white/10 bg-white dark:bg-surface text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-surface-muted transition-colors"
             onClick={(e) => e.stopPropagation()}
           >

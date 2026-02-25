@@ -112,7 +112,7 @@ export type Database = {
           view_count: number
           onboarded: boolean
           stripe_customer_id: string | null
-          plan: 'hobby' | 'contributor' | 'plus' | 'gov' | null
+          plan: 'hobby' | 'contributor' | 'gov' | null
           billing_mode: 'standard' | 'trial' | null
           subscription_status: string | null
           guest_id: string | null
@@ -137,7 +137,7 @@ export type Database = {
           view_count?: number
           onboarded?: boolean
           stripe_customer_id?: string | null
-          plan?: 'hobby' | 'contributor' | 'plus' | null
+          plan?: 'hobby' | 'contributor' | null
           billing_mode?: 'standard' | 'trial' | null
           subscription_status?: string | null
           stripe_subscription_id?: string | null
@@ -163,7 +163,7 @@ export type Database = {
           view_count?: number
           onboarded?: boolean
           stripe_customer_id?: string | null
-          plan?: 'hobby' | 'contributor' | 'plus' | null
+          plan?: 'hobby' | 'contributor' | null
           billing_mode?: 'standard' | 'trial' | null
           subscription_status?: string | null
           stripe_subscription_id?: string | null

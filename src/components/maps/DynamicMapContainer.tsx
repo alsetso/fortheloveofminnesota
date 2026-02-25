@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useDynamicMap } from '@/hooks/useDynamicMap';
 import MapIDBox from '@/app/map/[id]/components/MapIDBox';
-import { MapboxMapInstance } from '@/types/mapbox';
+import type { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface DynamicMapContainerProps {
   /** Map identifier: UUID or slug */
@@ -103,7 +103,7 @@ export default function DynamicMapContainer({
       isOwner={false} // TODO: Check ownership from auth
       isLiveMap={isLiveMap}
       onLivePinSelect={onPinSelect}
-      onLiveClickReport={onClickReport}
+      onLiveClickReport={onClickReport ? (item) => { if (item?.type === 'map') onClickReport(item.lat, item.lng); } : undefined}
       showDistricts={showDistricts}
       showCTU={showCTU}
       showStateBoundary={showStateBoundary}
@@ -115,7 +115,7 @@ export default function DynamicMapContainer({
       showPins={showPins}
       pinDisplayGrouping={pinDisplayGrouping}
       showOnlyMyPins={showOnlyMyPins}
-      timeFilter={timeFilter}
+      timeFilter={timeFilter === '24h' || timeFilter === '7d' ? timeFilter : null}
       onMapLoad={(mapInstance) => {
         mapInstanceRef.current = mapInstance;
         if (onMapLoad) {
@@ -124,13 +124,15 @@ export default function DynamicMapContainer({
       }}
       initialPins={pins.map((pin) => ({
         id: pin.id,
-        lat: pin.lat || 0,
-        lng: pin.lng || 0,
-        description: pin.description || null,
-        image_url: pin.image_url || null,
-        account: pin.account || null,
-        mention_type: pin.mention_type || null,
+        map_id: pin.map_id,
+        lat: pin.lat ?? 0,
+        lng: pin.lng ?? 0,
+        emoji: pin.emoji ?? null,
+        caption: pin.caption ?? pin.body ?? null,
+        image_url: pin.image_url ?? null,
+        video_url: pin.video_url ?? null,
         created_at: pin.created_at,
+        updated_at: pin.updated_at,
       }))}
     />
   );

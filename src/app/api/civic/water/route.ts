@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
         // Single record by id
         if (id) {
-          const { data, error } = await supabase.rpc('get_water', {
+          const { data, error } = await (supabase as any).rpc('get_water', {
             p_id: id,
             p_limit: 1,
           });
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         // Map view: bbox
         if (bbox) {
           const [minLng, minLat, maxLng, maxLat] = bbox.split(',').map(Number);
-          const { data, error } = await supabase.rpc('get_water_bbox', {
+          const { data, error } = await (supabase as any).rpc('get_water_bbox', {
             p_min_lng: minLng,
             p_min_lat: minLat,
             p_max_lng: maxLng,
@@ -83,8 +83,8 @@ export async function GET(request: NextRequest) {
           const pageLimit = Math.min(limit ?? 100, 500);
           const pageOffset = offset ?? 0;
           const [countRes, dataRes] = await Promise.all([
-            supabase.rpc('get_water_count'),
-            supabase.rpc('get_water_paginated', {
+            (supabase as any).rpc('get_water_count'),
+            (supabase as any).rpc('get_water_paginated', {
               p_limit: pageLimit,
               p_offset: pageOffset,
             }),
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Legacy: plain list with limit
-        const { data, error } = await supabase.rpc('get_water', {
+        const { data, error } = await (supabase as any).rpc('get_water', {
           p_id: null,
           p_limit: limit ?? 5000,
         });

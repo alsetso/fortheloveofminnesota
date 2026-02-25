@@ -16,6 +16,7 @@ import {
   BriefcaseIcon,
   MagnifyingGlassIcon,
   UserPlusIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import {
   UserCircleIcon as UserCircleIconSolid,
@@ -32,7 +33,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStateSafe } from '@/features/auth';
 import { useAppModalContextSafe } from '@/contexts/AppModalContext';
-import { AccountService } from '@/features/auth';
+import { AccountService, type Account } from '@/features/auth';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { socialGraphQueries } from '@/lib/data/queries/socialGraph';
 
@@ -133,6 +134,8 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
     return pathname === href || pathname.startsWith(href + '/');
   };
 
+  const showPricingLink = !account || account.plan !== 'contributor';
+
   return (
     <div className="h-full flex flex-col overflow-y-auto scrollbar-hide bg-white dark:bg-header">
       {/* Profile Card */}
@@ -186,6 +189,19 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
             </Link>
           );
         })}
+        {showPricingLink && (
+          <Link
+            href="/pricing"
+            className={`flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
+              isNavActive('/pricing')
+                ? 'bg-surface-accent text-foreground'
+                : 'text-foreground-muted hover:bg-surface-accent hover:text-foreground'
+            }`}
+          >
+            <CurrencyDollarIcon className="w-5 h-5" />
+            <span>Pricing</span>
+          </Link>
+        )}
       </div>
 
       {/* Following Section or Custom Content */}
@@ -254,7 +270,7 @@ export default function LeftSidebar({ children }: LeftSidebarProps) {
                   href={acc.username ? `/${encodeURIComponent(acc.username)}` : '#'}
                   className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-surface-accent transition-colors"
                 >
-                  <ProfilePhoto account={acc} size="sm" editable={false} />
+                  <ProfilePhoto account={acc as unknown as Account} size="sm" editable={false} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm text-foreground truncate">{displayName}</span>

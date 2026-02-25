@@ -45,8 +45,8 @@ export default function CreateMentionContent({
   const { user, account, activeAccountId } = useAuthStateSafe();
   const { openWelcome } = useAppModalContextSafe();
   
-  // Determine max length based on account plan (240 for hobby, 1000 for pro/plus)
-  const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
+  // Determine max length based on account plan (240 for hobby, 1000 for contributor)
+  const isPro = account?.plan === 'contributor';
   const maxLength = isPro ? 1000 : 240;
   
   const [description, setDescription] = useState('');

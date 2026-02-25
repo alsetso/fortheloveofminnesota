@@ -19,16 +19,13 @@ interface PaymentMethod {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  hobby: 'Hobby',
+  hobby: 'Public',
   contributor: 'Contributor',
-  plus: 'Pro+',
-  business: 'Business',
-  gov: 'Government',
 };
 
 const PLAN_PRICES: Record<string, string> = {
+  hobby: '$0',
   contributor: '$20/mo',
-  plus: '$80/mo',
 };
 
 function getStatusBadge(status: string | null | undefined) {
@@ -53,8 +50,8 @@ export default function BillingPageClient() {
   const [settingUp, setSettingUp] = useState(false);
 
   const hasCustomer = Boolean(account?.stripe_customer_id);
-  const planLabel = PLAN_LABELS[account?.plan ?? ''] ?? 'Hobby';
-  const planPrice = PLAN_PRICES[account?.plan ?? ''] ?? 'Free';
+  const planLabel = PLAN_LABELS[account?.plan ?? ''] ?? 'Public';
+  const planPrice = PLAN_PRICES[account?.plan ?? ''] ?? '$0';
   const isPaid = account?.plan && account.plan !== 'hobby';
   const statusBadge = getStatusBadge(account?.subscription_status);
 
@@ -154,7 +151,7 @@ export default function BillingPageClient() {
             </button>
           ) : (
             <Link
-              href="/settings/plans"
+              href="/pricing"
               className="px-2.5 py-1.5 text-xs font-medium text-foreground bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
             >
               View Plans

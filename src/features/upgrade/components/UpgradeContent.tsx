@@ -47,8 +47,8 @@ export default function UpgradeContent() {
   const [loadingPlans, setLoadingPlans] = useState(true);
   const [selectedPlanSlug, setSelectedPlanSlug] = useState<string | null>(null);
   
-  // Check if user has a paid plan (contributor or plus)
-  const isPro = account?.plan === 'contributor' || account?.plan === 'plus';
+  // Check if user has a paid plan (contributor)
+  const isPro = account?.plan === 'contributor';
   const isActive = account?.subscription_status === 'active' || account?.subscription_status === 'trialing';
   const isAuthenticated = !!user;
 
@@ -132,7 +132,7 @@ export default function UpgradeContent() {
 
     // Otherwise, show payment/setup screen
     const planHash = plan === 'government' ? 'gov' : plan;
-    router.push(`/billing#apply-${planHash}`);
+    router.push('/pricing');
     setSelectedPlan(plan);
     setShowPaymentScreen(true);
   };
@@ -149,7 +149,7 @@ export default function UpgradeContent() {
 
 
   const handleBackFromPayment = () => {
-    router.push('/billing');
+    router.push('/pricing');
     setShowPaymentScreen(false);
     setSelectedPlan(null);
   };
@@ -160,12 +160,12 @@ export default function UpgradeContent() {
       openWelcome();
       return;
     }
-    router.push('/billing#apply-credits');
+    router.push('/settings/billing');
     setShowCreditsPayment(true);
   };
 
   const handleBackFromCreditsPayment = () => {
-    router.push('/billing');
+    router.push('/pricing');
     setShowCreditsPayment(false);
   };
 
@@ -253,7 +253,7 @@ export default function UpgradeContent() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <div className={`relative w-12 h-12 rounded-full overflow-hidden flex-shrink-0 ${
-              (account.plan === 'contributor' || account.plan === 'plus')
+              account.plan === 'contributor'
                 ? 'p-[1px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                 : 'border border-gray-200'
             }`}>
@@ -361,7 +361,7 @@ export default function UpgradeContent() {
               </div>
               <button
                 onClick={() => {
-                  router.push('/billing');
+                  router.push('/pricing');
                   setSelectedPlanSlug(null);
                 }}
                 className="text-gray-500 hover:text-gray-700"
@@ -607,7 +607,7 @@ export default function UpgradeContent() {
             const featureCount = plan.features.length;
             
             const handlePlanClick = () => {
-              router.push(`/billing#plan-${plan.slug}`);
+              router.push('/pricing');
               setSelectedPlanSlug(plan.slug);
             };
             

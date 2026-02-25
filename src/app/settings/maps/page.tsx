@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClientWithAuth } from '@/lib/supabaseServer';
 import MapsSettingsClient from '@/features/settings/components/MapsSettingsClient';
 
-const ALLOWED_PLANS = new Set(['contributor', 'professional', 'plus', 'business', 'gov']);
+const ALLOWED_PLANS = new Set(['contributor', 'gov']);
 
 export default async function SettingsMapsPage() {
   const supabase = await createServerClientWithAuth();
@@ -18,7 +18,7 @@ export default async function SettingsMapsPage() {
   const cookieStore = await cookies();
   const activeAccountId = cookieStore.get('active_account_id')?.value || null;
 
-  let account;
+  let account: { plan?: string | null; role?: string | null } | null = null;
   if (activeAccountId) {
     const result = await supabase
       .from('accounts')
@@ -26,7 +26,7 @@ export default async function SettingsMapsPage() {
       .eq('id', activeAccountId)
       .eq('user_id', user.id)
       .maybeSingle();
-    account = result.data;
+    account = result.data as { plan?: string | null; role?: string | null } | null;
   }
 
   if (!account) {
@@ -36,7 +36,7 @@ export default async function SettingsMapsPage() {
       .eq('user_id', user.id)
       .limit(1)
       .maybeSingle();
-    account = result.data;
+    account = result.data as { plan?: string | null; role?: string | null } | null;
   }
 
   const plan = (account?.plan as string | null)?.toLowerCase() ?? null;
@@ -44,7 +44,7 @@ export default async function SettingsMapsPage() {
   const isAdmin = role === 'admin';
 
   if (!isAdmin && (!plan || !ALLOWED_PLANS.has(plan))) {
-    redirect('/settings/plans');
+    redirect('/pricing');
   }
 
   return <MapsSettingsClient />;

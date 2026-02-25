@@ -133,9 +133,9 @@ export const getAccountSubscriptionState = cache(async (): Promise<SubscriptionS
     hasSubscription = !!subscription;
   }
 
-  // Normalize plan (ensure it's 'hobby', 'contributor', or 'plus')
-  // Note: professional and business plans have been removed - migrated to contributor
-  const plan: Plan = account.plan === 'plus' ? 'plus' : account.plan === 'contributor' ? 'contributor' : 'hobby';
+  // Normalize plan (ensure it's 'hobby' or 'contributor')
+  // Note: professional, business, plus plans have been archived - migrated to contributor
+  const plan: Plan = account.plan === 'contributor' ? 'contributor' : 'hobby';
   
   // Normalize billing mode (ensure it's 'standard' or 'trial')
   const billingMode: BillingMode = account.billing_mode === 'trial' ? 'trial' : 'standard';
@@ -184,7 +184,7 @@ export async function getFeatureAccess(_requiredPlan: Plan = 'hobby'): Promise<'
     return 'limited_access';
   }
   
-  if (state.plan === 'contributor' || state.plan === 'plus') {
+  if (state.plan === 'contributor') {
     return 'full_access';
   }
   
@@ -198,7 +198,7 @@ export async function getFeatureAccess(_requiredPlan: Plan = 'hobby'): Promise<'
  */
 export async function hasProAccess(): Promise<boolean> {
   const state = await getAccountSubscriptionState();
-  return (state.plan === 'contributor' || state.plan === 'plus') && (state.isActive || state.isComped);
+  return state.plan === 'contributor' && (state.isActive || state.isComped);
 }
 
 /**

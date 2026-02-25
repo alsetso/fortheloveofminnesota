@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
         // Single record by id
         if (id) {
-          const { data, error } = await supabase.rpc('get_school_districts', {
+          const { data, error } = await (supabase as any).rpc('get_school_districts', {
             p_id: id,
             p_sd_number: null,
             p_limit: 1,
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
         // All attendance areas for a specific district
         if (sd_number) {
-          const { data, error } = await supabase.rpc('get_school_districts', {
+          const { data, error } = await (supabase as any).rpc('get_school_districts', {
             p_id: null,
             p_sd_number: sd_number,
             p_limit: limit ?? 100,
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
           const pageLimit = Math.min(limit ?? 100, 500);
           const pageOffset = offset ?? 0;
           const [countRes, dataRes] = await Promise.all([
-            supabase.rpc('get_school_districts_count'),
-            supabase.rpc('get_school_districts_paginated', {
+            (supabase as any).rpc('get_school_districts_count'),
+            (supabase as any).rpc('get_school_districts_paginated', {
               p_limit: pageLimit,
               p_offset: pageOffset,
             }),
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Legacy: plain list
-        const { data, error } = await supabase.rpc('get_school_districts', {
+        const { data, error } = await (supabase as any).rpc('get_school_districts', {
           p_id: null,
           p_sd_number: null,
           p_limit: limit ?? 1000,

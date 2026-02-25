@@ -9,12 +9,8 @@ export function hasContributorOrHigherAccessClient(account: { plan: string; subs
     return false;
   }
 
-  // Check if user has Contributor, Professional, or Business plan
-  const hasContributorAccess = 
-    account.plan === 'contributor' || 
-    account.plan === 'professional' || 
-    account.plan === 'business' ||
-    account.plan === 'plus'; // Legacy plus plan also has access
+  // Check if user has Contributor plan (paid tier)
+  const hasContributorAccess = account.plan === 'contributor';
 
   // Check if subscription is active
   const isActive = 

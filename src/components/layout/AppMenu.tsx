@@ -395,7 +395,7 @@ function PlanDetailContent({
         body: JSON.stringify({
           plan: 'contributor',
           period: 'monthly',
-          returnUrl: '/billing?plan=contributor',
+          returnUrl: '/pricing',
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -614,7 +614,7 @@ function BillingSubPageContent({
             <div className="flex flex-col gap-2 pt-0.5">
               <p className="text-xs text-gray-400">Add a payment method to subscribe or manage your plan.</p>
               <Link
-                href="/billing"
+                href="/pricing"
                 onClick={onClose}
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-2.5 py-2 text-xs font-medium text-white hover:bg-white/15 transition-colors w-fit"
               >

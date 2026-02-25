@@ -17,7 +17,7 @@ export default function BillingFeatureGate({
   children,
   fallback = null,
   mode = 'hide',
-  upgradeHref = '/billing',
+  upgradeHref = '/pricing',
 }: BillingFeatureGateProps) {
   const { isLoading, hasFeature } = useBillingEntitlementsSafe();
 

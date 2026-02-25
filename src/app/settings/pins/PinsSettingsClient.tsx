@@ -220,7 +220,7 @@ export default function PinsSettingsClient() {
           {getPinLimitDisplay() || 'Loading...'}
         </p>
         {pinLimit && !canCreateMore() && pinLimit.has_feature && (
-          <Link href="/settings/plans" className="text-xs font-medium text-blue-600 hover:underline">
+          <Link href="/pricing" className="text-xs font-medium text-blue-600 hover:underline">
             Upgrade to create more pins
           </Link>
         )}

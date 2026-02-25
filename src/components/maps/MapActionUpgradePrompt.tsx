@@ -61,14 +61,14 @@ export default function MapActionUpgradePrompt({
         
         <div className="flex items-center gap-2">
           <Link
-            href={`/billing#plan-${requiredPlan}`}
+            href="/pricing"
             className="flex-1 px-3 py-2 text-xs font-semibold bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-center"
             onClick={onClose}
           >
             Upgrade to {planLabels[requiredPlan]}
           </Link>
           <Link
-            href="/plans"
+            href="/pricing"
             className="px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
             onClick={onClose}
           >

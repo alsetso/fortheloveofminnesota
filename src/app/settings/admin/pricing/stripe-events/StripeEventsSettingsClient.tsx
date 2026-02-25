@@ -56,7 +56,7 @@ interface SubscriptionRow {
   accounts?: AccountRef | null;
 }
 
-const PLAN_OPTIONS = ['hobby', 'contributor', 'plus', 'testing'] as const;
+const PLAN_OPTIONS = ['hobby', 'contributor', 'testing'] as const;
 
 function hasSubMismatch(sub: SubscriptionRow): boolean {
   const plan = sub.accounts?.plan ?? 'hobby';
@@ -278,7 +278,7 @@ export default function StripeEventsSettingsClient() {
 
       {/* Plan breakdown */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {(['hobby', 'contributor', 'plus', 'testing'] as const).map((plan) => (
+        {PLAN_OPTIONS.map((plan) => (
           <button
             key={plan}
             type="button"

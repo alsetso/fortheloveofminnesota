@@ -999,7 +999,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
                                 <span className="text-xs font-medium text-gray-900 truncate">
                                   @{account!.username}
                                 </span>
-                                {(account!.plan === 'contributor' || account!.plan === 'plus') && (
+                                {account!.plan === 'contributor' && (
                                   <span className="text-[10px] font-semibold text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-200 flex-shrink-0">
                                     Contributor
                                   </span>
@@ -1367,7 +1367,7 @@ export default function MapTopContainer({ map, onLocationSelect, isLoadingMentio
             setTimeFilter(filter);
           }}
           account={account}
-          onUpgrade={() => router.push('/billing')}
+          onUpgrade={() => router.push('/pricing')}
           onProToast={(feature?: string) => proToast(feature || '')}
           districtsState={districtsState}
           ctuState={ctuState}

@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         const { createSupabaseClient } = await import('@/lib/supabase/unified');
         const supabase = await createSupabaseClient();
         
-        const { data, error } = await supabase.rpc('get_congressional_districts', {
+        const { data, error } = await (supabase as any).rpc('get_congressional_districts', {
           p_id: id || null,
           p_limit: limit ?? 3000
         });
@@ -51,11 +51,12 @@ export async function GET(request: NextRequest) {
         }
         
         // If querying by ID, return single object; otherwise return array
+        const arr = Array.isArray(data) ? data : [];
         if (id) {
-          return NextResponse.json(Array.isArray(data) && data.length > 0 ? data[0] : data);
+          return NextResponse.json(arr.length > 0 ? arr[0] : data);
         }
         
-        return NextResponse.json(data || []);
+        return NextResponse.json(data ?? []);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[Congressional Districts API] Error:', error);

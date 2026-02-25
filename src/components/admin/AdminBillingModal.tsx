@@ -58,7 +58,7 @@ interface Props {
   onSaved: () => void;
 }
 
-const PLAN_OPTIONS = ['hobby', 'contributor', 'plus', 'testing'] as const;
+const PLAN_OPTIONS = ['hobby', 'contributor', 'testing'] as const;
 const TABS = ['Account', 'Subscription', 'Events'] as const;
 type Tab = (typeof TABS)[number];
 

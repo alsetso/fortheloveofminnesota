@@ -8,7 +8,7 @@ import LiveMapRightSidebar from './LiveMapRightSidebar';
 import MapControls from '@/components/layout/MapControls';
 import AppMenu from '@/components/layout/AppMenu';
 import LivePinCard, { type LivePinData } from '@/components/layout/LivePinCard';
-import { MapboxMapInstance } from '@/types/mapbox';
+import { MapboxMapInstance } from '@/types/mapbox-events';
 
 interface SimpleMapViewProps {
   /** Map identifier: UUID or slug (default: 'live') */

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
         const { createSupabaseClient } = await import('@/lib/supabase/unified');
         const supabase = await createSupabaseClient();
         
-        const { data, error } = await supabase.rpc('get_state_boundary');
+        const { data, error } = await (supabase as any).rpc('get_state_boundary');
         
         if (error) {
           if (process.env.NODE_ENV === 'development') {
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
           );
         }
         
-        const stateData = Array.isArray(data) && data.length > 0 ? data[0] : data;
+        const stateData = Array.isArray(data) && (data as unknown[]).length > 0 ? (data as unknown[])[0] : data;
         
         if (!stateData) {
           return NextResponse.json(

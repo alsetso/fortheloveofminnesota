@@ -1647,7 +1647,7 @@ export default function GovTablesClient({ showTabsOnly = false, showTablesOnly =
         <div className="mt-3 bg-gray-50 border border-gray-200 rounded-md p-[10px]">
           <p className="text-xs text-gray-600">
             Editing government data requires a{' '}
-            <Link href="/billing" className="text-gray-900 font-medium hover:underline">
+            <Link href="/pricing" className="text-gray-900 font-medium hover:underline">
               Contributor, Professional, or Business subscription
             </Link>
             {' '}with an active subscription.

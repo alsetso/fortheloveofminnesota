@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         const supabase = await createSupabaseClient();
 
         if (school_district_id) {
-          const { data, error } = await supabase.rpc('get_school_buildings_by_district', {
+          const { data, error } = await (supabase as any).rpc('get_school_buildings_by_district', {
             p_district_id: school_district_id,
           });
 
@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
         // Single building by id — also fetch linked atlas school profile
         if (id) {
           const [buildingRes, atlasRes] = await Promise.all([
-            supabase.rpc('get_school_building_by_id', { p_id: id }),
-            supabase.rpc('get_atlas_school_by_building_id', { p_building_id: id }),
+            (supabase as any).rpc('get_school_building_by_id', { p_id: id }),
+            (supabase as any).rpc('get_atlas_school_by_building_id', { p_building_id: id }),
           ]);
 
           if (buildingRes.error) {
@@ -59,17 +59,17 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Failed to fetch school building' }, { status: 500 });
           }
 
-          const building = Array.isArray(buildingRes.data) && buildingRes.data.length > 0
-            ? buildingRes.data[0]
+          const building = Array.isArray(buildingRes.data) && (buildingRes.data as unknown[]).length > 0
+            ? (buildingRes.data as unknown[])[0]
             : null;
 
           if (building) {
-            const atlas = Array.isArray(atlasRes.data) && atlasRes.data.length > 0
-              ? atlasRes.data[0]
+            const atlas = Array.isArray(atlasRes.data) && (atlasRes.data as unknown[]).length > 0
+              ? (atlasRes.data as unknown[])[0]
               : null;
-            if (atlas) {
-              (building as Record<string, unknown>).atlas_school_slug = atlas.slug;
-              (building as Record<string, unknown>).atlas_school_id = atlas.id;
+            if (atlas && typeof atlas === 'object' && atlas !== null && 'slug' in atlas && 'id' in atlas) {
+              (building as Record<string, unknown>).atlas_school_slug = (atlas as { slug: string }).slug;
+              (building as Record<string, unknown>).atlas_school_id = (atlas as { id: string }).id;
             }
           }
 

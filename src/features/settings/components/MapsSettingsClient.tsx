@@ -17,7 +17,7 @@ interface OwnedMapRow {
   href: string;
 }
 
-const FULL_ACCESS_PLANS = new Set(['professional', 'plus', 'business', 'gov']);
+const FULL_ACCESS_PLANS = new Set(['contributor', 'gov']);
 
 export default function MapsSettingsClient() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function MapsSettingsClient() {
           <h3 className="text-sm font-semibold text-foreground mb-2">Map limits</h3>
           <p className="text-xs text-foreground/70 mb-2">{displayText}</p>
           {!canCreate && (
-            <Link href="/billing" className="text-xs font-medium text-lake-blue hover:underline">
+            <Link href="/pricing" className="text-xs font-medium text-lake-blue hover:underline">
               Upgrade to create more maps
             </Link>
           )}
@@ -87,7 +87,7 @@ export default function MapsSettingsClient() {
           onClick={(e) => {
             if (!canCreate) {
               e.preventDefault();
-              router.push('/billing');
+              router.push('/pricing');
             }
           }}
           className={`block bg-surface border border-border-muted dark:border-white/10 rounded-md p-6 flex flex-col items-center justify-center gap-2 transition-colors ${
@@ -182,7 +182,7 @@ export default function MapsSettingsClient() {
           <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium text-foreground/60 bg-surface-accent border border-border-muted dark:border-white/10 rounded">
             Coming soon
           </span>
-          <Link href="/settings/plans" className="text-xs font-medium text-lake-blue hover:underline">
+          <Link href="/pricing" className="text-xs font-medium text-lake-blue hover:underline">
             Upgrade for immediate access
           </Link>
         </div>

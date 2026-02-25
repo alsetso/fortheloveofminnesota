@@ -28,7 +28,8 @@ export default function PagesLeftSidebar() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!account?.id) {
+    const accountId = account?.id;
+    if (!accountId) {
       setLoading(false);
       return;
     }
@@ -40,7 +41,7 @@ export default function PagesLeftSidebar() {
           .schema('pages')
           .from('pages')
           .select('*', { count: 'exact', head: true })
-          .eq('owner_id', account.id);
+          .eq('owner_id', accountId);
 
         // Fetch recent pages count (last 7 days)
         const sevenDaysAgo = new Date();
@@ -50,7 +51,7 @@ export default function PagesLeftSidebar() {
           .schema('pages')
           .from('pages')
           .select('*', { count: 'exact', head: true })
-          .eq('owner_id', account.id)
+          .eq('owner_id', accountId)
           .gte('created_at', sevenDaysAgo.toISOString());
 
         // Fetch all pages to extract unique tags
@@ -58,7 +59,7 @@ export default function PagesLeftSidebar() {
           .schema('pages')
           .from('pages')
           .select('tags')
-          .eq('owner_id', account.id)
+          .eq('owner_id', accountId)
           .not('tags', 'is', null);
 
         // Count tags

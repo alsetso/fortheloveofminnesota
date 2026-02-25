@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
           : null;
         const singleClass = !classes ? (ctuClassRaw || null) : null;
         
-        const { data, error } = await supabase.rpc('get_ctu_boundaries', {
+        const { data, error } = await (supabase as any).rpc('get_ctu_boundaries', {
           p_id: id || null,
           p_ctu_class: singleClass,
           p_ctu_classes: classes,
@@ -60,11 +60,12 @@ export async function GET(request: NextRequest) {
         }
         
         // If querying by ID, return single object; otherwise return array
+        const arr = Array.isArray(data) ? data : [];
         if (id) {
-          return NextResponse.json(Array.isArray(data) && data.length > 0 ? data[0] : data);
+          return NextResponse.json(arr.length > 0 ? arr[0] : data);
         }
         
-        return NextResponse.json(data || []);
+        return NextResponse.json(data ?? []);
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.error('[CTU Boundaries API] Error:', error);

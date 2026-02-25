@@ -14,7 +14,7 @@ const ROUTE_PROTECTION: Record<string, {
   '/account/settings': { auth: true },
   '/map-test': { auth: true },
   '/admin': { auth: true, roles: ['admin'] },
-  '/analytics': { auth: true, roles: ['admin'] },
+  '/analytics': { auth: true },
   '/billing': { auth: true },
 };
 
@@ -189,9 +189,12 @@ export async function middleware(req: NextRequest) {
   ].join('; ');
   response.headers.set('Content-Security-Policy', csp);
 
-  // Redirect deprecated routes to /maps
+  // Redirect /plan, /plans, /billing to pricing
   if (pathname === '/plan' || pathname === '/plans' || pathname === '/billing') {
-    return NextResponse.redirect(new URL('/maps', req.url));
+    return NextResponse.redirect(new URL('/pricing', req.url));
+  }
+  if (pathname === '/settings/plans') {
+    return NextResponse.redirect(new URL('/pricing', req.url));
   }
   
   // Redirect /live to /maps (live route deprecated)
@@ -347,6 +350,8 @@ export async function middleware(req: NextRequest) {
     
     // Maps page (shows live map) is allowed for all users
     if (pathname === '/maps') return true;
+    // Pricing page is public
+    if (pathname === '/pricing') return true;
     
     // Gov, weather, and news are public
     if (pathname === '/gov' || pathname.startsWith('/gov/')) return true;

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import ProfilePhoto from '../shared/ProfilePhoto';
 import { Mention } from '@/types/mention';
+import type { Post } from '@/types/post';
 import PostMapDrawer from './PostMapDrawer';
 import PostImageDrawer from './PostImageDrawer';
 import { getAccessibleMaps, type AccessibleMap } from '@/lib/maps/getAccessibleMaps';
@@ -117,9 +118,7 @@ export default function CreatePostModal({
   };
 
   // Check if user can upload videos
-  const canUploadVideo = account?.plan === 'contributor' || 
-                         (account?.plan as string) === 'plus' || 
-                         account?.plan === 'gov';
+  const canUploadVideo = account?.plan === 'contributor' || account?.plan === 'gov';
 
   // Fetch accessible maps when modal opens
   useEffect(() => {

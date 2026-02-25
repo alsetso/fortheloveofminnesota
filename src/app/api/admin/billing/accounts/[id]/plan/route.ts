@@ -4,7 +4,7 @@ import { withSecurity } from '@/lib/security/middleware';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 
-const VALID_PLANS = ['hobby', 'contributor', 'plus', 'testing'] as const;
+const VALID_PLANS = ['hobby', 'contributor', 'testing'] as const;
 
 const updateAccountBillingSchema = z.object({
   plan: z.enum(VALID_PLANS).optional(),

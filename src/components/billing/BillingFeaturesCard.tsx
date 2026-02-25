@@ -25,7 +25,7 @@ export default function BillingFeaturesCard({ className = '' }: { className?: st
     <div className={`bg-white border border-gray-200 rounded-lg p-4 ${className}`}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-900">Enabled Features</h3>
-        <Link href="/billing" className="text-xs text-blue-600 hover:text-blue-800 underline">
+        <Link href="/pricing" className="text-xs text-blue-600 hover:text-blue-800 underline">
           View plans
         </Link>
       </div>
@@ -58,7 +58,7 @@ export default function BillingFeaturesCard({ className = '' }: { className?: st
 
           {sorted.length > 12 && (
             <div className="pt-1">
-              <Link href="/billing" className="text-xs text-blue-600 hover:text-blue-800 underline">
+              <Link href="/pricing" className="text-xs text-blue-600 hover:text-blue-800 underline">
                 View all {sorted.length}
               </Link>
             </div>

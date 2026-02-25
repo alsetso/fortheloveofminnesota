@@ -175,7 +175,7 @@ export default function FriendsFeed() {
               {/* Avatar */}
               <div className="flex-shrink-0">
                 {user.avatar ? (
-                  <ProfilePhoto account={{ username: user.username, image_url: user.avatar }} size="md" editable={false} />
+                  <ProfilePhoto account={{ username: user.username, image_url: user.avatar } as unknown as import('@/features/auth').Account} size="md" editable={false} />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-surface-accent flex items-center justify-center border border-white/10">
                     <UserCircleIcon className="w-6 h-6 text-white/60" />

@@ -83,7 +83,7 @@ export default function ProfileCollectionsList({
 
       if (account) {
         const plan = (account as { plan: string | null }).plan || 'hobby';
-        setMaxCollections((plan === 'contributor' || plan === 'plus') ? null : 3); // null means unlimited for Contributor
+        setMaxCollections(plan === 'contributor' ? null : 3); // null means unlimited for Contributor
       }
     } catch (err) {
       console.error('Error loading account plan:', err);

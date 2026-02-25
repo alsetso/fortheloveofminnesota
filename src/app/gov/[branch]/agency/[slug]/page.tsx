@@ -4,6 +4,7 @@ import Link from 'next/link';
 import OrgChart from '@/features/civic/components/OrgChart';
 import PersonAvatar from '@/features/civic/components/PersonAvatar';
 import {
+  getAgencyPayroll,
   getCivicAgencyBySlug,
   getCivicAgencyWithBuilding,
   getDepartmentBudget,
@@ -78,6 +79,15 @@ function formatContractDate(dateStr: string | null): string {
   return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
 }
 
+function formatWage(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(amount);
+}
+
 function aggregateBudget(rows: DepartmentBudgetRow[], year: number) {
   const yr = rows.filter((r) => r.budget_period === year);
   if (!yr.length) return null;
@@ -149,10 +159,11 @@ export default async function BranchAgencyPage({ params }: Props) {
   const parentOrg = orgWithBuilding?.parent ?? null;
   const leaders = org.roles?.filter((r) => r.is_current && r.person) ?? [];
   const needsJurisdictions = org.branch === 'judicial' || org.branch === 'legislative';
-  const [budgetRows, contractRows, jurisdictions] = await Promise.all([
+  const [budgetRows, contractRows, jurisdictions, payrollData] = await Promise.all([
     getDepartmentBudget(slug),
     getOrgContracts(slug, 10),
     needsJurisdictions ? getOrgJurisdictions(org.id) : Promise.resolve([] as OrgJurisdiction[]),
+    getAgencyPayroll(slug, 2025),
   ]);
   const isTransitionDept = TRANSITION_DEPTS.has(slug);
   const budgetYears = budgetRows ? getBudgetYears(budgetRows) : [];
@@ -385,6 +396,45 @@ export default async function BranchAgencyPage({ params }: Props) {
                 <p className="text-[10px] text-foreground-muted">Budget data not available.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {payrollData && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <h2 className="text-xs font-semibold text-foreground">
+                Workforce (FY{payrollData.fiscal_year})
+              </h2>
+              <span className="text-[10px] text-foreground-muted">Minnesota OpenCheckbook</span>
+            </div>
+            <div className="border border-border rounded-md p-3 bg-surface">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Employees</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {payrollData.total_employees.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Total Wages</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {formatWage(payrollData.total_wages)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Avg Salary</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {formatWage(payrollData.average_wages)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide font-medium">Overtime</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {formatWage(payrollData.total_overtime)}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

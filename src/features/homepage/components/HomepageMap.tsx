@@ -251,7 +251,7 @@ export default function HomepageMap({ cities, counties }: HomepageMapProps) {
           {/* Upgrade Button */}
           {account?.plan === 'hobby' && (
             <button
-              onClick={() => router.push('/billing')}
+              onClick={() => router.push('/pricing')}
               className="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
             >
               Upgrade

@@ -550,14 +550,14 @@ export default function LayerDetailMap({
                   <XMarkIcon className="w-3 h-3 text-gray-400" />
                 </button>
               </div>
-              {meta.address && (
+              {meta.address != null ? (
                 <div className="text-[10px] text-gray-500 mt-1">{String(meta.address)}</div>
-              )}
-              {meta.city && (
+              ) : null}
+              {meta.city != null ? (
                 <div className="text-[10px] text-gray-500">
-                  {String(meta.city)}{meta.zip ? `, ${String(meta.zip)}` : ''}
+                  {String(meta.city)}{meta.zip != null ? `, ${String(meta.zip)}` : ''}
                 </div>
-              )}
+              ) : null}
               {detailHref && (
                 <Link
                   href={detailHref}

@@ -399,12 +399,12 @@ function RelationshipSection({
                     {rName}
                   </span>
                   {isCtu &&
-                    r.ctu_class &&
-                    r.ctu_class !== 'CITY' && (
+                    r.ctu_class != null &&
+                    String(r.ctu_class) !== 'CITY' ? (
                       <span className="text-[9px] text-foreground-subtle uppercase tracking-wide">
                         {String(r.ctu_class).toLowerCase()}
                       </span>
-                    )}
+                    ) : null}
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {isCtu && r.population != null && (

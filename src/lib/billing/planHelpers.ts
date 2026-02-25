@@ -9,9 +9,9 @@
 export function isPaidPlan(plan: string | null | undefined): boolean {
   if (!plan) return false;
   
-  // Paid plans in billing schema: contributor, professional, business
+  // Paid plans in billing schema: contributor only (professional, business, plus archived)
   // Free plan: hobby
-  const paidPlans = ['contributor', 'professional', 'business', 'plus']; // plus is legacy, treated as paid
+  const paidPlans = ['contributor'];
   return paidPlans.includes(plan.toLowerCase());
 }
 

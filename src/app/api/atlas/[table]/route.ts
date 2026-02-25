@@ -61,7 +61,7 @@ export async function GET(
         const { createSupabaseClient } = await import('@/lib/supabase/unified');
         const supabase = await createSupabaseClient();
 
-        const { data, error } = await supabase.rpc('get_atlas_records', {
+        const { data, error } = await (supabase as any).rpc('get_atlas_records', {
           p_table: table,
           p_id: id ?? null,
           p_slug: slug ?? null,

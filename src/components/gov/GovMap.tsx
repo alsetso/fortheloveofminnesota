@@ -21,7 +21,7 @@ interface BuildingPin {
 
 export default function GovMap() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<import('mapbox-gl').default | null>(null);
+  const mapRef = useRef<import('mapbox-gl').Map | null>(null);
   const markersRef = useRef<import('mapbox-gl').Marker[]>([]);
   const [ready, setReady] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<GovBuildingRecord | null>(null);

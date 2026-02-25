@@ -92,10 +92,11 @@ export function canUserPerformMapAction(
     };
   }
   
-  // Normalize requiredPlan to valid PlanLevel (handle legacy professional/business plans)
-  const normalizedRequiredPlan: PlanLevel = requiredPlan === 'professional' || requiredPlan === 'business' 
-    ? 'contributor' 
-    : (requiredPlan === 'hobby' || requiredPlan === 'contributor' ? requiredPlan : 'contributor');
+  // Normalize requiredPlan to valid PlanLevel (handle legacy professional/business/plus plans)
+  const normalizedRequiredPlan: PlanLevel = 
+    requiredPlan === 'professional' || requiredPlan === 'business' || requiredPlan === 'plus'
+      ? 'contributor'
+      : (requiredPlan === 'hobby' || requiredPlan === 'contributor' ? requiredPlan : 'contributor');
   
   // Check subscription status
   const isActive = user.subscription_status === 'active' || user.subscription_status === 'trialing';

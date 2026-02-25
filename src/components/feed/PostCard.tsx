@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Post } from '@/types/post';
+import type { Account } from '@/features/auth';
 import ProfilePhoto from '@/components/shared/ProfilePhoto';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -116,7 +117,7 @@ export default function PostCard({ post }: PostCardProps) {
       <div className={`flex items-start gap-2 mb-3 ${post.background_color ? 'px-3' : ''}`}>
         {account && (
           <ProfilePhoto 
-            account={account} 
+            account={account as unknown as Account} 
             size="sm" 
             editable={false}
             className="flex-shrink-0"
@@ -255,7 +256,7 @@ export default function PostCard({ post }: PostCardProps) {
             <div className="px-3 pb-3 pt-2 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2">
               {sharedPostAccount && (
                 <ProfilePhoto 
-                  account={sharedPostAccount} 
+                  account={sharedPostAccount as unknown as Account} 
                   size="xs" 
                   editable={false}
                   className="flex-shrink-0"

@@ -177,13 +177,6 @@ export default function BusinessSettingsClient() {
         <p className="text-xs text-gray-600">
           Connect your business with Minnesota. Verified profiles and statewide visibility.
         </p>
-        {account.plan === 'business' && (
-          <div className="mt-2">
-            <span className="px-1.5 py-0.5 text-[10px] font-medium text-gray-700 bg-gray-100 rounded-full">
-              Current Plan
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Warning Banner */}

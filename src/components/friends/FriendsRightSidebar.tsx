@@ -52,7 +52,7 @@ export default function FriendsRightSidebar() {
             <div className="flex items-center gap-3 mb-3">
               {selectedUser.avatar ? (
                 <ProfilePhoto 
-                  account={{ username: selectedUser.username, image_url: selectedUser.avatar }} 
+                  account={{ username: selectedUser.username, image_url: selectedUser.avatar } as unknown as import('@/features/auth').Account} 
                   size="lg" 
                   editable={false} 
                 />

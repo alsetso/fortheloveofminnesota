@@ -16,10 +16,8 @@ interface Feature {
 }
 
 const PLAN_LABELS: Record<string, string> = {
-  hobby: 'Hobby',
+  hobby: 'Public',
   contributor: 'Contributor',
-  plus: 'Pro+',
-  gov: 'Government',
 };
 
 export default function UsageSettingsClient() {
@@ -105,7 +103,7 @@ export default function UsageSettingsClient() {
     return acc;
   }, {} as Record<string, Feature[]>);
 
-  const planLabel = account?.plan ? PLAN_LABELS[account.plan] || account.plan : 'Hobby';
+  const planLabel = account?.plan ? PLAN_LABELS[account.plan] || account.plan : 'Public';
 
   return (
     <div className="space-y-3">
@@ -117,7 +115,7 @@ export default function UsageSettingsClient() {
             <p className="text-xs font-medium text-foreground">{planLabel}</p>
             {account?.plan && account.plan !== 'hobby' && (
               <Link
-                href="/settings/plans"
+                href="/pricing"
                 className="text-xs text-lake-blue hover:text-lake-blue/80 hover:underline mt-0.5 inline-block"
               >
                 Upgrade or change plan
@@ -126,7 +124,7 @@ export default function UsageSettingsClient() {
           </div>
           {account?.plan === 'hobby' && (
             <Link
-              href="/settings/plans"
+              href="/pricing"
               className="px-3 py-1.5 text-xs font-medium text-foreground bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
             >
               Upgrade
@@ -201,7 +199,7 @@ export default function UsageSettingsClient() {
             Unlock unlimited maps, advanced analytics, and more with a paid plan.
           </p>
           <Link
-            href="/settings/plans"
+            href="/pricing"
             className="inline-block px-3 py-1.5 text-xs font-medium text-foreground bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
           >
             View Plans

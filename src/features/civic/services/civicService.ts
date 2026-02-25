@@ -420,7 +420,6 @@ export async function getExecutiveOfficers(): Promise<{
 }
 
 export interface AgencyWithBudget extends CivicAgency {
-  gov_type?: string | null;
   /** Most recent available FY budget total in dollars */
   budget_amount?: number | null;
   budget_year?: number | null;
@@ -833,6 +832,62 @@ export async function getOrgContracts(
   }
 
   return (data ?? []) as OrgContractRow[];
+}
+
+export type AgencyPayrollSummary = {
+  fiscal_year: number;
+  total_employees: number;
+  total_wages: number;
+  average_wages: number;
+  total_overtime: number;
+};
+
+/**
+ * Get payroll summary for an org by slug (one fiscal year).
+ * Uses checkbook_agency_name from civic.agencies; returns null if unset or no payroll rows.
+ */
+export async function getAgencyPayroll(
+  agencySlug: string,
+  fiscalYear = 2025
+): Promise<AgencyPayrollSummary | null> {
+  const supabase = await createSupabaseClient({ auth: false });
+
+  const { data: agency } = await supabase
+    .schema('civic')
+    .from('agencies')
+    .select('checkbook_agency_name')
+    .eq('slug', agencySlug)
+    .single();
+
+  if (!agency?.checkbook_agency_name) return null;
+
+  const { data: rows, error } = await (supabase as any)
+    .schema('checkbook')
+    .from('payroll')
+    .select('employee_name, total_wages, overtime_wages')
+    .eq('agency_name', agency.checkbook_agency_name)
+    .eq('fiscal_year', String(fiscalYear));
+
+  if (error) {
+    console.error('[civicService] getAgencyPayroll error:', error);
+    return null;
+  }
+
+  if (!rows?.length) return null;
+
+  const names = new Set((rows as { employee_name: string | null }[]).map((r) => r.employee_name ?? '').filter(Boolean));
+  const total_employees = names.size;
+  const total_wages = (rows as { total_wages: number }[]).reduce((s, r) => s + Number(r.total_wages ?? 0), 0);
+  const total_overtime = (rows as { overtime_wages: number }[]).reduce((s, r) => s + Number(r.overtime_wages ?? 0), 0);
+  const average_wages = total_employees > 0 ? total_wages / total_employees : 0;
+
+  return {
+    fiscal_year: fiscalYear,
+    total_employees,
+    total_wages,
+    average_wages,
+    total_overtime,
+  };
 }
 
 /** Escape value for use in ilike pattern (allow % and _ as literals) */

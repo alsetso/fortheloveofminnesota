@@ -53,6 +53,25 @@ export function preloadMapboxCSS(): Promise<void> {
 }
 
 /**
+ * Inject Mapbox Draw CSS via link tag (avoids webpack CSS extraction issues)
+ * Uses a CDN fallback or copies CSS to public folder in production
+ */
+function injectMapboxDrawCSS(): void {
+  if (typeof document === 'undefined') return; // SSR guard
+  
+  const linkId = 'mapbox-gl-draw-css';
+  if (document.getElementById(linkId)) return; // Already injected
+  
+  const link = document.createElement('link');
+  link.id = linkId;
+  link.rel = 'stylesheet';
+  // Use CDN or ensure CSS is copied to public folder during build
+  // For now, try to load from unpkg CDN as fallback
+  link.href = 'https://unpkg.com/@mapbox/mapbox-gl-draw@1.5.1/dist/mapbox-gl-draw.css';
+  document.head.appendChild(link);
+}
+
+/**
  * Dynamic import for Mapbox Draw
  */
 let mapboxDraw: typeof import('@mapbox/mapbox-gl-draw').default | null = null;
@@ -61,8 +80,8 @@ export async function loadMapboxDraw(): Promise<typeof import('@mapbox/mapbox-gl
   if (!mapboxDraw) {
     const drawModule = await import('@mapbox/mapbox-gl-draw');
     mapboxDraw = drawModule.default;
-    // Also import CSS
-    await import('@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css');
+    // Inject CSS via link tag instead of webpack import to avoid build errors
+    injectMapboxDrawCSS();
   }
   return mapboxDraw;
 }

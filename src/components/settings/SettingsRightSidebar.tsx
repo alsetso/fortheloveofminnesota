@@ -6,11 +6,8 @@ import { useSettings } from '@/features/settings/contexts/SettingsContext';
 import { getDisplayName } from '@/types/profile';
 
 const PLAN_LABELS: Record<string, string> = {
-  hobby: 'Hobby',
+  hobby: 'Public',
   contributor: 'Contributor',
-  plus: 'Pro+',
-  business: 'Business',
-  gov: 'Government',
 };
 
 /**
@@ -21,8 +18,8 @@ export default function SettingsRightSidebar() {
   const { account, userEmail } = useSettings();
   const displayName = getDisplayName(account);
   const subtitle = account.username ? `@${account.username}` : userEmail || '';
-  const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Hobby';
-  const hasPaidPlanBorder = account.plan === 'contributor' || account.plan === 'plus';
+  const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Public';
+  const hasPaidPlanBorder = account.plan === 'contributor';
   const canUpgrade = !account.plan || account.plan === 'hobby' || account.plan === 'contributor';
 
   return (
@@ -57,7 +54,7 @@ export default function SettingsRightSidebar() {
             <span className="text-xs text-foreground-muted">{planLabel}</span>
             {canUpgrade && (
               <Link
-                href="/settings/plans"
+                href="/pricing"
                 className="text-xs text-lake-blue hover:text-lake-blue/80 underline"
               >
                 Upgrade

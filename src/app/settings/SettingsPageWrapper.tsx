@@ -97,18 +97,15 @@ export default function SettingsPageWrapper({ account, userEmail, mapLimit, chil
    ───────────────────────────────────────────────── */
 
 const PLAN_LABELS: Record<string, string> = {
-  hobby: 'Hobby',
+  hobby: 'Public',
   contributor: 'Contributor',
-  plus: 'Pro+',
-  business: 'Business',
-  gov: 'Government',
 };
 
 function SettingsHomeSidebar({ onHideSidebar }: { onHideSidebar?: () => void }) {
   const { account, userEmail, mapLimit } = useSettings();
   const supabase = useSupabaseClient();
   const displayName = getDisplayName(account);
-  const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Hobby';
+  const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Public';
   const profileUrl = account.username ? `/${encodeURIComponent(account.username)}` : null;
   const canUpgrade = !account.plan || account.plan === 'hobby' || account.plan === 'contributor';
 
@@ -202,7 +199,7 @@ function SettingsHomeSidebar({ onHideSidebar }: { onHideSidebar?: () => void }) 
           </div>
           {canUpgrade && (
             <Link
-              href="/settings/plans"
+              href="/pricing"
               className="px-2.5 py-1 text-[10px] font-medium text-white bg-lake-blue rounded-md hover:bg-lake-blue/90 transition-colors"
             >
               Upgrade
@@ -303,7 +300,7 @@ function SettingsOverview() {
   const supabase = useSupabaseClient();
   const displayName = getDisplayName(account);
   const isAdmin = account?.role === 'admin';
-  const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Hobby';
+  const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Public';
   const profileUrl = account.username ? `/${encodeURIComponent(account.username)}` : null;
 
   const [stats, setStats] = useState({ pins: 0, collections: 0, maps: 0, visits: 0 });
@@ -402,12 +399,6 @@ function SettingsOverview() {
               className="px-2.5 py-1 text-[10px] font-medium text-foreground-muted bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 transition-colors"
             >
               Usage
-            </Link>
-            <Link
-              href="/settings/plans"
-              className="px-2.5 py-1 text-[10px] font-medium text-white bg-lake-blue rounded-md hover:bg-lake-blue/90 transition-colors"
-            >
-              Plans
             </Link>
           </div>
         </div>
@@ -516,7 +507,6 @@ const ACCOUNT_NAV: NavItem[] = [
 ];
 
 const BILLING_NAV: NavItem[] = [
-  { label: 'Plans', href: '/settings/plans', icon: CreditCardIcon, description: 'Compare and upgrade' },
   { label: 'Billing', href: '/settings/billing', icon: BanknotesIcon, description: 'Payment and subscription' },
   { label: 'Usage', href: '/settings/usage', icon: ChartBarIcon, description: 'Limits and features' },
 ];

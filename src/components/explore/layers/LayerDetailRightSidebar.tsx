@@ -186,11 +186,11 @@ export default function LayerDetailRightSidebar({
                           <div className="font-medium truncate text-foreground group-hover:text-foreground">
                             {child.name}
                           </div>
-                          {child.meta?.address && (
+                          {child.meta?.address != null ? (
                             <div className="text-[10px] text-foreground-subtle truncate">
                               {String(child.meta.address)}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                         <ChevronRightIcon className="w-3 h-3 flex-shrink-0 text-foreground-subtle group-hover:text-foreground" />
                       </Link>

@@ -38,7 +38,7 @@ export async function GET(
       .eq('visibility', 'public')
       .eq('is_active', true)
       .eq('archived', false)
-      .single();
+      .single() as { data: Record<string, unknown> | null; error: unknown };
 
     if (error || !pin) {
       return NextResponse.json({ error: 'Pin not found' }, { status: 404 });
@@ -46,10 +46,10 @@ export async function GET(
 
     const [accountRes, typeRes] = await Promise.all([
       pin.account_id
-        ? supabase.from('accounts').select('id, username, first_name, last_name, image_url').eq('id', pin.account_id).single()
+        ? supabase.from('accounts').select('id, username, first_name, last_name, image_url').eq('id', pin.account_id as string).single()
         : Promise.resolve({ data: null }),
       pin.mention_type_id
-        ? supabase.from('mention_types').select('id, emoji, name').eq('id', pin.mention_type_id).single()
+        ? supabase.from('mention_types').select('id, emoji, name').eq('id', pin.mention_type_id as string).single()
         : Promise.resolve({ data: null }),
     ]);
 
@@ -58,14 +58,14 @@ export async function GET(
       map_id: pin.map_id,
       lat: pin.lat ?? 0,
       lng: pin.lng ?? 0,
-      description: pin.description || pin.caption || null,
-      caption: pin.caption || null,
-      emoji: pin.emoji || null,
-      image_url: pin.image_url || null,
-      video_url: pin.video_url || null,
-      account_id: pin.account_id || null,
+      description: (pin.description ?? pin.caption) ?? null,
+      caption: pin.caption ?? null,
+      emoji: pin.emoji ?? null,
+      image_url: pin.image_url ?? null,
+      video_url: pin.video_url ?? null,
+      account_id: pin.account_id ?? null,
       created_at: pin.created_at,
-      view_count: (pin as { view_count?: number }).view_count ?? null,
+      view_count: pin.view_count ?? null,
       account: accountRes.data || null,
       mention_type: typeRes.data || null,
     });
@@ -127,8 +127,8 @@ export async function PUT(
           updated_at: new Date().toISOString(),
         };
 
-        const { data: updatedPin, error: updateError } = await supabase
-          .from('map_pins')
+        const { data: updatedPin, error: updateError } = await (supabase
+          .from('map_pins') as any)
           .update(updatePayload)
           .eq('id', pinId)
           .eq('account_id', accountId)
@@ -190,8 +190,8 @@ export async function DELETE(
           return NextResponse.json({ error: 'Pin not found' }, { status: 404 });
         }
 
-        const { error: deleteError } = await supabase
-          .from('map_pins')
+        const { error: deleteError } = await (supabase
+          .from('map_pins') as any)
           .update({ archived: true, updated_at: new Date().toISOString() })
           .eq('id', pinId)
           .eq('account_id', accountId);

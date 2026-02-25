@@ -788,7 +788,7 @@ export default function NewMapPage() {
               {/* Actions */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => router.push('/billing')}
+                  onClick={() => router.push('/pricing')}
                   className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
                 >
                   Upgrade to {upgradeInfo.nextPlanName}
@@ -848,7 +848,7 @@ export default function NewMapPage() {
                     )}
                     {mapLimit.max !== null && mapLimit.current >= mapLimit.max && (
                       <p className="text-[10px] text-red-600 mt-1.5">
-                        Map limit reached. <a href="/billing" className="underline font-medium">Upgrade your plan</a> to create more maps.
+                        Map limit reached. <a href="/pricing" className="underline font-medium">Upgrade your plan</a> to create more maps.
                       </p>
                     )}
                     {mapLimit.max === null && (

@@ -313,8 +313,8 @@ export async function PUT(
           const isAdmin = accountData?.role === 'admin';
           
           // Non-admins need pro/plus plan for custom slug
-          if (body.slug && !isAdmin && accountData?.plan !== 'pro' && accountData?.plan !== 'plus') {
-            return createErrorResponse('Custom slugs are only available for pro/plus accounts or admins', 403);
+          if (body.slug && !isAdmin && accountData?.plan !== 'contributor') {
+            return createErrorResponse('Custom slugs are only available for contributor accounts or admins', 403);
           }
 
           if (body.slug) {

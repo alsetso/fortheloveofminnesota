@@ -10,7 +10,11 @@ export async function POST(req: Request) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { data: account } = await supabaseAuth.from('accounts').select('role').eq('user_id', user.id).maybeSingle();
+    const { data: account } = await supabaseAuth
+      .from('accounts')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle() as { data: { role?: 'general' | 'admin' } | null };
     if (account?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

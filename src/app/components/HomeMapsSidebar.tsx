@@ -267,9 +267,6 @@ export default function HomeMapsSidebar() {
     if (!authAccount?.plan) return null;
     const plan = authAccount.plan.toLowerCase();
     if (plan === 'contributor') return 'Contributor';
-    if (plan === 'professional') return 'Professional';
-    if (plan === 'business') return 'Business';
-    if (plan === 'plus') return 'Pro+';
     if (plan === 'hobby') return 'Hobby';
     // Fallback: capitalize first letter
     return plan.charAt(0).toUpperCase() + plan.slice(1);
@@ -334,7 +331,7 @@ export default function HomeMapsSidebar() {
               </span>
               {limitState.isAtLimit && (
                 <Link
-                  href="/billing"
+                  href="/pricing"
                   className="text-xs font-medium text-blue-600 hover:text-blue-800 underline"
                 >
                   Upgrade

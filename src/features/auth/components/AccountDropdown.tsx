@@ -300,7 +300,7 @@ export default function AccountDropdown({
                     <button
                       onClick={() => {
                         setIsOpen(false);
-                        router.push('/billing');
+                        router.push('/settings/billing');
                       }}
                       className="w-full flex items-center gap-2 p-[10px] hover:bg-surface-accent transition-colors text-left text-xs text-foreground"
                     >

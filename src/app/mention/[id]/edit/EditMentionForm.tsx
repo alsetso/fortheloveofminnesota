@@ -73,7 +73,7 @@ export default function EditMentionForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const charLimit = accountPlan === 'contributor' || accountPlan === 'plus' ? 10000 : 240;
+  const charLimit = accountPlan === 'contributor' ? 10000 : 240;
 
   // ── Location ──
 

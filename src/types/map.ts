@@ -205,6 +205,7 @@ export interface MapItem {
   boundary_data?: BoundaryData | null;
   member_count: number;
   view_count?: number;
+  pin_count?: number;
   published_to_community?: boolean;
   published_at?: string | null;
   tags?: MapTag[] | null;

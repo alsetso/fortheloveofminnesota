@@ -70,7 +70,7 @@ export default function UpgradePageClient() {
                   type="button"
                   onClick={() => setShowAccountDropdown(!showAccountDropdown)}
                   className={`w-6 h-6 rounded-full overflow-hidden transition-all ${
-                    (account.plan === 'contributor' || account.plan === 'plus')
+                    account.plan === 'contributor'
                       ? 'p-[1px] bg-gradient-to-br from-yellow-400 via-yellow-500 to-yellow-600'
                       : 'border border-gray-200'
                   } ${showAccountDropdown ? 'ring-2 ring-gray-300' : ''}`}
@@ -126,7 +126,7 @@ export default function UpgradePageClient() {
                       type="button"
                       onClick={() => {
                         setShowAccountDropdown(false);
-                        router.push('/billing');
+                        router.push('/settings/billing');
                       }}
                       className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                     >

@@ -51,7 +51,7 @@ export class CollectionService {
 
     // Determine limit based on plan
     const plan = (account as { plan: string | null }).plan || 'hobby';
-    const isPro = plan === 'contributor' || plan === 'plus';
+    const isPro = plan === 'contributor';
     const maxCollections = isPro ? null : 3; // null means unlimited for Contributor
     const currentCount = count || 0;
 

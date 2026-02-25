@@ -19,6 +19,7 @@ const GOV_NAV_SECTIONS = [
     items: [
       { label: 'Dashboard', href: '/gov', icon: BuildingOfficeIcon, exact: true },
       { label: 'Directory', href: '/gov/directory', icon: UserGroupIcon },
+      { label: 'Checkbook', href: '/gov/checkbook', icon: BanknotesIcon },
     ],
   },
   {
@@ -27,16 +28,6 @@ const GOV_NAV_SECTIONS = [
       { label: 'Executive', href: '/gov/executive', icon: BuildingOfficeIcon },
       { label: 'Legislative', href: '/gov/legislative', icon: DocumentTextIcon },
       { label: 'Judicial', href: '/gov/judicial', icon: ScaleIcon },
-    ],
-  },
-  {
-    label: 'Checkbook',
-    items: [
-      { label: 'Overview', href: '/gov/checkbook', icon: BanknotesIcon, exact: true },
-      { label: 'Payments', href: '/gov/checkbook/payments', icon: CreditCardIcon, comingSoon: true },
-      { label: 'Payroll', href: '/gov/checkbook/payroll', icon: DocumentTextIcon, comingSoon: true },
-      { label: 'Contracts', href: '/gov/checkbook/contracts', icon: ClipboardDocumentListIcon, comingSoon: true },
-      { label: 'Budget', href: '/gov/checkbook/budget', icon: BanknotesIcon, comingSoon: true },
     ],
   },
   {

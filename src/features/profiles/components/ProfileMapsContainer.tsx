@@ -16,7 +16,7 @@ interface ProfileMapsContainerProps {
 
 // Helper to check if plan is pro
 const isProPlan = (plan: string | null | undefined): boolean => {
-  return plan === 'contributor' || plan === 'plus';
+  return plan === 'contributor';
 };
 
 export default function ProfileMapsContainer({ accountId, isOwnProfile, accountPlan }: ProfileMapsContainerProps) {
@@ -86,7 +86,7 @@ export default function ProfileMapsContainer({ accountId, isOwnProfile, accountP
     
     if (!currentUserIsPro) {
       // Redirect to billing if not pro
-      router.push('/billing');
+      router.push('/pricing');
       return;
     }
     

@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CreditCardIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
 import Link from 'next/link';
-import DraggableBottomSheet from '@/components/ui/DraggableBottomSheet';
-import BusinessSetupForm from '@/features/upgrade/components/BusinessSetupForm';
-import GovernmentSetupForm from '@/features/upgrade/components/GovernmentSetupForm';
 import AccountSettingsForm from './AccountSettingsForm';
 import { useAuth } from '@/features/auth';
 import type { ProfileAccount } from '@/types/profile';
@@ -27,8 +24,6 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState('');
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-  const [showBusinessModal, setShowBusinessModal] = useState(false);
-  const [showGovernmentModal, setShowGovernmentModal] = useState(false);
 
   useEffect(() => {
     setAccount({
@@ -65,15 +60,15 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
   };
 
   const handleManageBilling = () => {
-    router.push('/billing');
+    router.push('/settings/billing');
   };
 
   // Determine billing status
-  const isProUser = account.plan === 'contributor' || account.plan === 'plus';
+  const isProUser = account.plan === 'contributor';
   const isActive = account.subscription_status === 'active' || account.subscription_status === 'trialing';
   const isTrial = account.billing_mode === 'trial' || account.subscription_status === 'trialing';
-  const planDisplayName = account.plan === 'plus' ? 'Pro+' : account.plan === 'contributor' ? 'Contributor' : 'Hobby';
-  const planPrice = account.plan === 'plus' ? '$80/month' : account.plan === 'contributor' ? '$20/month' : 'Free';
+  const planDisplayName = account.plan === 'contributor' ? 'Contributor' : 'Hobby';
+  const planPrice = account.plan === 'contributor' ? '$20/month' : 'Free';
 
   // Get subscription status display
   const getStatusDisplay = () => {
@@ -146,50 +141,6 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
             >
               <CreditCardIcon className="w-3 h-3" />
               <span>{isProUser ? 'Manage' : 'Upgrade'}</span>
-            </button>
-          </div>
-        </div>
-
-          {/* Business & Government Plans */}
-          <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Business & Government Plans</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {/* Business Card */}
-            <button
-              onClick={() => setShowBusinessModal(true)}
-              className="p-[10px] border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent dark:hover:bg-white/10 transition-colors text-left"
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <h4 className="text-xs font-semibold text-foreground">Business</h4>
-                {account.plan === 'business' && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-medium text-foreground/80 bg-surface-accent rounded-full">
-                    Current
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] text-foreground/70 mb-2">
-                Connect your business with Minnesota. Verified profiles and statewide visibility.
-              </p>
-              <span className="text-[10px] font-medium text-foreground">Set up →</span>
-            </button>
-
-            {/* Government Card */}
-            <button
-              onClick={() => setShowGovernmentModal(true)}
-              className="p-[10px] border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent dark:hover:bg-white/10 transition-colors text-left"
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <h4 className="text-xs font-semibold text-foreground">Government</h4>
-                {account.plan === 'gov' && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-medium text-foreground/80 bg-surface-accent rounded-full">
-                    Current
-                  </span>
-                )}
-              </div>
-              <p className="text-[10px] text-foreground/70 mb-2">
-                Help your residents love Minnesota more. Strategic initiatives and civic engagement tools.
-              </p>
-              <span className="text-[10px] font-medium text-foreground">Set up →</span>
             </button>
           </div>
         </div>
@@ -274,42 +225,6 @@ export default function SettingsPageClient({ account: initialAccount, userEmail 
           </div>
         </div>
       )}
-
-      {/* Business Setup Modal */}
-      <DraggableBottomSheet
-        isOpen={showBusinessModal}
-        onClose={() => setShowBusinessModal(false)}
-        initialHeight={90}
-        snapPoints={[50, 90]}
-        showCloseButton={false}
-        showDragHandle={false}
-        hideScrollbar={true}
-        contentClassName="p-0"
-        sheetClassName="w-full max-w-[700px] rounded-t-2xl"
-        centered={true}
-      >
-        <BusinessSetupForm
-          onBack={() => setShowBusinessModal(false)}
-        />
-      </DraggableBottomSheet>
-
-      {/* Government Setup Modal */}
-      <DraggableBottomSheet
-        isOpen={showGovernmentModal}
-        onClose={() => setShowGovernmentModal(false)}
-        initialHeight={90}
-        snapPoints={[50, 90]}
-        showCloseButton={false}
-        showDragHandle={false}
-        hideScrollbar={true}
-        contentClassName="p-0"
-        sheetClassName="w-full max-w-[700px] rounded-t-2xl"
-        centered={true}
-      >
-        <GovernmentSetupForm
-          onBack={() => setShowGovernmentModal(false)}
-        />
-      </DraggableBottomSheet>
     </div>
   );
 }

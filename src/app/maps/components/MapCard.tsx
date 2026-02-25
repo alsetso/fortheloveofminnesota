@@ -38,7 +38,7 @@ export default function MapCard({
 
   // Memoize canAccess to prevent recalculation
   const canAccess = useMemo(
-    () => !map.requiresPro || userAccount?.plan === 'contributor' || userAccount?.plan === 'plus',
+    () => !map.requiresPro || userAccount?.plan === 'contributor',
     [map.requiresPro, userAccount?.plan]
   );
 
@@ -94,7 +94,7 @@ export default function MapCard({
     // For professional maps without access, redirect to billing
     if (map.requiresPro && !canAccess) {
       e.preventDefault();
-      router.push('/billing');
+      router.push('/pricing');
       return;
     }
 

@@ -14,7 +14,7 @@ export default function UpgradeButton({ feature, className, children }: UpgradeB
 
   return (
     <button
-      onClick={() => router.push('/billing')}
+      onClick={() => router.push('/pricing')}
       className={className}
     >
       {children}

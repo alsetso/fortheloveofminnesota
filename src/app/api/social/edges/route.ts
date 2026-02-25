@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
           .select('id')
           .eq('user_id', userId!)
           .eq('id', accountId!)
-          .single();
+          .single() as { data: { id: string } | null; error: unknown };
 
         if (accountError || !fromAccount) {
           return NextResponse.json(
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if edge already exists
-        const { data: existingEdge } = await supabase
+        const { data: existingEdge } = await (supabase as any)
           .schema('social_graph')
           .from('edges')
           .select('id, status')
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
           if (existingEdge.status === 'accepted') {
             let isMutualFollow = false;
             if (relationship === 'follow') {
-              const { data: reverseEdge } = await supabase
+              const { data: reverseEdge } = await (supabase as any)
                 .schema('social_graph')
                 .from('edges')
                 .select('id')
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
             });
           }
           // If pending, update to accepted
-          const { data: updatedEdge, error: updateError } = await supabase
+          const { data: updatedEdge, error: updateError } = await (supabase as any)
             .schema('social_graph')
             .from('edges')
             .update({ status: 'accepted' })
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           // Check for mutual follow after update
           let isMutualFollow = false;
           if (relationship === 'follow') {
-            const { data: reverseEdge } = await supabase
+            const { data: reverseEdge } = await (supabase as any)
               .schema('social_graph')
               .from('edges')
               .select('id')

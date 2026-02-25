@@ -68,8 +68,8 @@ export async function POST(
         }
 
         // Create bookmark
-        const { error: bookmarkError } = await supabase
-          .from('saved_items')
+        const { error: bookmarkError } = await (supabase
+          .from('saved_items') as any)
           .insert({
             account_id: accountId,
             item_type: 'post',

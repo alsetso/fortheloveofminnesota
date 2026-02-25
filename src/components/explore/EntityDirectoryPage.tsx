@@ -86,7 +86,7 @@ export default function EntityDirectoryPage({ entitySlug }: EntityDirectoryPageP
       fetch(`${config.apiEndpoint}?${params}`)
         .then((r) => (r.ok ? r.json() : { data: [], total: 0 }))
         .then((json: { data?: unknown[]; total?: number }) => {
-          const data = Array.isArray(json?.data) ? json.data : [];
+          const data = Array.isArray(json?.data) ? (json.data as Record<string, unknown>[]) : [];
           setRecords(data);
           setTotalCount(typeof json?.total === 'number' ? json.total : data.length);
         })

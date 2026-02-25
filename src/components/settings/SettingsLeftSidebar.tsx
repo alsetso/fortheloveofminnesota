@@ -12,7 +12,6 @@ import {
   ChevronRightIcon,
   ChevronLeftIcon,
   ChevronDownIcon,
-  CreditCardIcon,
   BanknotesIcon,
   MapPinIcon,
   ClockIcon,
@@ -80,7 +79,6 @@ export default function SettingsLeftSidebar({ onHideSidebar }: SettingsLeftSideb
   ] as const;
 
   const billingNavItems = [
-    { label: 'Plans', href: '/settings/plans', Icon: CreditCardIcon },
     { label: 'Billing', href: '/settings/billing', Icon: BanknotesIcon },
     { label: 'Usage', href: '/settings/usage', Icon: ChartBarIcon },
   ] as const;

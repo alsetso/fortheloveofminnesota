@@ -42,7 +42,7 @@ const KNOWN_APP_ROUTES = new Set([
   'stories', 'billing', 'plans', 'onboarding', 'signup', 'login',
   'terms', 'post', 'marketplace', 'ad_center', 'contact', 'download',
   'privacy', 'not-found', 'school', 'schools', 'transportation', 'weather',
-  'realestate', 'work',
+  'realestate', 'work', 'marketing',
 ]);
 
 /** Routes where the right sidebar should be suppressed in the main content area. */
@@ -179,17 +179,8 @@ export default function NewPageWrapper({
     { label: 'Home', href: '/', icon: HomeIcon, iconSolid: HomeIconSolid },
     { label: 'Maps', href: '/maps', icon: MapIcon, iconSolid: MapIconSolid },
     { label: 'People', href: '/people', icon: UsersIcon, iconSolid: UsersIconSolid },
+    { label: 'Analytics', href: '/analytics', icon: ChartBarIcon, iconSolid: ChartBarIconSolid },
   ];
-
-  // Add Analytics for admins
-  if (account?.role === 'admin') {
-    navItems.push({
-      label: 'Analytics',
-      href: '/analytics',
-      icon: ChartBarIcon,
-      iconSolid: ChartBarIconSolid,
-    });
-  }
 
   // Add Profile if username exists
   if (account?.username) {

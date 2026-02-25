@@ -149,7 +149,7 @@ export default function PlanPaymentModal({
     if (!plan) return;
 
     if (!account) {
-      const returnUrl = `/billing?plan=${plan.slug}`;
+      const returnUrl = '/pricing';
       window.location.href = `/?redirect=${encodeURIComponent(returnUrl)}&message=${encodeURIComponent('Please sign in to continue with your purchase')}`;
       return;
     }
@@ -162,7 +162,7 @@ export default function PlanPaymentModal({
         body: JSON.stringify({
           plan: plan.slug,
           period: selectedPeriod,
-          returnUrl: `/settings/plans`,
+          returnUrl: '/pricing',
         }),
       });
 
@@ -241,7 +241,7 @@ export default function PlanPaymentModal({
             <p className="text-xs text-foreground-muted">The selected plan is no longer available.</p>
             <button
               onClick={onClose}
-              className="w-full px-4 py-2 bg-foreground text-surface font-semibold rounded-lg hover:opacity-90 transition-colors"
+              className="w-full px-4 py-2 bg-lake-blue text-white font-semibold rounded-lg hover:bg-lake-blue/90 transition-colors"
             >
               Close
             </button>
@@ -363,7 +363,7 @@ export default function PlanPaymentModal({
                   onClick={() => setSelectedPeriod('monthly')}
                   className={`flex flex-col items-center p-3 rounded-xl border-2 text-left transition-all ${
                     selectedPeriod === 'monthly'
-                      ? 'border-foreground bg-surface-accent dark:bg-white/5'
+                      ? 'border-lake-blue bg-lake-blue/10 dark:bg-lake-blue/10'
                       : 'border-border-muted dark:border-white/10 bg-surface'
                   }`}
                 >
@@ -376,7 +376,7 @@ export default function PlanPaymentModal({
                   onClick={() => setSelectedPeriod('yearly')}
                   className={`relative flex flex-col items-center p-3 rounded-xl border-2 text-left transition-all ${
                     selectedPeriod === 'yearly'
-                      ? 'border-foreground bg-surface-accent dark:bg-white/5'
+                      ? 'border-lake-blue bg-lake-blue/10 dark:bg-lake-blue/10'
                       : 'border-border-muted dark:border-white/10 bg-surface'
                   }`}
                 >
@@ -467,10 +467,10 @@ export default function PlanPaymentModal({
               {!account && (
                 <button
                   onClick={() => {
-                    const returnUrl = `/billing?plan=${plan.slug}`;
+                    const returnUrl = '/pricing';
                     window.location.href = `/?redirect=${encodeURIComponent(returnUrl)}&message=${encodeURIComponent('Please sign in to activate your free plan')}`;
                   }}
-                  className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full py-3 px-4 bg-lake-blue text-white font-semibold rounded-lg hover:bg-lake-blue/90 transition-colors"
                 >
                   Sign In to Activate
                 </button>
@@ -480,10 +480,10 @@ export default function PlanPaymentModal({
             <>
               <button
                 onClick={() => {
-                  const returnUrl = `/billing?plan=${plan.slug}`;
+                  const returnUrl = '/pricing';
                   window.location.href = `/?redirect=${encodeURIComponent(returnUrl)}&message=${encodeURIComponent('Please sign in to continue with your purchase')}`;
                 }}
-                className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                className="w-full py-3 px-4 bg-lake-blue text-white font-semibold rounded-lg hover:bg-lake-blue/90 transition-colors"
               >
                 Sign In to Continue
               </button>
@@ -497,7 +497,7 @@ export default function PlanPaymentModal({
                 className={`w-full py-3 px-4 font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   direction === 'downgrade'
                     ? 'bg-amber-600 text-white hover:bg-amber-700'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-lake-blue text-white hover:bg-lake-blue/90'
                 }`}
               >
                 {processing
@@ -516,7 +516,7 @@ export default function PlanPaymentModal({
                     : 'Using your card on file'}
               </p>
               {!hasActiveSubscription && plan.slug === 'contributor' && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 text-center font-medium">
+                <p className="text-xs text-lake-blue text-center font-medium">
                   Includes a 7-day free trial
                 </p>
               )}
@@ -526,7 +526,7 @@ export default function PlanPaymentModal({
               <button
                 onClick={handleCheckout}
                 disabled={processing || !account}
-                className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-4 bg-lake-blue text-white font-semibold rounded-lg hover:bg-lake-blue/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {processing ? 'Processing...' : 'Continue to Payment'}
               </button>

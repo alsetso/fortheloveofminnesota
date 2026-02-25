@@ -1,32 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClientWithAuth } from '@/lib/supabaseServer';
+import { createServerClientWithAuth, createServiceClient } from '@/lib/supabaseServer';
 import { cookies } from 'next/headers';
 import { withSecurity } from '@/lib/security/middleware';
 import type { BillingPlan, BillingFeature } from '@/lib/billing/types';
 
 /**
  * GET /api/billing/plans
- * Public endpoint to fetch all active plans with their features
- * No authentication required - safe for public billing page
- * 
- * Security:
- * - Rate limited: 100 requests/minute (public)
- * - Read-only access to billing schema
- * - Only returns active plans and features
+ * Public endpoint to fetch all active plans with their features.
+ * Works for both authenticated and unauthenticated users (e.g. /pricing).
+ *
+ * Billing data is read with the service client so plans/features always load
+ * regardless of auth. Admin-only plan filtering uses the request session when present.
+ *
+ * Security: requireAuth false, rateLimit public, read-only.
  */
 export async function GET(request: NextRequest) {
   return withSecurity(
     request,
     async (req) => {
       try {
-        const supabase = await createServerClientWithAuth(cookies());
-        
-        // Check if user is admin
+        // Service client for billing reads — ensures plans/features load for non-auth
+        const supabaseBilling = await createServiceClient();
+
+        // Optional: current user for admin-only plan filtering
         let isAdmin = false;
         try {
-          const { data: { user } } = await supabase.auth.getUser();
+          const supabaseAuth = await createServerClientWithAuth(cookies());
+          const { data: { user } } = await supabaseAuth.auth.getUser();
           if (user) {
-            const { data: account } = await supabase
+            const { data: account } = await supabaseAuth
               .from('accounts')
               .select('role')
               .eq('user_id', user.id)
@@ -35,24 +37,16 @@ export async function GET(request: NextRequest) {
             isAdmin = (account as { role: string } | null)?.role === 'admin';
           }
         } catch {
-          // Not authenticated or error - not admin
+          // Not authenticated or error — not admin
         }
-        
-        // Fetch all active plans, filter admin-only plans for non-admins
-        let plansQuery = supabase
+
+        const { data: plansRaw, error: plansError } = await supabaseBilling
           .from('billing_plans')
           .select('*')
-          .eq('is_active', true);
-        
-        // Hide admin-only plans from non-admins
-        if (!isAdmin) {
-          plansQuery = plansQuery.or('is_admin_only.is.null,is_admin_only.eq.false');
-        }
-        
-        const { data: plans, error: plansError } = await plansQuery
+          .eq('is_active', true)
           .order('display_order', { ascending: true })
           .returns<BillingPlan[]>();
-        
+
         if (plansError) {
           console.error('[Billing API] Error fetching plans:', plansError);
           return NextResponse.json(
@@ -60,9 +54,14 @@ export async function GET(request: NextRequest) {
             { status: 500 }
           );
         }
-        
+
+        // Filter admin-only plans for non-admins (is_admin_only may be missing on public.billing_plans view)
+        const plans = (plansRaw || []).filter((p: BillingPlan & { is_admin_only?: boolean }) =>
+          isAdmin ? true : p.is_admin_only !== true
+        );
+
         // Fetch all active features for reference
-        const { data: allFeatures, error: featuresError } = await supabase
+        const { data: allFeatures, error: featuresError } = await supabaseBilling
           .from('billing_features')
           .select('*')
           .eq('is_active', true)
@@ -91,7 +90,7 @@ export async function GET(request: NextRequest) {
         });
         
         // Fetch plan-feature relationships (direct assignments only) WITH LIMITS
-        const { data: planFeatures, error: planFeaturesError } = await supabase
+        const { data: planFeatures, error: planFeaturesError } = await supabaseBilling
           .from('billing_plan_features')
           .select('plan_id, feature_id, limit_value, limit_type')
           .returns<Array<{plan_id: string; feature_id: string; limit_value: number | null; limit_type: 'count' | 'storage_mb' | 'boolean' | 'unlimited' | null}>>();

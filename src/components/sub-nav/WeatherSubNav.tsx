@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * Weather sub-nav (Overview, Hourly, 7-Day, Alerts, Stations, City Lookup).
+ * Currently unused: the weather page is a single dashboard with in-page jump links.
+ * Kept in case you add /weather/hourly, /weather/forecast, etc. later.
+ */
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {

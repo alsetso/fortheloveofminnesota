@@ -13,6 +13,7 @@ import {
   windDegToDir,
 } from './useWeather';
 import type { WeatherAlert, ForecastPeriod } from './useWeather';
+import { getEmojisForObservation } from './weatherEmoji';
 import {
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
@@ -82,7 +83,7 @@ function CurrentConditions({ stationId, label }: { stationId: string; label: str
 
   if (error) {
     return (
-      <div className="border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px]">
+      <div className="border border-gray-200 dark:border-white/10 rounded-lg bg-transparent dark:bg-transparent p-3 sm:p-[10px] min-w-0">
         <p className="text-xs text-red-500">Failed to load {label}</p>
       </div>
     );
@@ -96,32 +97,54 @@ function CurrentConditions({ stationId, label }: { stationId: string; label: str
   const windChill = cToF(p?.windChill?.value ?? null);
   const dewpoint = cToF(p?.dewpoint?.value ?? null);
 
+  const emojis = getEmojisForObservation({
+    textDescription: p?.textDescription ?? null,
+    tempF: temp,
+    windMph: wind,
+    humidityPercent: humidity ?? null,
+    windChillF: windChill,
+  });
+
   return (
-    <div className="border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px] space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider">{label}</p>
+    <div className="border border-gray-200 dark:border-white/10 rounded-lg bg-transparent dark:bg-transparent p-3 sm:p-[10px] min-w-0 flex flex-col space-y-2">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider truncate">
+          {label}
+        </p>
         {p?.timestamp && (
-          <p className="text-[10px] text-foreground-muted">{formatTime(p.timestamp)}</p>
+          <p className="text-[10px] text-foreground-muted flex-shrink-0 tabular-nums">
+            {formatTime(p.timestamp)}
+          </p>
         )}
       </div>
 
+      {emojis.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0" aria-hidden>
+          {emojis.map((emoji, i) => (
+            <span key={i} className="text-sm sm:text-base leading-none" role="img">
+              {emoji}
+            </span>
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-10 w-24" />
+        <div className="space-y-2 flex-1">
+          <Skeleton className="h-8 sm:h-10 w-20 sm:w-24" />
           <Skeleton className="h-3 w-full" />
         </div>
       ) : (
         <>
-          <div className="flex items-end gap-2">
-            <span className="text-2xl sm:text-3xl font-semibold text-foreground tabular-nums leading-none">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-1 sm:gap-2 min-w-0">
+            <span className="text-xl sm:text-2xl md:text-3xl font-semibold text-foreground tabular-nums leading-tight">
               {temp != null ? `${temp}°` : '--'}
             </span>
-            <span className="text-xs text-foreground-muted pb-0.5 truncate">
+            <span className="text-[10px] sm:text-xs text-foreground-muted truncate">
               {p?.textDescription || '--'}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-1 text-xs">
+          <div className="grid grid-cols-2 gap-x-2 sm:gap-x-3 gap-y-1 text-[10px] sm:text-xs min-w-0">
             <Stat label="Wind" value={wind != null ? `${windDir} ${wind} mph` : '--'} />
             <Stat label="Humidity" value={humidity != null ? `${Math.round(humidity)}%` : '--'} />
             <Stat label="Visibility" value={vis != null ? `${vis} mi` : '--'} />
@@ -136,9 +159,9 @@ function CurrentConditions({ stationId, label }: { stationId: string; label: str
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
-      <span className="text-foreground-muted">{label}</span>
-      <span className="text-foreground font-medium tabular-nums">{value}</span>
+    <div className="flex justify-between gap-2 min-w-0">
+      <span className="text-foreground-muted flex-shrink-0">{label}</span>
+      <span className="text-foreground font-medium tabular-nums truncate text-right">{value}</span>
     </div>
   );
 }
@@ -170,7 +193,7 @@ function AlertsSection() {
 
   if (alerts.length === 0) {
     return (
-      <div className="border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px] text-center">
+      <div className="border border-gray-200 dark:border-white/10 rounded-md bg-transparent dark:bg-transparent p-[10px] text-center">
         <p className="text-xs text-foreground-muted">No active weather alerts for Minnesota</p>
       </div>
     );
@@ -179,7 +202,7 @@ function AlertsSection() {
   return (
     <div className="space-y-1.5">
       {Array.from(grouped).map(([event, items]) => (
-        <div key={event} className="border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface overflow-hidden">
+        <div key={event} className="border border-gray-200 dark:border-white/10 rounded-md bg-transparent dark:bg-transparent overflow-hidden">
           <button
             type="button"
             onClick={() => setExpanded(expanded === event ? null : event)}
@@ -227,7 +250,7 @@ function HourlyRow({ periods }: { periods: ForecastPeriod[] }) {
       {periods.map((p) => (
         <div
           key={p.number}
-          className="flex-shrink-0 w-[60px] border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface p-1.5 text-center space-y-0.5"
+          className="flex-shrink-0 w-[60px] border border-gray-200 dark:border-white/10 rounded-md bg-transparent dark:bg-transparent p-1.5 text-center space-y-0.5"
         >
           <p className="text-[10px] text-foreground-muted">{formatTime(p.startTime)}</p>
           <p className="text-sm font-semibold text-foreground tabular-nums">{p.temperature}°</p>
@@ -246,7 +269,7 @@ function SevenDay({ periods }: { periods: ForecastPeriod[] }) {
       {periods.map((p) => (
         <div
           key={p.number}
-          className="flex items-center gap-2 sm:gap-3 border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface px-2 sm:px-[10px] py-2"
+          className="flex items-center gap-2 sm:gap-3 border border-gray-200 dark:border-white/10 rounded-md bg-transparent dark:bg-transparent px-2 sm:px-[10px] py-2"
         >
           <div className="w-16 sm:w-20 flex-shrink-0">
             <p className="text-xs font-medium text-foreground truncate">{p.name}</p>
@@ -414,7 +437,7 @@ export default function WeatherDashboard() {
   const hourly = hourlyData?.properties?.periods?.slice(0, 24) ?? [];
 
   return (
-    <div className="max-w-7xl mx-auto w-full px-2 sm:px-[10px] py-3 pb-24 sm:pb-3 space-y-3">
+    <div className="max-w-4xl mx-auto w-full px-2 sm:px-[10px] py-3 pb-24 sm:pb-3 space-y-3">
       {/* Header */}
       <div className="flex-shrink-0 pt-4 pb-2 sm:pt-6 sm:pb-3 text-center">
         <h1 className="text-xl sm:text-2xl font-semibold text-foreground tracking-tight">
@@ -425,12 +448,52 @@ export default function WeatherDashboard() {
         </p>
       </div>
 
+      {/* In-page jump links — replaces former sub-sidebar */}
+      <nav className="flex flex-wrap justify-center gap-x-2 gap-y-1 pb-2 border-b border-border-muted dark:border-white/10">
+        {[
+          { id: 'conditions', label: 'Conditions' },
+          { id: 'alerts', label: 'Alerts' },
+          { id: 'hourly', label: 'Hourly' },
+          { id: 'forecast', label: '7-Day' },
+          { id: 'city-lookup', label: 'City lookup' },
+        ].map(({ id, label }) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            className="text-xs px-2 py-1 rounded-md text-foreground-muted hover:bg-surface-accent hover:text-foreground transition-colors"
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      {/* City Lookup — near top so users can pick a city first */}
+      <div id="city-lookup" className="scroll-mt-4">
+        <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider mb-1.5">
+          City Lookup
+        </p>
+        <div className="border border-gray-200 dark:border-white/10 rounded-md bg-transparent dark:bg-transparent p-[10px]">
+          <CitySearch onSelect={setSelectedCity} />
+        </div>
+      </div>
+
+      {/* Selected City Forecast — appears when a city is chosen */}
+      {selectedCity && (
+        <div className="border border-gray-200 dark:border-white/10 rounded-md bg-transparent dark:bg-transparent p-[10px]">
+          <CityForecastPanel
+            lat={selectedCity.lat}
+            lon={selectedCity.lon}
+            cityName={selectedCity.name}
+          />
+        </div>
+      )}
+
       {/* Current Conditions — 3 key stations */}
-      <div>
+      <div id="conditions" className="scroll-mt-4">
         <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider mb-1.5">
           Current Conditions
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
           <CurrentConditions stationId="KMSP" label="Minneapolis (KMSP)" />
           <CurrentConditions stationId="KDLH" label="Duluth (KDLH)" />
           <CurrentConditions stationId="KRST" label="Rochester (KRST)" />
@@ -438,7 +501,7 @@ export default function WeatherDashboard() {
       </div>
 
       {/* Active Alerts */}
-      <div>
+      <div id="alerts" className="scroll-mt-4">
         <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider mb-1.5">
           Active Alerts
         </p>
@@ -446,7 +509,7 @@ export default function WeatherDashboard() {
       </div>
 
       {/* Hourly for active city */}
-      <div>
+      <div id="hourly" className="scroll-mt-4">
         <div className="flex items-center justify-between mb-1.5">
           <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider">
             Hourly — {activeName}
@@ -474,7 +537,7 @@ export default function WeatherDashboard() {
       </div>
 
       {/* 7-Day Forecast */}
-      <div>
+      <div id="forecast" className="scroll-mt-4">
         <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider mb-1.5">
           7-Day Forecast — {activeName}
         </p>
@@ -488,27 +551,6 @@ export default function WeatherDashboard() {
           <SevenDay periods={forecast7} />
         )}
       </div>
-
-      {/* City Search */}
-      <div>
-        <p className="text-[10px] font-medium text-foreground-muted uppercase tracking-wider mb-1.5">
-          City Lookup
-        </p>
-        <div className="border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px]">
-          <CitySearch onSelect={setSelectedCity} />
-        </div>
-      </div>
-
-      {/* Selected City Forecast */}
-      {selectedCity && (
-        <div className="border border-gray-200 dark:border-white/10 rounded-md bg-white dark:bg-surface p-[10px]">
-          <CityForecastPanel
-            lat={selectedCity.lat}
-            lon={selectedCity.lon}
-            cityName={selectedCity.name}
-          />
-        </div>
-      )}
     </div>
   );
 }

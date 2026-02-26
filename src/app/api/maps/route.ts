@@ -10,6 +10,7 @@ import { validateQueryParams, validateRequestBody } from '@/lib/security/validat
 import { z } from 'zod';
 import { commonSchemas } from '@/lib/security/validation';
 import { MAP_FEATURE_SLUG, checkMapLimitServer } from '@/lib/billing/mapLimits';
+import { maybeSendUsageLimitNotification } from '@/lib/notifications/usageWarning';
 
 /**
  * GET /api/maps
@@ -346,6 +347,17 @@ export async function POST(request: NextRequest) {
             console.error('[Maps API] Error creating map:', error);
           }
           return createErrorResponse('Failed to create map', 500);
+        }
+
+        // Optional: in-app usage warning when at or near plan limit (best-effort; never fail the request)
+        try {
+          await maybeSendUsageLimitNotification(
+            finalAccountId,
+            MAP_FEATURE_SLUG,
+            (ownedMapsCount ?? 0) + 1
+          );
+        } catch {
+          // Swallow: notification is best-effort only; map was already created.
         }
 
         return createSuccessResponse(map, 201);

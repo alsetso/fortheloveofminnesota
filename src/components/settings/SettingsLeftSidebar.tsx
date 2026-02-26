@@ -58,21 +58,25 @@ export default function SettingsLeftSidebar({ onHideSidebar }: SettingsLeftSideb
       ]
     : [];
 
-  const generalNavItems = [
-    { label: 'Maps', href: '/settings/maps', Icon: MapIcon },
-    { label: 'Pins', href: '/settings/pins', Icon: MapPinIcon },
-    { label: 'Collections', href: '/settings/collections', Icon: Square3Stack3DIcon },
-    { label: 'Business', href: '/settings/business', Icon: BuildingOfficeIcon },
-  ] as const;
-
-  const accountPrivacyNavItems = [
-    { label: 'Profile', href: '/settings/profile', Icon: UserCircleIcon },
-    { label: 'History', href: '/settings/history', Icon: ClockIcon },
-    { label: 'ID Verification', href: '/settings/id', Icon: IdentificationIcon },
-  ] as const;
-
-  const billingNavItems = [
-    { label: 'Billing', href: '/settings/billing', Icon: BanknotesIcon },
+  const navSections = [
+    {
+      label: 'General',
+      items: [
+        { label: 'Maps', href: '/settings/maps', Icon: MapIcon },
+        { label: 'Pins', href: '/settings/pins', Icon: MapPinIcon },
+        { label: 'Collections', href: '/settings/collections', Icon: Square3Stack3DIcon },
+        { label: 'Business', href: '/settings/business', Icon: BuildingOfficeIcon },
+      ],
+    },
+    {
+      label: 'Account',
+      items: [
+        { label: 'Profile', href: '/settings/profile', Icon: UserCircleIcon },
+        { label: 'History', href: '/settings/history', Icon: ClockIcon },
+        { label: 'ID Verification', href: '/settings/id', Icon: IdentificationIcon },
+        { label: 'Billing', href: '/settings/billing', Icon: BanknotesIcon },
+      ],
+    },
   ] as const;
 
   const isActive = (href: string) => {
@@ -180,77 +184,34 @@ export default function SettingsLeftSidebar({ onHideSidebar }: SettingsLeftSideb
         </div>
       )}
 
-      {/* General Section */}
-      <div className="p-3 border-b border-border-muted dark:border-white/10">
-        <div className="space-y-1">
-          {generalNavItems.map((item) => {
-            const Icon = item.Icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-surface-accent text-foreground'
-                    : 'text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/10 hover:text-foreground'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="flex-1">{item.label}</span>
-                <ChevronRightIcon className="w-4 h-4 text-foreground-muted" />
-              </Link>
-            );
-          })}
+      {/* Nav Sections */}
+      {navSections.map((section) => (
+        <div key={section.label} className="p-3 border-b border-border-muted dark:border-white/10">
+          <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1.5 px-2">
+            {section.label}
+          </p>
+          <div className="space-y-0.5">
+            {section.items.map((item) => {
+              const Icon = item.Icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
+                    isActive(item.href)
+                      ? 'bg-surface-accent text-foreground'
+                      : 'text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/10 hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="flex-1">{item.label}</span>
+                  <ChevronRightIcon className="w-4 h-4 text-foreground-muted" />
+                </Link>
+              );
+            })}
+          </div>
         </div>
-      </div>
-
-      {/* Account & Privacy Section */}
-      <div className="p-3 border-b border-border-muted dark:border-white/10">
-        <div className="space-y-1">
-          {accountPrivacyNavItems.map((item) => {
-            const Icon = item.Icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-surface-accent text-foreground'
-                    : 'text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/10 hover:text-foreground'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="flex-1">{item.label}</span>
-                <ChevronRightIcon className="w-4 h-4 text-foreground-muted" />
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Billing Section */}
-      <div className="p-3 border-b border-border-muted dark:border-white/10">
-        <div className="space-y-1">
-          {billingNavItems.map((item) => {
-            const Icon = item.Icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 px-2 py-2 text-sm rounded-md transition-colors ${
-                  isActive(item.href)
-                    ? 'bg-surface-accent text-foreground'
-                    : 'text-foreground-muted hover:bg-surface-accent dark:hover:bg-white/10 hover:text-foreground'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                <span className="flex-1">{item.label}</span>
-                <ChevronRightIcon className="w-4 h-4 text-foreground-muted" />
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+      ))}
 
       {/* Sign Out */}
       <div className="mt-auto p-3 border-t border-border-muted dark:border-white/10">

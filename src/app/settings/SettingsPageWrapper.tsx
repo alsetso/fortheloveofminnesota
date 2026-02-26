@@ -36,10 +36,46 @@ interface SettingsPageWrapperProps {
   children: React.ReactNode;
 }
 
+interface Stats {
+  pins: number;
+  collections: number;
+  maps: number;
+  visits: number;
+}
+
 export default function SettingsPageWrapper({ account, userEmail, mapLimit, children }: SettingsPageWrapperProps) {
   const pathname = usePathname();
+  const supabase = useSupabaseClient();
   const isMainSettings = pathname === '/settings';
   const [sidebarVisible, setSidebarVisible] = useState(true);
+
+  const [stats, setStats] = useState<Stats>({ pins: 0, collections: 0, maps: 0, visits: 0 });
+  const [statsLoaded, setStatsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!isMainSettings || !account?.id) return;
+    async function fetchStats() {
+      try {
+        const [pinsRes, collectionsRes, mapsRes, visitsRes] = await Promise.all([
+          supabase.from('map_pins').select('id', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_active', true),
+          supabase.from('collections').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
+          fetch(`/api/maps?account_id=${account.id}&limit=1&offset=0`).then((r) => r.json()).catch(() => ({ maps: [] })),
+          supabase.from('url_visits').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
+        ]);
+        setStats({
+          pins: pinsRes.count ?? 0,
+          collections: collectionsRes.count ?? 0,
+          maps: Array.isArray(mapsRes.maps) ? mapsRes.maps.length : (mapsRes.total ?? 0),
+          visits: visitsRes.count ?? 0,
+        });
+      } catch {
+        // Silently fail
+      } finally {
+        setStatsLoaded(true);
+      }
+    }
+    fetchStats();
+  }, [isMainSettings, account?.id, supabase]);
 
   return (
     <SettingsProvider account={account} userEmail={userEmail} mapLimit={mapLimit}>
@@ -47,7 +83,7 @@ export default function SettingsPageWrapper({ account, userEmail, mapLimit, chil
         leftSidebar={
           sidebarVisible
             ? isMainSettings
-              ? <SettingsHomeSidebar onHideSidebar={() => setSidebarVisible(false)} />
+              ? <SettingsHomeSidebar onHideSidebar={() => setSidebarVisible(false)} stats={stats} statsLoaded={statsLoaded} />
               : <SettingsLeftSidebar onHideSidebar={() => setSidebarVisible(false)} />
             : undefined
         }
@@ -66,7 +102,7 @@ export default function SettingsPageWrapper({ account, userEmail, mapLimit, chil
             </div>
           )}
           {isMainSettings ? (
-            <SettingsOverview />
+            <SettingsOverview stats={stats} statsLoaded={statsLoaded} />
           ) : (
             <>
               <div className="mb-3 lg:hidden">
@@ -97,41 +133,12 @@ const PLAN_LABELS: Record<string, string> = {
   contributor: 'Contributor',
 };
 
-function SettingsHomeSidebar({ onHideSidebar }: { onHideSidebar?: () => void }) {
+function SettingsHomeSidebar({ onHideSidebar, stats, statsLoaded }: { onHideSidebar?: () => void; stats: Stats; statsLoaded: boolean }) {
   const { account, userEmail, mapLimit } = useSettings();
-  const supabase = useSupabaseClient();
   const displayName = getDisplayName(account);
   const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Public';
   const profileUrl = account.username ? `/${encodeURIComponent(account.username)}` : null;
   const canUpgrade = !account.plan || account.plan === 'hobby' || account.plan === 'contributor';
-
-  const [stats, setStats] = useState({ pins: 0, collections: 0, maps: 0, visits: 0 });
-  const [statsLoaded, setStatsLoaded] = useState(false);
-
-  useEffect(() => {
-    async function fetchStats() {
-      if (!account?.id) return;
-      try {
-        const [pinsRes, collectionsRes, mapsRes, visitsRes] = await Promise.all([
-          supabase.from('map_pins').select('id', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_active', true),
-          supabase.from('collections').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
-          fetch(`/api/maps?account_id=${account.id}&limit=1&offset=0`).then((r) => r.json()).catch(() => ({ maps: [] })),
-          supabase.from('url_visits').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
-        ]);
-        setStats({
-          pins: pinsRes.count ?? 0,
-          collections: collectionsRes.count ?? 0,
-          maps: Array.isArray(mapsRes.maps) ? mapsRes.maps.length : (mapsRes.total ?? 0),
-          visits: visitsRes.count ?? 0,
-        });
-      } catch {
-        // Silently fail, stats show 0
-      } finally {
-        setStatsLoaded(true);
-      }
-    }
-    fetchStats();
-  }, [account?.id, supabase]);
 
   return (
     <div className="h-full flex flex-col overflow-y-auto scrollbar-hide">
@@ -290,41 +297,12 @@ function SidebarLink({ href, label }: { href: string; label: string }) {
    Stats row + nav grid
    ───────────────────────────────────────────────── */
 
-function SettingsOverview() {
+function SettingsOverview({ stats, statsLoaded }: { stats: Stats; statsLoaded: boolean }) {
   const { account, userEmail, mapLimit } = useSettings();
-  const supabase = useSupabaseClient();
   const displayName = getDisplayName(account);
   const isAdmin = account?.role === 'admin';
   const planLabel = (account.plan && PLAN_LABELS[account.plan]) || 'Public';
   const profileUrl = account.username ? `/${encodeURIComponent(account.username)}` : null;
-
-  const [stats, setStats] = useState({ pins: 0, collections: 0, maps: 0, visits: 0 });
-  const [statsLoaded, setStatsLoaded] = useState(false);
-
-  useEffect(() => {
-    async function fetchStats() {
-      if (!account?.id) return;
-      try {
-        const [pinsRes, collectionsRes, mapsRes, visitsRes] = await Promise.all([
-          supabase.from('map_pins').select('id', { count: 'exact', head: true }).eq('account_id', account.id).eq('is_active', true),
-          supabase.from('collections').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
-          fetch(`/api/maps?account_id=${account.id}&limit=1&offset=0`).then((r) => r.json()).catch(() => ({ maps: [] })),
-          supabase.from('url_visits').select('id', { count: 'exact', head: true }).eq('account_id', account.id),
-        ]);
-        setStats({
-          pins: pinsRes.count ?? 0,
-          collections: collectionsRes.count ?? 0,
-          maps: Array.isArray(mapsRes.maps) ? mapsRes.maps.length : (mapsRes.total ?? 0),
-          visits: visitsRes.count ?? 0,
-        });
-      } catch {
-        // Silently fail
-      } finally {
-        setStatsLoaded(true);
-      }
-    }
-    fetchStats();
-  }, [account?.id, supabase]);
 
   return (
     <div className="space-y-4">

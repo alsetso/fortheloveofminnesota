@@ -7,6 +7,7 @@ import { MapIcon, PlusIcon, Cog6ToothIcon, ArrowTopRightOnSquareIcon } from '@he
 import { useSettings } from '@/features/settings/contexts/SettingsContext';
 import { getMapUrl } from '@/lib/maps/urls';
 import { useToast } from '@/features/ui/hooks/useToast';
+import PinDisplaySettingsClient from '@/app/settings/maps/pins/PinsSettingsClient';
 
 interface OwnedMapRow {
   id: string;
@@ -166,6 +167,12 @@ export default function MapsSettingsClient() {
           <MapIcon className="w-3 h-3" />
           Go to Maps
         </Link>
+
+        {/* Pin Display Settings */}
+        <div className="pt-2 border-t border-border-muted dark:border-white/10">
+          <h2 className="text-sm font-semibold text-foreground-muted uppercase tracking-wider px-0.5 mb-3">Pin Display</h2>
+          <PinDisplaySettingsClient />
+        </div>
       </div>
     );
   }
@@ -226,6 +233,12 @@ export default function MapsSettingsClient() {
           </div>
         </div>
       )}
+
+      {/* Pin Display Settings */}
+      <div className="pt-2 border-t border-border-muted dark:border-white/10">
+        <h2 className="text-sm font-semibold text-foreground-muted uppercase tracking-wider px-0.5 mb-3">Pin Display</h2>
+        <PinDisplaySettingsClient />
+      </div>
     </div>
   );
 }

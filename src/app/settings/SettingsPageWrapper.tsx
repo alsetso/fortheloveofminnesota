@@ -12,9 +12,7 @@ import type { ProfileAccount } from '@/types/profile';
 import { getDisplayName } from '@/types/profile';
 import SignOutButton from '@/components/settings/SignOutButton';
 import {
-  Cog6ToothIcon,
   MapIcon,
-  ShieldCheckIcon,
   UserCircleIcon,
   CreditCardIcon,
   BanknotesIcon,
@@ -24,8 +22,6 @@ import {
   BuildingOfficeIcon,
   UsersIcon,
   IdentificationIcon,
-  ChartBarIcon,
-  AtSymbolIcon,
   ArrowTopRightOnSquareIcon,
   CircleStackIcon,
   ServerStackIcon,
@@ -222,8 +218,7 @@ function SettingsHomeSidebar({ onHideSidebar }: { onHideSidebar?: () => void }) 
       {/* Quick Links */}
       <div className="p-3 border-b border-border-muted dark:border-white/10 space-y-0.5">
         <SidebarLink href="/settings/billing" label="Billing" />
-        <SidebarLink href="/settings/privacy" label="Privacy" />
-        <SidebarLink href="/settings/account" label="Account" />
+        <SidebarLink href="/settings/profile" label="Profile" />
       </div>
 
       {/* Map Limit */}
@@ -395,7 +390,7 @@ function SettingsOverview() {
           </div>
           <div className="flex gap-2">
             <Link
-              href="/settings/usage"
+              href="/settings/billing"
               className="px-2.5 py-1 text-[10px] font-medium text-foreground-muted bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 transition-colors"
             >
               Usage
@@ -491,7 +486,6 @@ function SettingsNavSection({ title, items }: { title: string; items: NavItem[] 
 /* ─── Nav Item Definitions ─── */
 
 const GENERAL_NAV: NavItem[] = [
-  { label: 'General', href: '/settings/general', icon: Cog6ToothIcon, description: 'Profile, verification, location' },
   { label: 'Maps', href: '/settings/maps', icon: MapIcon, description: 'Your maps and limits' },
   { label: 'Pins', href: '/settings/pins', icon: MapPinIcon, description: 'Manage saved pins' },
   { label: 'Collections', href: '/settings/collections', icon: Square3Stack3DIcon, description: 'Organize pins into groups' },
@@ -499,16 +493,13 @@ const GENERAL_NAV: NavItem[] = [
 ];
 
 const ACCOUNT_NAV: NavItem[] = [
-  { label: 'Privacy', href: '/settings/privacy', icon: ShieldCheckIcon, description: 'Visibility and tagging' },
-  { label: 'Account', href: '/settings/account', icon: UserCircleIcon, description: 'Profile details' },
-  { label: 'Username', href: '/settings/username', icon: AtSymbolIcon, description: 'Change your @handle' },
+  { label: 'Profile', href: '/settings/profile', icon: UserCircleIcon, description: 'Account, privacy, username' },
   { label: 'History', href: '/settings/history', icon: ClockIcon, description: 'Activity and visits' },
   { label: 'ID Verification', href: '/settings/id', icon: IdentificationIcon, description: 'Verify your identity' },
 ];
 
 const BILLING_NAV: NavItem[] = [
-  { label: 'Billing', href: '/settings/billing', icon: BanknotesIcon, description: 'Payment and subscription' },
-  { label: 'Usage', href: '/settings/usage', icon: ChartBarIcon, description: 'Limits and features' },
+  { label: 'Billing', href: '/settings/billing', icon: BanknotesIcon, description: 'Payment, subscription, usage' },
 ];
 
 const ADMIN_NAV: NavItem[] = [

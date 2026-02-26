@@ -6,8 +6,11 @@ import {
   CreditCardIcon,
   ArrowTopRightOnSquareIcon,
   CheckCircleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStateSafe } from '@/features/auth';
+import UsageSettingsClient from '@/app/settings/usage/UsageSettingsClient';
+import GovernmentSettingsClient from '@/app/settings/government/GovernmentSettingsClient';
 
 interface PaymentMethod {
   id: string;
@@ -48,12 +51,23 @@ export default function BillingPageClient() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [settingUp, setSettingUp] = useState(false);
+  const [trialEndDate, setTrialEndDate] = useState<string | null>(null);
 
   const hasCustomer = Boolean(account?.stripe_customer_id);
-  const planLabel = PLAN_LABELS[account?.plan ?? ''] ?? 'Public';
-  const planPrice = PLAN_PRICES[account?.plan ?? ''] ?? '$0';
-  const isPaid = account?.plan && account.plan !== 'hobby';
-  const statusBadge = getStatusBadge(account?.subscription_status);
+  const subscriptionStatus = account?.subscription_status ?? null;
+  const billingMode = (account as any)?.billing_mode ?? null;
+  const isTrialing = subscriptionStatus === 'trialing' || billingMode === 'trial';
+
+  // If the user is trialing, treat them as a contributor regardless of the
+  // cached plan field (webhook may not have flushed yet).
+  const effectivePlan = isTrialing && (!account?.plan || account.plan === 'hobby')
+    ? 'contributor'
+    : (account?.plan ?? 'hobby');
+
+  const planLabel = PLAN_LABELS[effectivePlan] ?? 'Public';
+  const planPrice = isTrialing ? 'Free trial' : (PLAN_PRICES[effectivePlan] ?? '$0');
+  const isPaid = effectivePlan !== 'hobby';
+  const statusBadge = getStatusBadge(subscriptionStatus);
 
   useEffect(() => {
     if (hasCustomer) {
@@ -62,6 +76,18 @@ export default function BillingPageClient() {
       setLoading(false);
     }
   }, [hasCustomer]);
+
+  useEffect(() => {
+    if (!isTrialing || !hasCustomer) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/billing/subscription-state');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.trial_end_date) setTrialEndDate(data.trial_end_date);
+      } catch { /* non-critical */ }
+    })();
+  }, [isTrialing, hasCustomer]);
 
   const fetchPaymentMethods = async () => {
     setLoading(true);
@@ -124,35 +150,71 @@ export default function BillingPageClient() {
   return (
     <div className="space-y-3">
       {/* Subscription */}
-      <div className="bg-surface border border-border-muted dark:border-white/10 rounded-md p-[10px]">
+      <div className={`bg-surface border rounded-md p-[10px] ${
+        isTrialing
+          ? 'border-lake-blue/30 dark:border-lake-blue/20'
+          : isPaid
+            ? 'border-green-300/50 dark:border-green-500/20'
+            : 'border-border-muted dark:border-white/10'
+      }`}>
         <h3 className="text-sm font-semibold text-foreground mb-2">Subscription</h3>
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-semibold text-foreground">{planLabel}</span>
-              <span className="text-xs text-foreground-muted">{planPrice}</span>
+              {!isTrialing && (
+                <span className="text-xs text-foreground-muted">{planPrice}</span>
+              )}
               {statusBadge && (
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${statusBadge.cls}`}>
                   {statusBadge.text}
                 </span>
               )}
             </div>
-            {!isPaid && (
+            {isTrialing ? (
+              <div className="space-y-0.5">
+                {trialEndDate ? (
+                  <p className="text-xs text-lake-blue/90">
+                    Free trial until{' '}
+                    <span className="font-semibold">
+                      {new Date(trialEndDate).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                    . No charge until then.
+                  </p>
+                ) : (
+                  <p className="text-xs text-foreground-muted">Free trial active — no charge yet</p>
+                )}
+              </div>
+            ) : !isPaid ? (
               <p className="text-xs text-foreground-muted">Upgrade to unlock more features</p>
+            ) : (
+              <p className="text-xs text-foreground-muted">Active paid subscription</p>
             )}
           </div>
           {isPaid && hasCustomer ? (
             <button
               onClick={openPortal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 transition-colors"
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground bg-surface-accent border border-border-muted dark:border-white/10 rounded-md hover:bg-surface-accent/80 transition-colors"
             >
               Manage
               <ArrowTopRightOnSquareIcon className="w-3 h-3" />
             </button>
+          ) : isTrialing ? (
+            <button
+              onClick={openPortal}
+              className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-lake-blue bg-lake-blue/10 border border-lake-blue/20 rounded-md hover:bg-lake-blue/20 transition-colors"
+            >
+              <SparklesIcon className="w-3 h-3" />
+              Manage
+            </button>
           ) : (
             <Link
               href="/pricing"
-              className="px-2.5 py-1.5 text-xs font-medium text-foreground bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
+              className="shrink-0 px-2.5 py-1.5 text-xs font-medium text-white bg-lake-blue hover:bg-lake-blue/80 rounded-md transition-colors"
             >
               View Plans
             </Link>
@@ -238,6 +300,18 @@ export default function BillingPageClient() {
         <p className="text-xs text-foreground-muted">
           Questions? <a href="mailto:loveofminnesota@gmail.com" className="text-lake-blue hover:underline">loveofminnesota@gmail.com</a>
         </p>
+      </div>
+
+      {/* Usage / Plan Features */}
+      <div className="pt-2 border-t border-border-muted dark:border-white/10">
+        <h2 className="text-sm font-semibold text-foreground-muted uppercase tracking-wider px-0.5 mb-3">Usage</h2>
+        <UsageSettingsClient />
+      </div>
+
+      {/* Government Plan */}
+      <div className="pt-2 border-t border-border-muted dark:border-white/10">
+        <h2 className="text-sm font-semibold text-foreground-muted uppercase tracking-wider px-0.5 mb-3">Government</h2>
+        <GovernmentSettingsClient />
       </div>
     </div>
   );

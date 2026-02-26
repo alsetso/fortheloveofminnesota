@@ -5,9 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
-  Cog6ToothIcon,
   MapIcon,
-  ShieldCheckIcon,
   UserCircleIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
@@ -19,9 +17,7 @@ import {
   BuildingOfficeIcon,
   UsersIcon,
   IdentificationIcon,
-  ChartBarIcon,
   ArrowTopRightOnSquareIcon,
-  AtSymbolIcon,
   ServerStackIcon,
   CircleStackIcon,
   StarIcon,
@@ -63,7 +59,6 @@ export default function SettingsLeftSidebar({ onHideSidebar }: SettingsLeftSideb
     : [];
 
   const generalNavItems = [
-    { label: 'General', href: '/settings/general', Icon: Cog6ToothIcon },
     { label: 'Maps', href: '/settings/maps', Icon: MapIcon },
     { label: 'Pins', href: '/settings/pins', Icon: MapPinIcon },
     { label: 'Collections', href: '/settings/collections', Icon: Square3Stack3DIcon },
@@ -71,16 +66,13 @@ export default function SettingsLeftSidebar({ onHideSidebar }: SettingsLeftSideb
   ] as const;
 
   const accountPrivacyNavItems = [
-    { label: 'Privacy', href: '/settings/privacy', Icon: ShieldCheckIcon },
-    { label: 'Account', href: '/settings/account', Icon: UserCircleIcon },
-    { label: 'Username', href: '/settings/username', Icon: AtSymbolIcon },
+    { label: 'Profile', href: '/settings/profile', Icon: UserCircleIcon },
     { label: 'History', href: '/settings/history', Icon: ClockIcon },
     { label: 'ID Verification', href: '/settings/id', Icon: IdentificationIcon },
   ] as const;
 
   const billingNavItems = [
     { label: 'Billing', href: '/settings/billing', Icon: BanknotesIcon },
-    { label: 'Usage', href: '/settings/usage', Icon: ChartBarIcon },
   ] as const;
 
   const isActive = (href: string) => {

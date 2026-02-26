@@ -15,6 +15,18 @@ const getSupabaseHostname = (): string | null => {
 const supabaseHostname = getSupabaseHostname();
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: '/settings/general', destination: '/settings/profile', permanent: true },
+      { source: '/settings/account', destination: '/settings/profile', permanent: true },
+      { source: '/settings/username', destination: '/settings/profile', permanent: true },
+      { source: '/settings/privacy', destination: '/settings/profile', permanent: true },
+      { source: '/settings/usage', destination: '/settings/billing', permanent: true },
+      { source: '/settings/government', destination: '/settings/billing', permanent: true },
+      { source: '/settings/maps/pins', destination: '/settings/maps', permanent: true },
+      { source: '/settings/plans', destination: '/pricing', permanent: true },
+    ];
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },

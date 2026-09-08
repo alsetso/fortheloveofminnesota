@@ -1,0 +1,37 @@
+# App build artifacts — apps themselves are first-class in this repo.
+apps/*/.next/
+apps/*/out/
+apps/*/node_modules/
+apps/*/.vercel/
+apps/*/.turbo/
+apps/*/.env
+apps/*/.env.*
+!apps/*/.env.example
+apps/*/*.pem
+apps/*/.pnpm-store/
+
+.DS_Store
+.env
+.env.*
+!.env.example
+/env.local
+node_modules/
+.pnpm-store/
+.cursor/
+.codex/
+
+# Blender / Python local artifacts
+__pycache__/
+*.blend
+*.blend1
+
+# Blender working tree stays on this machine; runtime GLBs live in shared/3d-models.
+shared/blender-queue/*
+!shared/blender-queue/README.md
+
+# Local GIS / payroll dumps — already in alsetso/ftlomn. Too large for git push.
+apps/web/minnesota_gov/GIS/
+apps/web/minnesota_gov/State Payrole/
+
+# Local snapshots contain nested repositories and local configuration.
+archive/web-transition-2026-09-07/

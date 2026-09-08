@@ -1,0 +1,12 @@
+{
+  "name": "fortheloveofminnesota",
+  "private": true,
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "dev:ios": "pnpm --filter @ftlomn/ios dev",
+    "dev:admin": "pnpm --filter @ftlomn/admin dev",
+    "dev:web": "pnpm --filter minnesota dev",
+    "dev:web-v2": "pnpm --filter @ftlomn/web dev",
+    "dev:free-ios": "pnpm --filter @ftlomn/free-ios dev"
+  }
+}

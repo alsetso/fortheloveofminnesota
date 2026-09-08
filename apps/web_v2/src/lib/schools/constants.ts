@@ -1,0 +1,2 @@
+export const SCHOOL_CATALOG_PAGE_SIZE = 25;
+export const SCHOOL_SEARCH_DEBOUNCE_MS = 280;

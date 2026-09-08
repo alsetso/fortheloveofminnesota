@@ -1,0 +1,865 @@
+{
+  "version": 1,
+  "basePath": "/models",
+  "categories": {
+    "props": {
+      "description": "Droppable map props shared by iOS and web",
+      "models": [
+        {
+          "id": "avatar-businessman",
+          "file": "props/avatar-businessman.glb",
+          "label": "Businessman (Head + Suit + Shirt + Shoes)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "avatar-construction-worker",
+          "file": "props/avatar-construction-worker.glb",
+          "label": "Construction Worker (Helmet + Vest + Pants + Boots)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "avatar-farmer",
+          "file": "props/avatar-farmer.glb",
+          "label": "Farmer (Hat + Shirt + Overalls + Boots)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "avatar-knight",
+          "file": "props/avatar-knight.glb",
+          "label": "Knight (Helmet + Armor + Pants + Boots)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "avatar-soldier",
+          "file": "props/avatar-soldier.glb",
+          "label": "Soldier (Helmet + Vest + Uniform + Boots)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "avatar-wizard",
+          "file": "props/avatar-wizard.glb",
+          "label": "Wizard (Hat + Robe + Body + Boots)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "avatar-wizardess",
+          "file": "props/avatar-wizardess.glb",
+          "label": "Wizardess (Hat + Dress + Body + Boots)",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "beagle-poly",
+          "file": "props/beagle-poly.glb",
+          "label": "Beagle",
+          "attribution": "Poly by Google"
+        },
+        {
+          "id": "big-tree",
+          "file": "props/big-tree.glb",
+          "label": "Big Tree",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "billboard-poly",
+          "file": "props/billboard-poly.glb",
+          "label": "Billboard",
+          "attribution": "Poly by Google"
+        },
+        {
+          "id": "black-pickup-truck",
+          "file": "props/black-pickup-truck.glb",
+          "label": "Black Pickup Truck",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "black-truck-empty-trailer",
+          "file": "props/black-truck-empty-trailer.glb",
+          "label": "Black Truck Empty Trailer",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "block",
+          "file": "props/block.glb",
+          "label": "Block"
+        },
+        {
+          "id": "block-brick",
+          "file": "props/block-brick.glb",
+          "label": "Brick Block"
+        },
+        {
+          "id": "block-crate",
+          "file": "props/block-crate.glb",
+          "label": "Crate Block"
+        },
+        {
+          "id": "block-gold",
+          "file": "props/block-gold.glb",
+          "label": "Gold Block"
+        },
+        {
+          "id": "block-ice",
+          "file": "props/block-ice.glb",
+          "label": "Ice Block"
+        },
+        {
+          "id": "block-metal",
+          "file": "props/block-metal.glb",
+          "label": "Metal Block"
+        },
+        {
+          "id": "block-paper-box",
+          "file": "props/block-paper-box.glb",
+          "label": "Paper Box"
+        },
+        {
+          "id": "block-stone",
+          "file": "props/block-stone.glb",
+          "label": "Stone Block"
+        },
+        {
+          "id": "block-wood",
+          "file": "props/block-wood.glb",
+          "label": "Wood Block"
+        },
+        {
+          "id": "blue-pickup-truck",
+          "file": "props/blue-pickup-truck.glb",
+          "label": "Blue Pickup Truck",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "boat-and-trailer",
+          "file": "props/boat-and-trailer.glb",
+          "label": "Boat and Trailer",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "bus-stop",
+          "file": "props/bus-stop.glb",
+          "label": "Bus Stop",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "camera",
+          "file": "props/camera.glb",
+          "label": "Camera",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "caravan",
+          "file": "props/caravan.glb",
+          "label": "Caravan",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "cat-poly",
+          "file": "props/cat-poly.glb",
+          "label": "Cat",
+          "attribution": "Poly by Google"
+        },
+        {
+          "id": "caution-barrier",
+          "file": "props/caution-barrier.glb",
+          "label": "Caution Barrier",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "chicken-coop-quaternius",
+          "file": "props/chicken-coop-quaternius.glb",
+          "label": "Chicken coop",
+          "attribution": "Quaternius"
+        },
+        {
+          "id": "chicken-jeremy",
+          "file": "props/chicken-jeremy.glb",
+          "label": "Chicken",
+          "attribution": "jeremy"
+        },
+        {
+          "id": "coin-quaternius",
+          "file": "props/coin-quaternius.glb",
+          "label": "Coin",
+          "attribution": "Quaternius"
+        },
+        {
+          "id": "cow-poly",
+          "file": "props/cow-poly.glb",
+          "label": "Cow",
+          "attribution": "Poly by Google"
+        },
+        {
+          "id": "crystal",
+          "file": "props/crystal.glb",
+          "label": "Crystal",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "dollar",
+          "file": "props/dollar.glb",
+          "label": "Dollar",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "donut",
+          "file": "props/donut.glb",
+          "label": "Donut",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "doorway",
+          "file": "props/doorway.glb",
+          "label": "Doorway",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "elk-river-fire-dept-one",
+          "file": "props/elk-river-fire-dept-one.glb",
+          "label": "Elk River Fire Dept One",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "elk-river-historic-watertower",
+          "file": "props/elk-river-historic-watertower.glb",
+          "label": "Elk River Historic Water Tower",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "fish-bass",
+          "file": "props/fish-bass.glb",
+          "label": "Bass"
+        },
+        {
+          "id": "fish-bluegill",
+          "file": "props/fish-bluegill.glb",
+          "label": "Bluegill"
+        },
+        {
+          "id": "fish-kenney",
+          "file": "props/fish-kenney.glb",
+          "label": "Fish",
+          "attribution": "Kenney"
+        },
+        {
+          "id": "fish-northern-pike",
+          "file": "props/fish-northern-pike.glb",
+          "label": "Northern Pike"
+        },
+        {
+          "id": "fish-walleye",
+          "file": "props/fish-walleye.glb",
+          "label": "Walleye"
+        },
+        {
+          "id": "flag-quaternius",
+          "file": "props/flag-quaternius.glb",
+          "label": "Flag",
+          "attribution": "Quaternius"
+        },
+        {
+          "id": "fox-poly",
+          "file": "props/fox-poly.glb",
+          "label": "Fox",
+          "attribution": "Poly by Google"
+        },
+        {
+          "id": "gas-can",
+          "file": "props/gas-can.glb",
+          "label": "Gas Can",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "gavel",
+          "file": "props/gavel.glb",
+          "label": "Gavel",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "gazebo",
+          "file": "props/gazebo.glb",
+          "label": "Gazebo",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "heart-quaternius",
+          "file": "props/heart-quaternius.glb",
+          "label": "Heart",
+          "attribution": "Quaternius"
+        },
+        {
+          "id": "helicopter",
+          "file": "props/helicopter.glb",
+          "label": "Helicopter",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "home-doormat",
+          "file": "props/home-doormat.glb",
+          "label": "Home Doormat",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "infit-custom-page-signage",
+          "file": "props/infit-custom-page-signage.glb",
+          "label": "inFIT24 Page Signage",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "lion",
+          "file": "props/lion.glb",
+          "label": "Lion",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "loaf-of-bread",
+          "file": "props/loaf-of-bread.glb",
+          "label": "Loaf of Bread",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "m939-truck",
+          "file": "props/m939-truck.glb",
+          "label": "M939 Truck",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "male-base-model",
+          "file": "props/male-base-model.glb",
+          "label": "Male Base Model",
+          "attribution": "FTLOM avatar template",
+          "category": "avatar",
+          "realWorldMeters": 1.84
+        },
+        {
+          "id": "minnesota-welcome-sign",
+          "file": "props/minnesota-welcome-sign.glb",
+          "label": "Minnesota Welcome Sign",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "oldschool-robot",
+          "file": "props/oldschool-robot.glb",
+          "label": "Oldschool Robot",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "police-car",
+          "file": "props/police-car.glb",
+          "label": "Police Car",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "red-book",
+          "file": "props/red-book.glb",
+          "label": "Red Book",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "red-motorcycle",
+          "file": "props/red-motorcycle.glb",
+          "label": "Red Motorcycle",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "rv",
+          "file": "props/rv.glb",
+          "label": "RV",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "sand-volleyball-net-and-black-ball-net",
+          "file": "props/sand-volleyball-net-and-black-ball-net.glb",
+          "label": "Sand Volleyball Net and Black Ball Net",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "soda",
+          "file": "props/soda.glb",
+          "label": "Soda",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "sports-car",
+          "file": "props/sports-car.glb",
+          "label": "Sports Car",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "star",
+          "file": "props/star.glb",
+          "label": "Star",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "state-fair-gate-01",
+          "file": "props/state-fair-gate-01.glb",
+          "label": "State Fair Gate #1",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-02",
+          "file": "props/state-fair-gate-02.glb",
+          "label": "State Fair Gate #2",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-03",
+          "file": "props/state-fair-gate-03.glb",
+          "label": "State Fair Gate #3",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-04",
+          "file": "props/state-fair-gate-04.glb",
+          "label": "State Fair Gate #4",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-05",
+          "file": "props/state-fair-gate-05.glb",
+          "label": "State Fair Gate #5",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-06",
+          "file": "props/state-fair-gate-06.glb",
+          "label": "State Fair Gate #6",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-07",
+          "file": "props/state-fair-gate-07.glb",
+          "label": "State Fair Gate #7",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-08",
+          "file": "props/state-fair-gate-08.glb",
+          "label": "State Fair Gate #8",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-09",
+          "file": "props/state-fair-gate-09.glb",
+          "label": "State Fair Gate #9",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-10",
+          "file": "props/state-fair-gate-10.glb",
+          "label": "State Fair Gate #10",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-11",
+          "file": "props/state-fair-gate-11.glb",
+          "label": "State Fair Gate #11",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-12",
+          "file": "props/state-fair-gate-12.glb",
+          "label": "State Fair Gate #12",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-13",
+          "file": "props/state-fair-gate-13.glb",
+          "label": "State Fair Gate #13",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-14",
+          "file": "props/state-fair-gate-14.glb",
+          "label": "State Fair Gate #14",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-15",
+          "file": "props/state-fair-gate-15.glb",
+          "label": "State Fair Gate #15",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-16",
+          "file": "props/state-fair-gate-16.glb",
+          "label": "State Fair Gate #16",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-17",
+          "file": "props/state-fair-gate-17.glb",
+          "label": "State Fair Gate #17",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-gate-18",
+          "file": "props/state-fair-gate-18.glb",
+          "label": "State Fair Gate #18",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-accessible-companion-adult",
+          "file": "props/state-fair-pin-accessible-companion-adult.glb",
+          "label": "State Fair Accessible Companion Restroom (Adult Changing) Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-accessible-companion-restroom",
+          "file": "props/state-fair-pin-accessible-companion-restroom.glb",
+          "label": "State Fair Accessible Companion Restroom Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-accessible-parking",
+          "file": "props/state-fair-pin-accessible-parking.glb",
+          "label": "State Fair Accessible Parking Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-accessible-restroom-baby",
+          "file": "props/state-fair-pin-accessible-restroom-baby.glb",
+          "label": "State Fair Accessible Restroom (Baby Changing) Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-atm",
+          "file": "props/state-fair-pin-atm.glb",
+          "label": "State Fair ATM Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-blue-ribbon-book-cart",
+          "file": "props/state-fair-pin-blue-ribbon-book-cart.glb",
+          "label": "State Fair Blue Ribbon Bargain Book Cart Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-entrance-gate",
+          "file": "props/state-fair-pin-entrance-gate.glb",
+          "label": "State Fair Entrance Gate Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-family-baby-care",
+          "file": "props/state-fair-pin-family-baby-care.glb",
+          "label": "State Fair Family & Baby Care Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-first-aid",
+          "file": "props/state-fair-pin-first-aid.glb",
+          "label": "State Fair First Aid Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-hand-wash",
+          "file": "props/state-fair-pin-hand-wash.glb",
+          "label": "State Fair Hand Wash Station Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-information-booth",
+          "file": "props/state-fair-pin-information-booth.glb",
+          "label": "State Fair Information Booth Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-lost-and-found",
+          "file": "props/state-fair-pin-lost-and-found.glb",
+          "label": "State Fair Lost & Found Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-mobility-rental",
+          "file": "props/state-fair-pin-mobility-rental.glb",
+          "label": "State Fair Mobility Rental Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-music-stage",
+          "file": "props/state-fair-pin-music-stage.glb",
+          "label": "State Fair Music / Performance Stage Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-parade-route",
+          "file": "props/state-fair-pin-parade-route.glb",
+          "label": "State Fair Parade Route Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-park-and-ride-bus",
+          "file": "props/state-fair-pin-park-and-ride-bus.glb",
+          "label": "State Fair Park & Ride Bus Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-police",
+          "file": "props/state-fair-pin-police.glb",
+          "label": "State Fair Police Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-public-parking",
+          "file": "props/state-fair-pin-public-parking.glb",
+          "label": "State Fair Public Parking Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-restroom",
+          "file": "props/state-fair-pin-restroom.glb",
+          "label": "State Fair Restroom Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-restroom-baby",
+          "file": "props/state-fair-pin-restroom-baby.glb",
+          "label": "State Fair Restroom (Baby Changing) Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-rideshare-dropoff",
+          "file": "props/state-fair-pin-rideshare-dropoff.glb",
+          "label": "State Fair Rideshare Drop-Off Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-severe-weather-shelter",
+          "file": "props/state-fair-pin-severe-weather-shelter.glb",
+          "label": "State Fair Severe Weather Shelter Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-shopping-merchandise",
+          "file": "props/state-fair-pin-shopping-merchandise.glb",
+          "label": "State Fair Shopping / Merchandise Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-smoking-vaping",
+          "file": "props/state-fair-pin-smoking-vaping.glb",
+          "label": "State Fair Smoking / Vaping Area Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-trolley-route",
+          "file": "props/state-fair-pin-trolley-route.glb",
+          "label": "State Fair Trolley Route Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-water-station",
+          "file": "props/state-fair-pin-water-station.glb",
+          "label": "State Fair Water Station Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-pin-wifi-hotspot",
+          "file": "props/state-fair-pin-wifi-hotspot.glb",
+          "label": "State Fair Wi-Fi Hotspot Pin",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-skyride-building",
+          "file": "props/state-fair-skyride-building.glb",
+          "label": "Minnesota State Fair SkyRide Building",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-skyride-end-beam",
+          "file": "props/state-fair-skyride-end-beam.glb",
+          "label": "Minnesota State Fair SkyRide End Beam",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-skyride-line-section",
+          "file": "props/state-fair-skyride-line-section.glb",
+          "label": "Minnesota State Fair SkyRide Line Section",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-skyride-start-beam",
+          "file": "props/state-fair-skyride-start-beam.glb",
+          "label": "Minnesota State Fair SkyRide Start Beam",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "state-fair-space-tower",
+          "file": "props/state-fair-space-tower.glb",
+          "label": "Minnesota State Fair Space Tower",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "stone-wall",
+          "file": "props/stone-wall.glb",
+          "label": "Stone Wall",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "stop-sign",
+          "file": "props/stop-sign.glb",
+          "label": "Stop Sign",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "surfboard",
+          "file": "props/surfboard.glb",
+          "label": "Surfboard",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "tent",
+          "file": "props/tent.glb",
+          "label": "Tent",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "tire",
+          "file": "props/tire.glb",
+          "label": "Tire",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "toolbox",
+          "file": "props/toolbox.glb",
+          "label": "Toolbox",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "tractor",
+          "file": "props/tractor.glb",
+          "label": "Tractor",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "traffic-light",
+          "file": "props/traffic-light.glb",
+          "label": "Traffic Light",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "trail-bike",
+          "file": "props/trail-bike.glb",
+          "label": "Trail Bike",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "treasure-chest-safayan",
+          "file": "props/treasure-chest-safayan.glb",
+          "label": "Treasure chest",
+          "attribution": "Alex Safayan"
+        },
+        {
+          "id": "tree-quaternius",
+          "file": "props/tree-quaternius.glb",
+          "label": "Tree",
+          "attribution": "Quaternius"
+        },
+        {
+          "id": "truck-and-boat-trailer",
+          "file": "props/truck-and-boat-trailer.glb",
+          "label": "Truck and Boat Trailer",
+          "attribution": "Blender queue"
+        },
+        {
+          "id": "ufo",
+          "file": "props/ufo.glb",
+          "label": "Ufo",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "utility-boat",
+          "file": "props/utility-boat.glb",
+          "label": "Utility Boat",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "volleyball-ball",
+          "file": "props/volleyball-ball.glb",
+          "label": "Volleyball Ball",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "welcome-sign",
+          "file": "props/welcome-sign.glb",
+          "label": "Welcome Sign",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "wind-turbine",
+          "file": "props/wind-turbine.glb",
+          "label": "Wind Turbine",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "wood-block",
+          "file": "props/wood-block.glb",
+          "label": "Wood Block",
+          "attribution": "Admin upload"
+        },
+        {
+          "id": "wooden-sign-ipoly3d",
+          "file": "props/wooden-sign-ipoly3d.glb",
+          "label": "Wooden sign",
+          "attribution": "iPoly3D"
+        }
+      ]
+    },
+    "avatars": {
+      "description": "Player identity avatars \u2014 rendered as the Find Me position model, never placed on the map as props",
+      "models": [
+        {
+          "id": "avatar-male",
+          "file": "avatars/male-base.glb",
+          "label": "Male (Base)",
+          "attribution": "FTLOMN original"
+        },
+        {
+          "id": "avatar-female",
+          "file": "avatars/female-base.glb",
+          "label": "Female (Base)",
+          "attribution": "FTLOMN original"
+        },
+        {
+          "id": "avatar-soldier",
+          "file": "avatars/soldier.glb",
+          "label": "Soldier",
+          "attribution": "FTLOMN original"
+        },
+        {
+          "id": "avatar-knight",
+          "file": "avatars/knight.glb",
+          "label": "Knight",
+          "attribution": "FTLOMN original"
+        }
+      ]
+    },
+    "avatar-assets": {
+      "description": "Holdable items for avatars \u2014 account-local, never placed on the shared map",
+      "models": [
+        {
+          "id": "asset-sword",
+          "file": "avatar-assets/sword.glb",
+          "label": "Sword",
+          "attach_point": "right_hand",
+          "attribution": "FTLOMN original"
+        },
+        {
+          "id": "asset-flag",
+          "file": "avatar-assets/flag.glb",
+          "label": "Flag",
+          "attach_point": "left_hand",
+          "attribution": "Quaternius"
+        },
+        {
+          "id": "asset-shovel",
+          "file": "avatar-assets/shovel.glb",
+          "label": "Shovel",
+          "attach_point": "right_hand",
+          "attribution": "FTLOMN original"
+        }
+      ]
+    }
+  }
+}

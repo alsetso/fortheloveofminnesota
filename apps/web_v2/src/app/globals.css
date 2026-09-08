@@ -1,0 +1,590 @@
+@import 'mapbox-gl/dist/mapbox-gl.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /*
+   * Do NOT alias --safe-area-* to env(safe-area-inset-*) here.
+   * Despia injects --safe-area-top/bottom/left/right at runtime. Pre-defining
+   * them as env() fights that injection and can double the inset with
+   * Auto-Inject / viewport-fit=cover (tab bar, headers look ~2× too tall).
+   * Usage sites already fall back: var(--safe-area-*, env(safe-area-inset-*, 0px)).
+   */
+  /* Despia injects --screen-radius (device bezel). Dock uses screenRadius − pad. */
+
+  /* Keyboard tracking (DespiaNativeChrome) — root stays full-screen; dock stays put. */
+  --vv-height: 100%;
+  --vv-offset-top: 0px;
+  --keyboard-inset: 0px;
+
+  /* Map host hangs this far past the clip; cropped by .map-canvas overflow. */
+  --map-bleed-bottom: 40px;
+
+  /* Map chrome surface — streets (light). Outdoors / satellite via [data-map-surface]. */
+  --foreground: 20 32 28;
+  --foreground-muted: 20 32 28 / 0.55;
+  --lake-blue: 42 111 143;
+  /* Sheet underlay vs elevated (rows / rails / pill) — shell beige (#f7f5f1). */
+  --map-sheet-fill: 247 245 241 / 0.92;
+  --map-glass-fill: 247 245 241 / 0.95;
+  --map-glass-border: 255 255 255 / 0.42;
+  --map-glass-chip: 255 255 255 / 0.5;
+  --map-glass-hover: 255 255 255 / 0.78;
+  --map-ink-subtle: 0 0 0 / 0.06;
+  --map-ink-faint: 0 0 0 / 0.04;
+  --map-search-fill: 0 0 0 / 0.06;
+  --map-search-focus: 0 0 0 / 0.08;
+  --map-handle: 0 0 0 / 0.15;
+  --map-handle-hover: 0 0 0 / 0.25;
+  --map-danger-fg: 185 28 28;
+  --map-danger-bg: 239 68 68 / 0.2;
+  --map-danger-border: 248 113 113 / 0.4;
+  --map-danger-hover: 239 68 68 / 0.25;
+  /* Streets — lake-blue active rail (Find Me / layers lit state). */
+  --map-rail-active-bg: 42 111 143 / 0.16;
+  --map-rail-active-border: 42 111 143 / 0.42;
+  --map-rail-active-ring: 42 111 143 / 0.28;
+  --map-rail-active-fg: 42 111 143;
+  /* Sent chat bubbles — accent fill + contrasting ink */
+  --map-chat-sent-fg: 255 255 255;
+}
+
+/*
+ * DespiaNativeChrome toggles body.keyboard-visible from visualViewport.
+ * Hide the Own tab bar so chat composers can sit flush on the keyboard.
+ * Keep the in-flow spacer ([data-app-tab-bar-spacer]) so content height
+ * does not jump when the fixed bar fades out.
+ */
+body.keyboard-visible [data-app-tab-bar] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(110%);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+[data-chat-composer-dock] {
+  transition: padding-bottom 160ms ease;
+}
+
+/* Outdoors basemap — parchment / light brown glass + moss-green accent. */
+[data-map-surface='neutral'] {
+  --foreground: 52 42 28;
+  --foreground-muted: 52 42 28 / 0.58;
+  --lake-blue: 92 110 62;
+  --map-sheet-fill: 247 245 241 / 0.92;
+  --map-glass-fill: 247 245 241 / 0.95;
+  --map-glass-border: 180 155 115 / 0.4;
+  --map-glass-chip: 240 226 200 / 0.55;
+  --map-glass-hover: 245 232 210 / 0.82;
+  --map-ink-subtle: 70 50 25 / 0.08;
+  --map-ink-faint: 70 50 25 / 0.05;
+  --map-search-fill: 70 50 25 / 0.08;
+  --map-search-focus: 70 50 25 / 0.12;
+  --map-handle: 70 50 25 / 0.2;
+  --map-handle-hover: 70 50 25 / 0.32;
+  --map-danger-fg: 165 45 30;
+  --map-danger-bg: 185 60 40 / 0.2;
+  --map-danger-border: 185 80 55 / 0.4;
+  --map-danger-hover: 185 60 40 / 0.28;
+  --map-rail-active-bg: 92 110 62 / 0.18;
+  --map-rail-active-border: 92 110 62 / 0.42;
+  --map-rail-active-ring: 92 110 62 / 0.28;
+  --map-rail-active-fg: 92 110 62;
+  --map-chat-sent-fg: 255 255 255;
+}
+
+/* Satellite imagery — dark surface chrome for dock, rails, pill, overlays. */
+[data-map-surface='dark'] {
+  --foreground: 244 247 245;
+  --foreground-muted: 244 247 245 / 0.65;
+  --lake-blue: 125 196 230;
+  /* Clearer sheet; lighter elevated glass; quieter borders. */
+  --map-sheet-fill: 0 0 0 / 0.28;
+  --map-glass-fill: 255 255 255 / 0.14;
+  --map-glass-border: 255 255 255 / 0.12;
+  --map-glass-chip: 255 255 255 / 0.16;
+  --map-glass-hover: 255 255 255 / 0.22;
+  --map-ink-subtle: 255 255 255 / 0.1;
+  --map-ink-faint: 255 255 255 / 0.06;
+  --map-search-fill: 255 255 255 / 0.16;
+  --map-search-focus: 255 255 255 / 0.22;
+  --map-handle: 255 255 255 / 0.28;
+  --map-handle-hover: 255 255 255 / 0.4;
+  --map-danger-fg: 255 255 255;
+  --map-danger-bg: 239 68 68 / 0.35;
+  --map-danger-border: 252 165 165 / 0.45;
+  --map-danger-hover: 239 68 68 / 0.45;
+  /* Satellite — white active rail. */
+  --map-rail-active-bg: 255 255 255 / 0.22;
+  --map-rail-active-border: 255 255 255 / 0.4;
+  --map-rail-active-ring: 255 255 255 / 0.28;
+  --map-rail-active-fg: 255 255 255;
+  /* Light cyan accent needs dark ink on satellite chrome */
+  --map-chat-sent-fg: 12 28 36;
+}
+
+/*
+ * Dark app theme — overrides ALL basemap surface chrome with dark glass.
+ * Specificity (0,2,1) beats per-surface rules (0,1,0) so dark mode wins
+ * regardless of which basemap (streets / outdoors / satellite) is selected.
+ * The map tiles themselves are unaffected — only the UI chrome layer flips.
+ */
+html[data-theme='dark'] [data-map-surface] {
+  --foreground: 244 247 245;
+  --foreground-muted: 244 247 245 / 0.65;
+  --lake-blue: 125 196 230;
+  --map-sheet-fill: 0 0 0 / 0.32;
+  --map-glass-fill: 255 255 255 / 0.12;
+  --map-glass-border: 255 255 255 / 0.10;
+  --map-glass-chip: 255 255 255 / 0.14;
+  --map-glass-hover: 255 255 255 / 0.20;
+  --map-ink-subtle: 255 255 255 / 0.09;
+  --map-ink-faint: 255 255 255 / 0.05;
+  --map-search-fill: 255 255 255 / 0.14;
+  --map-search-focus: 255 255 255 / 0.20;
+  --map-handle: 255 255 255 / 0.24;
+  --map-handle-hover: 255 255 255 / 0.38;
+  --map-danger-fg: 255 255 255;
+  --map-danger-bg: 239 68 68 / 0.35;
+  --map-danger-border: 252 165 165 / 0.45;
+  --map-danger-hover: 239 68 68 / 0.45;
+  --map-rail-active-bg: 125 196 230 / 0.20;
+  --map-rail-active-border: 125 196 230 / 0.42;
+  --map-rail-active-ring: 125 196 230 / 0.26;
+  --map-rail-active-fg: 125 196 230;
+  --map-chat-sent-fg: 12 28 36;
+}
+
+/* Light app theme — keep explicit for selector completeness */
+html[data-theme='light'] [data-map-surface='neutral'] {
+  --foreground: 52 42 28;
+  --foreground-muted: 52 42 28 / 0.58;
+  --lake-blue: 92 110 62;
+  --map-sheet-fill: 247 245 241 / 0.92;
+  --map-glass-fill: 247 245 241 / 0.95;
+  --map-glass-border: 180 155 115 / 0.4;
+  --map-glass-chip: 240 226 200 / 0.55;
+  --map-glass-hover: 245 232 210 / 0.82;
+  --map-ink-subtle: 70 50 25 / 0.08;
+  --map-ink-faint: 70 50 25 / 0.05;
+  --map-search-fill: 70 50 25 / 0.08;
+  --map-search-focus: 70 50 25 / 0.12;
+  --map-handle: 70 50 25 / 0.2;
+  --map-handle-hover: 70 50 25 / 0.32;
+  --map-rail-active-bg: 92 110 62 / 0.18;
+  --map-rail-active-border: 92 110 62 / 0.42;
+  --map-rail-active-ring: 92 110 62 / 0.28;
+  --map-rail-active-fg: 92 110 62;
+}
+
+html[data-theme='light'] [data-map-surface='dark'] {
+  --foreground: 244 247 245;
+  --foreground-muted: 244 247 245 / 0.65;
+  --lake-blue: 125 196 230;
+  --map-sheet-fill: 0 0 0 / 0.28;
+  --map-glass-fill: 255 255 255 / 0.14;
+  --map-glass-border: 255 255 255 / 0.12;
+  --map-glass-chip: 255 255 255 / 0.16;
+  --map-glass-hover: 255 255 255 / 0.22;
+  --map-ink-subtle: 255 255 255 / 0.1;
+  --map-ink-faint: 255 255 255 / 0.06;
+  --map-search-fill: 255 255 255 / 0.16;
+  --map-search-focus: 255 255 255 / 0.22;
+  --map-handle: 255 255 255 / 0.28;
+  --map-handle-hover: 255 255 255 / 0.4;
+  --map-rail-active-bg: 255 255 255 / 0.22;
+  --map-rail-active-border: 255 255 255 / 0.4;
+  --map-rail-active-ring: 255 255 255 / 0.28;
+  --map-rail-active-fg: 255 255 255;
+  --map-chat-sent-fg: 12 28 36;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  background: #0f1a17;
+  color: rgb(var(--foreground));
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Kill double-tap page zoom; Mapbox keeps its own pinch via touch handlers. */
+  touch-action: manipulation;
+}
+
+/*
+ * Own shell must stay on the layout viewport. Page pinch/double-tap zoom
+ * desyncs fixed TopBar / TabBar from safe-area insets (lost header/footer pad).
+ */
+[data-app-tab-host],
+.despia-app-root,
+.app-root {
+  touch-action: manipulation;
+}
+
+/* Despia: ≥1rem on inputs so focus stays readable (runtime also blocks zoom-on-focus). */
+input,
+textarea,
+select {
+  font-size: 1rem;
+}
+
+/*
+ * Despia Own-screen frame — fixed to the layout viewport (not 100vh).
+ * Do not shrink/offset with visualViewport: that lifts the shell and leaves a
+ * gap above the keyboard. Map dock stays pinned; keyboard overlays chrome.
+ * Used by welcome / splash / legal via <DespiaAppFrame>.
+ */
+.despia-app-root {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.despia-safe-top {
+  flex-shrink: 0;
+  height: var(--safe-area-top, env(safe-area-inset-top, 0px));
+}
+
+.despia-safe-bottom {
+  flex-shrink: 0;
+  height: var(--safe-area-bottom, env(safe-area-inset-bottom, 0px));
+}
+
+.despia-app-header,
+.despia-app-footer {
+  flex-shrink: 0;
+}
+
+.despia-app-content {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.despia-app-content::-webkit-scrollbar {
+  display: none;
+}
+
+.despia-app-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.despia-touch-target {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+/* Full-bleed map host — fixed to layout viewport; keyboard overlays dock chrome. */
+.app-root {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: auto;
+  overflow: hidden;
+  background: #0f1a17;
+}
+
+/*
+ * Non-map tabs: lift `.app-root` when a tab bar clearance is set.
+ * Map sets --app-tab-bar-clearance: 0 so the shell stays edge-to-edge.
+ */
+[data-app-tab-host] .app-root {
+  bottom: var(--app-tab-bar-clearance, 0px);
+}
+
+/*
+ * `/game` inside AppShell chrome: pin the map host to the flex stage between
+ * TopBar and TabBar instead of the full viewport (fixed would cover TopBar).
+ * Keep bottom clearance so the dock sits above the fixed TabBar.
+ */
+[data-app-shell-map] .app-root {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  bottom: var(--app-tab-bar-clearance, 0px);
+}
+
+.map-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Mapbox owns pan/pinch — do not inherit page zoom locks as page-scale. */
+  touch-action: none;
+}
+
+.map-canvas__host {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* Taller than the clip window — bottom bleed is cropped by .map-canvas. */
+  bottom: calc(-1 * var(--map-bleed-bottom, 40px));
+  width: 100%;
+}
+
+.map-canvas__host .mapboxgl-map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-canvas__error {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 0.35rem;
+  padding: 2rem;
+  text-align: center;
+  background: rgba(15, 26, 23, 0.88);
+  color: #f4f7f5;
+}
+
+.map-canvas__error-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.map-canvas__error-body {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.75;
+  max-width: 22rem;
+}
+
+/* Match ios map dock horizontal chip / body scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Outside-MN banner entry animation. */
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.22s ease-out both;
+}
+
+/* Game HUD resource chip — brief bump when a count increases. */
+@keyframes hud-stat-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.animate-hud-stat-pulse {
+  animation: hud-stat-pulse 0.48s ease-out;
+}
+
+/* Long-press point drop — red arc sweeps once over the hold duration.
+   Circumference comes from the component so the radius stays in one place. */
+@keyframes play-press-fill {
+  from { stroke-dashoffset: var(--play-press-circumference); }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes play-press-in {
+  from { opacity: 0; transform: scale(0.82); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.play-press-ring {
+  animation: play-press-fill 500ms linear forwards;
+}
+
+/* Softens the flash a quick tap would otherwise leave behind. */
+.play-press-in {
+  animation: play-press-in 140ms ease-out both;
+}
+
+@layer utilities {
+  .text-foreground {
+    color: rgb(var(--foreground));
+  }
+  .text-foreground-muted {
+    color: rgb(var(--foreground-muted));
+  }
+  .text-lake-blue {
+    color: rgb(var(--lake-blue));
+  }
+  .bg-lake-blue {
+    background-color: rgb(var(--lake-blue));
+  }
+  /** User/sent chat bubble — lake accent (blue / moss / cyan) per map surface. */
+  .bg-map-chat-sent {
+    background-color: rgb(var(--lake-blue));
+    color: rgb(var(--map-chat-sent-fg));
+  }
+  .bg-lake-blue\/10 {
+    background-color: rgb(var(--lake-blue) / 0.1);
+  }
+  .bg-lake-blue\/15 {
+    background-color: rgb(var(--lake-blue) / 0.15);
+  }
+  .hover\:bg-lake-blue\/90:hover {
+    background-color: rgb(var(--lake-blue) / 0.9);
+  }
+  .border-lake-blue\/35 {
+    border-color: rgb(var(--lake-blue) / 0.35);
+  }
+  .border-lake-blue\/40 {
+    border-color: rgb(var(--lake-blue) / 0.4);
+  }
+  .border-lake-blue\/50 {
+    border-color: rgb(var(--lake-blue) / 0.5);
+  }
+  .text-lake-blue\/80 {
+    color: rgb(var(--lake-blue) / 0.8);
+  }
+  .hover\:text-lake-blue:hover {
+    color: rgb(var(--lake-blue));
+  }
+  .hover\:bg-lake-blue\/15:hover {
+    background-color: rgb(var(--lake-blue) / 0.15);
+  }
+  .focus\:border-lake-blue\/50:focus {
+    border-color: rgb(var(--lake-blue) / 0.5);
+  }
+  .focus\:ring-lake-blue\/20:focus {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.2);
+  }
+  .focus\:ring-lake-blue\/30:focus {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.3);
+  }
+  .focus\:ring-lake-blue\/50:focus {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.5);
+  }
+  .focus-visible\:ring-lake-blue\/50:focus-visible {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.5);
+  }
+  .ring-lake-blue\/20 {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.2);
+  }
+  .ring-lake-blue\/25 {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.25);
+  }
+  .ring-lake-blue\/30 {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.3);
+  }
+  .ring-lake-blue\/40 {
+    --tw-ring-color: rgb(var(--lake-blue) / 0.4);
+  }
+
+  /* Map surface glass — flips with [data-map-surface]. */
+  .bg-map-sheet {
+    background-color: rgb(var(--map-sheet-fill));
+  }
+  .bg-map-glass {
+    background-color: rgb(var(--map-glass-fill));
+  }
+  .border-map-glass {
+    border-color: rgb(var(--map-glass-border));
+  }
+  .bg-map-glass-chip {
+    background-color: rgb(var(--map-glass-chip));
+  }
+  .hover\:bg-map-glass-hover:hover {
+    background-color: rgb(var(--map-glass-hover));
+  }
+  .active\:bg-map-glass-hover:active {
+    background-color: rgb(var(--map-glass-hover));
+  }
+  .bg-map-ink-subtle {
+    background-color: rgb(var(--map-ink-subtle));
+  }
+  .bg-map-ink-faint {
+    background-color: rgb(var(--map-ink-faint));
+  }
+  .border-map-ink-subtle {
+    border-color: rgb(var(--map-ink-subtle));
+  }
+  .ring-map-ink-subtle {
+    --tw-ring-color: rgb(var(--map-ink-subtle));
+  }
+  .hover\:bg-map-ink-subtle:hover {
+    background-color: rgb(var(--map-ink-subtle));
+  }
+  .hover\:bg-map-ink-faint:hover {
+    background-color: rgb(var(--map-ink-faint));
+  }
+  .bg-map-search-fill {
+    background-color: rgb(var(--map-search-fill));
+  }
+  .focus\:bg-map-search-focus:focus {
+    background-color: rgb(var(--map-search-focus));
+  }
+  .bg-map-handle {
+    background-color: rgb(var(--map-handle));
+  }
+  .group:hover .group-hover\:bg-map-handle-hover {
+    background-color: rgb(var(--map-handle-hover));
+  }
+  .text-map-danger {
+    color: rgb(var(--map-danger-fg));
+  }
+  .bg-map-danger {
+    background-color: rgb(var(--map-danger-bg));
+  }
+  .border-map-danger {
+    border-color: rgb(var(--map-danger-border));
+  }
+  .hover\:bg-map-danger-hover:hover {
+    background-color: rgb(var(--map-danger-hover));
+  }
+  .bg-map-rail-active {
+    background-color: rgb(var(--map-rail-active-bg));
+  }
+  .border-map-rail-active {
+    border-color: rgb(var(--map-rail-active-border));
+  }
+  .ring-map-rail-active {
+    --tw-ring-color: rgb(var(--map-rail-active-ring));
+  }
+  .text-map-rail-active {
+    color: rgb(var(--map-rail-active-fg));
+  }
+  .ring-map-danger {
+    --tw-ring-color: rgb(var(--map-danger-border));
+  }
+}

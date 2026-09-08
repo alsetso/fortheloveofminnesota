@@ -1,0 +1,17 @@
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:3002",
+      "http://127.0.0.1:3002",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+      "https://ios2026.fortheloveofminnesota.com",
+      "https://i-os-2-ftlomn.vercel.app",
+      "https://i-os-2-ftlomn-alset-solutions.vercel.app"
+    ],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["Content-Type", "Cache-Control"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]

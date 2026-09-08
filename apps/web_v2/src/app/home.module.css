@@ -1,0 +1,51 @@
+.page {
+  height: 100dvh;
+  overflow-y: auto;
+  background: #f5f0e8;
+  color: #203c33;
+  color-scheme: light;
+}
+
+.container { max-width: 1160px; margin: 0 auto; padding: 0 36px; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 28px 0; }
+.brand { display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 650; }
+.brand img { object-fit: contain; }
+.signIn { font-size: 14px; font-weight: 600; white-space: nowrap; padding: 12px 18px; border: 1px solid #c9cfc3; border-radius: 999px; }
+.hero { display: grid; grid-template-columns: 1.15fr 1fr; gap: 64px; align-items: center; padding: 34px 0 64px; }
+.eyebrow, .number { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; font-weight: 600; }
+.eyebrow { margin-bottom: 24px; }
+.intro h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(52px, 6vw, 82px); font-weight: 400; letter-spacing: -0.055em; line-height: 1.04; }
+.description { max-width: 400px; margin-top: 26px; font-size: 16px; line-height: 1.8; color: #56665b; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; margin-top: 30px; font-size: 14px; font-weight: 600; }
+.primary { display: inline-flex; align-items: center; gap: 22px; background: #203c33; color: #fffdf8; padding: 15px 23px; border-radius: 999px; }
+.secondary { padding: 12px 0; }
+.secondary span { margin-left: 8px; }
+.note { margin-top: 18px; color: #637163; font-size: 12px; line-height: 1.6; }
+.photo { position: relative; min-height: 470px; border-radius: 160px 160px 16px 16px; overflow: hidden; background: #7f9368; }
+.photoImage { object-fit: cover; object-position: center 43%; }
+.caption { position: absolute; bottom: 0; left: 0; right: 0; padding: 60px 24px 24px; color: white; font-size: 14px; background: linear-gradient(transparent, #102a1ac9); }
+.about { border-top: 1px solid #d8dbcf; padding: 38px 0 48px; scroll-margin-top: 24px; }
+.about h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 30px; letter-spacing: -0.025em; }
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 38px; margin-top: 30px; }
+.number { color: #6a7667; }
+.features h3 { margin-top: 12px; font-size: 17px; font-weight: 600; }
+.features p { margin-top: 10px; font-size: 14px; line-height: 1.75; color: #56665b; }
+.footer { border-top: 1px solid #d8dbcf; padding: 24px 0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 20px; font-size: 12px; color: #56665b; }
+.footer nav { display: flex; flex-wrap: wrap; gap: 20px; }
+.page a:focus-visible { outline: 3px solid #2a6f8f; outline-offset: 5px; border-radius: 4px; }
+.signIn:hover, .secondary:hover, .footer a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.primary:hover { background: #315446; }
+
+@media (max-width: 700px) {
+  .container { padding: 0 22px; }
+  .header { padding: 20px 0; }
+  .brand { font-size: 12px; gap: 8px; max-width: 210px; }
+  .brand img { width: 32px; height: 32px; }
+  .signIn { padding: 10px 14px; font-size: 12px; }
+  .hero { grid-template-columns: 1fr; gap: 32px; padding: 32px 0 36px; }
+  .intro h1 { font-size: 64px; }
+  .description { max-width: 480px; }
+  .photo { min-height: 340px; border-radius: 100px 100px 12px 12px; }
+  .features { grid-template-columns: 1fr; gap: 28px; }
+  .about { padding: 30px 0 36px; }
+}
